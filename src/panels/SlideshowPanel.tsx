@@ -1,0 +1,209 @@
+import { FolderOpen, FolderX, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square } from 'lucide-react'
+import { useRef } from 'react'
+import { useAppState } from '../AppState'
+
+const minSlideshowInterval = 250
+const maxSlideshowInterval = 5000
+const maxSpeed = 20
+
+export function SlideshowPanel() {
+  const { slideshow } = useAppState()
+  const firstImage = slideshow.images[0]
+  const currentImage = slideshow.images[slideshow.settings.currentIndex]
+  const folderInputRef = useRef<HTMLInputElement | null>(null)
+  const speedValue = intervalToSpeed(slideshow.settings.intervalMs)
+  const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
+
+  async function chooseFolder() {
+    if (window.showDirectoryPicker) {
+      const selected = await slideshow.selectFolder()
+      if (selected) return
+    }
+
+    folderInputRef.current?.click()
+  }
+
+  function stopCanvasEvent(event: React.SyntheticEvent) {
+    ;(event as unknown as { isKilled?: boolean }).isKilled = true
+    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
+    event.stopPropagation()
+  }
+
+  return (
+    <section className="panel panel-slideshow-surface">
+      <header className="card-header">
+        <div>
+          <h2 className="card-title">Images</h2>
+        </div>
+        <div className="card-header-actions">
+          <button className="card-icon-button" type="button" title="Select folder" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}>
+            <FolderOpen size={18} />
+          </button>
+          <button
+            className="card-icon-button"
+            type="button"
+            title="Reset selected folder"
+            onPointerDown={stopCanvasEvent}
+            onClick={() => void slideshow.resetFolder()}
+          >
+            <FolderX size={18} />
+          </button>
+        </div>
+        <input
+          ref={folderInputRef}
+          className="visually-hidden-file-input"
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          // Chromium supports directory upload through these non-standard attributes.
+          webkitdirectory=""
+          directory=""
+          onChange={(event) => {
+            const files = event.target.files
+            if (files?.length) void slideshow.importFiles(files)
+            event.currentTarget.value = ''
+          }}
+        />
+      </header>
+
+      <div className="slideshow-stage card-content" style={{ aspectRatio: stageAspectRatio }}>
+        {currentImage ? (
+          <img
+            key={currentImage.url}
+            src={currentImage.url}
+            alt={currentImage.name}
+            draggable={false}
+            onDragStart={(event) => {
+              event.preventDefault()
+              stopCanvasEvent(event)
+            }}
+            onPointerDown={stopCanvasEvent}
+            style={{
+              transform: `scale(${slideshow.settings.zoom})`,
+              transitionDuration: `${slideshow.settings.transitionMs}ms`,
+            }}
+          />
+        ) : (
+          <div className="empty-stage">
+            <button
+              className="empty-stage-button"
+              type="button"
+              onPointerDown={stopCanvasEvent}
+              onClick={() => void chooseFolder()}
+              title="Select image folder"
+            >
+              <FolderOpen size={34} />
+            </button>
+            <p>{slideshow.status}</p>
+          </div>
+        )}
+      </div>
+
+      <div
+        className="panel-body panel-interactive slideshow-controls"
+        onPointerDown={stopCanvasEvent}
+        onMouseDown={stopCanvasEvent}
+        onClick={stopCanvasEvent}
+        onDragStart={(event) => event.preventDefault()}
+      >
+        <div className="transport-row">
+          <button className="card-icon-button" type="button" title="Previous image" onClick={slideshow.previous}>
+            <SkipBack size={18} />
+          </button>
+          <button
+            className="card-icon-button is-primary is-large"
+            type="button"
+            title="Start or pause"
+            onClick={() => slideshow.setIsPlaying(!slideshow.isPlaying)}
+          >
+            {slideshow.isPlaying ? <Pause size={20} /> : <Play size={20} />}
+          </button>
+          <button className="card-icon-button" type="button" title="Next image" onClick={slideshow.next}>
+            <SkipForward size={18} />
+          </button>
+          <button className="card-icon-button" type="button" title="Stop" onClick={slideshow.stop}>
+            <Square size={16} />
+          </button>
+        </div>
+
+        <div className="range-grid">
+          <label>
+            <span>Speed</span>
+            <input
+              type="range"
+              min={1}
+              max={maxSpeed}
+              step={1}
+              value={speedValue}
+              onChange={(event) => slideshow.updateSettings({ intervalMs: speedToInterval(Number(event.target.value)) })}
+            />
+          </label>
+          <label>
+            <span>Fade</span>
+            <input
+              type="range"
+              min={0}
+              max={2000}
+              step={50}
+              value={slideshow.settings.transitionMs}
+              onChange={(event) => slideshow.updateSettings({ transitionMs: Number(event.target.value) })}
+            />
+          </label>
+        </div>
+
+        <div className="zoom-row">
+          <label>
+            <span>Zoom</span>
+            <input
+              type="range"
+              min={0.5}
+              max={2.4}
+              step={0.05}
+              value={slideshow.settings.zoom}
+              onChange={(event) => slideshow.updateSettings({ zoom: Number(event.target.value) })}
+            />
+          </label>
+          <span className="zoom-readout">{Math.round(slideshow.settings.zoom * 100)}%</span>
+          <button className="card-icon-button" type="button" title="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: 1 })}>
+            <RotateCcw size={17} />
+          </button>
+        </div>
+      </div>
+
+      <footer
+        className="card-footer panel-interactive"
+        onPointerDown={stopCanvasEvent}
+        onMouseDown={stopCanvasEvent}
+        onClick={stopCanvasEvent}
+      >
+        <span className="card-footer-meta">{currentImage?.name ?? slideshow.status}</span>
+        <div className="card-footer-status">
+          {slideshow.error ? (
+            <span className="error-text">{slideshow.error}</span>
+          ) : (
+            <span>{slideshow.images.length ? `${slideshow.settings.currentIndex + 1} / ${slideshow.images.length}` : '0 / 0'}</span>
+          )}
+          <button
+            className={`card-icon-button card-footer-button ${slideshow.settings.shuffle ? 'is-active' : ''}`}
+            type="button"
+            title="Shuffle"
+            onClick={() => slideshow.updateSettings({ shuffle: !slideshow.settings.shuffle })}
+          >
+            <Shuffle size={14} />
+          </button>
+        </div>
+      </footer>
+    </section>
+  )
+}
+
+function speedToInterval(speed: number) {
+  const normalized = (Math.max(1, Math.min(maxSpeed, speed)) - 1) / (maxSpeed - 1)
+  return Math.round(maxSlideshowInterval - normalized * (maxSlideshowInterval - minSlideshowInterval))
+}
+
+function intervalToSpeed(intervalMs: number) {
+  const clamped = Math.max(minSlideshowInterval, Math.min(maxSlideshowInterval, intervalMs))
+  const normalized = (maxSlideshowInterval - clamped) / (maxSlideshowInterval - minSlideshowInterval)
+  return Math.round(normalized * (maxSpeed - 1) + 1)
+}

@@ -1,0 +1,265 @@
+:root {
+  color-scheme: dark;
+  font-family: var(--font-family-ui);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+
+  --color-canvas: #101114;
+  --color-text: #f5f3ee;
+  --color-text-muted: rgba(245, 243, 238, 0.64);
+  --color-text-soft: rgba(245, 243, 238, 0.8);
+  --color-danger: #ffb4a9;
+  --color-panel-border: rgba(255, 255, 255, 0.16);
+  --color-control: rgba(255, 255, 255, 0.1);
+  --color-control-border: rgba(255, 255, 255, 0.14);
+  --color-control-border-hover: rgba(255, 255, 255, 0.25);
+  --color-input-bg: rgba(0, 0, 0, 0.24);
+  --color-note-control-bg: rgba(7, 13, 14, 0.94);
+  --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
+  --color-focus-ring: rgba(255, 255, 255, 0.46);
+  --color-panel-divider: rgba(255, 255, 255, 0.1);
+  --color-panel-frame: rgba(255, 255, 255, 0.11);
+  --color-card-bg: rgba(0, 0, 0, 0.18);
+  --color-card-bg-hover: rgba(255, 255, 255, 0.11);
+  --color-empty-control: rgba(255, 255, 255, 0.09);
+  --color-empty-control-hover: rgba(255, 255, 255, 0.15);
+  --color-album-empty: rgba(255, 255, 255, 0.08);
+  --color-album-empty-highlight: rgba(255, 255, 255, 0.16);
+  --color-app-badge-border: rgba(255, 255, 255, 0.12);
+  --color-app-badge-text: #f6f2ea;
+  --color-toast-border: rgba(255, 255, 255, 0.15);
+  --color-toast-text: #f8f4ef;
+  --color-input-text: #fffaf2;
+  --color-note-title: #fff8ee;
+  --color-editor-border: rgba(255, 255, 255, 0.12);
+  --color-editor-bg: rgba(12, 23, 22, 0.78);
+
+  --background-app:
+    radial-gradient(circle at 25% 20%, rgba(55, 79, 92, 0.26), transparent 32%),
+    radial-gradient(circle at 80% 12%, rgba(117, 85, 62, 0.2), transparent 27%),
+    linear-gradient(135deg, #101114 0%, #181715 54%, #12151a 100%);
+  --background-canvas-grid:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  --background-album-empty:
+    linear-gradient(135deg, var(--color-album-empty-highlight), transparent),
+    var(--color-album-empty);
+  --background-app-badge: rgba(12, 13, 15, 0.68);
+  --background-tldraw-controls: rgba(12, 13, 15, 0.64);
+  --background-toast: rgba(14, 15, 18, 0.92);
+
+  --shadow-panel: 0 26px 70px rgba(0, 0, 0, 0.34);
+  --shadow-app-badge: 0 14px 34px rgba(0, 0, 0, 0.28);
+  --shadow-album-art: 0 14px 32px rgba(0, 0, 0, 0.35);
+  --shadow-tldraw-controls: 0 14px 34px rgba(0, 0, 0, 0.24);
+
+  --blur-app-badge: blur(18px);
+  --blur-panel: blur(20px);
+  --blur-tldraw-controls: blur(18px);
+
+  --font-size-panel-body: 13px;
+  --font-size-panel-label: 12px;
+  --font-size-app-badge-title: 13px;
+  --font-size-app-badge-meta: 12px;
+  --font-size-spotify-login-title: 22px;
+  --font-size-track-title: 19px;
+  --font-size-track-meta: 13px;
+  --font-size-progress: 12px;
+  --font-size-playlist-title: 13px;
+  --font-size-playlist-meta: 12px;
+  --font-size-note-title: 20px;
+  --font-size-code-editor: 13px;
+  --font-size-notes-panel-title: 24px;
+  --font-size-notes-control-label: 16px;
+  --font-size-notes-control: 18px;
+  --font-size-notes-selector: 16px;
+  --font-size-notes-footer: 14px;
+  --font-size-notes-editor: 24px;
+  --font-size-notes-code-editor: 22px;
+  --font-size-notes-toolbar: 17px;
+  --font-size-notes-heading-1: 46px;
+  --font-size-notes-heading-2: 37px;
+  --font-size-notes-heading-3: 30px;
+
+  --font-family-ui:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-code: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --font-weight-control: 700;
+  --font-weight-track-title: 750;
+  --font-weight-note-title: 720;
+
+  --line-height-tight: 1;
+  --line-height-panel-title: 1.1;
+  --line-height-body: 1.45;
+  --line-height-track-title: 1.15;
+  --line-height-track-meta: 1.35;
+  --line-height-code: 1.55;
+
+  --space-panel-header-gap: 12px;
+  --space-panel-body-x: 16px;
+  --space-panel-body-top: 14px;
+  --space-panel-body-bottom: 16px;
+  --space-control-gap: 10px;
+  --space-control-inner-gap: 8px;
+  --space-app-badge-left: 8px;
+  --space-app-badge-top: 8px;
+  --space-app-badge-gap: 12px;
+  --space-app-badge-padding-y: 10px;
+  --space-app-badge-padding-x: 12px;
+  --space-tldraw-controls-top: 8px;
+  --space-tldraw-controls-right: 8px;
+  --space-tldraw-controls-gap: 6px;
+  --space-tldraw-controls-padding-block: 6px;
+  --space-tldraw-controls-padding-inline: 14px;
+  --space-toast-top: 22px;
+  --space-toast-padding-y: 12px;
+  --space-toast-padding-x: 14px;
+  --space-input-row-top: 10px;
+  --space-row-gap: 10px;
+  --space-row-bottom: 12px;
+  --space-spotify-login-gap: 18px;
+  --space-spotify-title-bottom: 8px;
+  --space-now-playing-gap: 14px;
+  --space-now-playing-bottom: 14px;
+  --space-track-title-bottom: 7px;
+  --space-playlist-gap: 8px;
+  --space-playlist-top: 12px;
+  --space-playlist-padding: 8px;
+  --space-playlist-padding-inline-end: 2px;
+  --space-playlist-image-gap: 10px;
+  --space-playlist-meta-top: 4px;
+  --space-empty-stage-gap: 12px;
+  --space-slideshow-controls-top: 14px;
+  --space-range-label-gap: 10px;
+  --space-range-bottom: 16px;
+  --space-zoom-bottom: 14px;
+  --space-error-top: 8px;
+  --space-notes-gap: 12px;
+  --space-note-kicker-title-gap: 10px;
+  --space-notes-toolbar-gap: 6px;
+
+  --size-play-button: 46px;
+  --size-primary-button-min: 118px;
+  --size-primary-button-padding-x: 15px;
+  --size-input-height: 38px;
+  --size-input-padding-x: 12px;
+  --size-volume-min: 110px;
+  --size-album-art: 92px;
+  --size-album-frame-max: 220px;
+  --size-playlist-list-max-height: 176px;
+  --size-playlist-art: 42px;
+  --size-note-title-height: 30px;
+  --size-note-title-max-width: 290px;
+  --size-empty-file-input: 1px;
+  --size-empty-stage-copy-max: 260px;
+  --size-empty-stage-button: 74px;
+  --size-zoom-readout-min: 44px;
+  --size-toast-max-width: 520px;
+  --size-toast-viewport-inset: 40px;
+  --size-grid: 48px;
+  --size-tldraw-control-button: 34px;
+  --size-tldraw-controls-max-width: calc(100vw - 32px);
+  --size-tldraw-page-selector-width: 148px;
+  --z-app-badge: 5;
+  --z-tldraw-controls: 6;
+  --z-toast: 10;
+
+  --radius-control: 12px;
+  --radius-panel: 22px;
+  --radius-pill: 999px;
+  --radius-tldraw-controls: 999px;
+  --radius-toast: 12px;
+  --radius-album-art: 14px;
+  --radius-playlist-card: 12px;
+  --radius-playlist-art: 9px;
+  --radius-empty-stage-button: 18px;
+  --radius-editor: 14px;
+
+  --border-width-hairline: 1px;
+  --opacity-disabled: 0.45;
+  --transition-fast: 150ms ease;
+  --motion-reduced-duration: 1ms;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --active-control-translate-y: 1px;
+  --range-accent: #f5eee0;
+
+  --image-panel-label-size: clamp(18px, 2.4cqi, 28px);
+  --image-panel-status-size: clamp(18px, 2.4cqi, 28px);
+  --image-panel-control-x: clamp(16px, 2.8cqi, 32px);
+  --image-panel-control-bottom: clamp(16px, 2.8cqi, 30px);
+  --image-panel-control-gap: clamp(14px, 2.3cqi, 28px);
+  --image-panel-stage-inset: clamp(1px, 0.4cqi, 5px);
+  --image-panel-zoom-readout-width: 58px;
+  --image-panel-zoom-button-width: 54px;
+  --image-panel-zoom-label-width: 56px;
+
+  /*
+   * Card shell — single source of truth for the Media / Spotify / Notes
+   * canvas cards. Shared shell tokens are identical across all three; only
+   * --accent and --bg (set per card below) should differ. New cards adopt
+   * the shell by pairing these tokens with the .card-* classes in
+   * styles.css instead of duplicating header/footer/button rules.
+   */
+  --card-radius: 20px;
+  --content-radius: 12px;
+  --button-radius: 8px;
+  --card-border: 0.5px solid rgba(255, 255, 255, 0.09);
+  --card-padding: 20px;
+
+  --card-eyebrow-size: 11px;
+  --card-eyebrow-tracking: 1.5px;
+  --card-eyebrow-weight: 700;
+  --card-title-size: 20px;
+  --card-title-weight: 500;
+  --card-title-color: rgba(255, 255, 255, 0.94);
+  --card-header-button-size: 32px;
+
+  --card-footer-meta-size: 11px;
+  --card-footer-meta-color: rgba(255, 255, 255, 0.32);
+  --card-footer-button-size: 26px;
+
+  --card-button-bg: rgba(255, 255, 255, 0.04);
+  --card-button-border: rgba(255, 255, 255, 0.1);
+  --card-button-icon-color: rgba(255, 255, 255, 0.58);
+  --card-button-bg-hover: rgba(255, 255, 255, 0.08);
+  --card-button-active-bg: rgba(255, 255, 255, 0.12);
+  --card-button-active-border: rgba(255, 255, 255, 0.18);
+  --card-button-active-icon: rgba(255, 255, 255, 0.75);
+}
+
+/*
+ * Derived tokens must be declared on the same element that sets --accent/--bg
+ * (the .panel-* identity rules below), not at :root: a custom property's
+ * var() references resolve against the element where the property itself is
+ * declared, so a :root declaration referencing --accent would resolve before
+ * any card-specific --accent exists and inherit down as invalid.
+ */
+.panel {
+  --card-eyebrow-color: color-mix(in srgb, var(--accent) 50%, rgba(255, 255, 255, 0.5));
+  --card-content-bg: color-mix(in srgb, var(--accent) 7%, transparent);
+  --card-primary-bg: color-mix(in srgb, var(--accent) 20%, transparent);
+  --card-primary-border: color-mix(in srgb, var(--accent) 45%, transparent);
+  --card-primary-icon: color-mix(in srgb, var(--accent) 85%, white);
+  --card-bg-gradient: linear-gradient(160deg, color-mix(in srgb, var(--accent) 28%, transparent), var(--bg) 62%), var(--bg);
+}
+
+/* Per-card identity — the only tokens each card should need to define. */
+.panel-slideshow-surface {
+  --accent: #7f77dd;
+  --bg: #16121f;
+}
+
+.panel-spotify-surface {
+  --accent: #1db954;
+  --bg: #0e1712;
+}
+
+.panel-notes-surface {
+  --accent: #8fb7a2;
+  --bg: #101918;
+}
