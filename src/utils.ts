@@ -1,10 +1,38 @@
-export function debounce<T extends (...args: never[]) => void>(fn: T, delayMs: number) {
-  let timeoutId: number | undefined
+export interface DebouncedFunction<T extends (...args: never[]) => void> {
+  (...args: Parameters<T>): void
+  flush(): void
+  cancel(): void
+}
 
-  return (...args: Parameters<T>) => {
-    window.clearTimeout(timeoutId)
-    timeoutId = window.setTimeout(() => fn(...args), delayMs)
+export function debounce<T extends (...args: never[]) => void>(fn: T, delayMs: number): DebouncedFunction<T> {
+  let timeoutId: number | undefined
+  let pendingArgs: Parameters<T> | undefined
+
+  const invoke = () => {
+    timeoutId = undefined
+    const args = pendingArgs
+    pendingArgs = undefined
+    if (args) fn(...args)
   }
+
+  const debounced = ((...args: Parameters<T>) => {
+    pendingArgs = args
+    window.clearTimeout(timeoutId)
+    timeoutId = window.setTimeout(invoke, delayMs)
+  }) as DebouncedFunction<T>
+
+  debounced.flush = () => {
+    if (timeoutId === undefined) return
+    window.clearTimeout(timeoutId)
+    invoke()
+  }
+  debounced.cancel = () => {
+    window.clearTimeout(timeoutId)
+    timeoutId = undefined
+    pendingArgs = undefined
+  }
+
+  return debounced
 }
 
 export function clamp(value: number, min: number, max: number) {

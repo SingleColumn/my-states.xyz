@@ -15,7 +15,8 @@ import { formatDuration } from '../utils'
 
 export function SpotifyPanel() {
   const { spotify } = useAppState()
-  const [query, setQuery] = useState(spotify.playlist.lastSearch)
+  const [query, setQuery] = useState('')
+  const [searchType, setSearchType] = useState<'tracks' | 'playlists'>('tracks')
   const [playlistUrl, setPlaylistUrl] = useState(spotify.playlist.url ?? '')
   const [volume, setVolume] = useState(70)
   const [busy, setBusy] = useState(false)
@@ -132,11 +133,15 @@ export function SpotifyPanel() {
               className="input-row"
               onSubmit={(event) => {
                 event.preventDefault()
-                void run(() => spotify.searchPlaylists(query))
+                void run(() => searchType === 'tracks' ? spotify.searchTracks(query) : spotify.searchPlaylists(query))
               }}
             >
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search playlists" />
-              <button className="card-icon-button" type="submit" title="Search playlists" disabled={busy}>
+              <select aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
+                <option value="tracks">Tracks</option>
+                <option value="playlists">Playlists</option>
+              </select>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchType === 'tracks' ? 'Song - artist' : 'Search playlists'} />
+              <button className="card-icon-button" type="submit" title={`Search ${searchType}`} disabled={busy}>
                 <Search size={18} />
               </button>
             </form>
@@ -154,24 +159,38 @@ export function SpotifyPanel() {
               </button>
             </form>
 
-            <div className="playlist-list">
-              {spotify.playlists.map((playlist) => (
-                <button
-                  className="playlist-option"
-                  type="button"
-                  key={playlist.id}
-                  onClick={() => void run(() => spotify.playPlaylist(playlist))}
-                >
-                  {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
-                  <span>
-                    <strong>{playlist.name}</strong>
-                    <small>
-                      {playlist.owner} - {playlist.trackCount} tracks
-                    </small>
-                  </span>
-                </button>
-              ))}
-            </div>
+            {searchType === 'tracks' ? (
+              <div className="playlist-list" aria-label="Track search results">
+                {spotify.tracks.map((track) => (
+                  <button className="playlist-option" type="button" key={track.id} onClick={() => void run(() => spotify.playTrack(track))}>
+                    {track.image ? <img src={track.image} alt="" /> : <div />}
+                    <span>
+                      <strong>{track.name}</strong>
+                      <small>{track.artists} - {track.album}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="playlist-list" aria-label="Playlist search results">
+                {spotify.playlists.map((playlist) => (
+                  <button
+                    className="playlist-option"
+                    type="button"
+                    key={playlist.id}
+                    onClick={() => void run(() => spotify.playPlaylist(playlist))}
+                  >
+                    {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
+                    <span>
+                      <strong>{playlist.name}</strong>
+                      <small>
+                        {playlist.owner} - {playlist.trackCount} tracks
+                      </small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

@@ -1,5 +1,5 @@
-import { FolderOpen, FolderX, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square } from 'lucide-react'
-import { useRef } from 'react'
+import { FolderOpen, FolderX, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useAppState } from '../AppState'
 
 const minSlideshowInterval = 250
@@ -11,6 +11,7 @@ export function SlideshowPanel() {
   const firstImage = slideshow.images[0]
   const currentImage = slideshow.images[slideshow.settings.currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
   const speedValue = intervalToSpeed(slideshow.settings.intervalMs)
   const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
 
@@ -36,6 +37,18 @@ export function SlideshowPanel() {
           <h2 className="card-title">Images</h2>
         </div>
         <div className="card-header-actions">
+          <button
+            className={`card-icon-button ${isImagePickerOpen ? 'is-active' : ''}`}
+            type="button"
+            title={`${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`}
+            aria-label={`${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`}
+            aria-controls="loaded-images-picker"
+            aria-expanded={isImagePickerOpen}
+            onPointerDown={stopCanvasEvent}
+            onClick={() => setIsImagePickerOpen((current) => !current)}
+          >
+            <Images size={18} />
+          </button>
           <button className="card-icon-button" type="button" title="Select folder" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}>
             <FolderOpen size={18} />
           </button>
@@ -49,6 +62,39 @@ export function SlideshowPanel() {
             <FolderX size={18} />
           </button>
         </div>
+        {isImagePickerOpen ? (
+          <section
+            className="slideshow-image-picker panel-interactive"
+            id="loaded-images-picker"
+            aria-label="Loaded images"
+            onPointerDown={stopCanvasEvent}
+            onClick={stopCanvasEvent}
+          >
+            <div className="slideshow-image-picker-heading">
+              <span>Loaded images</span>
+              <span>{slideshow.images.length ? `${slideshow.images.length} total` : 'None yet'}</span>
+            </div>
+            {slideshow.images.length ? (
+              <div className="slideshow-image-picker-list">
+                {slideshow.images.map((image, index) => (
+                  <button
+                    className={`slideshow-image-thumbnail ${index === slideshow.settings.currentIndex ? 'is-current' : ''}`}
+                    type="button"
+                    key={image.id}
+                    aria-label={`Show ${image.name}`}
+                    aria-pressed={index === slideshow.settings.currentIndex}
+                    title={image.name}
+                    onClick={() => slideshow.updateSettings({ currentIndex: index })}
+                  >
+                    <img src={image.url} alt="" draggable={false} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="slideshow-image-picker-empty">Select a folder to load images.</p>
+            )}
+          </section>
+        ) : null}
         <input
           ref={folderInputRef}
           className="visually-hidden-file-input"

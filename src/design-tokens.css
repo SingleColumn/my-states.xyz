@@ -105,16 +105,20 @@
   --space-panel-body-bottom: 16px;
   --space-control-gap: 10px;
   --space-control-inner-gap: 8px;
-  --space-app-badge-left: 8px;
-  --space-app-badge-top: 8px;
-  --space-app-badge-gap: 12px;
-  --space-app-badge-padding-y: 10px;
-  --space-app-badge-padding-x: 12px;
-  --space-tldraw-controls-top: 8px;
-  --space-tldraw-controls-right: 8px;
-  --space-tldraw-controls-gap: 6px;
-  --space-tldraw-controls-padding-block: 6px;
-  --space-tldraw-controls-padding-inline: 14px;
+  --space-top-toolbar-edge: 4px;
+  --space-top-toolbar-gap: 6px;
+  --space-top-toolbar-padding-block: 4px;
+  --space-top-toolbar-padding-inline: 10px;
+  --space-app-badge-left: var(--space-top-toolbar-edge);
+  --space-app-badge-top: var(--space-top-toolbar-edge);
+  --space-app-badge-gap: var(--space-top-toolbar-gap);
+  --space-app-badge-padding-y: var(--space-top-toolbar-padding-block);
+  --space-app-badge-padding-x: var(--space-top-toolbar-padding-inline);
+  --space-tldraw-controls-top: var(--space-top-toolbar-edge);
+  --space-tldraw-controls-right: var(--space-top-toolbar-edge);
+  --space-tldraw-controls-gap: var(--space-top-toolbar-gap);
+  --space-tldraw-controls-padding-block: var(--space-top-toolbar-padding-block);
+  --space-tldraw-controls-padding-inline: var(--space-top-toolbar-padding-inline);
   --space-toast-top: 22px;
   --space-toast-padding-y: 12px;
   --space-toast-padding-x: 14px;
@@ -161,7 +165,10 @@
   --size-toast-max-width: 520px;
   --size-toast-viewport-inset: 40px;
   --size-grid: 48px;
-  --size-tldraw-control-button: 34px;
+  --size-top-toolbar-height: 40px;
+  --size-top-toolbar-control: 30px;
+  --size-session-selector-width: 220px;
+  --size-tldraw-control-button: var(--size-top-toolbar-control);
   --size-tldraw-controls-max-width: calc(100vw - 32px);
   --size-tldraw-page-selector-width: 148px;
   --z-app-badge: 5;
@@ -171,7 +178,8 @@
   --radius-control: 12px;
   --radius-panel: 22px;
   --radius-pill: 999px;
-  --radius-tldraw-controls: 999px;
+  --radius-top-toolbar: 999px;
+  --radius-tldraw-controls: var(--radius-top-toolbar);
   --radius-toast: 12px;
   --radius-album-art: 14px;
   --radius-playlist-card: 12px;
@@ -240,6 +248,25 @@
  * any card-specific --accent exists and inherit down as invalid.
  */
 .panel {
+  /* Scale the shared UI with its canvas panel, not with the browser viewport. */
+  --font-size-panel-body: clamp(20px, 2.2cqi, 30px);
+  --font-size-panel-label: clamp(18px, 1.9cqi, 25px);
+  --font-size-spotify-login-title: clamp(32px, 3.4cqi, 50px);
+  --font-size-track-title: clamp(30px, 3.8cqi, 56px);
+  --font-size-track-meta: clamp(20px, 2.3cqi, 30px);
+  --font-size-progress: clamp(17px, 1.8cqi, 23px);
+  --font-size-playlist-title: clamp(20px, 2.1cqi, 28px);
+  --font-size-playlist-meta: clamp(17px, 1.8cqi, 23px);
+  --image-panel-label-size: clamp(20px, 2.2cqi, 30px);
+  --image-panel-status-size: clamp(22px, 2.8cqi, 36px);
+  --card-eyebrow-size: clamp(14px, 1.4cqi, 18px);
+  --card-title-size: clamp(28px, 3cqi, 42px);
+  --card-footer-meta-size: clamp(17px, 1.6cqi, 22px);
+  --card-header-button-size: clamp(38px, 3.4cqi, 52px);
+  --card-footer-button-size: clamp(32px, 2.7cqi, 40px);
+  --size-play-button: clamp(56px, 4.8cqi, 72px);
+  --size-input-height: clamp(46px, 3.6cqi, 56px);
+
   --card-eyebrow-color: color-mix(in srgb, var(--accent) 50%, rgba(255, 255, 255, 0.5));
   --card-content-bg: color-mix(in srgb, var(--accent) 7%, transparent);
   --card-primary-bg: color-mix(in srgb, var(--accent) 20%, transparent);
@@ -262,4 +289,15 @@
 .panel-notes-surface {
   --accent: #8fb7a2;
   --bg: #101918;
+  --font-size-notes-panel-title: clamp(28px, 3cqi, 42px);
+  --font-size-notes-control-label: clamp(18px, 1.9cqi, 25px);
+  --font-size-notes-control: clamp(22px, 2.3cqi, 30px);
+  --font-size-notes-selector: clamp(20px, 2.1cqi, 28px);
+  --font-size-notes-footer: clamp(17px, 1.6cqi, 22px);
+  --font-size-notes-editor: clamp(24px, 2.7cqi, 36px);
+  --font-size-notes-code-editor: clamp(22px, 2.3cqi, 32px);
+  --font-size-notes-toolbar: clamp(18px, 1.8cqi, 23px);
+  --font-size-notes-heading-1: clamp(46px, 5cqi, 68px);
+  --font-size-notes-heading-2: clamp(37px, 4.1cqi, 56px);
+  --font-size-notes-heading-3: clamp(30px, 3.4cqi, 46px);
 }

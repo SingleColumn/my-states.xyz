@@ -25,6 +25,17 @@ export interface SpotifyPlaylistSummary {
   trackCount: number
 }
 
+export interface SpotifyTrackSummary {
+  id: string
+  name: string
+  uri: string
+  url: string
+  image: string | null
+  artists: string
+  album: string
+  durationMs: number
+}
+
 function getClientId() {
   return import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() ?? ''
 }
@@ -221,6 +232,19 @@ export interface SpotifyPlaylistApiItem {
   items?: { total?: number } | null
 }
 
+export interface SpotifyTrackApiItem {
+  id: string
+  name: string
+  uri: string
+  external_urls?: { spotify?: string }
+  album?: {
+    name?: string
+    images?: Array<{ url: string }>
+  } | null
+  artists?: Array<{ name?: string }> | null
+  duration_ms?: number
+}
+
 export function mapPlaylist(item: SpotifyPlaylistApiItem): SpotifyPlaylistSummary {
   return {
     id: item.id,
@@ -230,6 +254,19 @@ export function mapPlaylist(item: SpotifyPlaylistApiItem): SpotifyPlaylistSummar
     image: item.images?.[0]?.url ?? null,
     owner: item.owner?.display_name ?? 'Spotify',
     trackCount: item.items?.total ?? item.tracks?.total ?? 0,
+  }
+}
+
+export function mapTrack(item: SpotifyTrackApiItem): SpotifyTrackSummary {
+  return {
+    id: item.id,
+    name: item.name,
+    uri: item.uri,
+    url: item.external_urls?.spotify ?? '',
+    image: item.album?.images?.[0]?.url ?? null,
+    artists: item.artists?.map((artist) => artist.name).filter((name): name is string => Boolean(name)).join(', ') || 'Unknown artist',
+    album: item.album?.name ?? 'Unknown album',
+    durationMs: item.duration_ms ?? 0,
   }
 }
 

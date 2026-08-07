@@ -1,0 +1,141 @@
+import './test/setup'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
+import { describe, expect, it, vi } from 'vitest'
+import { exportSessionArchive, importSessionArchive } from './sessionArchive'
+import {
+  createSession,
+  defaultSlideshowSettings,
+  getNotes,
+  getSession,
+  getSessionAssets,
+  saveNote,
+  saveSession,
+  saveSessionAssets,
+  saveSpotifyTokens,
+  sessionLimits,
+} from './storage'
+
+async function createCompleteArchive() {
+  const session = await createSession('Archive source')
+  const now = Date.now()
+  const note = {
+    id: 'note_source',
+    sessionId: session.id,
+    title: 'Lyrics',
+    content: '# A portable note\n\nSaved without credentials.',
+    createdAt: now,
+    updatedAt: now,
+  }
+  await saveNote(note)
+  await saveSessionAssets(session.id, [
+    makeAsset('image_one', 'cover.png', new Uint8Array([137, 80, 78, 71])),
+    makeAsset('image_two', 'scene.webp', new Uint8Array([82, 73, 70, 70])),
+  ])
+  await saveSession({
+    ...session,
+    activeNoteId: note.id,
+    canvas: {
+      camera: { x: 120, y: -80, z: 1.25 },
+      panels: [{ panelType: 'notes', x: 1, y: 2, w: 300, h: 400 }],
+    },
+    slideshow: { ...defaultSlideshowSettings, intervalMs: 3500, shuffle: true },
+    spotify: {
+      id: 'playlist_123',
+      uri: 'spotify:playlist:playlist_123',
+      name: 'Focus',
+      url: 'https://open.spotify.com/playlist/playlist_123',
+    },
+  })
+  return exportSessionArchive(session.id)
+}
+
+function makeAsset(id: string, filename: string, bytes: Uint8Array) {
+  return {
+    id,
+    filename,
+    name: filename,
+    mimeType: filename.endsWith('.webp') ? 'image/webp' : 'image/png',
+    size: bytes.byteLength,
+    lastModified: 0,
+    width: 1,
+    height: 1,
+    blob: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer]),
+  }
+}
+
+function asFile(blob: Blob) {
+  return blob as File
+}
+
+async function archiveEntries(blob: Blob) {
+  return unzipSync(new Uint8Array(await blob.arrayBuffer()))
+}
+
+function manifest(entries: Record<string, Uint8Array>) {
+  return JSON.parse(strFromU8(entries['manifest.json'])) as {
+    images: Array<{ path: string; mimeType: string }>
+    notes: Array<{ path: string }>
+    spotify: unknown
+  }
+}
+
+describe('portable session archives', () => {
+  it('exports and imports notes, embedded images, canvas state, and a playlist reference without Spotify tokens', async () => {
+    saveSpotifyTokens({ accessToken: 'access-secret', refreshToken: 'refresh-secret', expiresAt: Date.now() + 60_000 })
+    const archive = await createCompleteArchive()
+    const entries = await archiveEntries(archive)
+    const exportedManifest = manifest(entries)
+
+    expect(JSON.stringify(exportedManifest)).not.toContain('access-secret')
+    expect(JSON.stringify(exportedManifest)).not.toContain('refresh-secret')
+    expect(Object.values(entries).map((entry) => strFromU8(entry)).join('')).not.toContain('access-secret')
+
+    const imported = await importSessionArchive(asFile(archive))
+    const [stored, notes, assets] = await Promise.all([
+      getSession(imported.id),
+      getNotes(imported.id),
+      getSessionAssets(imported.id),
+    ])
+
+    expect(stored?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
+    expect(stored?.slideshow).toMatchObject({ intervalMs: 3500, shuffle: true })
+    expect(stored?.spotify).toEqual(exportedManifest.spotify)
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toMatchObject({ title: 'Lyrics', content: '# A portable note\n\nSaved without credentials.' })
+    expect(assets.map((asset) => asset.filename).sort()).toEqual(['cover.png', 'scene.webp'])
+    expect(await assets[0].blob.arrayBuffer()).toBeInstanceOf(ArrayBuffer)
+  })
+
+  it('round-trips a session without notes, images, or a Spotify playlist', async () => {
+    const source = await createSession('Empty archive')
+    const archive = await exportSessionArchive(source.id)
+    const imported = await importSessionArchive(asFile(archive))
+    const [stored, notes, assets] = await Promise.all([getSession(imported.id), getNotes(imported.id), getSessionAssets(imported.id)])
+
+    expect(stored?.spotify).toEqual({ id: null, uri: null, name: null, url: null })
+    expect(notes).toEqual([])
+    expect(assets).toEqual([])
+  })
+
+  it('rejects corrupt, incomplete, unsafe, unsupported, and oversized archives', async () => {
+    const archive = await createCompleteArchive()
+    const entries = await archiveEntries(archive)
+    const sourceManifest = manifest(entries)
+
+    await expect(importSessionArchive(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).rejects.toThrow('manifest.json is not valid JSON')
+    await expect(importSessionArchive(asFile(new Blob([zipSync({ '../manifest.json': strToU8('{}') })])))).rejects.toThrow('unsafe file path')
+
+    const missingImage = { ...entries }
+    delete missingImage[sourceManifest.images[0].path]
+    await expect(importSessionArchive(asFile(new Blob([zipSync(missingImage)])))).rejects.toThrow('missing or duplicate image file')
+
+    const unsupportedImage = { ...entries }
+    const unsupportedManifest = manifest(unsupportedImage)
+    unsupportedManifest.images[0].mimeType = 'image/tiff'
+    unsupportedImage['manifest.json'] = strToU8(JSON.stringify(unsupportedManifest))
+    await expect(importSessionArchive(asFile(new Blob([zipSync(unsupportedImage)])))).rejects.toThrow('invalid image')
+
+    const oversized = { size: sessionLimits.maxArchiveBytes + 1, arrayBuffer: vi.fn() } as unknown as File
+    await expect(importSessionArchive(oversized)).rejects.toThrow('exceeds the 260 MB limit')
+  })
+})

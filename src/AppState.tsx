@@ -1,41 +1,48 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ImageItem,
-  ImageMetadata,
   Note,
+  Session,
+  SessionSummary,
   SlideshowSettings,
-  SpotifyPlaylistState,
+  SpotifyPlaylistReference,
   SpotifyTokens,
   SpotifyTrackState,
 } from './types'
 import {
   clearDirectoryHandle,
-  clearImageMetadata,
+  createSession as createStoredSession,
   defaultSlideshowSettings,
-  defaultSpotifyPlaylistState,
+  defaultSpotifyPlaylistReference,
   deleteNote as deleteStoredNote,
+  deleteSession as deleteStoredSession,
   getDirectoryHandle,
   getNotes,
-  loadLastNoteId,
-  loadSlideshowSettings,
-  loadSpotifyPlaylistState,
-  loadSpotifyTokens,
+  getSession,
+  getSessionAssets,
+  getSessionSummaries,
+  initializeSessions,
+  replaceSessionAssets,
   saveDirectoryHandle,
-  saveImageMetadata,
-  saveLastNoteId,
   saveNote,
-  saveSlideshowSettings,
-  saveSpotifyPlaylistState,
+  saveSession,
   saveSpotifyTokens,
+  setActiveSessionId,
+  sessionLimits,
+  loadSpotifyTokens,
 } from './storage'
+import { downloadSessionArchive, exportSessionArchive, importSessionArchive } from './sessionArchive'
 import { createId } from './utils'
 import {
   exchangeSpotifyCode,
   mapPlaylist,
+  mapTrack,
   parseSpotifyPlaylistUrl,
   refreshSpotifyToken,
   SpotifyPlaylistApiItem,
   SpotifyPlaylistSummary,
+  SpotifyTrackApiItem,
+  SpotifyTrackSummary,
   spotifyFetch,
   startSpotifyLogin,
 } from './spotify'
@@ -50,6 +57,7 @@ interface NotesState {
   createNote(): Promise<void>
   selectNote(id: string): void
   deleteNote(id: string): Promise<void>
+  flush(): Promise<void>
 }
 
 interface SlideshowState {
@@ -71,8 +79,9 @@ interface SlideshowState {
 
 interface SpotifyState {
   tokens: SpotifyTokens | null
-  playlist: SpotifyPlaylistState
+  playlist: SpotifyPlaylistReference
   playlists: SpotifyPlaylistSummary[]
+  tracks: SpotifyTrackSummary[]
   track: SpotifyTrackState | null
   deviceId: string | null
   isReady: boolean
@@ -82,8 +91,10 @@ interface SpotifyState {
   logout(): void
   handleCallback(code: string, state: string | null): Promise<void>
   searchPlaylists(query: string): Promise<void>
+  searchTracks(query: string): Promise<void>
   loadPlaylistFromUrl(url: string): Promise<void>
   playPlaylist(summary?: SpotifyPlaylistSummary): Promise<void>
+  playTrack(summary: SpotifyTrackSummary): Promise<void>
   togglePlay(): Promise<void>
   previousTrack(): Promise<void>
   nextTrack(): Promise<void>
@@ -91,7 +102,23 @@ interface SpotifyState {
   seek(positionMs: number): Promise<void>
 }
 
+interface SessionsState {
+  isReady: boolean
+  sessions: SessionSummary[]
+  activeSession: Session | null
+  error: string | null
+  create(name: string): Promise<void>
+  open(sessionId: string): Promise<void>
+  rename(name: string): Promise<void>
+  remove(sessionId: string): Promise<void>
+  exportActive(): Promise<void>
+  importFile(file: File): Promise<void>
+  updateCanvas(canvas: Session['canvas']): void
+  registerCanvasFlush(flush: () => void | Promise<void>): () => void
+}
+
 interface AppStateValue {
+  sessions: SessionsState
   notes: NotesState
   slideshow: SlideshowState
   spotify: SpotifyState
@@ -100,11 +127,53 @@ interface AppStateValue {
 const AppStateContext = createContext<AppStateValue | null>(null)
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const notes = useNotesState()
-  const slideshow = useSlideshowState()
-  const spotify = useSpotifyState()
+  const sessionCore = useSessionState()
+  const notes = useNotesState(sessionCore.activeSession, sessionCore.patchActiveSession)
+  const slideshow = useSlideshowState(sessionCore.activeSession, sessionCore.patchActiveSession)
+  const spotify = useSpotifyState(sessionCore.activeSession, sessionCore.patchActiveSession)
 
-  const value = useMemo(() => ({ notes, slideshow, spotify }), [notes, slideshow, spotify])
+  const sessions = useMemo<SessionsState>(
+    () => ({
+      isReady: sessionCore.isReady,
+      sessions: sessionCore.sessions,
+      activeSession: sessionCore.activeSession,
+      error: sessionCore.error,
+      create: async (name) => {
+        await notes.flush()
+        await sessionCore.flush()
+        await sessionCore.create(name)
+      },
+      open: async (sessionId) => {
+        await notes.flush()
+        await sessionCore.flush()
+        await sessionCore.open(sessionId)
+      },
+      rename: sessionCore.rename,
+      remove: async (sessionId) => {
+        await notes.flush()
+        await sessionCore.flush()
+        await sessionCore.remove(sessionId)
+      },
+      exportActive: async () => {
+        await notes.flush()
+        if (!sessionCore.activeSession) throw new Error('No session is open.')
+        await sessionCore.flush()
+        const blob = await exportSessionArchive(sessionCore.activeSession.id)
+        downloadSessionArchive(blob, sessionCore.activeSession.name)
+      },
+      importFile: async (file) => {
+        await notes.flush()
+        await sessionCore.flush()
+        const imported = await importSessionArchive(file)
+        await sessionCore.open(imported.id)
+      },
+      updateCanvas: sessionCore.updateCanvas,
+      registerCanvasFlush: sessionCore.registerCanvasFlush,
+    }),
+    [notes, sessionCore],
+  )
+
+  const value = useMemo(() => ({ sessions, notes, slideshow, spotify }), [sessions, notes, slideshow, spotify])
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
 }
@@ -115,329 +184,428 @@ export function useAppState() {
   return value
 }
 
-function useNotesState(): NotesState {
-  const [notes, setNotes] = useState<Note[]>([])
-  const [activeNote, setActiveNote] = useState<Note | null>(null)
-  const saveTimerRef = useRef<number | null>(null)
+function useSessionState() {
+  const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [activeSession, setActiveSession] = useState<Session | null>(null)
+  const [isReady, setIsReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const activeSessionRef = useRef<Session | null>(null)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const canvasFlushRef = useRef<(() => void | Promise<void>) | null>(null)
+
+  const refreshSummaries = useCallback(async () => {
+    setSessions(await getSessionSummaries())
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-
     async function load() {
-      const storedNotes = await getNotes()
-      if (cancelled) return
-
-      setNotes(storedNotes)
-      const lastNoteId = loadLastNoteId()
-      const selected = storedNotes.find((note) => note.id === lastNoteId) ?? storedNotes[0] ?? null
-      setActiveNote(selected)
+      try {
+        const initial = await initializeSessions()
+        const session = await getSession(initial.activeSessionId)
+        if (cancelled || !session) return
+        activeSessionRef.current = session
+        setActiveSession(session)
+        setSessions((await getSessionSummaries()).map((item) => item))
+        setError(null)
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load local sessions.')
+      } finally {
+        if (!cancelled) setIsReady(true)
+      }
     }
-
     void load()
-
     return () => {
       cancelled = true
     }
   }, [])
 
-  useEffect(() => {
-    if (!activeNote) return
+  const persist = useCallback(async (session: Session) => {
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      const saved = await saveSession(session)
+      if (activeSessionRef.current?.id === saved.id) {
+        activeSessionRef.current = saved
+        setActiveSession(saved)
+      }
+    })
+    await saveQueueRef.current
+    await refreshSummaries()
+  }, [refreshSummaries])
 
+  const patchActiveSession = useCallback(
+    (patch: (current: Session) => Session) => {
+      const current = activeSessionRef.current
+      if (!current) return
+      const next = patch(current)
+      activeSessionRef.current = next
+      setActiveSession(next)
+      void persist(next).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the session.'))
+    },
+    [persist],
+  )
+
+  const registerCanvasFlush = useCallback((flush: () => void | Promise<void>) => {
+    canvasFlushRef.current = flush
+    return () => {
+      if (canvasFlushRef.current === flush) canvasFlushRef.current = null
+    }
+  }, [])
+
+  const flush = useCallback(async () => {
+    await canvasFlushRef.current?.()
+    await saveQueueRef.current
+  }, [])
+
+  const open = useCallback(async (sessionId: string) => {
+    await flush()
+    const session = await getSession(sessionId)
+    if (!session) throw new Error('The requested session no longer exists.')
+    await setActiveSessionId(sessionId)
+    activeSessionRef.current = session
+    setActiveSession(session)
+    setError(null)
+  }, [flush])
+
+  const create = useCallback(async (name: string) => {
+    const session = await createStoredSession(name)
+    await refreshSummaries()
+    await open(session.id)
+  }, [open, refreshSummaries])
+
+  const rename = useCallback(async (name: string) => {
+    const current = activeSessionRef.current
+    if (!current) return
+    const next = await saveSession({ ...current, name })
+    activeSessionRef.current = next
+    setActiveSession(next)
+    await refreshSummaries()
+  }, [refreshSummaries])
+
+  const remove = useCallback(async (sessionId: string) => {
+    const removingActive = activeSessionRef.current?.id === sessionId
+    await deleteStoredSession(sessionId)
+    const remaining = await getSessionSummaries()
+    setSessions(remaining)
+    if (!removingActive) return
+
+    if (remaining[0]) {
+      await open(remaining[0].id)
+      return
+    }
+
+    const replacement = await createStoredSession('My first session')
+    setSessions(await getSessionSummaries())
+    await open(replacement.id)
+  }, [open])
+
+  const updateCanvas = useCallback((canvas: Session['canvas']) => {
+    patchActiveSession((current) => ({ ...current, canvas }))
+  }, [patchActiveSession])
+
+  return {
+    isReady,
+    sessions,
+    activeSession,
+    error,
+    create,
+    open,
+    rename,
+    remove,
+    updateCanvas,
+    patchActiveSession,
+    registerCanvasFlush,
+    flush,
+  }
+}
+
+function useNotesState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): NotesState {
+  const [notes, setNotes] = useState<Note[]>([])
+  const [activeNote, setActiveNote] = useState<Note | null>(null)
+  const activeNoteRef = useRef<Note | null>(null)
+  const dirtyRef = useRef(false)
+  const saveTimerRef = useRef<number | null>(null)
+
+  const persistActiveNote = useCallback(async () => {
+    const note = activeNoteRef.current
+    if (!note || !dirtyRef.current) return
+    dirtyRef.current = false
+    await saveNote(note)
+    setNotes((current) => [note, ...current.filter((candidate) => candidate.id !== note.id)].sort((a, b) => b.updatedAt - a.updatedAt))
+  }, [])
+
+  const flush = useCallback(async () => {
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
     }
+    await persistActiveNote()
+  }, [persistActiveNote])
 
-    saveTimerRef.current = window.setTimeout(() => {
-      void saveNote(activeNote)
-      setNotes((current) => {
-        const withoutCurrent = current.filter((note) => note.id !== activeNote.id)
-        return [activeNote, ...withoutCurrent].sort((a, b) => b.updatedAt - a.updatedAt)
-      })
-      saveLastNoteId(activeNote.id)
-    }, 500)
+  useEffect(() => {
+    let cancelled = false
+    void flush()
+    activeNoteRef.current = null
+    setActiveNote(null)
+    setNotes([])
+
+    const sessionId = session?.id ?? ''
+    const activeNoteId = session?.activeNoteId
+    if (!sessionId) return
+    async function load() {
+      const storedNotes = await getNotes(sessionId)
+      if (cancelled) return
+      const selected = storedNotes.find((note) => note.id === activeNoteId) ?? storedNotes[0] ?? null
+      activeNoteRef.current = selected
+      setNotes(storedNotes)
+      setActiveNote(selected)
+    }
+    void load()
 
     return () => {
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current)
-      }
+      cancelled = true
+      void flush()
     }
-  }, [activeNote])
+  }, [session?.id]) // Session changes are the loading boundary.
+
+  const scheduleSave = useCallback(() => {
+    dirtyRef.current = true
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null
+      void persistActiveNote()
+    }, 500)
+  }, [persistActiveNote])
 
   const createNote = useCallback(async () => {
+    if (!session) return
     const now = Date.now()
     const note: Note = {
       id: createId('note'),
+      sessionId: session.id,
       title: 'Untitled note',
       content: '',
       createdAt: now,
       updatedAt: now,
     }
-
     await saveNote(note)
+    activeNoteRef.current = note
     setNotes((current) => [note, ...current])
     setActiveNote(note)
-    saveLastNoteId(note.id)
-  }, [])
+    patchSession((current) => ({ ...current, activeNoteId: note.id }))
+  }, [patchSession, session])
 
-  const selectNote = useCallback(
-    (id: string) => {
-      const note = notes.find((candidate) => candidate.id === id)
-      if (note) {
-        setActiveNote(note)
-        saveLastNoteId(note.id)
-      }
-    },
-    [notes],
-  )
+  const selectNote = useCallback((id: string) => {
+    const next = notes.find((note) => note.id === id)
+    if (!next) return
+    void flush()
+    activeNoteRef.current = next
+    setActiveNote(next)
+    patchSession((current) => ({ ...current, activeNoteId: next.id }))
+  }, [flush, notes, patchSession])
 
-  const deleteNote = useCallback(
-    async (id: string) => {
-      await deleteStoredNote(id)
-      const nextNotes = notes.filter((note) => note.id !== id)
-      setNotes(nextNotes)
-
-      if (activeNote?.id === id) {
-        const next = nextNotes[0] ?? null
-        setActiveNote(next)
-        saveLastNoteId(next?.id ?? null)
-      }
-    },
-    [activeNote?.id, notes],
-  )
+  const deleteNote = useCallback(async (id: string) => {
+    await flush()
+    await deleteStoredNote(id)
+    const nextNotes = notes.filter((note) => note.id !== id)
+    setNotes(nextNotes)
+    if (activeNoteRef.current?.id === id) {
+      const next = nextNotes[0] ?? null
+      activeNoteRef.current = next
+      setActiveNote(next)
+      patchSession((current) => ({ ...current, activeNoteId: next?.id ?? null }))
+    }
+  }, [flush, notes, patchSession])
 
   const setActiveNoteContent = useCallback((content: string) => {
-    setActiveNote((note) => (note ? { ...note, content, updatedAt: Date.now() } : note))
-  }, [])
+    const current = activeNoteRef.current
+    if (!current) return
+    const next = { ...current, content, updatedAt: Date.now() }
+    activeNoteRef.current = next
+    setActiveNote(next)
+    scheduleSave()
+  }, [scheduleSave])
 
   const setActiveNoteTitle = useCallback((title: string) => {
-    setActiveNote((note) => (note ? { ...note, title, updatedAt: Date.now() } : note))
-  }, [])
+    const current = activeNoteRef.current
+    if (!current) return
+    const next = { ...current, title, updatedAt: Date.now() }
+    activeNoteRef.current = next
+    setActiveNote(next)
+    scheduleSave()
+  }, [scheduleSave])
 
-  return {
-    notes,
-    activeNote,
-    setActiveNoteContent,
-    setActiveNoteTitle,
-    createNote,
-    selectNote,
-    deleteNote,
-  }
+  return { notes, activeNote, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
-function useSlideshowState(): SlideshowState {
-  const [settings, setSettings] = useState(loadSlideshowSettings)
+function useSlideshowState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): SlideshowState {
+  const [settings, setSettings] = useState<SlideshowSettings>(defaultSlideshowSettings)
   const [images, setImages] = useState<ImageItem[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
-  const [status, setStatus] = useState('Select an image folder to begin.')
+  const [status, setStatus] = useState('Open a session to add images.')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    saveSlideshowSettings(settings)
-  }, [settings])
+    let cancelled = false
+    setIsPlaying(false)
+    setSettings(session?.slideshow ?? defaultSlideshowSettings)
+    setImages((current) => {
+      for (const image of current) URL.revokeObjectURL(image.url)
+      return []
+    })
+    setError(null)
+
+    const sessionId = session?.id ?? ''
+    if (!sessionId) {
+      setStatus('Open a session to add images.')
+      return
+    }
+
+    async function load() {
+      try {
+        const assets = await getSessionAssets(sessionId)
+        if (cancelled) return
+        const nextImages = await Promise.all(assets.map(createImageItemFromAsset))
+        if (cancelled) {
+          nextImages.forEach((image) => URL.revokeObjectURL(image.url))
+          return
+        }
+        nextImages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+        setImages(nextImages)
+        setStatus(nextImages.length ? `${nextImages.length} images loaded from this session.` : 'Select images to add them to this session.')
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load session images.')
+      }
+    }
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [session?.id])
 
   useEffect(() => {
     if (!isPlaying || images.length === 0) return
-
     const intervalId = window.setInterval(() => {
-      setSettings((current) => ({
-        ...current,
-        currentIndex: getNextImageIndex(current.currentIndex, images.length, current.shuffle),
-      }))
-    }, settings.intervalMs)
-
-    return () => window.clearInterval(intervalId)
-  }, [images.length, isPlaying, settings.intervalMs, settings.shuffle])
-
-  useEffect(() => {
-    void restoreFolder()
-    return () => {
-      for (const image of images) URL.revokeObjectURL(image.url)
-    }
-    // Run once on mount; image URLs are cleaned up when replaced by loadImagesFromHandle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const loadImagesFromHandle = useCallback(
-    async (handle: FileSystemDirectoryHandle) => {
-      const nextImages: ImageItem[] = []
-      let totalFiles = 0
-
-      for await (const file of readImageFilesFromDirectory(handle)) {
-        totalFiles += 1
-        if (!isSupportedImageFile(file)) continue
-        nextImages.push(await createImageItem(file, file.name))
-      }
-
-      nextImages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-
-      setImages((current) => {
-        for (const image of current) URL.revokeObjectURL(image.url)
-        return nextImages
+      setSettings((current) => {
+        const next = { ...current, currentIndex: getNextImageIndex(current.currentIndex, images.length, current.shuffle) }
+        patchSession((stored) => ({ ...stored, slideshow: next }))
+        return next
       })
+    }, settings.intervalMs)
+    return () => window.clearInterval(intervalId)
+  }, [images.length, isPlaying, patchSession, settings.intervalMs, settings.shuffle])
 
-      const metadata: ImageMetadata[] = nextImages.map(({ name, size, lastModified, width, height }) => ({
-        name,
-        size,
-        lastModified,
-        width,
-        height,
-      }))
+  const replaceImages = useCallback(async (files: FileList | File[], folderName: string) => {
+    if (!session) return
+    const selected = Array.from(files).filter(isSupportedImageFile)
+    if (selected.length > sessionLimits.maxImageCount) throw new Error(`A session can contain at most ${sessionLimits.maxImageCount} images.`)
 
-      await saveImageMetadata(metadata)
-
-      setSettings((current) => ({
-        ...current,
-        folderName: handle.name,
-        currentIndex: Math.min(current.currentIndex, Math.max(nextImages.length - 1, 0)),
-      }))
-      setStatus(
-        nextImages.length
-          ? `${nextImages.length} images loaded from ${handle.name}.`
-          : `No supported images found. Browser returned ${totalFiles} files from ${handle.name}.`,
-      )
-      setError(null)
-    },
-    [],
-  )
-
-  const loadImagesFromFiles = useCallback(async (files: FileList | File[]) => {
-    const selectedFiles = Array.from(files)
-    const nextImages = (
-      await Promise.all(
-        selectedFiles
-          .filter(isSupportedImageFile)
-          .map((file) => createImageItem(file, file.webkitRelativePath || file.name)),
-      )
-    ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    const assets = await Promise.all(selected.map((file) => createSessionAsset(file, session.id)))
+    await replaceSessionAssets(session.id, assets)
+    const nextImages = await Promise.all(assets.map(createImageItemFromAsset))
+    nextImages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
 
     setImages((current) => {
       for (const image of current) URL.revokeObjectURL(image.url)
       return nextImages
     })
-
-    const metadata: ImageMetadata[] = nextImages.map(({ name, size, lastModified, width, height }) => ({
-      name,
-      size,
-      lastModified,
-      width,
-      height,
-    }))
-
-    await saveImageMetadata(metadata)
-
-    const folderName = nextImages[0]?.name.includes('/') ? nextImages[0].name.split('/')[0] : 'Imported folder'
-    setSettings((current) => ({
-      ...current,
-      folderName,
-      currentIndex: 0,
-    }))
-    setStatus(
-      nextImages.length
-        ? `${nextImages.length} images loaded from ${folderName}.`
-        : `No supported images found. Browser returned ${selectedFiles.length} files.`,
-    )
+    const nextSettings = { ...settings, folderName, currentIndex: 0 }
+    setSettings(nextSettings)
+    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
+    setStatus(nextImages.length ? `${nextImages.length} images added to this session.` : 'No supported images were selected.')
     setError(null)
-  }, [])
+  }, [patchSession, session, settings])
 
-  const restoreFolder = useCallback(async () => {
-    const stored = await getDirectoryHandle()
-    if (!stored) return
-
-    try {
-      const permission = await ensureReadPermission(stored.handle)
-      if (!permission) {
-        setStatus(`Permission needed to reopen ${stored.name}.`)
-        return
-      }
-
-      await loadImagesFromHandle(stored.handle)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not reopen image folder.')
-    }
-  }, [loadImagesFromHandle])
+  const loadImagesFromHandle = useCallback(async (handle: FileSystemDirectoryHandle) => {
+    const files: File[] = []
+    for await (const file of readImageFilesFromDirectory(handle)) files.push(file)
+    await replaceImages(files, handle.name)
+  }, [replaceImages])
 
   const selectFolder = useCallback(async () => {
+    if (!session) return false
     if (!window.showDirectoryPicker) {
-      setError('This MVP requires Chrome or Edge with File System Access API support.')
+      setError('Folder selection is unavailable in this browser. Use the file picker instead.')
       return false
     }
-
     try {
-      setStatus('Choose a folder. The picker may not preview image files.')
       const handle = await window.showDirectoryPicker()
-      await saveDirectoryHandle(handle)
+      await saveDirectoryHandle(session.id, handle)
       await loadImagesFromHandle(handle)
       return true
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return true
-      setError(caught instanceof Error ? caught.message : 'Could not select folder.')
+      setError(caught instanceof Error ? caught.message : 'Could not select the folder.')
       return false
     }
-  }, [loadImagesFromHandle])
+  }, [loadImagesFromHandle, session])
+
+  const restoreFolder = useCallback(async () => {
+    if (!session) return
+    const stored = await getDirectoryHandle(session.id)
+    if (!stored) return
+    try {
+      if (!(await ensureReadPermission(stored.handle))) {
+        setStatus(`Permission is needed to reopen ${stored.name}.`)
+        return
+      }
+      await loadImagesFromHandle(stored.handle)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not reopen the image folder.')
+    }
+  }, [loadImagesFromHandle, session])
 
   const resetFolder = useCallback(async () => {
+    if (!session) return
     setIsPlaying(false)
+    await replaceSessionAssets(session.id, [])
+    await clearDirectoryHandle(session.id)
     setImages((current) => {
       for (const image of current) URL.revokeObjectURL(image.url)
       return []
     })
-    setSettings((current) => ({
-      ...current,
-      folderName: null,
-      currentIndex: 0,
-      zoom: 1,
-    }))
-    setStatus('Select an image folder to begin.')
+    const nextSettings = { ...settings, folderName: null, currentIndex: 0, zoom: 1 }
+    setSettings(nextSettings)
+    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
+    setStatus('Select images to add them to this session.')
     setError(null)
-    await clearDirectoryHandle()
-    await clearImageMetadata()
-  }, [])
+  }, [patchSession, session, settings])
 
   const stop = useCallback(() => {
     setIsPlaying(false)
-    setSettings((current) => ({ ...current, currentIndex: 0 }))
-  }, [])
+    const next = { ...settings, currentIndex: 0 }
+    setSettings(next)
+    patchSession((stored) => ({ ...stored, slideshow: next }))
+  }, [patchSession, settings])
 
   const next = useCallback(() => {
-    setSettings((current) => ({
-      ...current,
-      currentIndex: getNextImageIndex(current.currentIndex, images.length, current.shuffle),
-    }))
-  }, [images.length])
+    const nextSettings = { ...settings, currentIndex: getNextImageIndex(settings.currentIndex, images.length, settings.shuffle) }
+    setSettings(nextSettings)
+    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
+  }, [images.length, patchSession, settings])
 
   const previous = useCallback(() => {
-    setSettings((current) => ({
-      ...current,
-      currentIndex: images.length ? (current.currentIndex - 1 + images.length) % images.length : 0,
-    }))
-  }, [images.length])
+    const nextSettings = { ...settings, currentIndex: images.length ? (settings.currentIndex - 1 + images.length) % images.length : 0 }
+    setSettings(nextSettings)
+    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
+  }, [images.length, patchSession, settings])
 
   const updateSettings = useCallback((partial: Partial<SlideshowSettings>) => {
-    setSettings((current) => ({ ...current, ...partial }))
-  }, [])
+    setSettings((current) => {
+      const next = { ...current, ...partial }
+      patchSession((stored) => ({ ...stored, slideshow: next }))
+      return next
+    })
+  }, [patchSession])
 
-  return {
-    settings,
-    images,
-    isPlaying,
-    status,
-    error,
-    selectFolder,
-    importFiles: loadImagesFromFiles,
-    resetFolder,
-    restoreFolder,
-    setIsPlaying,
-    stop,
-    next,
-    previous,
-    updateSettings,
-  }
+  return { settings, images, isPlaying, status, error, selectFolder, importFiles: (files) => replaceImages(files, 'Imported images'), resetFolder, restoreFolder, setIsPlaying, stop, next, previous, updateSettings }
 }
 
-function useSpotifyState(): SpotifyState {
+function useSpotifyState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): SpotifyState {
   const [tokens, setTokens] = useState<SpotifyTokens | null>(loadSpotifyTokens)
-  const [playlist, setPlaylist] = useState<SpotifyPlaylistState>(loadSpotifyPlaylistState)
+  const [playlist, setPlaylist] = useState<SpotifyPlaylistReference>(defaultSpotifyPlaylistReference)
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
+  const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
   const [track, setTrack] = useState<SpotifyTrackState | null>(null)
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
@@ -446,20 +614,19 @@ function useSpotifyState(): SpotifyState {
   const playerRef = useRef<Spotify.Player | null>(null)
 
   useEffect(() => {
+    setPlaylist(session?.spotify ?? defaultSpotifyPlaylistReference)
+    setPlaylists([])
+    setTracks([])
+    setTrack(null)
+  }, [session?.id])
+
+  useEffect(() => {
     saveSpotifyTokens(tokens)
   }, [tokens])
 
-  useEffect(() => {
-    saveSpotifyPlaylistState(playlist)
-  }, [playlist])
-
   const ensureFreshTokens = useCallback(async () => {
     if (!tokens) throw new Error('Log in to Spotify first.')
-
-    if (tokens.expiresAt - Date.now() > 60_000) {
-      return tokens
-    }
-
+    if (tokens.expiresAt - Date.now() > 60_000) return tokens
     const refreshed = await refreshSpotifyToken(tokens)
     setTokens(refreshed)
     return refreshed
@@ -467,74 +634,53 @@ function useSpotifyState(): SpotifyState {
 
   useEffect(() => {
     if (!tokens?.accessToken || playerRef.current) return
-
     let cancelled = false
-
     async function initPlayer() {
       try {
         await loadSpotifySdk()
         if (cancelled || !window.Spotify || !tokens?.accessToken) return
-
-        const player = new window.Spotify.Player({
-          name: 'Music Images Canvas',
-          getOAuthToken: (callback) => callback(tokens.accessToken),
-          volume: 0.7,
-        })
-
+        const player = new window.Spotify.Player({ name: 'Music Images Canvas', getOAuthToken: (callback) => callback(tokens.accessToken), volume: 0.7 })
         player.addListener('ready', ({ device_id }) => {
           setDeviceId(device_id)
           setIsReady(true)
           setStatus('Spotify browser device is ready.')
           setError(null)
         })
-
         player.addListener('not_ready', () => {
           setIsReady(false)
           setStatus('Spotify browser device is offline.')
         })
-
         player.addListener('player_state_changed', (state) => {
           if (!state) return
           const current = state.track_window.current_track
-          setTrack({
-            title: current.name,
-            artist: current.artists.map((artist) => artist.name).join(', '),
-            album: current.album.name,
-            albumArt: current.album.images[0]?.url ?? null,
-            durationMs: state.duration,
-            positionMs: state.position,
-            paused: state.paused,
-          })
+          setTrack({ title: current.name, artist: current.artists.map((artist) => artist.name).join(', '), album: current.album.name, albumArt: current.album.images[0]?.url ?? null, durationMs: state.duration, positionMs: state.position, paused: state.paused })
         })
-
         const handleError = (event: Spotify.WebPlaybackError) => {
           setError(event.message)
           setStatus('Spotify playback needs attention.')
         }
-
         player.addListener('initialization_error', handleError)
         player.addListener('authentication_error', handleError)
         player.addListener('account_error', handleError)
         player.addListener('playback_error', handleError)
-
         playerRef.current = player
         await player.connect()
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : 'Could not initialize Spotify.')
       }
     }
-
     void initPlayer()
-
     return () => {
       cancelled = true
     }
   }, [tokens?.accessToken])
 
-  const login = useCallback(async () => {
-    await startSpotifyLogin()
-  }, [])
+  const setSessionPlaylist = useCallback((next: SpotifyPlaylistReference) => {
+    setPlaylist(next)
+    patchSession((current) => ({ ...current, spotify: next }))
+  }, [patchSession])
 
+  const login = useCallback(async () => startSpotifyLogin(), [])
   const logout = useCallback(() => {
     playerRef.current?.disconnect()
     playerRef.current = null
@@ -544,147 +690,124 @@ function useSpotifyState(): SpotifyState {
     setTrack(null)
     setStatus('Logged out of Spotify.')
   }, [])
-
   const handleCallback = useCallback(async (code: string, state: string | null) => {
-    const nextTokens = await exchangeSpotifyCode(code, state)
-    setTokens(nextTokens)
+    setTokens(await exchangeSpotifyCode(code, state))
     setStatus('Spotify login complete.')
   }, [])
 
-  const searchPlaylists = useCallback(
-    async (query: string) => {
-      const fresh = await ensureFreshTokens()
-      setPlaylist((current) => ({ ...current, lastSearch: query }))
-      if (!query.trim()) {
-        setPlaylists([])
-        return
-      }
+  const searchPlaylists = useCallback(async (query: string) => {
+    const fresh = await ensureFreshTokens()
+    if (!query.trim()) {
+      setPlaylists([])
+      return
+    }
+    const result = await spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: '0' }).toString()}`, fresh.accessToken)
+    const items = [...result.playlists.items]
+    let next = result.playlists.next
+    for (let offset = 10; next && offset < 50; offset += 10) {
+      const page = await spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: String(offset) }).toString()}`, fresh.accessToken)
+      items.push(...page.playlists.items)
+      next = page.playlists.next
+    }
+    const mapped = items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist)
+    setPlaylists([...new Map(mapped.map((item) => [item.id, item])).values()])
+    setError(null)
+  }, [ensureFreshTokens])
 
-      const result = await spotifyFetch<{
-        playlists: {
-          next: string | null
-          items: Array<SpotifyPlaylistApiItem | null>
-        }
-      }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: '0' }).toString()}`, fresh.accessToken)
+  const searchTracks = useCallback(async (query: string) => {
+    const trimmed = query.trim()
+    if (!trimmed) {
+      setTracks([])
+      return
+    }
+    const fresh = await ensureFreshTokens()
+    const result = await spotifyFetch<{ tracks: { items: Array<SpotifyTrackApiItem | null> } }>(
+      `/search?${new URLSearchParams({ q: buildTrackSearchQuery(trimmed), type: 'track', limit: '10' }).toString()}`,
+      fresh.accessToken,
+    )
+    const mapped = result.tracks.items.filter(isSpotifyTrackApiItem).map(mapTrack)
+    setTracks(rankTracks(mapped, trimmed))
+    setError(null)
+  }, [ensureFreshTokens])
 
-      const playlistItems = [...result.playlists.items]
-      let next = result.playlists.next
-      for (let offset = 10; next && offset < 50; offset += 10) {
-        const page = await spotifyFetch<{
-          playlists: {
-            next: string | null
-            items: Array<SpotifyPlaylistApiItem | null>
-          }
-        }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: String(offset) }).toString()}`, fresh.accessToken)
-        playlistItems.push(...page.playlists.items)
-        next = page.playlists.next
-      }
+  const loadPlaylistFromUrl = useCallback(async (url: string) => {
+    const id = parseSpotifyPlaylistUrl(url)
+    if (!id) throw new Error('Paste a valid Spotify playlist URL or URI.')
+    const item = await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${id}`, (await ensureFreshTokens()).accessToken)
+    const summary = mapPlaylist(item)
+    setSessionPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url })
+    setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
+    setError(null)
+  }, [ensureFreshTokens, setSessionPlaylist])
 
-      const mapped = playlistItems.filter(isSpotifyPlaylistApiItem).map((item) => mapPlaylist(item))
-      setPlaylists([...new Map(mapped.map((item) => [item.id, item])).values()])
-      setError(null)
-    },
-    [ensureFreshTokens],
-  )
+  const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary) => {
+    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : playlist
+    if (!selected.uri) throw new Error('Choose a playlist first.')
+    if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
+    const fresh = await ensureFreshTokens()
+    await spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) })
+    await spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) })
+    setSessionPlaylist(selected)
+    setStatus(`Playing ${selected.name ?? 'playlist'}.`)
+    setError(null)
+  }, [deviceId, ensureFreshTokens, playlist, setSessionPlaylist])
 
-  const loadPlaylistFromUrl = useCallback(
-    async (url: string) => {
-      const id = parseSpotifyPlaylistUrl(url)
-      if (!id) throw new Error('Paste a valid Spotify playlist URL or URI.')
-
-      const fresh = await ensureFreshTokens()
-      const item = await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${id}`, fresh.accessToken)
-      const summary = mapPlaylist(item)
-      setPlaylist({
-        id: summary.id,
-        uri: summary.uri,
-        name: summary.name,
-        url: summary.url,
-        lastSearch: playlist.lastSearch,
-      })
-      setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
-      setError(null)
-    },
-    [ensureFreshTokens, playlist.lastSearch],
-  )
-
-  const playPlaylist = useCallback(
-    async (summary?: SpotifyPlaylistSummary) => {
-      const selected = summary
-        ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, lastSearch: playlist.lastSearch }
-        : playlist
-
-      if (!selected.uri) throw new Error('Choose a playlist first.')
-      if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
-
-      const fresh = await ensureFreshTokens()
-      await spotifyFetch<void>('/me/player', fresh.accessToken, {
-        method: 'PUT',
-        body: JSON.stringify({
-          device_ids: [deviceId],
-          play: false,
-        }),
-      })
-
-      await spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, {
-        method: 'PUT',
-        body: JSON.stringify({ context_uri: selected.uri }),
-      })
-
-      setPlaylist(selected)
-      setStatus(`Playing ${selected.name ?? 'playlist'}.`)
-      setError(null)
-    },
-    [deviceId, ensureFreshTokens, playlist],
-  )
-
-  const togglePlay = useCallback(async () => {
-    await playerRef.current?.togglePlay()
-  }, [])
-
-  const previousTrack = useCallback(async () => {
-    await playerRef.current?.previousTrack()
-  }, [])
-
-  const nextTrack = useCallback(async () => {
-    await playerRef.current?.nextTrack()
-  }, [])
-
-  const setVolume = useCallback(async (value: number) => {
-    await playerRef.current?.setVolume(value)
-  }, [])
-
-  const seek = useCallback(async (positionMs: number) => {
-    await playerRef.current?.seek(positionMs)
-  }, [])
+  const playTrack = useCallback(async (summary: SpotifyTrackSummary) => {
+    if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
+    const fresh = await ensureFreshTokens()
+    await spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) })
+    await spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) })
+    setStatus(`Playing ${summary.name} by ${summary.artists}.`)
+    setError(null)
+  }, [deviceId, ensureFreshTokens])
 
   return {
-    tokens,
-    playlist,
-    playlists,
-    track,
-    deviceId,
-    isReady,
-    status,
-    error,
-    login,
-    logout,
-    handleCallback,
-    searchPlaylists,
-    loadPlaylistFromUrl,
-    playPlaylist,
-    togglePlay,
-    previousTrack,
-    nextTrack,
-    setVolume,
-    seek,
+    tokens, playlist, playlists, tracks, track, deviceId, isReady, status, error, login, logout, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
+    togglePlay: async () => playerRef.current?.togglePlay(),
+    previousTrack: async () => playerRef.current?.previousTrack(),
+    nextTrack: async () => playerRef.current?.nextTrack(),
+    setVolume: async (value) => playerRef.current?.setVolume(value),
+    seek: async (positionMs) => playerRef.current?.seek(positionMs),
   }
+}
+
+function isSpotifyTrackApiItem(item: SpotifyTrackApiItem | null): item is SpotifyTrackApiItem {
+  return Boolean(item?.id && item.name && item.uri)
+}
+
+function buildTrackSearchQuery(query: string) {
+  const parts = query.split(/\s+-\s+|\s+by\s+/i)
+  if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) return query
+  return `track:${parts[0].trim()} artist:${parts[1].trim()}`
+}
+
+function rankTracks(tracks: SpotifyTrackSummary[], query: string) {
+  const normalisedQuery = normaliseSearchText(query)
+  const [title, artist] = query.split(/\s+-\s+|\s+by\s+/i).map(normaliseSearchText)
+  return [...tracks].sort((left, right) => scoreTrack(right) - scoreTrack(left))
+
+  function scoreTrack(track: SpotifyTrackSummary) {
+    const trackTitle = normaliseSearchText(track.name)
+    const trackArtist = normaliseSearchText(track.artists)
+    const combined = `${trackTitle} ${trackArtist}`
+    let score = 0
+    if (combined === normalisedQuery) score += 1000
+    if (trackTitle === normalisedQuery) score += 800
+    if (title && trackTitle === title) score += 700
+    if (artist && trackArtist.includes(artist)) score += 500
+    if (combined.includes(normalisedQuery)) score += 300
+    score += normalisedQuery.split(' ').filter((word) => combined.includes(word)).length * 10
+    return score
+  }
+}
+
+function normaliseSearchText(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 }
 
 async function ensureReadPermission(handle: FileSystemDirectoryHandle) {
   const descriptor = { mode: 'read' as const }
   if (!handle.queryPermission || !handle.requestPermission) return true
-
   if ((await handle.queryPermission(descriptor)) === 'granted') return true
   return (await handle.requestPermission(descriptor)) === 'granted'
 }
@@ -692,7 +815,6 @@ async function ensureReadPermission(handle: FileSystemDirectoryHandle) {
 function getNextImageIndex(currentIndex: number, length: number, shuffle: boolean) {
   if (length <= 0) return 0
   if (!shuffle || length === 1) return (currentIndex + 1) % length
-
   let next = Math.floor(Math.random() * length)
   if (next === currentIndex) next = (next + 1) % length
   return next
@@ -702,58 +824,65 @@ function isSupportedImageFile(file: File) {
   return file.type.startsWith('image/') || supportedImagePattern.test(file.name)
 }
 
-async function createImageItem(file: File, name: string): Promise<ImageItem> {
+async function createSessionAsset(file: File, sessionId: string) {
+  if (file.size > sessionLimits.maxImageBytes) throw new Error(`${file.name} exceeds the 25 MB per-image limit.`)
+  const mimeType = normaliseImageMimeType(file)
+  if (!mimeType) throw new Error(`${file.name} is not a supported image type.`)
   const url = URL.createObjectURL(file)
   const dimensions = await readImageDimensions(url)
-
+  URL.revokeObjectURL(url)
   return {
-    name,
+    id: createId('image'),
+    sessionId,
+    filename: file.name,
+    name: file.webkitRelativePath || file.name,
+    mimeType,
     size: file.size,
     lastModified: file.lastModified,
-    url,
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,
+    blob: file,
   }
+}
+
+async function createImageItemFromAsset(asset: Awaited<ReturnType<typeof getSessionAssets>>[number]) {
+  const url = URL.createObjectURL(asset.blob)
+  return { ...asset, url }
+}
+
+function normaliseImageMimeType(file: File) {
+  if (['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/bmp', 'image/svg+xml'].includes(file.type)) return file.type
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  return ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif', bmp: 'image/bmp', svg: 'image/svg+xml' } as Record<string, string | undefined>)[extension ?? '']
 }
 
 async function readImageDimensions(url: string): Promise<{ width: number; height: number } | null> {
   const image = new Image()
   image.src = url
-
   try {
     await image.decode()
   } catch {
     return null
   }
-
   if (!image.naturalWidth || !image.naturalHeight) return null
-  return {
-    width: image.naturalWidth,
-    height: image.naturalHeight,
-  }
+  return { width: image.naturalWidth, height: image.naturalHeight }
 }
 
 async function* readImageFilesFromDirectory(handle: FileSystemDirectoryHandle): AsyncGenerator<File> {
   for await (const [, entry] of handle.entries()) {
-    if (entry.kind === 'file') {
-      yield entry.getFile()
-      continue
-    }
-
-    yield* readImageFilesFromDirectory(entry)
+    if (entry.kind === 'file') yield entry.getFile()
+    else yield* readImageFilesFromDirectory(entry)
   }
 }
 
 function loadSpotifySdk() {
   if (window.Spotify) return Promise.resolve()
-
   return new Promise<void>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[src="https://sdk.scdn.co/spotify-player.js"]')
     if (existing) {
       window.onSpotifyWebPlaybackSDKReady = () => resolve()
       return
     }
-
     const script = document.createElement('script')
     script.src = 'https://sdk.scdn.co/spotify-player.js'
     script.async = true

@@ -3,21 +3,36 @@ import type {
   CanvasState,
   ImageMetadata,
   Note,
+  Session,
+  SessionImage,
+  SessionSummary,
   SlideshowSettings,
+  SpotifyPlaylistReference,
   SpotifyPlaylistState,
   SpotifyTokens,
 } from './types'
+import { createId } from './utils'
 
-const APP_STATE_VERSION = 1
+const DB_VERSION = 2
+const SESSION_SCHEMA_VERSION = 1
+const MIGRATION_KEY = 'session-migration-v1'
+const MIGRATION_PENDING_KEY = 'session-migration-v1-pending'
+const ACTIVE_SESSION_KEY = 'active-session-id'
 
-const keys = {
-  schemaVersion: 'mic:schema-version',
+const legacyKeys = {
   canvas: 'mic:canvas',
   slideshow: 'mic:slideshow',
   spotifyTokens: 'mic:spotify-tokens',
   spotifyPlaylist: 'mic:spotify-playlist',
   lastNoteId: 'mic:last-note-id',
 }
+
+export const sessionLimits = {
+  maxImageCount: 200,
+  maxImageBytes: 25 * 1024 * 1024,
+  maxTotalImageBytes: 250 * 1024 * 1024,
+  maxArchiveBytes: 260 * 1024 * 1024,
+} as const
 
 export const defaultSlideshowSettings: SlideshowSettings = {
   folderName: null,
@@ -36,12 +51,50 @@ export const defaultSpotifyPlaylistState: SpotifyPlaylistState = {
   lastSearch: '',
 }
 
+export const defaultSpotifyPlaylistReference: SpotifyPlaylistReference = {
+  id: null,
+  uri: null,
+  name: null,
+  url: null,
+}
+
+interface SessionAssetRecord extends SessionImage {
+  blob: Blob
+}
+
+interface PreferenceRecord {
+  key: string
+  value: string
+}
+
+interface MigrationVerificationRecord {
+  sessionId: string
+  name: string
+  canvas: CanvasState | null
+  slideshow: SlideshowSettings
+  spotify: SpotifyPlaylistReference
+  activeNoteId: string | null
+  noteIds: string[]
+  directoryName: string | null
+}
+
+export interface ImportedSessionContent {
+  name: string
+  canvas: CanvasState | null
+  slideshow: SlideshowSettings
+  spotify: SpotifyPlaylistReference
+  activeNoteSourceId: string | null
+  notes: Array<Pick<Note, 'id' | 'title' | 'content' | 'createdAt' | 'updatedAt'>>
+  assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>
+}
+
 interface MusicImagesCanvasDb extends DBSchema {
   notes: {
     key: string
     value: Note
     indexes: {
       'by-updated': number
+      'by-session-updated': [string, number]
     }
   }
   directoryHandles: {
@@ -60,10 +113,36 @@ interface MusicImagesCanvasDb extends DBSchema {
       updatedAt: number
     }
   }
+  sessions: {
+    key: string
+    value: Session
+    indexes: {
+      'by-updated': number
+    }
+  }
+  assets: {
+    key: string
+    value: SessionAssetRecord
+    indexes: {
+      'by-session': string
+    }
+  }
+  preferences: {
+    key: string
+    value: PreferenceRecord
+  }
+  sessionDirectoryHandles: {
+    key: string
+    value: {
+      sessionId: string
+      name: string
+      handle: FileSystemDirectoryHandle
+    }
+  }
 }
 
-const dbPromise = openDB<MusicImagesCanvasDb>('music-images-canvas', 1, {
-  upgrade(db) {
+const dbPromise = openDB<MusicImagesCanvasDb>('music-images-canvas', DB_VERSION, {
+  upgrade(db, oldVersion, _newVersion, transaction) {
     if (!db.objectStoreNames.contains('notes')) {
       const notes = db.createObjectStore('notes', { keyPath: 'id' })
       notes.createIndex('by-updated', 'updatedAt')
@@ -76,10 +155,26 @@ const dbPromise = openDB<MusicImagesCanvasDb>('music-images-canvas', 1, {
     if (!db.objectStoreNames.contains('imageMetadata')) {
       db.createObjectStore('imageMetadata', { keyPath: 'id' })
     }
+
+    if (oldVersion < 2) {
+      const notes = transaction.objectStore('notes')
+      if (!notes.indexNames.contains('by-session-updated')) {
+        notes.createIndex('by-session-updated', ['sessionId', 'updatedAt'])
+      }
+
+      const sessions = db.createObjectStore('sessions', { keyPath: 'id' })
+      sessions.createIndex('by-updated', 'updatedAt')
+
+      const assets = db.createObjectStore('assets', { keyPath: 'id' })
+      assets.createIndex('by-session', 'sessionId')
+
+      db.createObjectStore('preferences', { keyPath: 'key' })
+      db.createObjectStore('sessionDirectoryHandles', { keyPath: 'sessionId' })
+    }
   },
 })
 
-function readJson<T>(key: string, fallback: T): T {
+function readLegacyJson<T>(key: string, fallback: T): T {
   const raw = window.localStorage.getItem(key)
   if (!raw) return fallback
 
@@ -90,68 +185,261 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-function writeJson<T>(key: string, value: T) {
-  window.localStorage.setItem(keys.schemaVersion, String(APP_STATE_VERSION))
-  window.localStorage.setItem(key, JSON.stringify(value))
-}
-
-export function loadCanvasState(): CanvasState | null {
-  return readJson<CanvasState | null>(keys.canvas, null)
-}
-
-export function saveCanvasState(state: CanvasState) {
-  writeJson(keys.canvas, state)
-}
-
-export function loadSlideshowSettings() {
-  return readJson(keys.slideshow, defaultSlideshowSettings)
-}
-
-export function saveSlideshowSettings(settings: SlideshowSettings) {
-  writeJson(keys.slideshow, settings)
-}
-
-export function loadSpotifyTokens() {
-  return readJson<SpotifyTokens | null>(keys.spotifyTokens, null)
-}
-
-export function saveSpotifyTokens(tokens: SpotifyTokens | null) {
-  if (!tokens) {
-    window.localStorage.removeItem(keys.spotifyTokens)
-    return
+function legacyPlaylistReference(): SpotifyPlaylistReference {
+  const playlist = readLegacyJson(legacyKeys.spotifyPlaylist, defaultSpotifyPlaylistState)
+  return {
+    id: playlist.id,
+    uri: playlist.uri,
+    name: playlist.name,
+    url: playlist.url,
   }
-  writeJson(keys.spotifyTokens, tokens)
 }
 
-export function loadSpotifyPlaylistState() {
-  return readJson(keys.spotifyPlaylist, defaultSpotifyPlaylistState)
-}
-
-export function saveSpotifyPlaylistState(state: SpotifyPlaylistState) {
-  writeJson(keys.spotifyPlaylist, state)
-}
-
-export function loadLastNoteId() {
-  return window.localStorage.getItem(keys.lastNoteId)
-}
-
-export function saveLastNoteId(noteId: string | null) {
-  if (!noteId) {
-    window.localStorage.removeItem(keys.lastNoteId)
-    return
+function makeSession(name: string, initial?: Partial<Session>): Session {
+  const now = Date.now()
+  return {
+    id: createId('session'),
+    name: normalizeSessionName(name),
+    schemaVersion: SESSION_SCHEMA_VERSION,
+    createdAt: now,
+    updatedAt: now,
+    activeNoteId: null,
+    canvas: null,
+    slideshow: { ...defaultSlideshowSettings },
+    spotify: { ...defaultSpotifyPlaylistReference },
+    ...initial,
   }
-  window.localStorage.setItem(keys.lastNoteId, noteId)
 }
 
-export async function getNotes() {
+export async function initializeSessions() {
   const db = await dbPromise
-  const notes = await db.getAllFromIndex('notes', 'by-updated')
+  const migration = await db.get('preferences', MIGRATION_KEY)
+
+  if (!migration) {
+    const pending = await db.get('preferences', MIGRATION_PENDING_KEY)
+    let verification = pending ? parseMigrationVerification(pending.value) : null
+
+    if (pending && !verification) {
+      throw new Error('The previous session migration cannot be verified. Your original browser data has not been removed.')
+    }
+
+    if (!verification) {
+      const existingSessions = await db.count('sessions')
+      if (!existingSessions) verification = await migrateLegacyState(db)
+    }
+
+    if (verification) await verifyMigratedLegacyState(db, verification)
+
+    const tx = db.transaction('preferences', 'readwrite')
+    await tx.store.put({ key: MIGRATION_KEY, value: 'complete' })
+    await tx.store.delete(MIGRATION_PENDING_KEY)
+    await tx.done
+  }
+
+  let sessions = await getSessions()
+  if (!sessions.length) {
+    const session = await createSession('My first session')
+    sessions = [session]
+  }
+
+  const activePreference = await db.get('preferences', ACTIVE_SESSION_KEY)
+  const activeSessionId = sessions.some((session) => session.id === activePreference?.value)
+    ? activePreference?.value ?? sessions[0].id
+    : sessions[0].id
+
+  if (activePreference?.value !== activeSessionId) {
+    await db.put('preferences', { key: ACTIVE_SESSION_KEY, value: activeSessionId })
+  }
+
+  return { sessions, activeSessionId }
+}
+
+async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<MigrationVerificationRecord> {
+  const legacyCanvas = readLegacyJson<CanvasState | null>(legacyKeys.canvas, null)
+  const legacySlideshow = { ...defaultSlideshowSettings, ...readLegacyJson(legacyKeys.slideshow, defaultSlideshowSettings) }
+  const legacyLastNoteId = window.localStorage.getItem(legacyKeys.lastNoteId)
+  const legacyNotes = await db.getAll('notes')
+  const legacySpotify = legacyPlaylistReference()
+  const legacyFolder = await db.get('directoryHandles', 'slideshow')
+  const hasLegacyState = Boolean(legacyCanvas || legacyNotes.length || legacySlideshow.folderName || legacySpotify.id)
+  const activeNoteId = legacyNotes.some((note) => note.id === legacyLastNoteId) ? legacyLastNoteId : legacyNotes[0]?.id ?? null
+  const session = makeSession(hasLegacyState ? 'Imported workspace' : 'My first session', {
+    canvas: legacyCanvas,
+    slideshow: legacySlideshow,
+    spotify: legacySpotify,
+    activeNoteId,
+  })
+  const verification: MigrationVerificationRecord = {
+    sessionId: session.id,
+    name: session.name,
+    canvas: session.canvas,
+    slideshow: session.slideshow,
+    spotify: session.spotify,
+    activeNoteId,
+    noteIds: legacyNotes.map((note) => note.id),
+    directoryName: legacyFolder?.name ?? null,
+  }
+
+  const tx = db.transaction(['sessions', 'notes', 'preferences', 'sessionDirectoryHandles'], 'readwrite')
+  await tx.objectStore('sessions').put(session)
+
+  for (const note of legacyNotes) {
+    await tx.objectStore('notes').put({ ...note, sessionId: session.id })
+  }
+
+  if (legacyFolder) {
+    await tx.objectStore('sessionDirectoryHandles').put({
+      sessionId: session.id,
+      name: legacyFolder.name,
+      handle: legacyFolder.handle,
+    })
+  }
+
+  await tx.objectStore('preferences').put({ key: ACTIVE_SESSION_KEY, value: session.id })
+  await tx.objectStore('preferences').put({ key: MIGRATION_PENDING_KEY, value: JSON.stringify(verification) })
+  await tx.done
+  return verification
+}
+
+async function verifyMigratedLegacyState(db: Awaited<typeof dbPromise>, expected: MigrationVerificationRecord) {
+  const [session, notes, directory] = await Promise.all([
+    db.get('sessions', expected.sessionId),
+    db.getAllFromIndex('notes', 'by-session-updated', IDBKeyRange.bound([expected.sessionId, 0], [expected.sessionId, Number.MAX_SAFE_INTEGER])),
+    db.get('sessionDirectoryHandles', expected.sessionId),
+  ])
+
+  const hasExpectedNotes = notes.length === expected.noteIds.length
+    && notes.every((note) => note.sessionId === expected.sessionId && expected.noteIds.includes(note.id))
+  const sessionMatches = session
+    && session.name === expected.name
+    && session.activeNoteId === expected.activeNoteId
+    && JSON.stringify(session.canvas) === JSON.stringify(expected.canvas)
+    && JSON.stringify(session.slideshow) === JSON.stringify(expected.slideshow)
+    && JSON.stringify(session.spotify) === JSON.stringify(expected.spotify)
+  const directoryMatches = expected.directoryName === null
+    ? !directory
+    : directory?.name === expected.directoryName
+
+  if (!sessionMatches || !hasExpectedNotes || !directoryMatches) {
+    throw new Error('The previous session migration could not be verified. Your original browser data has not been removed; reload to retry.')
+  }
+}
+
+function parseMigrationVerification(value: string): MigrationVerificationRecord | null {
+  try {
+    const parsed = JSON.parse(value) as Partial<MigrationVerificationRecord>
+    if (
+      !parsed
+      || typeof parsed.sessionId !== 'string'
+      || typeof parsed.name !== 'string'
+      || !Array.isArray(parsed.noteIds)
+      || !parsed.noteIds.every((id) => typeof id === 'string')
+      || (parsed.activeNoteId !== null && typeof parsed.activeNoteId !== 'string')
+      || (parsed.directoryName !== null && typeof parsed.directoryName !== 'string')
+    ) return null
+    return parsed as MigrationVerificationRecord
+  } catch {
+    return null
+  }
+}
+
+export async function getSessions(): Promise<Session[]> {
+  const db = await dbPromise
+  const sessions = await db.getAllFromIndex('sessions', 'by-updated')
+  return sessions.sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+export async function getSession(sessionId: string) {
+  const db = await dbPromise
+  return db.get('sessions', sessionId)
+}
+
+export async function createSession(name: string) {
+  const db = await dbPromise
+  const session = makeSession(name)
+  await db.put('sessions', session)
+  return session
+}
+
+export async function saveSession(session: Session) {
+  const db = await dbPromise
+  const next = { ...session, name: normalizeSessionName(session.name), updatedAt: Date.now() }
+  await db.put('sessions', next)
+  return next
+}
+
+export async function setActiveSessionId(sessionId: string) {
+  const db = await dbPromise
+  await db.put('preferences', { key: ACTIVE_SESSION_KEY, value: sessionId })
+}
+
+export async function deleteSession(sessionId: string) {
+  const db = await dbPromise
+  const tx = db.transaction(['sessions', 'notes', 'assets', 'sessionDirectoryHandles', 'preferences'], 'readwrite')
+  const noteIds = await tx.objectStore('notes').index('by-session-updated').getAllKeys(IDBKeyRange.bound([sessionId, 0], [sessionId, Number.MAX_SAFE_INTEGER]))
+  const assetIds = await tx.objectStore('assets').index('by-session').getAllKeys(sessionId)
+
+  await Promise.all([
+    ...noteIds.map((id) => tx.objectStore('notes').delete(id)),
+    ...assetIds.map((id) => tx.objectStore('assets').delete(id)),
+    tx.objectStore('sessions').delete(sessionId),
+    tx.objectStore('sessionDirectoryHandles').delete(sessionId),
+  ])
+
+  const active = await tx.objectStore('preferences').get(ACTIVE_SESSION_KEY)
+  if (active?.value === sessionId) {
+    await tx.objectStore('preferences').delete(ACTIVE_SESSION_KEY)
+  }
+  await tx.done
+}
+
+export async function importSessionContent(content: ImportedSessionContent) {
+  validateAssets(content.assets)
+  const sourceNoteIds = new Set<string>()
+  for (const note of content.notes) {
+    if (!note.id || sourceNoteIds.has(note.id)) throw new Error('The session bundle contains duplicate note IDs.')
+    sourceNoteIds.add(note.id)
+  }
+
+  const session = makeSession(content.name, {
+    canvas: content.canvas,
+    slideshow: content.slideshow,
+    spotify: content.spotify,
+  })
+  const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
+  session.activeNoteId = content.activeNoteSourceId ? noteIdMap.get(content.activeNoteSourceId) ?? null : null
+
+  const tx = (await dbPromise).transaction(['sessions', 'notes', 'assets'], 'readwrite')
+  await tx.objectStore('sessions').put(session)
+
+  for (const note of content.notes) {
+    await tx.objectStore('notes').put({
+      ...note,
+      id: noteIdMap.get(note.id) ?? createId('note'),
+      sessionId: session.id,
+    })
+  }
+
+  for (const asset of content.assets) {
+    await tx.objectStore('assets').put({
+      ...asset,
+      id: createId('image'),
+      sessionId: session.id,
+    })
+  }
+
+  await tx.done
+  return session
+}
+
+export async function getSessionSummaries(): Promise<SessionSummary[]> {
+  return (await getSessions()).map(({ id, name, updatedAt }) => ({ id, name, updatedAt }))
+}
+
+export async function getNotes(sessionId: string) {
+  const db = await dbPromise
+  const notes = await db.getAllFromIndex('notes', 'by-session-updated', IDBKeyRange.bound([sessionId, 0], [sessionId, Number.MAX_SAFE_INTEGER]))
   return notes.sort((a, b) => b.updatedAt - a.updatedAt)
-}
-
-export async function getNote(id: string) {
-  const db = await dbPromise
-  return db.get('notes', id)
 }
 
 export async function saveNote(note: Note) {
@@ -164,41 +452,82 @@ export async function deleteNote(id: string) {
   await db.delete('notes', id)
 }
 
-export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle) {
+export async function getSessionAssets(sessionId: string) {
   const db = await dbPromise
-  await db.put('directoryHandles', {
-    id: 'slideshow',
-    name: handle.name,
-    handle,
-  })
+  return db.getAllFromIndex('assets', 'by-session', sessionId)
 }
 
-export async function getDirectoryHandle() {
+export async function saveSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>) {
+  validateAssets(assets)
   const db = await dbPromise
-  return db.get('directoryHandles', 'slideshow')
+  const tx = db.transaction('assets', 'readwrite')
+  for (const asset of assets) {
+    await tx.store.put({ ...asset, sessionId })
+  }
+  await tx.done
 }
 
-export async function clearDirectoryHandle() {
+export async function replaceSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>) {
+  validateAssets(assets)
   const db = await dbPromise
-  await db.delete('directoryHandles', 'slideshow')
+  const tx = db.transaction('assets', 'readwrite')
+  const existingIds = await tx.store.index('by-session').getAllKeys(sessionId)
+  await Promise.all(existingIds.map((id) => tx.store.delete(id)))
+  for (const asset of assets) {
+    await tx.store.put({ ...asset, sessionId })
+  }
+  await tx.done
 }
 
-export async function saveImageMetadata(images: ImageMetadata[]) {
+export async function saveDirectoryHandle(sessionId: string, handle: FileSystemDirectoryHandle) {
   const db = await dbPromise
-  await db.put('imageMetadata', {
-    id: 'slideshow',
-    images,
-    updatedAt: Date.now(),
-  })
+  await db.put('sessionDirectoryHandles', { sessionId, name: handle.name, handle })
 }
 
-export async function getImageMetadata() {
+export async function getDirectoryHandle(sessionId: string) {
   const db = await dbPromise
-  const record = await db.get('imageMetadata', 'slideshow')
-  return record?.images ?? []
+  return db.get('sessionDirectoryHandles', sessionId)
 }
 
-export async function clearImageMetadata() {
+export async function clearDirectoryHandle(sessionId: string) {
   const db = await dbPromise
-  await db.delete('imageMetadata', 'slideshow')
+  await db.delete('sessionDirectoryHandles', sessionId)
+}
+
+export function loadSpotifyTokens() {
+  return readLegacyJson<SpotifyTokens | null>(legacyKeys.spotifyTokens, null)
+}
+
+export function saveSpotifyTokens(tokens: SpotifyTokens | null) {
+  if (!tokens) {
+    window.localStorage.removeItem(legacyKeys.spotifyTokens)
+    return
+  }
+  window.localStorage.setItem(legacyKeys.spotifyTokens, JSON.stringify(tokens))
+}
+
+function validateAssets(assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>) {
+  if (assets.length > sessionLimits.maxImageCount) {
+    throw new Error(`A session can contain at most ${sessionLimits.maxImageCount} images.`)
+  }
+
+  let total = 0
+  for (const asset of assets) {
+    if (asset.blob.size > sessionLimits.maxImageBytes) {
+      throw new Error(`${asset.filename} exceeds the ${formatBytes(sessionLimits.maxImageBytes)} per-image limit.`)
+    }
+    total += asset.blob.size
+  }
+
+  if (total > sessionLimits.maxTotalImageBytes) {
+    throw new Error(`Images exceed the ${formatBytes(sessionLimits.maxTotalImageBytes)} per-session limit.`)
+  }
+}
+
+function normalizeSessionName(name: string) {
+  return name.trim().slice(0, 80) || 'Untitled session'
+}
+
+function formatBytes(bytes: number) {
+  return `${Math.round(bytes / 1024 / 1024)} MB`
 }
