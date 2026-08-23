@@ -52,7 +52,7 @@ The app is a single-user MVP: it has no backend, accounts, cloud sync, or sharin
 
    If you serve the app at a different origin or port, update the redirect URI in Spotify and set the optional `VITE_SPOTIFY_REDIRECT_URI` value in `.env` to the same callback URL.
 
-> Keep `.env` private. It is intentionally excluded from version control.
+> Keep `.env` private. It is intentionally excluded from version control. The Spotify Client ID is public browser configuration; never place a Spotify client secret in this app or a `VITE_*` variable.
 
 ## Run locally
 
@@ -72,6 +72,19 @@ npm run build
 # Serve the production build locally
 npm run preview
 ```
+
+## Deploy to Vercel
+
+This repository includes `vercel.json`, which rewrites all routes to `index.html` so Spotify can return users to `/callback` in this Vite SPA.
+
+Before production deployment, set these Vercel Production environment variables and register the exact HTTPS callback URL in the Spotify Developer Dashboard:
+
+```dotenv
+VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
+VITE_SPOTIFY_REDIRECT_URI=https://your-domain.example/callback
+```
+
+Use [VERCEL_DEPLOYMENT_CHECKLIST.md](VERCEL_DEPLOYMENT_CHECKLIST.md) for the complete DNS, OAuth, deployment, and hosted-browser verification steps.
 
 ## Using the workspace
 
