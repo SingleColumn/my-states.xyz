@@ -65,7 +65,8 @@ export function CanvasViewControls({
         onClick={onFitPanels}
       >
         <Focus size={16} aria-hidden="true" />
-        <span>Fit all</span>
+        <span className="canvas-control-label-long">Fit all</span>
+        <span className="canvas-control-label-short">Fit</span>
       </button>
       <button
         ref={triggerRef}

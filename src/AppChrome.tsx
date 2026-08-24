@@ -61,8 +61,13 @@ export function AppChrome({
 
   return (
     <div ref={rootRef} className="app-chrome" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-      <section className="app-chrome-identity" aria-label="Application and canvas controls">
+      <section className="app-chrome-identity" aria-label="Application identity">
         <strong>Music Images Canvas</strong>
+      </section>
+
+      <SessionToolbar />
+
+      <section className="app-chrome-canvas" aria-label="Canvas view controls">
         <button
           className="app-chrome-control app-chrome-pan-control"
           type="button"
@@ -72,7 +77,8 @@ export function AppChrome({
           onClick={onTogglePanMode}
         >
           <Hand size={16} aria-hidden="true" />
-          <span>{isPanMode ? 'Exit pan' : 'Pan canvas'}</span>
+          <span className="canvas-control-label-long">{isPanMode ? 'Exit pan mode' : 'Pan canvas'}</span>
+          <span className="canvas-control-label-short">{isPanMode ? 'Exit' : 'Pan'}</span>
         </button>
         <CanvasViewControls
           isReady={isCanvasReady}
@@ -84,7 +90,7 @@ export function AppChrome({
         />
       </section>
 
-      <SessionToolbar />
+      <div className="app-chrome-spacer" aria-hidden="true" />
 
       <nav className="app-chrome-tldraw" aria-label="Canvas history and page controls">
         <DefaultPageMenu />

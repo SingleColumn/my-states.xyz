@@ -48,17 +48,14 @@
     linear-gradient(135deg, var(--color-album-empty-highlight), transparent),
     var(--color-album-empty);
   --background-app-badge: rgba(12, 13, 15, 0.68);
-  --background-tldraw-controls: rgba(12, 13, 15, 0.64);
   --background-toast: rgba(14, 15, 18, 0.92);
 
   --shadow-panel: 0 26px 70px rgba(0, 0, 0, 0.34);
   --shadow-app-badge: 0 14px 34px rgba(0, 0, 0, 0.28);
   --shadow-album-art: 0 14px 32px rgba(0, 0, 0, 0.35);
-  --shadow-tldraw-controls: 0 14px 34px rgba(0, 0, 0, 0.24);
 
   --blur-app-badge: blur(18px);
   --blur-panel: blur(20px);
-  --blur-tldraw-controls: blur(18px);
 
   --font-size-panel-body: 13px;
   --font-size-panel-label: 12px;
@@ -105,20 +102,11 @@
   --space-panel-body-bottom: 16px;
   --space-control-gap: 10px;
   --space-control-inner-gap: 8px;
-  --space-top-toolbar-edge: 4px;
-  --space-top-toolbar-gap: 6px;
-  --space-top-toolbar-padding-block: 4px;
-  --space-top-toolbar-padding-inline: 10px;
-  --space-app-badge-left: var(--space-top-toolbar-edge);
-  --space-app-badge-top: var(--space-top-toolbar-edge);
-  --space-app-badge-gap: var(--space-top-toolbar-gap);
-  --space-app-badge-padding-y: var(--space-top-toolbar-padding-block);
-  --space-app-badge-padding-x: var(--space-top-toolbar-padding-inline);
-  --space-tldraw-controls-top: var(--space-top-toolbar-edge);
-  --space-tldraw-controls-right: var(--space-top-toolbar-edge);
-  --space-tldraw-controls-gap: var(--space-top-toolbar-gap);
-  --space-tldraw-controls-padding-block: var(--space-top-toolbar-padding-block);
-  --space-tldraw-controls-padding-inline: var(--space-top-toolbar-padding-inline);
+  --space-top-toolbar-edge: 6px;
+  --space-top-toolbar-gap: 5px;
+  --space-app-chrome-group-gap: 16px;
+  --space-top-toolbar-padding-block: 7px;
+  --space-top-toolbar-padding-inline: 14px;
   --space-toast-top: 22px;
   --space-toast-padding-y: 12px;
   --space-toast-padding-x: 14px;
@@ -166,21 +154,18 @@
   --size-toast-max-width: 520px;
   --size-toast-viewport-inset: 40px;
   --size-grid: 48px;
-  --size-top-toolbar-height: 40px;
-  --size-top-toolbar-control: 30px;
-  --size-session-selector-width: 220px;
+  --size-top-toolbar-height: 54px;
+  --size-top-toolbar-control: 36px;
+  --size-session-selector-width: 260px;
   --size-tldraw-control-button: var(--size-top-toolbar-control);
-  --size-tldraw-controls-max-width: calc(100vw - 32px);
-  --size-tldraw-page-selector-width: 148px;
+  --size-tldraw-page-selector-width: 112px;
   --z-app-badge: 5;
   --z-tldraw-controls: 6;
   --z-toast: 10;
 
   --radius-control: 12px;
   --radius-panel: 22px;
-  --radius-pill: 999px;
-  --radius-top-toolbar: 999px;
-  --radius-tldraw-controls: var(--radius-top-toolbar);
+  --radius-top-toolbar: 14px;
   --radius-toast: 12px;
   --radius-album-art: 14px;
   --radius-playlist-card: 12px;

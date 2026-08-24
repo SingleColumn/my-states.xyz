@@ -50,10 +50,10 @@ button {
 
 .app-chrome {
   display: grid;
-  grid-template-areas: "identity sessions tldraw";
-  grid-template-columns: minmax(max-content, 1fr) minmax(280px, auto) minmax(max-content, 1fr);
+  grid-template-areas: "identity sessions canvas spacer tldraw";
+  grid-template-columns: auto auto auto minmax(8px, 1fr) auto;
   align-items: center;
-  gap: var(--space-top-toolbar-gap);
+  column-gap: var(--space-app-chrome-group-gap);
   width: calc(100% - 2 * var(--space-top-toolbar-edge));
   min-height: var(--size-top-toolbar-height);
   margin: var(--space-top-toolbar-edge);
@@ -69,15 +69,14 @@ button {
 
 .app-chrome-identity {
   grid-area: identity;
-  display: flex;
-  align-items: center;
-  gap: var(--space-top-toolbar-gap);
   min-width: 0;
 }
 
 .app-chrome-identity strong {
   flex-shrink: 0;
+  white-space: nowrap;
   font-size: var(--font-size-app-badge-title);
+  font-weight: 680;
   line-height: var(--line-height-tight);
 }
 
@@ -86,13 +85,13 @@ button {
   grid-area: sessions;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-top-toolbar-gap);
   min-width: 0;
 }
 
 .session-toolbar select {
-  width: min(var(--size-session-selector-width), 28vw);
+  width: min(var(--size-session-selector-width), 22vw);
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
   padding: 0 8px;
@@ -108,6 +107,70 @@ button {
   width: var(--size-top-toolbar-control);
   height: var(--size-top-toolbar-control);
   min-width: var(--size-top-toolbar-control);
+}
+
+.session-action-transfer,
+.session-action-delete {
+  position: relative;
+  margin-left: 6px;
+}
+
+.session-action-transfer::before,
+.session-action-delete::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: -7px;
+  width: 1px;
+  background: var(--color-panel-divider);
+  content: "";
+}
+
+.session-action-delete:hover:not(:disabled),
+.session-actions-menu .is-destructive:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.session-toolbar .session-actions-menu-trigger {
+  display: none;
+}
+
+.session-actions-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: max-content;
+  min-width: 190px;
+  padding: 6px;
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-toast);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+}
+
+.session-actions-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-app-badge-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.session-actions-menu button:hover:not(:disabled) {
+  background: var(--card-button-bg-hover);
+}
+
+.session-actions-menu button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 .session-toolbar-error {
@@ -139,13 +202,15 @@ button {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-tldraw-controls-gap);
+  gap: var(--space-top-toolbar-gap);
+  padding-left: 12px;
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
   min-width: 0;
 }
 
 .app-chrome-tldraw .tlui-toolbar,
 .app-chrome-tldraw .tlui-buttons__horizontal {
-  gap: var(--space-tldraw-controls-gap);
+  gap: var(--space-top-toolbar-gap);
 }
 
 .app-chrome-tldraw .tlui-buttons__horizontal > * {
@@ -173,6 +238,9 @@ button {
   min-width: var(--size-tldraw-page-selector-width);
   padding: 0 12px;
   justify-content: space-between;
+  background: var(--card-button-bg);
+  font-size: var(--font-size-app-badge-meta);
+  font-weight: 500;
 }
 
 .app-chrome-tldraw .tlui-page-menu__name {
@@ -227,6 +295,23 @@ button {
   background: var(--card-button-bg);
   color: var(--card-button-icon-color);
   cursor: pointer;
+}
+
+.app-chrome-canvas {
+  grid-area: canvas;
+  display: flex;
+  align-items: center;
+  gap: var(--space-top-toolbar-gap);
+  padding-left: 12px;
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
+.app-chrome-spacer {
+  grid-area: spacer;
+}
+
+.canvas-control-label-short {
+  display: none;
 }
 
 .app-chrome-control:hover:not(:disabled) {
@@ -1351,23 +1436,44 @@ input[type="range"] {
   }
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1399px) {
   .app-chrome {
-    grid-template-areas:
-      "identity tldraw"
-      "sessions sessions";
-    grid-template-columns: minmax(0, 1fr) max-content;
-    border-radius: var(--radius-control);
+    column-gap: 12px;
+    padding-inline: 12px;
   }
 
   .session-toolbar select {
-    width: min(var(--size-session-selector-width), 46vw);
+    width: clamp(180px, 20vw, 220px);
+  }
+
+  .canvas-control-label-long {
+    display: none;
+  }
+
+  .canvas-control-label-short {
+    display: inline;
+  }
+
+  .app-chrome-tldraw .tlui-page-menu__trigger {
+    width: 104px;
+    min-width: 104px;
   }
 }
 
-@media (max-width: 900px) {
-  .app-chrome-pan-control span,
-  .app-chrome-fit-control span {
+@media (max-width: 1199px) {
+  .session-action-secondary {
+    display: none !important;
+  }
+
+  .session-toolbar .session-actions-menu-trigger {
+    display: inline-flex;
+  }
+
+  .session-toolbar select {
+    width: clamp(160px, 22vw, 200px);
+  }
+
+  .canvas-control-label-short {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1384,8 +1490,8 @@ input[type="range"] {
   }
 
   .app-chrome-tldraw .tlui-page-menu__trigger {
-    width: min(148px, 24vw);
-    min-width: min(148px, 24vw);
+    width: 96px;
+    min-width: 96px;
   }
 
   .session-toolbar-error {
@@ -1393,37 +1499,65 @@ input[type="range"] {
   }
 }
 
-@media (max-width: 780px) {
+@media (max-width: 799px) {
   .app-chrome {
     grid-template-areas:
-      "identity"
-      "tldraw"
-      "sessions";
-    grid-template-columns: minmax(0, 1fr);
+      "identity sessions sessions"
+      "canvas spacer tldraw";
+    grid-template-columns: auto minmax(8px, 1fr) auto;
+    row-gap: var(--space-top-toolbar-gap);
+    column-gap: 10px;
   }
 
-  .app-chrome-identity,
-  .app-chrome-tldraw,
   .session-toolbar {
-    justify-content: center;
+    justify-content: flex-end;
   }
 
-  .app-chrome-tldraw .tlui-page-menu__trigger {
-    width: var(--size-tldraw-page-selector-width);
-    min-width: var(--size-tldraw-page-selector-width);
+  .app-chrome-canvas {
+    padding-left: 0;
+    border-left: 0;
   }
 
   .session-toolbar select {
-    width: min(var(--size-session-selector-width), calc(100vw - 210px));
+    width: clamp(130px, 30vw, 190px);
   }
 }
 
 @media (max-width: 520px) {
+  .app-chrome {
+    grid-template-areas:
+      "identity sessions"
+      "canvas spacer"
+      "tldraw tldraw";
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .app-chrome-identity strong {
-    max-width: 150px;
+    display: block;
+    max-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .session-toolbar select {
+    width: clamp(105px, 28vw, 145px);
+  }
+
+  .app-chrome-tldraw {
+    justify-content: center;
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-chrome-identity strong {
+    max-width: 78px;
+  }
+
+  .session-toolbar select {
+    width: 100px;
   }
 }
 
