@@ -43,6 +43,13 @@ export interface SpotifyTrackSummary {
   durationMs: number
 }
 
+export type SpotifyPlaybackAction = 'toggle-current' | 'load-saved-playlist' | 'missing-playlist'
+
+export function getSpotifyPlaybackAction(hasCurrentTrack: boolean, playlistUri: string | null): SpotifyPlaybackAction {
+  if (hasCurrentTrack) return 'toggle-current'
+  return playlistUri ? 'load-saved-playlist' : 'missing-playlist'
+}
+
 function getClientId() {
   return import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() ?? ''
 }

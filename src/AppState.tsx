@@ -35,6 +35,7 @@ import { downloadSessionArchive, exportSessionArchive, importSessionArchive } fr
 import { createId } from './utils'
 import {
   exchangeSpotifyCode,
+  getSpotifyPlaybackAction,
   mapPlaylist,
   mapTrack,
   parseSpotifyPlaylistUrl,
@@ -807,9 +808,24 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify])
 
+  const togglePlay = useCallback(async () => {
+    const action = getSpotifyPlaybackAction(Boolean(track), playlist.uri)
+    if (action === 'load-saved-playlist') {
+      await playPlaylist()
+      return
+    }
+    if (action === 'missing-playlist') {
+      throw new Error('Load or choose a playlist before starting playback.')
+    }
+
+    const player = playerRef.current
+    if (!player) throw new Error('Spotify browser device is not ready yet.')
+    await player.togglePlay()
+  }, [playPlaylist, playlist.uri, track])
+
   return {
     tokens, playlist, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
-    togglePlay: async () => playerRef.current?.togglePlay(),
+    togglePlay,
     previousTrack: async () => playerRef.current?.previousTrack(),
     nextTrack: async () => playerRef.current?.nextTrack(),
     setVolume: async (value) => playerRef.current?.setVolume(value),
