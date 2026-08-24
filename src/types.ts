@@ -98,6 +98,7 @@ export interface SpotifyTrackState {
   artist: string
   album: string
   albumArt: string | null
+  url: string | null
   durationMs: number
   positionMs: number
   paused: boolean

@@ -45,6 +45,7 @@ declare global {
       track_window: {
         current_track: {
           name: string
+          uri?: string
           artists: Array<{ name: string }>
           album: {
             name: string

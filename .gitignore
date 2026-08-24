@@ -53,6 +53,8 @@ test-results/
 implementation-plan.md
 session-implementation-checklist.md
 spec.md
+VERCEL_DEPLOYMENT_CHECKLIST.md
+project_docs/
 
 # Temporary files
 tmp/

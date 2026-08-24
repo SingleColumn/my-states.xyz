@@ -7,6 +7,7 @@ import {
   TLBaseShape,
 } from 'tldraw'
 import type { PanelType } from './types'
+import { getCanonicalPanelLayout, getPanelMinimumSize } from './panelLayout'
 import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
@@ -32,9 +33,10 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   }
 
   override getDefaultProps(): PanelShape['props'] {
+    const layout = getCanonicalPanelLayout('slideshow')
     return {
-      w: 460,
-      h: 600,
+      w: layout.w,
+      h: layout.h,
       panelType: 'slideshow',
     }
   }
@@ -69,12 +71,13 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
 
   override onResize(shape: PanelShape, info: Parameters<BaseBoxShapeUtil<PanelShape>['onResize']>[1]) {
     const resized = super.onResize(shape, info) as PanelShape
+    const minimum = getPanelMinimumSize(shape.props.panelType as PanelType)
     return {
       ...resized,
       props: {
         ...resized.props,
-        w: Math.max(320, resized.props.w),
-        h: Math.max(260, resized.props.h),
+        w: Math.max(minimum.w, resized.props.w),
+        h: Math.max(minimum.h, resized.props.h),
       },
     }
   }

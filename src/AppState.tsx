@@ -41,6 +41,7 @@ import {
   refreshSpotifyToken,
   SpotifyPlaylistApiItem,
   SpotifyPlaylistSummary,
+  SpotifyAuthenticationError,
   SpotifyTrackApiItem,
   SpotifyTrackSummary,
   spotifyFetch,
@@ -83,12 +84,14 @@ interface SpotifyState {
   playlists: SpotifyPlaylistSummary[]
   tracks: SpotifyTrackSummary[]
   track: SpotifyTrackState | null
+  currentUrl: string | null
   deviceId: string | null
   isReady: boolean
   status: string
   error: string | null
   login(): Promise<void>
   logout(): void
+  clearSearchResults(): void
   handleCallback(code: string, state: string | null): Promise<void>
   searchPlaylists(query: string): Promise<void>
   searchTracks(query: string): Promise<void>
@@ -607,30 +610,67 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
   const [track, setTrack] = useState<SpotifyTrackState | null>(null)
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null)
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [status, setStatus] = useState('Log in to Spotify to play a playlist.')
   const [error, setError] = useState<string | null>(null)
   const playerRef = useRef<Spotify.Player | null>(null)
+  const tokensRef = useRef(tokens)
+
+  useEffect(() => {
+    tokensRef.current = tokens
+  }, [tokens])
 
   useEffect(() => {
     setPlaylist(session?.spotify ?? defaultSpotifyPlaylistReference)
     setPlaylists([])
     setTracks([])
     setTrack(null)
+    setCurrentUrl(null)
   }, [session?.id])
 
   useEffect(() => {
     saveSpotifyTokens(tokens)
   }, [tokens])
 
+  const endExpiredSession = useCallback(() => {
+    playerRef.current?.disconnect()
+    playerRef.current = null
+    setTokens(null)
+    setDeviceId(null)
+    setIsReady(false)
+    setTrack(null)
+    setCurrentUrl(null)
+    setStatus('Your Spotify session has expired. Log in again to continue playback.')
+    setError(null)
+  }, [])
+
   const ensureFreshTokens = useCallback(async () => {
     if (!tokens) throw new Error('Log in to Spotify first.')
     if (tokens.expiresAt - Date.now() > 60_000) return tokens
-    const refreshed = await refreshSpotifyToken(tokens)
-    setTokens(refreshed)
-    return refreshed
-  }, [tokens])
+    try {
+      const refreshed = await refreshSpotifyToken(tokens)
+      if (refreshed.expiresAt <= Date.now()) throw new Error('Spotify session has expired.')
+      setTokens(refreshed)
+      return refreshed
+    } catch {
+      endExpiredSession()
+      throw new Error('Your Spotify session has expired. Log in again to continue playback.')
+    }
+  }, [endExpiredSession, tokens])
+
+  const requestSpotify = useCallback(async <T,>(request: () => Promise<T>) => {
+    try {
+      return await request()
+    } catch (caught) {
+      if (caught instanceof SpotifyAuthenticationError) {
+        endExpiredSession()
+        throw new Error('Your Spotify session has expired. Log in again to continue playback.')
+      }
+      throw caught
+    }
+  }, [endExpiredSession])
 
   useEffect(() => {
     if (!tokens?.accessToken || playerRef.current) return
@@ -639,7 +679,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
       try {
         await loadSpotifySdk()
         if (cancelled || !window.Spotify || !tokens?.accessToken) return
-        const player = new window.Spotify.Player({ name: 'Music Images Canvas', getOAuthToken: (callback) => callback(tokens.accessToken), volume: 0.7 })
+        const player = new window.Spotify.Player({ name: 'Music Images Canvas', getOAuthToken: (callback) => callback(tokensRef.current?.accessToken ?? ''), volume: 0.7 })
         player.addListener('ready', ({ device_id }) => {
           setDeviceId(device_id)
           setIsReady(true)
@@ -653,14 +693,15 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
         player.addListener('player_state_changed', (state) => {
           if (!state) return
           const current = state.track_window.current_track
-          setTrack({ title: current.name, artist: current.artists.map((artist) => artist.name).join(', '), album: current.album.name, albumArt: current.album.images[0]?.url ?? null, durationMs: state.duration, positionMs: state.position, paused: state.paused })
+          setTrack({ title: current.name, artist: current.artists.map((artist) => artist.name).join(', '), album: current.album.name, albumArt: current.album.images[0]?.url ?? null, url: spotifyUrlFromUri(current.uri), durationMs: state.duration, positionMs: state.position, paused: state.paused })
+          setCurrentUrl(spotifyUrlFromUri(current.uri))
         })
         const handleError = (event: Spotify.WebPlaybackError) => {
           setError(event.message)
           setStatus('Spotify playback needs attention.')
         }
         player.addListener('initialization_error', handleError)
-        player.addListener('authentication_error', handleError)
+        player.addListener('authentication_error', endExpiredSession)
         player.addListener('account_error', handleError)
         player.addListener('playback_error', handleError)
         playerRef.current = player
@@ -673,7 +714,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     return () => {
       cancelled = true
     }
-  }, [tokens?.accessToken])
+  }, [endExpiredSession, tokens?.accessToken])
 
   const setSessionPlaylist = useCallback((next: SpotifyPlaylistReference) => {
     setPlaylist(next)
@@ -681,6 +722,10 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
   }, [patchSession])
 
   const login = useCallback(async () => startSpotifyLogin(), [])
+  const clearSearchResults = useCallback(() => {
+    setPlaylists([])
+    setTracks([])
+  }, [])
   const logout = useCallback(() => {
     playerRef.current?.disconnect()
     playerRef.current = null
@@ -688,6 +733,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     setDeviceId(null)
     setIsReady(false)
     setTrack(null)
+    setCurrentUrl(null)
     setStatus('Logged out of Spotify.')
   }, [])
   const handleCallback = useCallback(async (code: string, state: string | null) => {
@@ -701,18 +747,18 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
       setPlaylists([])
       return
     }
-    const result = await spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: '0' }).toString()}`, fresh.accessToken)
+    const result = await requestSpotify(() => spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: '0' }).toString()}`, fresh.accessToken))
     const items = [...result.playlists.items]
     let next = result.playlists.next
     for (let offset = 10; next && offset < 50; offset += 10) {
-      const page = await spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: String(offset) }).toString()}`, fresh.accessToken)
+      const page = await requestSpotify(() => spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: String(offset) }).toString()}`, fresh.accessToken))
       items.push(...page.playlists.items)
       next = page.playlists.next
     }
     const mapped = items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist)
     setPlaylists([...new Map(mapped.map((item) => [item.id, item])).values()])
     setError(null)
-  }, [ensureFreshTokens])
+  }, [ensureFreshTokens, requestSpotify])
 
   const searchTracks = useCallback(async (query: string) => {
     const trimmed = query.trim()
@@ -721,54 +767,68 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
       return
     }
     const fresh = await ensureFreshTokens()
-    const result = await spotifyFetch<{ tracks: { items: Array<SpotifyTrackApiItem | null> } }>(
+    const result = await requestSpotify(() => spotifyFetch<{ tracks: { items: Array<SpotifyTrackApiItem | null> } }>(
       `/search?${new URLSearchParams({ q: buildTrackSearchQuery(trimmed), type: 'track', limit: '10' }).toString()}`,
       fresh.accessToken,
-    )
+    ))
     const mapped = result.tracks.items.filter(isSpotifyTrackApiItem).map(mapTrack)
     setTracks(rankTracks(mapped, trimmed))
     setError(null)
-  }, [ensureFreshTokens])
+  }, [ensureFreshTokens, requestSpotify])
 
   const loadPlaylistFromUrl = useCallback(async (url: string) => {
     const id = parseSpotifyPlaylistUrl(url)
     if (!id) throw new Error('Paste a valid Spotify playlist URL or URI.')
-    const item = await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${id}`, (await ensureFreshTokens()).accessToken)
+    const fresh = await ensureFreshTokens()
+    const item = await requestSpotify(() => spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${id}`, fresh.accessToken))
     const summary = mapPlaylist(item)
-    setSessionPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url })
+    const selected = { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url }
+    if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
+    await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
+    await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
+    setSessionPlaylist(selected)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
+    setCurrentUrl(summary.url)
+    setStatus(`Playing ${summary.name}.`)
     setError(null)
-  }, [ensureFreshTokens, setSessionPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, setSessionPlaylist])
 
   const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary) => {
     const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : playlist
     if (!selected.uri) throw new Error('Choose a playlist first.')
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()
-    await spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) })
-    await spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) })
+    await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
+    await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
     setSessionPlaylist(selected)
+    setCurrentUrl(selected.url)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, playlist, setSessionPlaylist])
+  }, [deviceId, ensureFreshTokens, playlist, requestSpotify, setSessionPlaylist])
 
   const playTrack = useCallback(async (summary: SpotifyTrackSummary) => {
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()
-    await spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) })
-    await spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) })
+    await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
+    await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) }))
+    setCurrentUrl(summary.url)
     setStatus(`Playing ${summary.name} by ${summary.artists}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens])
+  }, [deviceId, ensureFreshTokens, requestSpotify])
 
   return {
-    tokens, playlist, playlists, tracks, track, deviceId, isReady, status, error, login, logout, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
+    tokens, playlist, playlists, tracks, track, currentUrl, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
     togglePlay: async () => playerRef.current?.togglePlay(),
     previousTrack: async () => playerRef.current?.previousTrack(),
     nextTrack: async () => playerRef.current?.nextTrack(),
     setVolume: async (value) => playerRef.current?.setVolume(value),
     seek: async (positionMs) => playerRef.current?.seek(positionMs),
   }
+}
+
+function spotifyUrlFromUri(uri?: string) {
+  const match = uri?.match(/^spotify:(track|episode):([A-Za-z0-9]+)$/)
+  return match ? `https://open.spotify.com/${match[1]}/${match[2]}` : null
 }
 
 function isSpotifyTrackApiItem(item: SpotifyTrackApiItem | null): item is SpotifyTrackApiItem {

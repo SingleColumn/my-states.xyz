@@ -1,10 +1,11 @@
-import { type SyntheticEvent, useState } from 'react'
+import { type SyntheticEvent, useEffect, useState } from 'react'
 import {
   ExternalLink,
   LogIn,
   LogOut,
   Pause,
   Play,
+  RotateCcw,
   Search,
   SkipBack,
   SkipForward,
@@ -17,7 +18,7 @@ export function SpotifyPanel() {
   const { spotify } = useAppState()
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'tracks' | 'playlists'>('tracks')
-  const [playlistUrl, setPlaylistUrl] = useState(spotify.playlist.url ?? '')
+  const [playlistUrl, setPlaylistUrl] = useState(spotify.currentUrl ?? '')
   const [volume, setVolume] = useState(70)
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -35,6 +36,17 @@ export function SpotifyPanel() {
   }
 
   const error = localError ?? spotify.error
+
+  useEffect(() => {
+    if (spotify.currentUrl) setPlaylistUrl(spotify.currentUrl)
+  }, [spotify.currentUrl])
+
+  function resetFields() {
+    setQuery('')
+    setPlaylistUrl('')
+    setLocalError(null)
+    spotify.clearSearchResults()
+  }
 
   return (
     <section className="panel panel-spotify-surface">
@@ -133,31 +145,36 @@ export function SpotifyPanel() {
               className="input-row"
               onSubmit={(event) => {
                 event.preventDefault()
+                void run(() => spotify.loadPlaylistFromUrl(playlistUrl))
+              }}
+            >
+              <input value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Current song or playlist URL" />
+              <button className="card-icon-button" type="submit" title="Play playlist URL" disabled={busy}>
+                <ExternalLink size={18} aria-label="Play playlist URL" />
+              </button>
+            </form>
+
+            <form
+              className="input-row spotify-search-row"
+              onSubmit={(event) => {
+                event.preventDefault()
                 void run(() => searchType === 'tracks' ? spotify.searchTracks(query) : spotify.searchPlaylists(query))
               }}
             >
               <select aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
-                <option value="tracks">Tracks</option>
-                <option value="playlists">Playlists</option>
+                <option value="tracks">Song</option>
+                <option value="playlists">Playlist</option>
               </select>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchType === 'tracks' ? 'Song - artist' : 'Search playlists'} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchType === 'tracks' ? 'Search songs' : 'Search playlists'} />
               <button className="card-icon-button" type="submit" title={`Search ${searchType}`} disabled={busy}>
                 <Search size={18} />
               </button>
             </form>
 
-            <form
-              className="input-row"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void run(() => spotify.loadPlaylistFromUrl(playlistUrl))
-              }}
-            >
-              <input value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Paste playlist URL" />
-              <button className="card-icon-button" type="submit" title="Load playlist URL" disabled={busy}>
-                <ExternalLink size={18} />
-              </button>
-            </form>
+            <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields}>
+              <RotateCcw size={18} />
+              Reset fields
+            </button>
 
             {searchType === 'tracks' ? (
               <div className="playlist-list" aria-label="Track search results">
@@ -201,7 +218,7 @@ export function SpotifyPanel() {
           {error ? (
             <span className="error-text">{error}</span>
           ) : (
-            <span>{spotify.tokens ? (spotify.isReady ? 'Ready' : spotify.status) : 'Logged out'}</span>
+            <span>{spotify.tokens && spotify.isReady ? 'Ready' : spotify.status}</span>
           )}
         </div>
       </footer>

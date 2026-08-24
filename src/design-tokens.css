@@ -147,6 +147,8 @@
   --space-notes-toolbar-gap: 6px;
 
   --size-play-button: 46px;
+  --size-control-icon: 18px;
+  --size-primary-icon: 20px;
   --size-primary-button-min: 118px;
   --size-primary-button-padding-x: 15px;
   --size-input-height: 38px;
@@ -154,7 +156,6 @@
   --size-volume-min: 110px;
   --size-album-art: 92px;
   --size-album-frame-max: 220px;
-  --size-playlist-list-max-height: 176px;
   --size-playlist-art: 42px;
   --size-note-title-height: 30px;
   --size-note-title-max-width: 290px;
@@ -249,23 +250,58 @@
  */
 .panel {
   /* Scale the shared UI with its canvas panel, not with the browser viewport. */
-  --font-size-panel-body: clamp(20px, 2.2cqi, 30px);
-  --font-size-panel-label: clamp(18px, 1.9cqi, 25px);
-  --font-size-spotify-login-title: clamp(32px, 3.4cqi, 50px);
-  --font-size-track-title: clamp(30px, 3.8cqi, 56px);
-  --font-size-track-meta: clamp(20px, 2.3cqi, 30px);
-  --font-size-progress: clamp(17px, 1.8cqi, 23px);
-  --font-size-playlist-title: clamp(20px, 2.1cqi, 28px);
-  --font-size-playlist-meta: clamp(17px, 1.8cqi, 23px);
-  --image-panel-label-size: clamp(20px, 2.2cqi, 30px);
-  --image-panel-status-size: clamp(22px, 2.8cqi, 36px);
-  --card-eyebrow-size: clamp(14px, 1.4cqi, 18px);
-  --card-title-size: clamp(28px, 3cqi, 42px);
-  --card-footer-meta-size: clamp(17px, 1.6cqi, 22px);
-  --card-header-button-size: clamp(38px, 3.4cqi, 52px);
-  --card-footer-button-size: clamp(32px, 2.7cqi, 40px);
-  --size-play-button: clamp(56px, 4.8cqi, 72px);
-  --size-input-height: clamp(46px, 3.6cqi, 56px);
+  --font-size-panel-body: clamp(13px, calc(7px + 1.2cqmin), 24px);
+  --font-size-panel-label: clamp(12px, calc(7px + 1.1cqmin), 21px);
+  --font-size-spotify-login-title: clamp(20px, calc(10px + 2.2cqmin), 38px);
+  --font-size-track-title: clamp(18px, calc(8px + 2.6cqmin), 44px);
+  --font-size-track-meta: clamp(13px, calc(8px + 1.2cqmin), 23px);
+  --font-size-progress: clamp(11px, calc(7px + 0.9cqmin), 18px);
+  --font-size-playlist-title: clamp(13px, calc(7.5px + 1.2cqmin), 22px);
+  --font-size-playlist-meta: clamp(11.5px, calc(7px + 1cqmin), 19px);
+  --image-panel-label-size: clamp(13px, calc(7px + 1.3cqmin), 23px);
+  --image-panel-status-size: clamp(14px, calc(7px + 1.6cqmin), 28px);
+  --card-eyebrow-size: clamp(10.5px, calc(8px + 0.7cqmin), 17px);
+  --card-title-size: clamp(18px, calc(10px + 2.2cqmin), 40px);
+  --card-footer-meta-size: clamp(11px, calc(7px + 1cqmin), 19px);
+  --card-header-button-size: clamp(30px, calc(22px + 1.8cqmin), 50px);
+  --card-footer-button-size: clamp(26px, calc(20px + 1.4cqmin), 38px);
+  --size-play-button: clamp(44px, calc(32px + 3cqmin), 72px);
+  --size-input-height: clamp(34px, calc(26px + 1.8cqmin), 54px);
+  --size-control-icon: clamp(16px, calc(12px + 0.9cqmin), 22px);
+  --size-primary-icon: clamp(18px, calc(13px + 1.2cqmin), 27px);
+
+  --card-padding: clamp(12px, calc(6px + 1.5cqmin), 24px);
+  --space-panel-header-gap: clamp(8px, calc(4px + 1cqmin), 16px);
+  --space-panel-body-x: clamp(12px, calc(7px + 1.2cqmin), 24px);
+  --space-panel-body-top: clamp(10px, calc(6px + 1cqmin), 18px);
+  --space-panel-body-bottom: clamp(12px, calc(7px + 1.1cqmin), 20px);
+  --space-control-gap: clamp(8px, calc(4px + 1cqmin), 16px);
+  --space-control-inner-gap: clamp(6px, calc(3px + 0.8cqmin), 12px);
+  --space-input-row-top: clamp(7px, calc(3px + 0.9cqmin), 14px);
+  --space-row-gap: clamp(6px, calc(3px + 0.9cqmin), 14px);
+  --space-row-bottom: clamp(8px, calc(4px + 1cqmin), 16px);
+  --space-now-playing-bottom: clamp(8px, calc(4px + 1.2cqmin), 19px);
+  --space-track-title-bottom: clamp(4px, calc(2px + 0.6cqmin), 9px);
+  --space-playlist-gap: clamp(6px, calc(3px + 0.8cqmin), 12px);
+  --space-playlist-top: clamp(8px, calc(4px + 1cqmin), 16px);
+  --space-playlist-padding: clamp(6px, calc(3px + 0.8cqmin), 12px);
+  --space-playlist-image-gap: clamp(7px, calc(3px + 1cqmin), 14px);
+  --space-slideshow-controls-top: clamp(10px, calc(5px + 1.2cqmin), 20px);
+  --space-range-bottom: clamp(10px, calc(5px + 1.2cqmin), 20px);
+  --space-zoom-bottom: clamp(8px, calc(4px + 1cqmin), 16px);
+  --space-notes-gap: clamp(8px, calc(4px + 1cqmin), 16px);
+
+  --size-album-frame-max: clamp(84px, 18cqmin, 240px);
+  --size-playlist-art: clamp(38px, calc(28px + 2.6cqmin), 64px);
+  --size-volume-min: clamp(90px, 15cqi, 180px);
+  --size-primary-button-min: clamp(100px, calc(80px + 5cqmin), 160px);
+  --size-primary-button-padding-x: clamp(11px, calc(6px + 1.2cqmin), 18px);
+  --size-input-padding-x: clamp(10px, calc(6px + 1cqmin), 16px);
+  --size-empty-stage-button: clamp(56px, 13cqmin, 112px);
+  --size-empty-stage-copy-max: clamp(220px, 55cqi, 420px);
+  --image-panel-control-x: clamp(12px, calc(6px + 1.5cqmin), 28px);
+  --image-panel-control-bottom: clamp(12px, calc(6px + 1.4cqmin), 26px);
+  --image-panel-control-gap: clamp(10px, calc(5px + 1.2cqmin), 22px);
 
   --card-eyebrow-color: color-mix(in srgb, var(--accent) 50%, rgba(255, 255, 255, 0.5));
   --card-content-bg: color-mix(in srgb, var(--accent) 7%, transparent);
@@ -289,15 +325,15 @@
 .panel-notes-surface {
   --accent: #8fb7a2;
   --bg: #101918;
-  --font-size-notes-panel-title: clamp(28px, 3cqi, 42px);
-  --font-size-notes-control-label: clamp(18px, 1.9cqi, 25px);
-  --font-size-notes-control: clamp(22px, 2.3cqi, 30px);
-  --font-size-notes-selector: clamp(20px, 2.1cqi, 28px);
-  --font-size-notes-footer: clamp(17px, 1.6cqi, 22px);
-  --font-size-notes-editor: clamp(24px, 2.7cqi, 36px);
-  --font-size-notes-code-editor: clamp(22px, 2.3cqi, 32px);
-  --font-size-notes-toolbar: clamp(18px, 1.8cqi, 23px);
-  --font-size-notes-heading-1: clamp(46px, 5cqi, 68px);
-  --font-size-notes-heading-2: clamp(37px, 4.1cqi, 56px);
-  --font-size-notes-heading-3: clamp(30px, 3.4cqi, 46px);
+  --font-size-notes-panel-title: clamp(18px, calc(10px + 2.2cqmin), 40px);
+  --font-size-notes-control-label: clamp(12px, calc(7px + 1.1cqmin), 21px);
+  --font-size-notes-control: clamp(13px, calc(8px + 1.2cqmin), 23px);
+  --font-size-notes-selector: clamp(13px, calc(8px + 1.1cqmin), 22px);
+  --font-size-notes-footer: clamp(11px, calc(7px + 1cqmin), 19px);
+  --font-size-notes-editor: clamp(15px, calc(10px + 1.1cqmin), 23px);
+  --font-size-notes-code-editor: clamp(14px, calc(9px + 1.1cqmin), 22px);
+  --font-size-notes-toolbar: clamp(13px, calc(9px + 0.9cqmin), 20px);
+  --font-size-notes-heading-1: clamp(28px, calc(14px + 3.2cqmin), 54px);
+  --font-size-notes-heading-2: clamp(24px, calc(13px + 2.6cqmin), 46px);
+  --font-size-notes-heading-3: clamp(20px, calc(12px + 2cqmin), 38px);
 }

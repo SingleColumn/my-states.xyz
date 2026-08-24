@@ -5,6 +5,13 @@ const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 const PKCE_VERIFIER_KEY = 'mic:spotify-code-verifier'
 const PKCE_STATE_KEY = 'mic:spotify-state'
 
+export class SpotifyAuthenticationError extends Error {
+  constructor(message = 'Spotify did not accept this session.') {
+    super(message)
+    this.name = 'SpotifyAuthenticationError'
+  }
+}
+
 export const spotifyScopes = [
   'streaming',
   'user-read-email',
@@ -211,6 +218,7 @@ export async function spotifyFetch<T>(path: string, accessToken: string, init?: 
 
   if (!response.ok) {
     const message = await readSpotifyErrorMessage(response)
+    if (response.status === 401) throw new SpotifyAuthenticationError(message ?? undefined)
     throw new Error(message ? `Spotify request failed (${response.status}): ${message}` : `Spotify request failed (${response.status}).`)
   }
 

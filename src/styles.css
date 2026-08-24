@@ -234,7 +234,7 @@ button {
   line-height: var(--line-height-tight);
 }
 
-.app-badge-pan-control {
+.app-badge-control {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -247,15 +247,72 @@ button {
   cursor: pointer;
 }
 
-.app-badge-pan-control:hover {
+.app-badge-control:hover:not(:disabled) {
   color: var(--card-button-active-icon);
   background: var(--card-button-bg-hover);
 }
 
-.app-badge-pan-control[aria-pressed="true"] {
+.app-badge-control[aria-pressed="true"],
+.app-badge-control[aria-expanded="true"] {
   color: var(--card-button-active-icon);
   border-color: var(--card-button-active-border);
   background: var(--card-button-active-bg);
+}
+
+.app-badge-control:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.canvas-view-controls {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-badge-menu-trigger {
+  width: var(--size-top-toolbar-control);
+  justify-content: center;
+  padding: 0;
+}
+
+.canvas-view-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: max-content;
+  min-width: 220px;
+  padding: 6px;
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-toast);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+}
+
+.canvas-view-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-app-badge-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.canvas-view-menu button:hover:not(:disabled) {
+  background: var(--card-button-bg-hover);
+}
+
+.canvas-view-menu button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 .callback-toast {
@@ -309,6 +366,12 @@ button {
 
 .panel-spotify-surface {
   background: var(--card-bg-gradient);
+}
+
+.panel-spotify-surface .panel-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .panel-slideshow-surface {
@@ -423,6 +486,17 @@ button {
   height: var(--size-play-button);
 }
 
+.card-icon-button svg {
+  width: var(--size-control-icon);
+  height: var(--size-control-icon);
+}
+
+.card-icon-button.is-large svg,
+.empty-stage-button svg {
+  width: var(--size-primary-icon);
+  height: var(--size-primary-icon);
+}
+
 .card-icon-button.is-wide {
   width: auto;
   min-width: var(--size-primary-button-min);
@@ -448,6 +522,7 @@ button {
 }
 
 .card-footer-meta {
+  min-width: 0;
   overflow: hidden;
   color: var(--card-footer-meta-color);
   font-size: var(--card-footer-meta-size);
@@ -462,6 +537,14 @@ button {
   gap: var(--space-control-inner-gap);
   color: var(--color-text-muted);
   font-size: var(--card-footer-meta-size);
+  max-width: 58%;
+  min-width: 0;
+}
+
+.card-footer-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-footer-button {
@@ -620,10 +703,22 @@ input[type="range"] {
   padding: 0 var(--size-input-padding-x);
 }
 
+.input-row select {
+  flex: 0 0 160px;
+  width: 160px;
+  height: var(--size-input-height);
+  padding: 0 var(--size-input-padding-x);
+}
+
+.spotify-reset-button {
+  margin-top: var(--space-input-row-top);
+}
+
 .playlist-list {
   display: grid;
+  flex: 1 1 0;
+  min-height: 0;
   gap: var(--space-playlist-gap);
-  max-height: var(--size-playlist-list-max-height);
   margin-top: var(--space-playlist-top);
   overflow: auto;
   padding-right: var(--space-playlist-padding-inline-end);
@@ -811,6 +906,8 @@ input[type="range"] {
 
 .slideshow-controls {
   min-height: 0;
+  max-height: min(42cqb, 320px);
+  overflow: auto;
   padding: var(--space-slideshow-controls-top) var(--image-panel-control-x)
     var(--image-panel-control-bottom);
 }
@@ -1118,20 +1215,108 @@ input[type="range"] {
   place-self: center;
 }
 
-@container panel-shell (max-width: 390px) {
+@container panel-shell (max-width: 520px) {
+  .panel-spotify-surface .panel-body {
+    overflow: auto;
+  }
+
+  .panel-spotify-surface .transport-row {
+    flex-wrap: wrap;
+  }
+
+  .panel-spotify-surface .volume-control {
+    flex-basis: 100%;
+  }
+
+  .spotify-search-row {
+    flex-wrap: wrap;
+  }
+
+  .spotify-search-row select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .panel-spotify-surface .playlist-list {
+    flex: 0 0 auto;
+    max-height: clamp(110px, 28cqb, 260px);
+  }
+
+  .range-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zoom-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .zoom-row label {
+    grid-column: 1 / -1;
+  }
+
   .notes-document-controls {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@container panel-shell (min-width: 720px) and (min-height: 620px) {
-  .notes-document-controls {
-    gap: 16px;
+@container panel-shell (max-height: 520px) {
+  .panel {
+    --space-panel-body-top: 8px;
+    --space-panel-body-bottom: 8px;
+    --space-row-bottom: 7px;
+    --space-now-playing-bottom: 7px;
+    --space-input-row-top: 6px;
   }
 
-  .note-select,
-  .notes-document-controls .note-title-input {
-    height: 46px;
+  .panel-spotify-surface {
+    --size-album-frame-max: clamp(64px, 14cqmin, 100px);
+  }
+
+  .panel-spotify-surface .panel-body {
+    overflow: auto;
+  }
+
+  .panel-spotify-surface .track-meta {
+    -webkit-line-clamp: 1;
+  }
+
+  .panel-spotify-surface .playlist-list {
+    flex: 0 0 auto;
+    max-height: clamp(96px, 28cqb, 150px);
+  }
+
+  .slideshow-controls {
+    max-height: 42cqb;
+  }
+
+  .notes-document-controls {
+    gap: 7px;
+  }
+
+  .notes-editor-toolbar {
+    max-height: 38cqb;
+    overflow-y: auto !important;
+  }
+}
+
+@container panel-shell (min-width: 900px) and (min-height: 700px) {
+  .notes-document-controls {
+    gap: clamp(16px, 2cqmin, 24px);
+  }
+
+  .panel-spotify-surface .playlist-list {
+    min-height: 180px;
+  }
+
+  .slideshow-controls {
+    max-height: 340px;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-badge > strong,
+  .app-badge > span {
+    display: none;
   }
 }
 
