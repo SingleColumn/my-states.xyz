@@ -1,18 +1,20 @@
-import { Focus, MoreHorizontal, PanelsTopLeft, PanelTop } from 'lucide-react'
+import { Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 interface CanvasViewControlsProps {
   isReady: boolean
-  canResetSelectedPanel: boolean
+  canUseSelectedPanel: boolean
   onFitPanels(): void
+  onFitSelectedPanel(): void
   onResetSelectedPanel(): void
   onResetPanelLayout(): void
 }
 
 export function CanvasViewControls({
   isReady,
-  canResetSelectedPanel,
+  canUseSelectedPanel,
   onFitPanels,
+  onFitSelectedPanel,
   onResetSelectedPanel,
   onResetPanelLayout,
 }: CanvasViewControlsProps) {
@@ -55,18 +57,19 @@ export function CanvasViewControls({
       onPointerDown={(event) => event.stopPropagation()}
     >
       <button
-        className="app-badge-control"
+        className="app-chrome-control app-chrome-fit-control"
         type="button"
+        aria-label="Fit all panels"
         title="Fit all panels into view"
         disabled={!isReady}
         onClick={onFitPanels}
       >
         <Focus size={16} aria-hidden="true" />
-        <span>Fit panels</span>
+        <span>Fit all</span>
       </button>
       <button
         ref={triggerRef}
-        className="app-badge-control app-badge-menu-trigger"
+        className="app-chrome-control app-chrome-menu-trigger"
         type="button"
         title="Panel view and layout actions"
         aria-label="Open panel view and layout actions"
@@ -82,8 +85,18 @@ export function CanvasViewControls({
           <button
             type="button"
             role="menuitem"
-            disabled={!canResetSelectedPanel}
-            title={canResetSelectedPanel ? 'Reset the selected panel to its default size' : 'Select exactly one panel to reset its size'}
+            disabled={!canUseSelectedPanel}
+            title={canUseSelectedPanel ? 'Fit the selected panel into the usable workspace' : 'Select exactly one panel to fit it'}
+            onClick={() => runMenuAction(onFitSelectedPanel)}
+          >
+            <FocusIcon size={16} aria-hidden="true" />
+            <span>Fit selected panel</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!canUseSelectedPanel}
+            title={canUseSelectedPanel ? 'Reset the selected panel to its default size' : 'Select exactly one panel to reset its size'}
             onClick={() => runMenuAction(onResetSelectedPanel)}
           >
             <PanelTop size={16} aria-hidden="true" />

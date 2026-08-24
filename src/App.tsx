@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Hand } from 'lucide-react'
-import { Box, Editor, Tldraw, TLShape } from 'tldraw'
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Editor, Tldraw, TLShape } from 'tldraw'
+import { AppChrome, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
-import { CanvasViewControls } from './CanvasViewControls'
+import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { PANEL_SHAPE_TYPE, PanelShape, PanelShapeUtil } from './PanelShape'
 import { mergePanelLayouts, resetAllPanelLayouts, resetPanelLayoutSize } from './panelLayout'
-import { SessionToolbar } from './SessionToolbar'
 import { debounce } from './utils'
 import type { CanvasState, PanelLayout, PanelType } from './types'
 
@@ -25,7 +24,9 @@ function AppContent() {
   const [isPanMode, setIsPanMode] = useState(false)
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
   const [isCanvasReady, setIsCanvasReady] = useState(false)
+  const [chromeHeight, setChromeHeight] = useState(0)
   const editorRef = useRef<Editor | null>(null)
+  const chromeRectRef = useRef<AppChromeRect | null>(null)
   const restoringCanvasRef = useRef(false)
   const programmaticCanvasMutationRef = useRef(false)
   const persistCanvasRef = useRef<ReturnType<typeof debounce> | null>(null)
@@ -83,7 +84,7 @@ function AppContent() {
       editor.selectNone()
       setSelectedPanelId(null)
       if (canvas?.camera) editor.setCamera(canvas.camera)
-      else fitPanelsInEditor(editor)
+      else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
     } finally {
       restoringCanvasRef.current = false
     }
@@ -163,7 +164,22 @@ function AppContent() {
       return
     }
     setCallbackStatus(null)
-    runProgrammaticCanvasMutation(fitPanelsInEditor)
+    runProgrammaticCanvasMutation((currentEditor) => {
+      fitBoundsInUsableViewport(currentEditor, getPanelBounds(currentEditor), chromeRectRef.current)
+    })
+  }, [runProgrammaticCanvasMutation])
+
+  const fitSelectedPanel = useCallback(() => {
+    const editor = editorRef.current
+    const bounds = editor ? getSelectedPanelPageBounds(editor) : null
+    if (!editor || !bounds) {
+      setCallbackStatus('Select exactly one panel to fit it into view.')
+      return
+    }
+    setCallbackStatus(null)
+    runProgrammaticCanvasMutation((currentEditor) => {
+      fitBoundsInUsableViewport(currentEditor, bounds, chromeRectRef.current)
+    })
   }, [runProgrammaticCanvasMutation])
 
   const resetSelectedPanel = useCallback(() => {
@@ -224,7 +240,7 @@ function AppContent() {
       if (duplicateIds.length) editor.deleteShapes(duplicateIds)
       editor.selectNone()
       setSelectedPanelId(null)
-      fitPanelsInEditor(editor)
+      fitBoundsInUsableViewport(editor, getPanelBounds(editor), chromeRectRef.current)
     })
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
   }, [runProgrammaticCanvasMutation])
@@ -238,9 +254,28 @@ function AppContent() {
     setIsPanMode(nextIsPanMode)
   }, [])
 
+  const handleChromeMeasure = useCallback((rect: AppChromeRect) => {
+    chromeRectRef.current = rect
+    setChromeHeight((current) => Math.abs(current - rect.height) < 0.5 ? current : rect.height)
+  }, [])
+
   useEffect(() => {
     if (editorRef.current && sessions.activeSession) restoreCanvas(editorRef.current, sessions.activeSession.canvas)
   }, [restoreCanvas, sessions.activeSession?.id])
+
+  const ChromeMenuPanel = useCallback(() => (
+    <AppChrome
+      isCanvasReady={isCanvasReady}
+      isPanMode={isPanMode}
+      canUseSelectedPanel={selectedPanelId !== null}
+      onTogglePanMode={togglePanMode}
+      onFitAllPanels={fitAllPanels}
+      onFitSelectedPanel={fitSelectedPanel}
+      onResetSelectedPanel={resetSelectedPanel}
+      onResetPanelLayout={resetPanelLayout}
+      onMeasure={handleChromeMeasure}
+    />
+  ), [fitAllPanels, fitSelectedPanel, handleChromeMeasure, isCanvasReady, isPanMode, resetPanelLayout, resetSelectedPanel, selectedPanelId, togglePanMode])
 
   const components = useMemo(
     () => ({
@@ -252,8 +287,10 @@ function AppContent() {
       StylePanel: null,
       Toolbar: null,
       NavigationPanel: null,
+      MenuPanel: ChromeMenuPanel,
+      TopPanel: null,
     }),
-    [],
+    [ChromeMenuPanel],
   )
 
   if (!sessions.isReady) {
@@ -261,31 +298,8 @@ function AppContent() {
   }
 
   return (
-    <main className="app-root">
+    <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
       <Tldraw shapeUtils={shapeUtils} components={components} onMount={handleMount} />
-      <SessionToolbar />
-      <div className="app-badge">
-        <strong>Music Images Canvas</strong>
-        <span>{sessions.activeSession?.name ?? 'No session'}</span>
-        <button
-          className="app-badge-control"
-          type="button"
-          aria-pressed={isPanMode}
-          title={isPanMode ? 'Exit pan mode' : 'Pan canvas: drag to move the view'}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={togglePanMode}
-        >
-          <Hand size={16} aria-hidden="true" />
-          <span>{isPanMode ? 'Exit pan' : 'Pan canvas'}</span>
-        </button>
-        <CanvasViewControls
-          isReady={isCanvasReady}
-          canResetSelectedPanel={selectedPanelId !== null}
-          onFitPanels={fitAllPanels}
-          onResetSelectedPanel={resetSelectedPanel}
-          onResetPanelLayout={resetPanelLayout}
-        />
-      </div>
       {sessions.error ? <div className="callback-toast">{sessions.error}</div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>
@@ -320,17 +334,11 @@ function panelShapeToLayout(shape: PanelShape): PanelLayout {
   }
 }
 
-function fitPanelsInEditor(editor: Editor) {
-  const bounds = getPanelBounds(editor)
-  if (!bounds) return
-  editor.zoomToBounds(bounds, { inset: 72, immediate: true })
-}
-
-function getPanelBounds(editor: Editor) {
-  const bounds = editor
-    .getCurrentPageShapes()
-    .filter(isPanelShape)
-    .map((shape) => editor.getShapePageBounds(shape))
-    .filter((bounds): bounds is Box => Boolean(bounds))
-  return bounds.length ? Box.Common(bounds) : null
+function fitBoundsInUsableViewport(editor: Editor, bounds: ReturnType<typeof getPanelBounds>, chromeRect: AppChromeRect | null) {
+  const viewport = editor.getViewportScreenBounds()
+  return fitEditorToBounds(
+    editor,
+    bounds,
+    getChromeAwareInsets(chromeRect?.bottom, { x: viewport.x, y: viewport.y, w: viewport.w, h: viewport.h }),
+  )
 }

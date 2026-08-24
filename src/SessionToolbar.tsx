@@ -27,7 +27,7 @@ export function SessionToolbar() {
   }
 
   return (
-    <div className="session-toolbar panel-interactive" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+    <section className="session-toolbar panel-interactive" aria-label="Session controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
       <select
         aria-label="Open session"
         value={sessions.activeSession?.id ?? ''}
@@ -42,6 +42,7 @@ export function SessionToolbar() {
         className="card-icon-button"
         type="button"
         title="New session"
+        aria-label="New session"
         disabled={busy}
         onClick={() => {
           const name = window.prompt('Name the new session', 'Untitled session')
@@ -54,6 +55,7 @@ export function SessionToolbar() {
         className="card-icon-button"
         type="button"
         title="Rename session"
+        aria-label="Rename session"
         disabled={busy || !sessions.activeSession}
         onClick={() => {
           const name = window.prompt('Rename session', sessions.activeSession?.name ?? '')
@@ -62,16 +64,17 @@ export function SessionToolbar() {
       >
         <Pencil size={16} />
       </button>
-      <button className="card-icon-button" type="button" title="Export session" disabled={busy || !sessions.activeSession} onClick={() => void run(sessions.exportActive)}>
+      <button className="card-icon-button" type="button" title="Export session" aria-label="Export session" disabled={busy || !sessions.activeSession} onClick={() => void run(sessions.exportActive)}>
         <Download size={17} />
       </button>
-      <button className="card-icon-button" type="button" title="Import session" disabled={busy} onClick={() => inputRef.current?.click()}>
+      <button className="card-icon-button" type="button" title="Import session" aria-label="Import session" disabled={busy} onClick={() => inputRef.current?.click()}>
         <FolderUp size={17} />
       </button>
       <button
         className="card-icon-button"
         type="button"
         title="Delete session"
+        aria-label="Delete session"
         disabled={busy || !sessions.activeSession}
         onClick={() => {
           const current = sessions.activeSession
@@ -95,6 +98,6 @@ export function SessionToolbar() {
         }}
       />
       {error ? <span className="session-toolbar-error">{error}</span> : null}
-    </div>
+    </section>
   )
 }

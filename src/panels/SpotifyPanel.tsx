@@ -15,10 +15,10 @@ import { useAppState } from '../AppState'
 import { formatDuration } from '../utils'
 
 export function SpotifyPanel() {
-  const { spotify } = useAppState()
+  const { spotify, sessions } = useAppState()
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'tracks' | 'playlists'>('tracks')
-  const [playlistUrl, setPlaylistUrl] = useState(spotify.currentUrl ?? '')
+  const [playlistUrl, setPlaylistUrl] = useState(spotify.playlist.url ?? '')
   const [volume, setVolume] = useState(70)
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -38,8 +38,8 @@ export function SpotifyPanel() {
   const error = localError ?? spotify.error
 
   useEffect(() => {
-    if (spotify.currentUrl) setPlaylistUrl(spotify.currentUrl)
-  }, [spotify.currentUrl])
+    setPlaylistUrl(spotify.playlist.url ?? '')
+  }, [sessions.activeSession?.id, spotify.playlist.url])
 
   function resetFields() {
     setQuery('')
@@ -97,7 +97,24 @@ export function SpotifyPanel() {
             </div>
 
             <div className="track-copy">
-              <p className="track-title">{spotify.track?.title ?? spotify.playlist.name ?? 'No playlist playing'}</p>
+              <div className="track-title-row">
+                <p className="track-title">{spotify.track?.title ?? spotify.playlist.name ?? 'No playlist playing'}</p>
+                {spotify.track?.url ? (
+                  <a
+                    className="current-playback-link"
+                    href={spotify.track.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open current item in Spotify"
+                    title="Open current item in Spotify"
+                    onPointerDown={stopCanvasEvent}
+                    onMouseDown={stopCanvasEvent}
+                    onClick={stopCanvasEvent}
+                  >
+                    <ExternalLink aria-hidden="true" />
+                  </a>
+                ) : null}
+              </div>
               <p className="track-meta">{spotify.track ? `${spotify.track.artist} - ${spotify.track.album}` : spotify.status}</p>
             </div>
 
@@ -148,9 +165,9 @@ export function SpotifyPanel() {
                 void run(() => spotify.loadPlaylistFromUrl(playlistUrl))
               }}
             >
-              <input value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Current song or playlist URL" />
-              <button className="card-icon-button" type="submit" title="Play playlist URL" disabled={busy}>
-                <ExternalLink size={18} aria-label="Play playlist URL" />
+              <input aria-label="Spotify playlist URL" value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Spotify playlist URL" />
+              <button className="card-icon-button" type="submit" title="Load Spotify playlist URL" aria-label="Load Spotify playlist URL" disabled={busy}>
+                <ExternalLink size={18} aria-hidden="true" />
               </button>
             </form>
 
