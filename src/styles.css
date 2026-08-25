@@ -1392,6 +1392,14 @@ input[type="range"] {
     max-height: clamp(110px, 28cqb, 260px);
   }
 
+  .notes-document-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Stacking every slider onto its own row costs about 80px of panel height, so
+   it waits until the panel is too narrow to hold two side by side. */
+@container panel-shell (max-width: 400px) {
   .range-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1402,10 +1410,6 @@ input[type="range"] {
 
   .zoom-row label {
     grid-column: 1 / -1;
-  }
-
-  .notes-document-controls {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1650,7 +1654,7 @@ input[type="range"] {
   gap: 3px;
   padding: clamp(9px, 2cqi, 12px);
   color: var(--color-input-text);
-  font-size: clamp(13px, min(2.8cqi, 2.4cqb), 17px);
+  font-size: var(--type-md);
   font-weight: 600;
   text-align: left;
 }
@@ -1678,7 +1682,7 @@ input[type="range"] {
 .empty-stage h3 {
   margin: 0;
   color: var(--color-text);
-  font-size: clamp(16px, min(4cqi, 3.4cqb), 26px);
+  font-size: var(--type-lg);
   font-weight: 600;
 }
 
@@ -1691,20 +1695,29 @@ input[type="range"] {
   padding: 7px clamp(12px, 3cqi, 18px);
   color: var(--color-input-text);
   font: inherit;
-  font-size: clamp(13px, min(2.8cqi, 2.4cqb), 17px);
+  font-size: var(--type-md);
   font-weight: 600;
 }
 
 .empty-stage-divider {
   color: var(--color-text-muted);
-  font-size: clamp(11px, min(2.3cqi, 2cqb), 14px);
+  font-size: var(--type-sm);
 }
 
 .empty-stage-collections {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--empty-stage-column-min), 1fr));
+  /* Three samples, so auto-fit is the wrong tool: at middling widths it fits
+     two and drops the third onto a lonely second row. One column or all three,
+     switched on the panel's own width. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--empty-stage-block-gap);
   width: 100%;
+}
+
+@container panel-shell (min-width: 380px) {
+  .empty-stage-collections {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .empty-stage-collections button {
@@ -1712,14 +1725,14 @@ input[type="range"] {
   padding: clamp(7px, 1.8cqi, 11px);
   overflow-wrap: anywhere;
   color: var(--color-input-text);
-  font-size: clamp(13px, min(2.8cqi, 2.4cqb), 17px);
+  font-size: var(--type-md);
   font-weight: 600;
 }
 
 .empty-stage p.empty-stage-status {
   max-width: min(100%, 520px);
   color: var(--color-text-soft);
-  font-size: clamp(11px, min(2.3cqi, 2cqb), 14px);
+  font-size: var(--type-sm);
   line-height: var(--line-height-body);
 }
 
@@ -1746,7 +1759,7 @@ input[type="range"] {
 
 .panel-slideshow-surface .sample-collection-list small {
   color: var(--color-text-soft) !important;
-  font-size: clamp(12px, min(2.2cqi, 1.9cqb), 14px);
+  font-size: var(--type-sm);
 }
 
 /* Keep the empty state centered, while giving its controls comfortable rhythm. */
@@ -1776,7 +1789,6 @@ input[type="range"] {
 /* The collections sit side by side and wrap only when the panel is too narrow
    to hold them, instead of always stacking into a single 340px column. */
 .panel-slideshow-surface .empty-stage-collections {
-  grid-template-columns: repeat(auto-fit, minmax(var(--empty-stage-column-min), 1fr));
   gap: var(--empty-stage-block-gap);
   width: 100%;
 }
@@ -1785,10 +1797,11 @@ input[type="range"] {
   width: 100%;
   min-height: var(--empty-stage-action-height);
   padding-inline: clamp(10px, 2cqi, 20px);
-  overflow: hidden;
+  /* Collection names are folder names and can be long. Wrapping keeps them
+     readable at three across; an ellipsis would just hide which one is which. */
+  overflow-wrap: anywhere;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .panel-slideshow-surface .empty-stage-icon {
@@ -1819,6 +1832,12 @@ input[type="range"] {
   .panel-slideshow-surface .empty-stage {
     align-content: start;
     gap: 10px;
-    padding: 16px;
+    padding: 14px;
+  }
+
+  /* A short panel has no room for decoration. The words earn their space,
+     the illustration does not. */
+  .panel-slideshow-surface .empty-stage-icon {
+    display: none;
   }
 }

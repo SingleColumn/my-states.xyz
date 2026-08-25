@@ -1,4 +1,5 @@
 import type { ImageItem, SlideshowSettings } from './types'
+import { DEFAULT_SLIDESHOW_ZOOM } from './storage'
 
 export function settingsForSessionAssets(settings: SlideshowSettings, folderName: string): SlideshowSettings {
   return { ...settings, folderName, imageSource: { type: 'session-assets' }, currentIndex: 0 }
@@ -9,7 +10,7 @@ export function settingsForBundledCollection(settings: SlideshowSettings, collec
 }
 
 export function settingsForClearedImages(settings: SlideshowSettings): SlideshowSettings {
-  return { ...settings, folderName: null, imageSource: { type: 'none' }, currentIndex: 0, zoom: 1 }
+  return { ...settings, folderName: null, imageSource: { type: 'none' }, currentIndex: 0, zoom: DEFAULT_SLIDESHOW_ZOOM }
 }
 
 export function statusForImageSource(source: SlideshowSettings['imageSource'], imageCount: number) {

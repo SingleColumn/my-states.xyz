@@ -3,9 +3,9 @@ import type { PanelLayout, PanelType } from './types'
 export const PANEL_TYPES = ['spotify', 'slideshow', 'notes'] as const satisfies readonly PanelType[]
 
 export const CANONICAL_PANEL_LAYOUTS = [
-  { panelType: 'spotify', x: -720, y: -300, w: 460, h: 600 },
-  { panelType: 'slideshow', x: -220, y: -300, w: 460, h: 600 },
-  { panelType: 'notes', x: 280, y: -300, w: 460, h: 600 },
+  { panelType: 'spotify', x: -720, y: -300, w: 460, h: 720 },
+  { panelType: 'slideshow', x: -220, y: -300, w: 460, h: 720 },
+  { panelType: 'notes', x: 280, y: -300, w: 460, h: 720 },
 ] as const satisfies readonly PanelLayout[]
 
 export const PANEL_MINIMUM_SIZES: Readonly<Record<PanelType, { w: number; h: number }>> = {

@@ -35,7 +35,7 @@ describe('panel layout helpers', () => {
 
   it('resets a panel size around its existing centre', () => {
     const reset = resetPanelLayoutSize({ panelType: 'spotify', x: 100, y: 200, w: 800, h: 1000 })
-    expect(reset).toEqual({ panelType: 'spotify', x: 270, y: 400, w: 460, h: 600 })
+    expect(reset).toEqual({ panelType: 'spotify', x: 270, y: 340, w: 460, h: 720 })
   })
 
   it('uses the selected panel type canonical dimensions', () => {
@@ -59,7 +59,7 @@ describe('panel layout helpers', () => {
   it('calculates fit bounds without mutating panel dimensions', () => {
     const layouts = resetAllPanelLayouts()
     const dimensions = layouts.map(({ w, h }) => ({ w, h }))
-    expect(getCollectivePanelBounds(layouts)).toEqual({ x: -720, y: -300, w: 1460, h: 600 })
+    expect(getCollectivePanelBounds(layouts)).toEqual({ x: -720, y: -300, w: 1460, h: 720 })
     expect(layouts.map(({ w, h }) => ({ w, h }))).toEqual(dimensions)
   })
 })

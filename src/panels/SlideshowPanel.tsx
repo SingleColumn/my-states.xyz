@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../AppState'
 import { getBundledCollections } from '../imageCollections'
 import type { ImageItem } from '../types'
+import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 5000
@@ -139,7 +140,7 @@ export function SlideshowPanel() {
         <div className="zoom-row">
           <label><span>Zoom</span><input type="range" min={0.5} max={2.4} step={0.05} value={slideshow.settings.zoom} onChange={(event) => slideshow.updateSettings({ zoom: Number(event.target.value) })} /></label>
           <span className="zoom-readout">{Math.round(slideshow.settings.zoom * 100)}%</span>
-          <button className="card-icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: 1 })}><RotateCcw size={17} /></button>
+          <button className="card-icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: DEFAULT_SLIDESHOW_ZOOM })}><RotateCcw size={17} /></button>
         </div>
       </div>
 

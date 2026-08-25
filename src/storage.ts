@@ -34,6 +34,8 @@ export const sessionLimits = {
   maxArchiveBytes: 260 * 1024 * 1024,
 } as const
 
+export const DEFAULT_SLIDESHOW_ZOOM = 1.1
+
 export const defaultSlideshowSettings: SlideshowSettings = {
   folderName: null,
   imageSource: { type: 'none' },
@@ -41,7 +43,7 @@ export const defaultSlideshowSettings: SlideshowSettings = {
   intervalMs: 5000,
   transitionMs: 450,
   shuffle: false,
-  zoom: 1,
+  zoom: DEFAULT_SLIDESHOW_ZOOM,
 }
 
 export const defaultSpotifyPlaylistState: SpotifyPlaylistState = {

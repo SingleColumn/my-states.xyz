@@ -23,7 +23,7 @@ describe('slideshow image source transitions', () => {
 
   it('clears either source predictably and reports empty samples clearly', () => {
     const selected = settingsForBundledCollection(defaultSlideshowSettings, 'jaumecopilotos-ai')
-    expect(settingsForClearedImages({ ...selected, currentIndex: 2, zoom: 2 })).toMatchObject({ imageSource: { type: 'none' }, folderName: null, currentIndex: 0, zoom: 1 })
+    expect(settingsForClearedImages({ ...selected, currentIndex: 2, zoom: 2 })).toMatchObject({ imageSource: { type: 'none' }, folderName: null, currentIndex: 0, zoom: 1.1 })
     expect(statusForImageSource(selected.imageSource, 0)).toBe('No images are available yet in "jaumecopilotos-ai".')
   })
 
