@@ -994,7 +994,12 @@ input[type="range"] {
 
 .empty-stage {
   display: grid;
-  place-items: center;
+  /* One bounded column rather than place-items: center. Centring makes every
+     child shrink to its own content, so percentage widths inside resolve
+     against nothing and the whole block stays narrow however large the stage
+     grows. A real column lets the actions fill the width they are given. */
+  grid-template-columns: min(100%, var(--empty-stage-content-max));
+  justify-content: center;
   align-content: center;
   gap: var(--space-empty-stage-gap);
   height: 100%;
@@ -1628,7 +1633,7 @@ input[type="range"] {
   border: var(--border-width-hairline) solid var(--card-button-border);
   border-radius: var(--button-radius);
   background: var(--card-button-bg);
-  color: var(--color-text);
+  color: var(--color-input-text);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
@@ -1644,7 +1649,14 @@ input[type="range"] {
   display: grid;
   gap: 3px;
   padding: clamp(9px, 2cqi, 12px);
+  color: var(--color-input-text);
+  font-size: clamp(13px, min(2.8cqi, 2.4cqb), 17px);
+  font-weight: 600;
   text-align: left;
+}
+
+.sample-collection-list button span {
+  color: var(--color-input-text);
 }
 
 .sample-collection-list small {
@@ -1677,7 +1689,10 @@ input[type="range"] {
   gap: 8px;
   min-height: clamp(34px, 8cqb, 44px);
   padding: 7px clamp(12px, 3cqi, 18px);
+  color: var(--color-input-text);
   font: inherit;
+  font-size: clamp(13px, min(2.8cqi, 2.4cqb), 17px);
+  font-weight: 600;
 }
 
 .empty-stage-divider {
@@ -1687,16 +1702,18 @@ input[type="range"] {
 
 .empty-stage-collections {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
-  gap: clamp(6px, 1.5cqi, 10px);
-  width: min(100%, 520px);
+  grid-template-columns: repeat(auto-fit, minmax(var(--empty-stage-column-min), 1fr));
+  gap: var(--empty-stage-block-gap);
+  width: 100%;
 }
 
 .empty-stage-collections button {
   min-width: 0;
   padding: clamp(7px, 1.8cqi, 11px);
   overflow-wrap: anywhere;
-  font-size: clamp(11px, min(2.4cqi, 2cqb), 14px);
+  color: var(--color-input-text);
+  font-size: clamp(13px, min(2.8cqi, 2.4cqb), 17px);
+  font-weight: 600;
 }
 
 .empty-stage p.empty-stage-status {
@@ -1706,3 +1723,102 @@ input[type="range"] {
   line-height: var(--line-height-body);
 }
 
+/* Keep onboarding labels legible even when inherited panel styles are unavailable. */
+.panel-slideshow-surface .empty-stage h3 {
+  color: #f5f3ee !important;
+  font-size: var(--empty-stage-title-size);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.panel-slideshow-surface .empty-stage-folder-button,
+.panel-slideshow-surface .empty-stage-collections button,
+.panel-slideshow-surface .sample-collection-list button {
+  color: #fffaf2 !important;
+  font-size: var(--empty-stage-action-size);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.panel-slideshow-surface .sample-collection-list button span {
+  color: var(--color-input-text) !important;
+}
+
+.panel-slideshow-surface .sample-collection-list small {
+  color: var(--color-text-soft) !important;
+  font-size: clamp(12px, min(2.2cqi, 1.9cqb), 14px);
+}
+
+/* Keep the empty state centered, while giving its controls comfortable rhythm. */
+.panel-slideshow-surface .empty-stage {
+  align-content: center;
+  gap: var(--empty-stage-block-gap);
+  padding: clamp(20px, 4cqi, 36px) clamp(16px, 5cqi, 44px);
+}
+
+.panel-slideshow-surface .empty-stage h3 {
+  margin: 0;
+}
+
+.panel-slideshow-surface .empty-stage-divider {
+  color: rgba(245, 243, 238, 0.82) !important;
+  font-size: var(--empty-stage-hint-size);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.panel-slideshow-surface .empty-stage-folder-button {
+  min-height: var(--empty-stage-action-height);
+  white-space: nowrap;
+}
+
+/* The collections sit side by side and wrap only when the panel is too narrow
+   to hold them, instead of always stacking into a single 340px column. */
+.panel-slideshow-surface .empty-stage-collections {
+  grid-template-columns: repeat(auto-fit, minmax(var(--empty-stage-column-min), 1fr));
+  gap: var(--empty-stage-block-gap);
+  width: 100%;
+}
+
+.panel-slideshow-surface .empty-stage-collections button {
+  width: 100%;
+  min-height: var(--empty-stage-action-height);
+  padding-inline: clamp(10px, 2cqi, 20px);
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-slideshow-surface .empty-stage-icon {
+  width: var(--empty-stage-icon-size);
+  height: var(--empty-stage-icon-size);
+}
+.panel-slideshow-surface .sample-collection-popover {
+  width: min(420px, calc(100cqw - (var(--card-padding) * 2)));
+}
+
+.panel-slideshow-surface .sample-collection-list button {
+  min-height: 52px;
+  padding-inline: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-slideshow-surface .sample-collection-list button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Small canvas cards cannot fit the complete onboarding stack at once.
+   Start the scroll area at the heading so no action is hidden above the fold. */
+@container panel-shell (max-height: 640px) {
+  .panel-slideshow-surface .empty-stage {
+    align-content: start;
+    gap: 10px;
+    padding: 16px;
+  }
+}
