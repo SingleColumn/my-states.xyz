@@ -19,12 +19,18 @@ export interface CanvasState {
 
 export interface SlideshowSettings {
   folderName: string | null
+  imageSource: ImageCollectionSource
   currentIndex: number
   intervalMs: number
   transitionMs: number
   shuffle: boolean
   zoom: number
 }
+
+export type ImageCollectionSource =
+  | { type: 'none' }
+  | { type: 'session-assets' }
+  | { type: 'bundled'; collectionId: string }
 
 export interface ImageMetadata {
   name: string
@@ -41,8 +47,13 @@ export interface SessionImage extends ImageMetadata {
   mimeType: string
 }
 
-export interface ImageItem extends SessionImage {
+export interface ImageItem extends ImageMetadata {
+  id: string
+  sessionId: string | null
+  filename: string
+  mimeType: string
   url: string
+  urlKind: 'object-url' | 'static'
 }
 
 export interface Note {

@@ -33,6 +33,14 @@ import {
 } from './storage'
 import { downloadSessionArchive, exportSessionArchive, importSessionArchive } from './sessionArchive'
 import { createId } from './utils'
+import { createImageItemsFromBundledCollection, getBundledCollection } from './imageCollections'
+import {
+  releaseImageItems,
+  settingsForBundledCollection,
+  settingsForClearedImages,
+  settingsForSessionAssets,
+  statusForImageSource,
+} from './slideshowSources'
 import {
   exchangeSpotifyCode,
   getSpotifyPlaybackAction,
@@ -70,6 +78,7 @@ interface SlideshowState {
   error: string | null
   selectFolder(): Promise<boolean>
   importFiles(files: FileList | File[]): Promise<void>
+  selectBundledCollection(collectionId: string): Promise<void>
   resetFolder(): Promise<void>
   restoreFolder(): Promise<void>
   setIsPlaying(value: boolean): void
@@ -452,31 +461,58 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
     setIsPlaying(false)
     setSettings(session?.slideshow ?? defaultSlideshowSettings)
     setImages((current) => {
-      for (const image of current) URL.revokeObjectURL(image.url)
+      releaseImageItems(current)
       return []
     })
     setError(null)
 
-    const sessionId = session?.id ?? ''
-    if (!sessionId) {
+    if (!session) {
       setStatus('Open a session to add images.')
       return
     }
 
     async function load() {
       try {
-        const assets = await getSessionAssets(sessionId)
-        if (cancelled) return
-        const nextImages = await Promise.all(assets.map(createImageItemFromAsset))
-        if (cancelled) {
-          nextImages.forEach((image) => URL.revokeObjectURL(image.url))
+        const source = session!.slideshow.imageSource
+        if (source.type === 'none') {
+          setStatus('Choose your images or try a sample collection.')
           return
         }
-        nextImages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+
+        let nextImages: ImageItem[]
+        if (source.type === 'bundled') {
+          if (!getBundledCollection(source.collectionId)) {
+            if (!cancelled) {
+              const message = `The sample collection "${source.collectionId}" is not available in this version.`
+              setStatus(message)
+              setError(message)
+            }
+            return
+          }
+          nextImages = await createImageItemsFromBundledCollection(source.collectionId) ?? []
+        } else {
+          const assets = await getSessionAssets(session!.id)
+          nextImages = await Promise.all(assets.map(createImageItemFromAsset))
+          nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
+        }
+
+        if (cancelled) {
+          releaseImageItems(nextImages)
+          return
+        }
         setImages(nextImages)
-        setStatus(nextImages.length ? `${nextImages.length} images loaded from this session.` : 'Select images to add them to this session.')
+        if (session!.slideshow.currentIndex >= nextImages.length && session!.slideshow.currentIndex !== 0) {
+          const resetIndex = { ...session!.slideshow, currentIndex: 0 }
+          setSettings(resetIndex)
+          patchSession((stored) => ({ ...stored, slideshow: resetIndex }))
+        }
+        setStatus(statusForImageSource(source, nextImages.length))
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load session images.')
+        if (!cancelled) {
+          const message = caught instanceof Error ? caught.message : 'Could not load session images.'
+          setStatus(message)
+          setError(message)
+        }
       }
     }
     void load()
@@ -506,16 +542,17 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
     const assets = await Promise.all(selected.map((file) => createSessionAsset(file, session.id)))
     await replaceSessionAssets(session.id, assets)
     const nextImages = await Promise.all(assets.map(createImageItemFromAsset))
-    nextImages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
 
+    setIsPlaying(false)
     setImages((current) => {
-      for (const image of current) URL.revokeObjectURL(image.url)
+      releaseImageItems(current)
       return nextImages
     })
-    const nextSettings = { ...settings, folderName, currentIndex: 0 }
+    const nextSettings = settingsForSessionAssets(settings, folderName)
     setSettings(nextSettings)
     patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-    setStatus(nextImages.length ? `${nextImages.length} images added to this session.` : 'No supported images were selected.')
+    setStatus(nextImages.length ? `${folderName} · ${nextImages.length} images` : 'No supported images were selected.')
     setError(null)
   }, [patchSession, session, settings])
 
@@ -543,6 +580,33 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
     }
   }, [loadImagesFromHandle, session])
 
+  const selectBundledCollection = useCallback(async (collectionId: string) => {
+    if (!session) throw new Error('Open a session before selecting images.')
+    const collection = getBundledCollection(collectionId)
+    if (!collection) {
+      const message = `The sample collection "${collectionId}" is not available in this version.`
+      setError(message)
+      setStatus(message)
+      return
+    }
+
+    try {
+      const nextImages = await createImageItemsFromBundledCollection(collectionId) ?? []
+      setIsPlaying(false)
+      setImages((current) => {
+        releaseImageItems(current)
+        return nextImages
+      })
+      const nextSettings = settingsForBundledCollection(settings, collection.id)
+      setSettings(nextSettings)
+      patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
+      setStatus(statusForImageSource(nextSettings.imageSource, nextImages.length))
+      setError(null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not load the sample collection.')
+    }
+  }, [patchSession, session, settings])
+
   const restoreFolder = useCallback(async () => {
     if (!session) return
     const stored = await getDirectoryHandle(session.id)
@@ -561,16 +625,18 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
   const resetFolder = useCallback(async () => {
     if (!session) return
     setIsPlaying(false)
-    await replaceSessionAssets(session.id, [])
-    await clearDirectoryHandle(session.id)
+    if (settings.imageSource.type === 'session-assets') {
+      await replaceSessionAssets(session.id, [])
+      await clearDirectoryHandle(session.id)
+    }
     setImages((current) => {
-      for (const image of current) URL.revokeObjectURL(image.url)
+      releaseImageItems(current)
       return []
     })
-    const nextSettings = { ...settings, folderName: null, currentIndex: 0, zoom: 1 }
+    const nextSettings = settingsForClearedImages(settings)
     setSettings(nextSettings)
     patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-    setStatus('Select images to add them to this session.')
+    setStatus('Choose your images or try a sample collection.')
     setError(null)
   }, [patchSession, session, settings])
 
@@ -601,7 +667,11 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
     })
   }, [patchSession])
 
-  return { settings, images, isPlaying, status, error, selectFolder, importFiles: (files) => replaceImages(files, 'Imported images'), resetFolder, restoreFolder, setIsPlaying, stop, next, previous, updateSettings }
+  return {
+    settings, images, isPlaying, status, error, selectFolder, selectBundledCollection,
+    importFiles: (files) => replaceImages(files, 'Imported images'), resetFolder, restoreFolder,
+    setIsPlaying, stop, next, previous, updateSettings,
+  }
 }
 
 function useSpotifyState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): SpotifyState {
@@ -914,7 +984,7 @@ async function createSessionAsset(file: File, sessionId: string) {
 
 async function createImageItemFromAsset(asset: Awaited<ReturnType<typeof getSessionAssets>>[number]) {
   const url = URL.createObjectURL(asset.blob)
-  return { ...asset, url }
+  return { ...asset, url, urlKind: 'object-url' as const }
 }
 
 function normaliseImageMimeType(file: File) {

@@ -38,7 +38,12 @@ async function createCompleteArchive() {
       camera: { x: 120, y: -80, z: 1.25 },
       panels: [{ panelType: 'notes', x: 1, y: 2, w: 300, h: 400 }],
     },
-    slideshow: { ...defaultSlideshowSettings, intervalMs: 3500, shuffle: true },
+    slideshow: {
+      ...defaultSlideshowSettings,
+      imageSource: { type: 'session-assets' },
+      intervalMs: 3500,
+      shuffle: true,
+    },
     spotify: {
       id: 'playlist_123',
       uri: 'spotify:playlist:playlist_123',
@@ -76,6 +81,7 @@ function manifest(entries: Record<string, Uint8Array>) {
     images: Array<{ path: string; mimeType: string }>
     notes: Array<{ path: string }>
     spotify: unknown
+    slideshow: typeof defaultSlideshowSettings
   }
 }
 
@@ -115,6 +121,43 @@ describe('portable session archives', () => {
     expect(stored?.spotify).toEqual({ id: null, uri: null, name: null, url: null })
     expect(notes).toEqual([])
     expect(assets).toEqual([])
+  })
+
+  it('exports and imports a bundled collection reference without copying image blobs', async () => {
+    const source = await createSession('Sample archive')
+    await saveSessionAssets(source.id, [makeAsset('inactive_local', 'inactive.png', new Uint8Array([1, 2, 3]))])
+    await saveSession({
+      ...source,
+      slideshow: {
+        ...defaultSlideshowSettings,
+        folderName: 'eightbitstrana',
+        imageSource: { type: 'bundled', collectionId: 'eightbitstrana' },
+      },
+    })
+
+    const archive = await exportSessionArchive(source.id)
+    const entries = await archiveEntries(archive)
+    const exportedManifest = manifest(entries)
+    expect(exportedManifest.slideshow.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
+    expect(exportedManifest.images).toEqual([])
+    expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toEqual([])
+
+    const imported = await importSessionArchive(asFile(archive))
+    expect((await getSession(imported.id))?.slideshow.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
+    expect(await getSessionAssets(imported.id)).toEqual([])
+  })
+
+  it('imports an unavailable bundled collection reference without crashing or substituting it', async () => {
+    const source = await createSession('Unavailable sample')
+    const entries = await archiveEntries(await exportSessionArchive(source.id))
+    const sourceManifest = manifest(entries)
+    sourceManifest.slideshow.imageSource = { type: 'bundled', collectionId: 'removed-sample' }
+    sourceManifest.slideshow.folderName = 'removed-sample'
+    entries['manifest.json'] = strToU8(JSON.stringify(sourceManifest))
+
+    const imported = await importSessionArchive(asFile(new Blob([zipSync(entries)])))
+    expect((await getSession(imported.id))?.slideshow.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
+    expect(await getSessionAssets(imported.id)).toEqual([])
   })
 
   it('rejects corrupt, incomplete, unsafe, unsupported, and oversized archives', async () => {

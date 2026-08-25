@@ -61,7 +61,9 @@ interface SessionManifest {
 export async function exportSessionArchive(sessionId: string) {
   const [session, notes, assets] = await Promise.all([getSession(sessionId), getNotes(sessionId), getSessionAssets(sessionId)])
   if (!session) throw new Error('The selected session no longer exists.')
-  validateExportContent(notes, assets)
+  // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
+  const exportedAssets = session.slideshow.imageSource.type === 'session-assets' ? assets : []
+  validateExportContent(notes, exportedAssets)
 
   const files: Record<string, Uint8Array> = {}
   const manifest: SessionManifest = {
@@ -92,7 +94,7 @@ export async function exportSessionArchive(sessionId: string) {
     })
   }
 
-  for (const asset of assets) {
+  for (const asset of exportedAssets) {
     const extension = extensionForAsset(asset)
     const path = `images/${asset.id}.${extension}`
     files[path] = new Uint8Array(await asset.blob.arrayBuffer())
@@ -434,6 +436,7 @@ function isSlideshowSettings(value: unknown): value is SlideshowSettings {
   return (
     isRecord(value) &&
     (value.folderName === null || typeof value.folderName === 'string') &&
+    (value.imageSource === undefined || isImageSource(value.imageSource)) &&
     typeof value.currentIndex === 'number' &&
     Number.isInteger(value.currentIndex) &&
     value.currentIndex >= 0 &&
@@ -448,6 +451,12 @@ function isSlideshowSettings(value: unknown): value is SlideshowSettings {
     Number.isFinite(value.zoom) &&
     value.zoom > 0
   )
+}
+
+function isImageSource(value: unknown) {
+  if (!isRecord(value) || typeof value.type !== 'string') return false
+  if (value.type === 'none' || value.type === 'session-assets') return true
+  return value.type === 'bundled' && typeof value.collectionId === 'string' && value.collectionId.length > 0
 }
 
 function isCanvasState(value: unknown): value is CanvasState | null {

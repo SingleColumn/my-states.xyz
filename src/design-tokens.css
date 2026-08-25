@@ -188,6 +188,7 @@
   --image-panel-control-bottom: clamp(16px, 2.8cqi, 30px);
   --image-panel-control-gap: clamp(14px, 2.3cqi, 28px);
   --image-panel-stage-inset: clamp(1px, 0.4cqi, 5px);
+  --image-panel-stage-inset-x: clamp(6px, 1cqi, 12px);
   --image-panel-zoom-readout-width: 58px;
   --image-panel-zoom-button-width: 54px;
   --image-panel-zoom-label-width: 56px;

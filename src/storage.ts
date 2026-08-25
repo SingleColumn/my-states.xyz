@@ -36,6 +36,7 @@ export const sessionLimits = {
 
 export const defaultSlideshowSettings: SlideshowSettings = {
   folderName: null,
+  imageSource: { type: 'none' },
   currentIndex: 0,
   intervalMs: 5000,
   transitionMs: 450,
@@ -346,12 +347,18 @@ function parseMigrationVerification(value: string): MigrationVerificationRecord 
 export async function getSessions(): Promise<Session[]> {
   const db = await dbPromise
   const sessions = await db.getAllFromIndex('sessions', 'by-updated')
-  return sessions.sort((a, b) => b.updatedAt - a.updatedAt)
+  const normalized = await Promise.all(sessions.map(async (session) =>
+    normalizeStoredSession(session, await db.countFromIndex('assets', 'by-session', session.id)),
+  ))
+  return normalized.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
 export async function getSession(sessionId: string) {
   const db = await dbPromise
-  return db.get('sessions', sessionId)
+  const session = await db.get('sessions', sessionId)
+  if (!session) return undefined
+  const assetCount = await db.countFromIndex('assets', 'by-session', sessionId)
+  return normalizeStoredSession(session, assetCount)
 }
 
 export async function createSession(name: string) {
@@ -403,7 +410,7 @@ export async function importSessionContent(content: ImportedSessionContent) {
 
   const session = makeSession(content.name, {
     canvas: content.canvas,
-    slideshow: content.slideshow,
+    slideshow: normalizeSlideshowSettings(content.slideshow, content.assets.length > 0),
     spotify: content.spotify,
   })
   const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
@@ -522,6 +529,29 @@ function validateAssets(assets: Array<Omit<SessionImage, 'sessionId'> & { blob: 
   if (total > sessionLimits.maxTotalImageBytes) {
     throw new Error(`Images exceed the ${formatBytes(sessionLimits.maxTotalImageBytes)} per-session limit.`)
   }
+}
+
+export function normalizeSlideshowSettings(
+  slideshow: SlideshowSettings | (Omit<SlideshowSettings, 'imageSource'> & { imageSource?: unknown }),
+  hasSessionAssets: boolean,
+): SlideshowSettings {
+  const candidate = slideshow.imageSource
+  let imageSource: SlideshowSettings['imageSource']
+  if (candidate && typeof candidate === 'object' && 'type' in candidate) {
+    const sourceRecord = candidate as Record<string, unknown>
+    const type = sourceRecord.type
+    if (type === 'session-assets') imageSource = { type: 'session-assets' }
+    else if (type === 'bundled' && typeof sourceRecord.collectionId === 'string') {
+      imageSource = { type: 'bundled', collectionId: sourceRecord.collectionId }
+    } else imageSource = { type: 'none' }
+  } else {
+    imageSource = hasSessionAssets ? { type: 'session-assets' } : { type: 'none' }
+  }
+  return { ...defaultSlideshowSettings, ...slideshow, imageSource }
+}
+
+function normalizeStoredSession(session: Session, assetCount: number): Session {
+  return { ...session, slideshow: normalizeSlideshowSettings(session.slideshow, assetCount > 0) }
 }
 
 function normalizeSessionName(name: string) {

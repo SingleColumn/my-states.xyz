@@ -11,7 +11,7 @@ The app is a single-user MVP: it has no backend, accounts, cloud sync, or sharin
 - Import and export complete portable sessions as `.mix-session.zip` files. Exports include the session's image bytes and Markdown notes, but never Spotify credentials.
 - Sign in to Spotify with OAuth PKCE and control browser playback.
 - Search Spotify playlists or load one from a Spotify playlist URL or URI.
-- Select a local image folder and browse it as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
+- Select a local image folder or one of three bundled sample collections and browse it as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
 - Import a directory through the browser's file picker when direct folder access is unavailable.
 - Create, select, rename, edit, autosave, delete, and download Markdown notes.
 - Use a rich Markdown editor with formatting, lists, links, tables, quotes, code blocks, and source/preview modes.
@@ -93,14 +93,34 @@ On first launch, the app creates a session with its three panels. Use the sessio
 | Panel | How to use it |
 | --- | --- |
 | Spotify | Log in, then search for a playlist or paste a Spotify playlist URL/URI. Playback controls require Spotify Premium. |
-| Images | Choose a folder from the header or empty state. The selected supported images are copied into the active session; JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG are supported. |
+| Images | Choose a local folder or a sample collection from the header or empty state. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active session; bundled samples remain static app assets. |
 | Markdown Text Editor | Create a document, give it a name, and write with the toolbar. Notes autosave; use the download button to export the active note as `.md`. |
 
 Drag a panel by its frame and use its resize handles to change its size. Use the usual canvas gestures to pan and zoom. Canvas interactions are isolated from each panel's internal controls.
 
+## Adding bundled sample photos
+
+The three registered sample folders are:
+
+```text
+public/sample-images/teemu-jpeg/
+public/sample-images/eightbitstrana/
+public/sample-images/jaumecopilotos-ai/
+```
+
+Copy supported image files into the relevant folder, then run the application. Both `npm run dev` and `npm run build` regenerate `public/sample-images/manifest.json` automatically before Vite starts. To refresh only the manifest, run:
+
+```bash
+npm run generate:sample-images
+```
+
+Open the Images panel and choose the collection to verify it. The generator includes JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files, ignores placeholders and other non-image files, sorts filenames naturally, and safely encodes spaces and special characters in URLs.
+
+For a responsive app, prefer WebP or AVIF where appropriate, avoid unnecessarily large source files, keep enough resolution for enlarged panels, and keep the total bundled sample size reasonable. No external image service is used.
+
 ## Portable sessions
 
-Export downloads a complete `.mix-session.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and embedded images. Spotify login tokens, playback device data, current-track data, and search results are not included.
+Export downloads a complete `.mix-session.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Spotify login tokens, playback device data, current-track data, and search results are not included.
 
 Version 1 supports up to 200 images, 25 MB per image, and 250 MB of image data in a session. Import validates the archive structure and rejects unsupported or oversized content. Before a session is switched, created, deleted, imported, or exported, pending note and canvas saves are flushed so the archive and stored session include the most recent changes.
 
@@ -129,7 +149,8 @@ Clearing this site's browser data removes the stored sessions, notes, images, se
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start Vite at `127.0.0.1:5173`. |
-| `npm run build` | Type-check and build the app into `dist/`. |
+| `npm run generate:sample-images` | Regenerate the bundled sample image manifest. |
+| `npm run dev` | Regenerate the sample manifest, then start Vite at `127.0.0.1:5173`. |
+| `npm run build` | Regenerate the sample manifest, type-check, and build the app into `dist/`. |
 | `npm run preview` | Preview the production build on localhost. |
-| `npm test` | Run portable-session and migration tests. |
+| `npm test` | Run application and sample-manifest tests. |

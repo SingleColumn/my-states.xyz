@@ -4,10 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build",
+    "generate:sample-images": "node scripts/generate-sample-images-manifest.mjs",
+    "dev": "npm run generate:sample-images && vite --host 127.0.0.1",
+    "build": "npm run generate:sample-images && tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run"
+    "test": "vitest run && node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.3.4",

@@ -43,7 +43,7 @@ describe('legacy session migration', () => {
       name: 'Imported workspace',
       activeNoteId: 'legacy_note',
       canvas: { camera: { x: 12, y: 34, z: 1.5 } },
-      slideshow: { folderName: 'references', intervalMs: 2500, shuffle: true },
+      slideshow: { folderName: 'references', imageSource: { type: 'none' }, intervalMs: 2500, shuffle: true },
       spotify: { id: 'legacy_playlist' },
     })
     expect(notes).toEqual([expect.objectContaining({ id: 'legacy_note', sessionId: first.activeSessionId, content: 'Legacy note body' })])

@@ -879,11 +879,11 @@ input[type="range"] {
   position: relative;
   align-self: center;
   justify-self: center;
-  width: calc(100% - (var(--image-panel-stage-inset) * 2));
+  width: calc(100% - (var(--image-panel-stage-inset-x) * 2));
   aspect-ratio: 1 / 1;
   max-height: calc(100% - (var(--image-panel-stage-inset) * 2));
   min-height: 0;
-  margin: var(--image-panel-stage-inset);
+  margin: var(--image-panel-stage-inset) var(--image-panel-stage-inset-x);
   overflow: hidden;
   pointer-events: auto !important;
 }
@@ -893,10 +893,32 @@ input[type="range"] {
   height: 100%;
   object-fit: contain;
   transform-origin: center;
-  transition-property: transform, opacity;
+  transition-property: transform;
   transition-timing-function: ease;
+  transition-duration: var(--transition-fast);
   -webkit-user-drag: none;
   user-select: none;
+}
+
+.slideshow-image-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.slideshow-image-outgoing {
+  z-index: 0;
+}
+
+.slideshow-image-incoming {
+  z-index: 1;
+  animation-name: slideshow-image-fade-in;
+  animation-timing-function: ease;
+  animation-fill-mode: both;
+}
+
+@keyframes slideshow-image-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .slideshow-image-picker {
@@ -1570,3 +1592,117 @@ input[type="range"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* Sample collections share the Images card's responsive, token-driven controls. */
+.sample-collection-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: var(--card-padding);
+  z-index: 3;
+  width: min(360px, calc(100cqw - (var(--card-padding) * 2)));
+  padding: clamp(10px, 2cqi, 14px);
+  border: var(--card-border);
+  border-radius: var(--content-radius);
+  background: var(--card-bg-gradient);
+  box-shadow: var(--shadow-panel);
+}
+
+.sample-collection-heading {
+  display: block;
+  margin-bottom: 8px;
+  color: color-mix(in srgb, var(--accent) 55%, white);
+  font-size: var(--card-footer-meta-size);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sample-collection-list {
+  display: grid;
+  gap: clamp(6px, 1.5cqi, 10px);
+}
+
+.sample-collection-list button,
+.empty-stage-collections button,
+.empty-stage-folder-button {
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.sample-collection-list button:hover,
+.empty-stage-collections button:hover,
+.empty-stage-folder-button:hover {
+  border-color: var(--card-button-active-border);
+  background: var(--card-button-bg-hover);
+}
+
+.sample-collection-list button {
+  display: grid;
+  gap: 3px;
+  padding: clamp(9px, 2cqi, 12px);
+  text-align: left;
+}
+
+.sample-collection-list small {
+  color: var(--color-text-muted);
+  font-size: var(--card-footer-meta-size);
+}
+
+.empty-stage {
+  overflow: auto;
+  padding: clamp(12px, 3cqi, 28px);
+}
+
+.empty-stage-icon {
+  width: clamp(26px, 7cqmin, 48px);
+  height: clamp(26px, 7cqmin, 48px);
+  color: color-mix(in srgb, var(--accent) 72%, white);
+}
+
+.empty-stage h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(16px, min(4cqi, 3.4cqb), 26px);
+  font-weight: 600;
+}
+
+.empty-stage-folder-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: clamp(34px, 8cqb, 44px);
+  padding: 7px clamp(12px, 3cqi, 18px);
+  font: inherit;
+}
+
+.empty-stage-divider {
+  color: var(--color-text-muted);
+  font-size: clamp(11px, min(2.3cqi, 2cqb), 14px);
+}
+
+.empty-stage-collections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  gap: clamp(6px, 1.5cqi, 10px);
+  width: min(100%, 520px);
+}
+
+.empty-stage-collections button {
+  min-width: 0;
+  padding: clamp(7px, 1.8cqi, 11px);
+  overflow-wrap: anywhere;
+  font-size: clamp(11px, min(2.4cqi, 2cqb), 14px);
+}
+
+.empty-stage p.empty-stage-status {
+  max-width: min(100%, 520px);
+  color: var(--color-text-soft);
+  font-size: clamp(11px, min(2.3cqi, 2cqb), 14px);
+  line-height: var(--line-height-body);
+}
+
