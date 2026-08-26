@@ -4,6 +4,7 @@ import { useAppState } from '../AppState'
 import { getBundledCollections } from '../imageCollections'
 import type { ImageItem } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
+import { SampleCollectionCard, useSampleCollectionPreviews } from './SampleCollectionCard'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 5000
@@ -12,6 +13,7 @@ const maxSpeed = 20
 export function SlideshowPanel() {
   const { slideshow } = useAppState()
   const collections = getBundledCollections()
+  const collectionPreviews = useSampleCollectionPreviews()
   const firstImage = slideshow.images[0]
   const currentImage = slideshow.images[slideshow.settings.currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
@@ -93,9 +95,13 @@ export function SlideshowPanel() {
             <span className="sample-collection-heading">Sample collections</span>
             <div className="sample-collection-list">
               {collections.map((collection) => (
-                <button type="button" key={collection.id} onClick={() => void chooseSample(collection.id)}>
-                  <span>{collection.name}</span><small>Sample collection</small>
-                </button>
+                <SampleCollectionCard
+                  key={collection.id}
+                  name={collection.name}
+                  preview={collectionPreviews[collection.id]}
+                  variant="row"
+                  onSelect={() => void chooseSample(collection.id)}
+                />
               ))}
             </div>
           </section>
@@ -117,9 +123,18 @@ export function SlideshowPanel() {
             <Images className="empty-stage-icon" aria-hidden="true" />
             <h3>Add images</h3>
             <button className="empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
-            <span className="empty-stage-divider">Or try a sample collection</span>
+            <span className="empty-stage-divider">Or try a collection from these creators</span>
             <div className="empty-stage-collections">
-              {collections.map((collection) => <button type="button" key={collection.id} onPointerDown={stopCanvasEvent} onClick={() => void chooseSample(collection.id)}>{collection.name}</button>)}
+              {collections.map((collection) => (
+                <SampleCollectionCard
+                  key={collection.id}
+                  name={collection.name}
+                  preview={collectionPreviews[collection.id]}
+                  variant="tile"
+                  onSelect={() => void chooseSample(collection.id)}
+                  onPointerDown={stopCanvasEvent}
+                />
+              ))}
             </div>
             {slideshow.settings.imageSource.type === 'bundled' || slideshow.error ? <p className="empty-stage-status" role="status">{slideshow.status}</p> : null}
           </div>

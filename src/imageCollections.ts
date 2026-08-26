@@ -1,12 +1,36 @@
 import type { ImageItem } from './types'
 
+/* Collections are named after the Instagram profile of the creator whose work
+   they contain, so the name is a credit and is never shortened or replaced.
+   `cover` names the image that represents the collection on screen; leaving it
+   null falls back to whichever file sorts first, which is rarely the best one. */
 export const bundledImageCollections = [
-  { id: 'teemu-jpeg', name: 'teemu-jpeg', basePath: '/sample-images/teemu-jpeg/' },
-  { id: 'eightbitstrana', name: 'eightbitstrana', basePath: '/sample-images/eightbitstrana/' },
-  { id: 'jaumecopilotos-ai', name: 'jaumecopilotos-ai', basePath: '/sample-images/jaumecopilotos-ai/' },
+  {
+    id: 'teemu-jpeg',
+    name: 'teemu-jpeg',
+    basePath: '/sample-images/teemu-jpeg/',
+    cover: '/sample-images/teemu-jpeg/teemu_jpeg_BaLy4m7ATYt_0.jpg',
+  },
+  {
+    id: 'eightbitstrana',
+    name: 'eightbitstrana',
+    basePath: '/sample-images/eightbitstrana/',
+    cover: '/sample-images/eightbitstrana/eightbitstrana_DF-os2-NtPL_0.jpg',
+  },
+  {
+    id: 'jaumecopilotos-ai',
+    name: 'jaumecopilotos-ai',
+    basePath: '/sample-images/jaumecopilotos-ai/',
+    cover: '/sample-images/jaumecopilotos-ai/jaumecopilotos_ai_DC3nykmC5TJ_0.webp',
+  },
 ] as const
 
 export type BundledImageCollectionId = (typeof bundledImageCollections)[number]['id']
+
+export interface BundledCollectionPreview {
+  id: string
+  coverUrl: string | null
+}
 
 interface ManifestCollection {
   id: string
@@ -28,9 +52,7 @@ export async function createImageItemsFromBundledCollection(
 ): Promise<ImageItem[] | null> {
   if (!getBundledCollection(id)) return null
 
-  const response = await fetchManifest('/sample-images/manifest.json', { cache: 'no-cache' })
-  if (!response.ok) throw new Error('Sample collections could not be loaded.')
-  const manifest = await response.json() as unknown
+  const manifest = await fetchManifestDocument(fetchManifest)
   const collection = readManifestCollection(manifest, id)
   if (!collection) return []
 
@@ -50,6 +72,31 @@ export async function createImageItemsFromBundledCollection(
       urlKind: 'static',
     }
   })
+}
+
+/**
+ * The cover image for every registered collection, read from the generated
+ * manifest so a card can never point at a file that is not on disk.
+ */
+export async function loadBundledCollectionPreviews(
+  fetchManifest: typeof fetch = fetch,
+): Promise<BundledCollectionPreview[]> {
+  const manifest = await fetchManifestDocument(fetchManifest)
+
+  return bundledImageCollections.map((collection) => {
+    const images = readManifestCollection(manifest, collection.id)?.images ?? []
+    const cover: string = collection.cover
+    return {
+      id: collection.id,
+      coverUrl: images.includes(cover) ? cover : images[0] ?? null,
+    }
+  })
+}
+
+async function fetchManifestDocument(fetchManifest: typeof fetch): Promise<unknown> {
+  const response = await fetchManifest('/sample-images/manifest.json', { cache: 'no-cache' })
+  if (!response.ok) throw new Error('Sample collections could not be loaded.')
+  return await response.json() as unknown
 }
 
 function readManifestCollection(value: unknown, id: string): ManifestCollection | null {

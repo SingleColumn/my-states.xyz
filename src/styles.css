@@ -76,7 +76,7 @@ button {
   flex-shrink: 0;
   white-space: nowrap;
   font-size: var(--font-size-app-badge-title);
-  font-weight: 680;
+  font-weight: var(--font-weight-display);
   line-height: var(--line-height-tight);
 }
 
@@ -94,7 +94,7 @@ button {
   width: min(var(--size-session-selector-width), 22vw);
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
-  padding: 0 8px;
+  padding: 0 var(--space-detail-3);
   border: var(--border-width-hairline) solid var(--card-button-border);
   border-radius: var(--button-radius);
   background: var(--background-app);
@@ -118,9 +118,9 @@ button {
 .session-action-transfer::before,
 .session-action-delete::before {
   position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: -7px;
+  top: var(--space-divider-inset);
+  bottom: var(--space-divider-inset);
+  left: calc(-1 * var(--space-divider-inset));
   width: 1px;
   background: var(--color-panel-divider);
   content: "";
@@ -137,13 +137,13 @@ button {
 
 .session-actions-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--space-popover-offset));
   right: 0;
   z-index: 30;
   display: grid;
   width: max-content;
-  min-width: 190px;
-  padding: 6px;
+  min-width: var(--size-session-menu-min-width);
+  padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
   background: var(--background-toast);
@@ -154,9 +154,9 @@ button {
 .session-actions-menu button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 10px;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
   border-radius: var(--button-radius);
   background: transparent;
   color: var(--color-app-badge-text);
@@ -175,16 +175,16 @@ button {
 
 .session-toolbar-error {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--space-detail-2));
   left: 50%;
   transform: translateX(-50%);
-  max-width: 260px;
-  padding: 6px 10px;
+  max-width: var(--size-session-error-max-width);
+  padding: var(--space-menu-padding) var(--space-menu-item-padding-x);
   border-radius: var(--button-radius);
   background: var(--background-toast);
   color: var(--color-danger);
   font-size: var(--font-size-app-badge-meta);
-  line-height: 1.25;
+  line-height: var(--line-height-toast);
 }
 
 .tl-watermark_SE {
@@ -203,7 +203,7 @@ button {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-top-toolbar-gap);
-  padding-left: 12px;
+  padding-left: var(--space-rich-content-inset);
   border-left: var(--border-width-hairline) solid var(--color-panel-divider);
   min-width: 0;
 }
@@ -236,11 +236,11 @@ button {
 .app-chrome-tldraw .tlui-page-menu__trigger {
   width: var(--size-tldraw-page-selector-width);
   min-width: var(--size-tldraw-page-selector-width);
-  padding: 0 12px;
+  padding: 0 var(--space-control-padding-x);
   justify-content: space-between;
   background: var(--card-button-bg);
   font-size: var(--font-size-app-badge-meta);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .app-chrome-tldraw .tlui-page-menu__name {
@@ -280,16 +280,16 @@ button {
 }
 
 .app-chrome-tldraw .tlui-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--size-tldraw-icon);
+  height: var(--size-tldraw-icon);
 }
 
 .app-chrome-control {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-detail-2);
   min-height: var(--size-top-toolbar-control);
-  padding: 0 8px;
+  padding: 0 var(--space-detail-3);
   border: var(--border-width-hairline) solid var(--card-button-border);
   border-radius: var(--button-radius);
   background: var(--card-button-bg);
@@ -302,7 +302,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-top-toolbar-gap);
-  padding-left: 12px;
+  padding-left: var(--space-rich-content-inset);
   border-left: var(--border-width-hairline) solid var(--color-panel-divider);
 }
 
@@ -335,7 +335,7 @@ button {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-detail-1);
 }
 
 .app-chrome-menu-trigger {
@@ -346,13 +346,13 @@ button {
 
 .canvas-view-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--space-popover-offset));
   right: 0;
   z-index: 30;
   display: grid;
   width: max-content;
-  min-width: 220px;
-  padding: 6px;
+  min-width: var(--size-canvas-menu-min-width);
+  padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
   background: var(--background-toast);
@@ -363,9 +363,9 @@ button {
 .canvas-view-menu button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 10px;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
   border-radius: var(--button-radius);
   background: transparent;
   color: var(--color-app-badge-text);
@@ -480,7 +480,7 @@ button {
 }
 
 .card-eyebrow {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-card-eyebrow-bottom);
   color: var(--card-eyebrow-color);
   font-size: var(--card-eyebrow-size);
   font-weight: var(--card-eyebrow-weight);
@@ -584,7 +584,10 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-control-gap);
-  padding: 12px var(--card-padding);
+  /* A floor set by the tallest thing a footer can hold, so footers that carry
+     only text line up across the canvas with ones that carry a button. */
+  min-height: var(--size-card-footer-min-height);
+  padding: var(--space-card-footer-padding-y) var(--card-padding);
   border-top: var(--card-border);
 }
 
@@ -805,8 +808,8 @@ input[type="range"] {
 }
 
 .input-row select {
-  flex: 0 0 160px;
-  width: 160px;
+  flex: 0 0 var(--size-form-select);
+  width: var(--size-form-select);
   height: var(--size-input-height);
   padding: 0 var(--size-input-padding-x);
 }
@@ -923,11 +926,11 @@ input[type="range"] {
 
 .slideshow-image-picker {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--space-popover-offset));
   right: var(--card-padding);
   z-index: 2;
   width: min(420px, calc(100cqw - (var(--card-padding) * 2)));
-  padding: 12px;
+  padding: var(--space-slideshow-picker-padding);
   border: var(--card-border);
   border-radius: var(--content-radius);
   background: var(--card-bg-gradient);
@@ -938,34 +941,34 @@ input[type="range"] {
   display: flex;
   justify-content: space-between;
   gap: var(--space-control-gap);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-slideshow-picker-heading-bottom);
   color: var(--color-text-muted);
   font-size: var(--card-footer-meta-size);
 }
 
 .slideshow-image-picker-heading span:first-child {
   color: color-mix(in srgb, var(--accent) 55%, white);
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
 
 .slideshow-image-picker-list {
   display: flex;
-  gap: 10px;
+  gap: var(--space-slideshow-picker-gap);
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: var(--space-slideshow-picker-list-bottom);
   scrollbar-width: thin;
 }
 
 .slideshow-image-thumbnail {
-  flex: 0 0 112px;
-  width: 112px;
-  height: 112px;
+  flex: 0 0 var(--size-slideshow-thumbnail);
+  width: var(--size-slideshow-thumbnail);
+  height: var(--size-slideshow-thumbnail);
   overflow: hidden;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-slideshow-thumbnail);
   background: var(--color-control);
   cursor: pointer;
 }
@@ -1034,10 +1037,16 @@ input[type="range"] {
 
 .slideshow-controls {
   min-height: 0;
-  max-height: min(42cqb, 320px);
+  max-height: min(42cqb, var(--size-slideshow-controls-max-height));
   overflow: auto;
   padding: var(--space-slideshow-controls-top) var(--image-panel-control-x)
     var(--image-panel-control-bottom);
+}
+
+/* Scoped to the slideshow: the Spotify transport row ends in a flexible volume
+   slider that already fills the row, so it has no dead space to centre. */
+.slideshow-controls .transport-row {
+  justify-content: center;
 }
 
 .range-grid {
@@ -1098,7 +1107,6 @@ input[type="range"] {
 
 .panel-notes-surface .card-title {
   font-size: var(--font-size-notes-panel-title);
-  font-weight: 650;
 }
 
 .panel-notes-surface .card-footer-meta,
@@ -1121,7 +1129,7 @@ input[type="range"] {
   width: 100%;
   max-width: var(--size-note-title-max-width);
   height: calc(var(--size-note-title-height) + 6px);
-  padding: 0 10px;
+  padding: 0 var(--space-menu-item-padding-x);
   border: var(--border-width-hairline) solid var(--color-control-border);
   border-radius: var(--radius-control);
   background: var(--color-note-control-bg);
@@ -1150,24 +1158,24 @@ input[type="range"] {
 
 .note-control-field {
   display: grid;
-  gap: 8px;
+  gap: var(--space-menu-item-gap);
   min-width: 0;
   color: var(--color-text-soft);
   font-size: var(--font-size-notes-control-label);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .notes-document-controls .note-title-input {
   max-width: none;
   height: var(--size-input-height);
   font-size: var(--font-size-notes-control);
-  font-weight: 500;
-  line-height: 1.2;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
 }
 
 .notes-document-controls .note-title-input::placeholder {
   font-size: var(--font-size-notes-control);
-  line-height: 1.2;
+  line-height: var(--line-height-control);
 }
 
 .note-select {
@@ -1177,8 +1185,8 @@ input[type="range"] {
   background: var(--color-note-control-bg);
   color: var(--color-input-text);
   font-size: var(--font-size-notes-selector);
-  font-weight: 500;
-  line-height: 1.2;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
 }
 
 .note-select:hover,
@@ -1187,10 +1195,10 @@ input[type="range"] {
 }
 
 .note-select option {
-  background: #071011;
+  background: var(--color-note-control-bg);
   color: var(--color-input-text);
   font-size: var(--font-size-notes-selector);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .cm-editor {
@@ -1298,7 +1306,7 @@ input[type="range"] {
   padding: var(--card-padding);
   color: var(--color-input-text);
   font-size: var(--font-size-notes-editor);
-  line-height: 1.7;
+  line-height: var(--line-height-rich-content);
 }
 
 .notes-editor-content:focus {
@@ -1312,13 +1320,13 @@ input[type="range"] {
 .notes-editor-content pre,
 .notes-editor-content table {
   margin-top: 0;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-rich-content-block);
 }
 
 .notes-editor-content h1,
 .notes-editor-content h2,
 .notes-editor-content h3 {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-rich-content-block);
   color: var(--color-note-title);
   line-height: var(--line-height-tight);
 }
@@ -1336,8 +1344,8 @@ input[type="range"] {
 }
 
 .notes-editor-content blockquote {
-  padding-left: 12px;
-  border-left: 2px solid var(--color-control-border-hover);
+  padding-left: var(--space-rich-content-inset);
+  border-left: var(--border-width-rich-content) solid var(--color-control-border-hover);
   color: var(--color-text-soft);
 }
 
@@ -1350,15 +1358,15 @@ input[type="range"] {
 .notes-rich-editor .cm-content,
 .notes-rich-editor .cm-line {
   font-size: var(--font-size-notes-code-editor);
-  line-height: 1.7;
+  line-height: var(--line-height-rich-content);
 }
 
 .notes-editor-content pre {
   overflow: auto;
-  padding: 10px;
+  padding: var(--space-code-block-padding);
   border: var(--border-width-hairline) solid var(--color-panel-divider);
   border-radius: var(--radius-control);
-  background: rgba(0, 0, 0, 0.24);
+  background: var(--color-code-block-bg);
 }
 
 .empty-note-button {
@@ -1389,7 +1397,7 @@ input[type="range"] {
 
   .panel-spotify-surface .playlist-list {
     flex: 0 0 auto;
-    max-height: clamp(110px, 28cqb, 260px);
+    max-height: var(--size-playlist-height-default);
   }
 
   .notes-document-controls {
@@ -1417,8 +1425,8 @@ input[type="range"] {
   .panel {
     --space-panel-body-top: 8px;
     --space-panel-body-bottom: 8px;
-    --space-row-bottom: 7px;
-    --space-now-playing-bottom: 7px;
+    --space-row-bottom: var(--space-divider-inset);
+    --space-now-playing-bottom: var(--space-divider-inset);
     --space-input-row-top: 6px;
   }
 
@@ -1436,7 +1444,7 @@ input[type="range"] {
 
   .panel-spotify-surface .playlist-list {
     flex: 0 0 auto;
-    max-height: clamp(96px, 28cqb, 150px);
+    max-height: var(--size-playlist-height-compact);
   }
 
   .slideshow-controls {
@@ -1448,7 +1456,7 @@ input[type="range"] {
   }
 
   .notes-editor-toolbar {
-    max-height: 38cqb;
+    max-height: var(--size-notes-toolbar-height-compact);
     overflow-y: auto !important;
   }
 }
@@ -1459,11 +1467,11 @@ input[type="range"] {
   }
 
   .panel-spotify-surface .playlist-list {
-    min-height: 180px;
+    min-height: var(--size-playlist-height-large);
   }
 
   .slideshow-controls {
-    max-height: 340px;
+    max-height: var(--size-slideshow-controls-height-large);
   }
 }
 
@@ -1537,7 +1545,7 @@ input[type="range"] {
       "canvas spacer tldraw";
     grid-template-columns: auto minmax(8px, 1fr) auto;
     row-gap: var(--space-top-toolbar-gap);
-    column-gap: 10px;
+    column-gap: var(--space-app-chrome-compact-gap);
   }
 
   .session-toolbar {
@@ -1605,7 +1613,7 @@ input[type="range"] {
 /* Sample collections share the Images card's responsive, token-driven controls. */
 .sample-collection-popover {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--space-popover-offset));
   right: var(--card-padding);
   z-index: 3;
   width: min(360px, calc(100cqw - (var(--card-padding) * 2)));
@@ -1621,8 +1629,8 @@ input[type="range"] {
   margin-bottom: 8px;
   color: color-mix(in srgb, var(--accent) 55%, white);
   font-size: var(--card-footer-meta-size);
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
 
@@ -1631,8 +1639,7 @@ input[type="range"] {
   gap: clamp(6px, 1.5cqi, 10px);
 }
 
-.sample-collection-list button,
-.empty-stage-collections button,
+.sample-collection-card,
 .empty-stage-folder-button {
   border: var(--border-width-hairline) solid var(--card-button-border);
   border-radius: var(--button-radius);
@@ -1642,30 +1649,87 @@ input[type="range"] {
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.sample-collection-list button:hover,
-.empty-stage-collections button:hover,
+.sample-collection-card:hover,
 .empty-stage-folder-button:hover {
   border-color: var(--card-button-active-border);
   background: var(--card-button-bg-hover);
 }
 
-.sample-collection-list button {
+/* A cover image says what a folder name cannot, so the name is free to stay
+   exactly as it is: the creator's profile, shown as the credit it is. */
+.sample-collection-card {
   display: grid;
-  gap: 3px;
-  padding: clamp(9px, 2cqi, 12px);
-  color: var(--color-input-text);
-  font-size: var(--type-md);
-  font-weight: 600;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--content-radius);
   text-align: left;
 }
 
-.sample-collection-list button span {
-  color: var(--color-input-text);
+.sample-collection-card.is-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sample-card-gap);
+  padding: var(--sample-card-padding);
 }
 
-.sample-collection-list small {
-  color: var(--color-text-muted);
-  font-size: var(--card-footer-meta-size);
+.sample-collection-cover {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--color-control);
+}
+
+.sample-collection-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sample-collection-cover-fallback {
+  width: 40%;
+  height: 40%;
+  color: color-mix(in srgb, var(--accent) 60%, white);
+}
+
+/* Square by default, but never taller than a share of the panel: a wide, short
+   panel would otherwise grow the covers until the stage had to scroll. */
+.sample-collection-card.is-tile .sample-collection-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: var(--sample-card-cover-tile-max);
+}
+
+.sample-collection-card.is-row .sample-collection-cover {
+  width: var(--sample-card-cover-row);
+  height: var(--sample-card-cover-row);
+  border-radius: var(--radius-slideshow-thumbnail);
+}
+
+.sample-collection-text {
+  display: grid;
+  min-width: 0;
+}
+
+.sample-collection-card.is-tile .sample-collection-text {
+  padding: var(--sample-card-padding);
+}
+
+.sample-collection-name {
+  color: var(--color-input-text);
+  font-size: var(--sample-card-name-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
+  /* A handle is someone's name: it may wrap at a separator, but it is never
+     truncated and never broken mid-word. */
+  overflow-wrap: break-word;
+}
+
+/* Two lines are reserved so one wrapped handle does not leave the other cards
+   in the row looking short. */
+.sample-collection-card.is-tile .sample-collection-name {
+  min-height: calc(var(--line-height-control) * 2em);
 }
 
 .empty-stage {
@@ -1674,6 +1738,9 @@ input[type="range"] {
 }
 
 .empty-stage-icon {
+  /* A fixed-size SVG in a stretched column sits at its start edge, so it needs
+     centring explicitly; every sibling centres itself through text-align. */
+  justify-self: center;
   width: clamp(26px, 7cqmin, 48px);
   height: clamp(26px, 7cqmin, 48px);
   color: color-mix(in srgb, var(--accent) 72%, white);
@@ -1683,20 +1750,20 @@ input[type="range"] {
   margin: 0;
   color: var(--color-text);
   font-size: var(--type-lg);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .empty-stage-folder-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-menu-item-gap);
   min-height: clamp(34px, 8cqb, 44px);
   padding: 7px clamp(12px, 3cqi, 18px);
   color: var(--color-input-text);
   font: inherit;
   font-size: var(--type-md);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .empty-stage-divider {
@@ -1714,19 +1781,37 @@ input[type="range"] {
   width: 100%;
 }
 
-@container panel-shell (min-width: 380px) {
+/* Three across only once each tile is wide enough to hold the longest handle;
+   below that the tiles turn into rows so the covers stay small and the names
+   keep a full line to themselves. */
+@container panel-shell (min-width: 440px) {
   .empty-stage-collections {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-.empty-stage-collections button {
-  min-width: 0;
-  padding: clamp(7px, 1.8cqi, 11px);
-  overflow-wrap: anywhere;
-  color: var(--color-input-text);
-  font-size: var(--type-md);
-  font-weight: 600;
+@container panel-shell (max-width: 439px) {
+  .sample-collection-card.is-tile {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sample-card-gap);
+    padding: var(--sample-card-padding);
+  }
+
+  .sample-collection-card.is-tile .sample-collection-cover {
+    width: var(--sample-card-cover-row);
+    height: var(--sample-card-cover-row);
+    aspect-ratio: auto;
+    border-radius: var(--radius-slideshow-thumbnail);
+  }
+
+  .sample-collection-card.is-tile .sample-collection-text {
+    padding: 0;
+  }
+
+  .sample-collection-card.is-tile .sample-collection-name {
+    min-height: 0;
+  }
 }
 
 .empty-stage p.empty-stage-status {
@@ -1738,28 +1823,21 @@ input[type="range"] {
 
 /* Keep onboarding labels legible even when inherited panel styles are unavailable. */
 .panel-slideshow-surface .empty-stage h3 {
-  color: #f5f3ee !important;
+  color: var(--color-text) !important;
   font-size: var(--empty-stage-title-size);
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: var(--font-weight-strong);
+  line-height: var(--line-height-control);
 }
 
-.panel-slideshow-surface .empty-stage-folder-button,
-.panel-slideshow-surface .empty-stage-collections button,
-.panel-slideshow-surface .sample-collection-list button {
-  color: #fffaf2 !important;
-  font-size: var(--empty-stage-action-size);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.panel-slideshow-surface .sample-collection-list button span {
+.panel-slideshow-surface .empty-stage-folder-button {
   color: var(--color-input-text) !important;
+  font-size: var(--empty-stage-action-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
-.panel-slideshow-surface .sample-collection-list small {
-  color: var(--color-text-soft) !important;
-  font-size: var(--type-sm);
+.panel-slideshow-surface .sample-collection-name {
+  color: var(--color-input-text) !important;
 }
 
 /* Keep the empty state centered, while giving its controls comfortable rhythm. */
@@ -1774,11 +1852,12 @@ input[type="range"] {
 }
 
 .panel-slideshow-surface .empty-stage-divider {
-  color: rgba(245, 243, 238, 0.82) !important;
+  color: var(--color-text-soft) !important;
   font-size: var(--empty-stage-hint-size);
-  font-weight: 600;
-  line-height: 1.3;
-  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-hint);
+  /* Wraps onto an even second line in a narrow panel rather than being clipped. */
+  text-wrap: balance;
 }
 
 .panel-slideshow-surface .empty-stage-folder-button {
@@ -1793,17 +1872,6 @@ input[type="range"] {
   width: 100%;
 }
 
-.panel-slideshow-surface .empty-stage-collections button {
-  width: 100%;
-  min-height: var(--empty-stage-action-height);
-  padding-inline: clamp(10px, 2cqi, 20px);
-  /* Collection names are folder names and can be long. Wrapping keeps them
-     readable at three across; an ellipsis would just hide which one is which. */
-  overflow-wrap: anywhere;
-  text-align: center;
-  white-space: normal;
-}
-
 .panel-slideshow-surface .empty-stage-icon {
   width: var(--empty-stage-icon-size);
   height: var(--empty-stage-icon-size);
@@ -1812,26 +1880,13 @@ input[type="range"] {
   width: min(420px, calc(100cqw - (var(--card-padding) * 2)));
 }
 
-.panel-slideshow-surface .sample-collection-list button {
-  min-height: 52px;
-  padding-inline: 16px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.panel-slideshow-surface .sample-collection-list button small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Small canvas cards cannot fit the complete onboarding stack at once.
    Start the scroll area at the heading so no action is hidden above the fold. */
 @container panel-shell (max-height: 640px) {
   .panel-slideshow-surface .empty-stage {
     align-content: start;
-    gap: 10px;
+    gap: var(--space-slideshow-picker-gap);
     padding: 14px;
   }
 

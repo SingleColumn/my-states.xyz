@@ -67,6 +67,61 @@
   --type-xl: 20px;
   --type-2xl: 24px;
 
+  /* Semantic weights and rhythm used by component-specific UI. */
+  --font-weight-display: 680;
+  --font-weight-emphasis: 650;
+  --tracking-label: 0.04em;
+  --size-session-error-max-width: 260px;
+  --size-tldraw-icon: 16px;
+  --space-control-padding-x: 12px;
+  --space-app-chrome-compact-gap: 10px;
+  --space-divider-inset: 7px;
+  --size-playlist-height-compact: clamp(96px, 28cqb, 150px);
+  --size-playlist-height-default: clamp(110px, 28cqb, 260px);
+  --size-notes-toolbar-height-compact: 38cqb;
+  --size-playlist-height-large: 180px;
+  --size-slideshow-controls-height-large: 340px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-strong: 700;
+  --line-height-control: 1.2;
+  --line-height-toast: 1.25;
+  --line-height-rich-content: 1.7;
+  --line-height-hint: 1.3;
+
+  /* Small shared spacing rungs for menus and content details. */
+  --space-detail-1: 4px;
+  --space-detail-2: 6px;
+  --space-detail-3: 8px;
+  --space-detail-4: 10px;
+  --space-detail-5: 12px;
+  --space-detail-6: 16px;
+
+  /* Component tokens: keep local visual decisions named and themeable. */
+  --space-popover-offset: 8px;
+  --space-menu-padding: var(--space-detail-2);
+  --space-menu-item-gap: var(--space-detail-3);
+  --space-menu-item-padding-x: var(--space-detail-4);
+  --size-menu-item-height: 34px;
+  --size-session-menu-min-width: 190px;
+  --size-canvas-menu-min-width: 220px;
+  --space-card-eyebrow-bottom: 4px;
+  --space-card-footer-padding-y: 12px;
+  --size-form-select: 160px;
+  --space-slideshow-picker-padding: var(--space-detail-5);
+  --space-slideshow-picker-heading-bottom: var(--space-detail-2);
+  --space-slideshow-picker-gap: var(--space-detail-4);
+  --space-slideshow-picker-list-bottom: 2px;
+  --size-slideshow-thumbnail: 112px;
+  --radius-slideshow-thumbnail: 9px;
+  --size-slideshow-controls-max-height: 320px;
+  --space-rich-content-block: 12px;
+  --space-rich-content-inset: 12px;
+  --border-width-rich-content: 2px;
+  --space-code-block-padding: 10px;
+  --color-code-block-bg: var(--color-input-bg);
+
   --font-size-panel-body: var(--type-md);
   --font-size-panel-label: var(--type-sm);
   --font-size-app-badge-title: 13px;
@@ -168,6 +223,11 @@
   --empty-stage-action-height: 40px;
   --empty-stage-content-max: 340px;
   --empty-stage-block-gap: 12px;
+  --sample-card-padding: 10px;
+  --sample-card-gap: 10px;
+  --sample-card-cover-row: 44px;
+  --sample-card-cover-tile-max: 200px;
+  --sample-card-name-size: var(--type-sm);
   --size-zoom-readout-min: 44px;
   --size-toast-max-width: 520px;
   --size-toast-viewport-inset: 40px;
@@ -235,6 +295,7 @@
   --card-footer-meta-size: 11px;
   --card-footer-meta-color: rgba(255, 255, 255, 0.32);
   --card-footer-button-size: 26px;
+  --size-card-footer-min-height: calc(26px + (var(--space-card-footer-padding-y) * 2));
 
   --card-button-bg: rgba(255, 255, 255, 0.04);
   --card-button-border: rgba(255, 255, 255, 0.1);
@@ -288,6 +349,7 @@
   --image-panel-status-size: var(--type-md);
   --card-header-button-size: clamp(30px, min(7cqi, 5.4cqb), 260px);
   --card-footer-button-size: clamp(26px, min(5.8cqi, 4.6cqb), 210px);
+  --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
   --size-play-button: clamp(44px, min(10cqi, 8cqb), 380px);
   --size-input-height: clamp(34px, min(7.5cqi, 4.4cqb), 260px);
   --size-control-icon: clamp(16px, min(3cqi, 2.4cqb), 120px);
@@ -334,8 +396,16 @@
   --empty-stage-hint-size: var(--type-sm);
   --empty-stage-icon-size: clamp(32px, min(7.5cqi, 6cqb), 300px);
   --empty-stage-action-height: clamp(40px, min(9cqi, 7cqb), 320px);
-  --empty-stage-content-max: clamp(300px, 66cqi, 760px);
+  /* Widened from 66cqi now that the onboarding row carries cover images: the
+     tiles need the room to hold the longest creator name on one line at the
+     default panel size, and the stage no longer reads as mostly empty. */
+  --empty-stage-content-max: clamp(300px, 84cqi, 760px);
   --empty-stage-block-gap: clamp(10px, min(2.6cqi, 2.1cqb), 110px);
+  --sample-card-padding: clamp(8px, min(1.9cqi, 1.6cqb), 80px);
+  --sample-card-gap: clamp(9px, min(2cqi, 1.7cqb), 84px);
+  --sample-card-cover-row: clamp(40px, min(9cqi, 7.5cqb), 200px);
+  --sample-card-cover-tile-max: clamp(110px, 22cqb, 300px);
+  --sample-card-name-size: var(--type-sm);
   --image-panel-control-x: clamp(12px, min(3cqi, 2.4cqb), 120px);
   --image-panel-control-bottom: clamp(12px, min(2.8cqi, 2.2cqb), 110px);
   --image-panel-control-gap: clamp(10px, min(2.4cqi, 1.9cqb), 96px);

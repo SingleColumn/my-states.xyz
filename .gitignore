@@ -50,10 +50,7 @@ playwright-report/
 test-results/
 
 # Local planning/session notes
-implementation-plan.md
-session-implementation-checklist.md
-spec.md
-VERCEL_DEPLOYMENT_CHECKLIST.md
+design-and-architecture.md
 project_docs/
 
 # Temporary files

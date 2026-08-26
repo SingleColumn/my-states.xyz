@@ -3,6 +3,7 @@ import {
   bundledImageCollections,
   createImageItemsFromBundledCollection,
   getBundledCollection,
+  loadBundledCollectionPreviews,
 } from './imageCollections'
 
 function manifestFetch(images: string[]) {
@@ -40,5 +41,29 @@ describe('bundled image collection registry', () => {
       url: '/sample-images/teemu-jpeg/01%20cover.webp',
       urlKind: 'static',
     })])
+  })
+})
+
+describe('collection previews', () => {
+  const curatedCover = bundledImageCollections[0].cover
+
+  it('prefers the curated cover over the first image on disk', async () => {
+    const [preview] = await loadBundledCollectionPreviews(
+      manifestFetch(['/sample-images/teemu-jpeg/first.jpg', curatedCover]),
+    )
+    expect(preview).toEqual({ id: 'teemu-jpeg', coverUrl: curatedCover })
+  })
+
+  it('falls back to the first image when the curated cover is missing', async () => {
+    const [preview] = await loadBundledCollectionPreviews(
+      manifestFetch(['/sample-images/teemu-jpeg/first.jpg']),
+    )
+    expect(preview).toMatchObject({ coverUrl: '/sample-images/teemu-jpeg/first.jpg' })
+  })
+
+  it('reports every registered collection, including ones absent from the manifest', async () => {
+    const previews = await loadBundledCollectionPreviews(manifestFetch([]))
+    expect(previews.map(({ id }) => id)).toEqual(bundledImageCollections.map(({ id }) => id))
+    expect(previews[1]).toEqual({ id: 'eightbitstrana', coverUrl: null })
   })
 })
