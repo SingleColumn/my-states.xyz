@@ -61,10 +61,6 @@ export function AppChrome({
 
   return (
     <div ref={rootRef} className="app-chrome" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-      <section className="app-chrome-identity" aria-label="Application identity">
-        <strong>Music Images Canvas</strong>
-      </section>
-
       <SessionToolbar />
 
       <section className="app-chrome-canvas" aria-label="Canvas view controls">

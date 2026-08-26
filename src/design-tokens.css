@@ -9,6 +9,10 @@
 
   --color-canvas: #101114;
   --color-text: #f5f3ee;
+  /* tldraw redefines --color-text on .tl-container for its own light theme,
+     which shadows the value above everywhere inside the canvas. Panel styles
+     must use this un-shadowed alias instead. */
+  --color-panel-text: #f5f3ee;
   --color-text-muted: rgba(245, 243, 238, 0.64);
   --color-text-soft: rgba(245, 243, 238, 0.8);
   --color-danger: #ffb4a9;
@@ -217,10 +221,7 @@
   --size-empty-stage-button: 74px;
   /* Static fallbacks; the .panel block below scales these with the panel. */
   --empty-stage-title-size: var(--type-lg);
-  --empty-stage-action-size: var(--type-md);
   --empty-stage-hint-size: var(--type-sm);
-  --empty-stage-icon-size: 32px;
-  --empty-stage-action-height: 40px;
   --empty-stage-content-max: 340px;
   --empty-stage-block-gap: 12px;
   --sample-card-padding: 10px;
@@ -392,10 +393,7 @@
      it and never above it. The actions read as body text, like every other
      button in the app. */
   --empty-stage-title-size: var(--type-lg);
-  --empty-stage-action-size: var(--type-md);
   --empty-stage-hint-size: var(--type-sm);
-  --empty-stage-icon-size: clamp(32px, min(7.5cqi, 6cqb), 300px);
-  --empty-stage-action-height: clamp(40px, min(9cqi, 7cqb), 320px);
   /* Widened from 66cqi now that the onboarding row carries cover images: the
      tiles need the room to hold the longest creator name on one line at the
      default panel size, and the stage no longer reads as mostly empty. */

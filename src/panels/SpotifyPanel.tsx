@@ -52,7 +52,7 @@ export function SpotifyPanel() {
     <section className="panel panel-spotify-surface">
       <header className="card-header">
         <div>
-          <h2 className="card-title">Spotify</h2>
+          <h2 className="card-title">Music</h2>
         </div>
         <div className="card-header-actions">
           {spotify.tokens ? (
@@ -77,7 +77,7 @@ export function SpotifyPanel() {
         {!spotify.tokens ? (
           <div className="card-content spotify-login">
             <div>
-              <h3>Browser playback</h3>
+              <h3>Play a playlist</h3>
               <p>{spotify.status}</p>
             </div>
             <button className="card-icon-button is-primary is-wide" type="button" onClick={() => void run(spotify.login)}>
@@ -232,10 +232,15 @@ export function SpotifyPanel() {
       <footer className="card-footer panel-interactive" {...canvasEventBlockerProps}>
         <span className="card-footer-meta">{spotify.playlist.name ?? 'No playlist loaded'}</span>
         <div className="card-footer-status">
+          {/* The panel is titled "Music", so the service is credited here instead —
+              and it stays visible once logged in, where the body no longer names it. */}
+          <span className="card-footer-service">Spotify</span>
           {error ? (
             <span className="error-text">{error}</span>
           ) : (
-            <span>{spotify.tokens && spotify.isReady ? 'Ready' : spotify.status}</span>
+            /* Logged out, spotify.status is the same sentence the body already
+               shows, so the footer reports connection state only. */
+            <span>{!spotify.tokens ? 'Not connected' : spotify.isReady ? 'Ready' : spotify.status}</span>
           )}
         </div>
       </footer>

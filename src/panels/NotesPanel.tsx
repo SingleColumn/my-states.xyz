@@ -43,7 +43,7 @@ export function NotesPanel() {
   return (
     <section className="panel panel-notes-surface">
       <header className="card-header">
-        <h2 className="card-title">Markdown Text Editor</h2>
+        <h2 className="card-title">Notes</h2>
         <div className="card-header-actions">
           <button
             className="card-icon-button"
@@ -91,20 +91,20 @@ export function NotesPanel() {
       <div className="panel-body notes-body">
         <div className="notes-document-controls">
           <label className="note-control-field" {...canvasEventBlockerProps}>
-            <span>Document Selector</span>
+            <span>Choose a note</span>
             <select
               className="note-select"
               value={notes.activeNote?.id ?? ''}
               onChange={(event) => void handleDocumentSelection(event.target.value)}
-              aria-label="Document selector"
+              aria-label="Choose a note"
               {...canvasEventBlockerProps}
             >
               <option value={newDocumentSelectValue}>
-                Create new document
+                Create new note
               </option>
               {notes.activeNote ? null : (
                 <option value="" disabled>
-                  Select existing document
+                  Select existing note
                 </option>
               )}
               {notes.notes.map((note) => (
@@ -116,14 +116,14 @@ export function NotesPanel() {
           </label>
 
           <label className="note-control-field" {...canvasEventBlockerProps}>
-            <span>Selected Document Name</span>
+            <span>Note title</span>
             <input
               className="note-title-input panel-interactive"
               value={notes.activeNote?.title ?? ''}
               onChange={(event) => notes.setActiveNoteTitle(event.target.value)}
               disabled={!notes.activeNote}
-              aria-label="Selected document name"
-              placeholder="Name selected document"
+              aria-label="Note title"
+              placeholder="Name this note"
               {...canvasEventBlockerProps}
             />
           </label>
@@ -142,18 +142,21 @@ export function NotesPanel() {
             />
           </div>
         ) : (
-          <button
-            className="card-icon-button is-primary is-wide empty-note-button"
-            type="button"
-            {...canvasEventBlockerProps}
-            onClick={(event) => {
-              stopCanvasEvent(event)
-              void notes.createNote()
-            }}
-          >
-            <FilePlus2 size={18} />
-            New note
-          </button>
+          <div className="notes-empty-state">
+            <h3>Start a note</h3>
+            <button
+              className="card-icon-button is-primary is-wide empty-note-button"
+              type="button"
+              {...canvasEventBlockerProps}
+              onClick={(event) => {
+                stopCanvasEvent(event)
+                void notes.createNote()
+              }}
+            >
+              <FilePlus2 size={18} />
+              New note
+            </button>
+          </div>
         )}
       </div>
 
@@ -242,7 +245,7 @@ function exportMarkdownNote(note: Note) {
 }
 
 function getDisplayNoteTitle(note: Note) {
-  return note.title.trim() || 'Untitled document'
+  return note.title.trim() || 'Untitled note'
 }
 
 function sanitizeMarkdownFileName(title: string) {

@@ -50,8 +50,8 @@ button {
 
 .app-chrome {
   display: grid;
-  grid-template-areas: "identity sessions canvas spacer tldraw";
-  grid-template-columns: auto auto auto minmax(8px, 1fr) auto;
+  grid-template-areas: "sessions canvas spacer tldraw";
+  grid-template-columns: auto auto minmax(8px, 1fr) auto;
   align-items: center;
   column-gap: var(--space-app-chrome-group-gap);
   width: calc(100% - 2 * var(--space-top-toolbar-edge));
@@ -65,19 +65,6 @@ button {
   backdrop-filter: var(--blur-app-badge);
   color: var(--color-app-badge-text);
   pointer-events: auto;
-}
-
-.app-chrome-identity {
-  grid-area: identity;
-  min-width: 0;
-}
-
-.app-chrome-identity strong {
-  flex-shrink: 0;
-  white-space: nowrap;
-  font-size: var(--font-size-app-badge-title);
-  font-weight: var(--font-weight-display);
-  line-height: var(--line-height-tight);
 }
 
 .session-toolbar {
@@ -428,6 +415,12 @@ button {
   height: 100%;
   min-width: 0;
   min-height: 0;
+  /* tldraw renders shapes inside .tl-html-container, which sets
+     `color: var(--color-text-1)` against its own light theme. Anything in a
+     panel without an explicit colour would otherwise inherit that near-black
+     and vanish on these dark surfaces. Re-anchor the whole subtree here —
+     note --color-text itself is shadowed by tldraw, hence the alias. */
+  color: var(--color-panel-text);
   font-size: var(--font-size-panel-body);
 }
 
@@ -617,6 +610,13 @@ button {
   white-space: nowrap;
 }
 
+/* Service attribution in a footer: reads as a quiet label, not as status. */
+.card-footer-service {
+  color: var(--card-eyebrow-color);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+}
+
 .card-footer-button {
   width: var(--card-footer-button-size);
   height: var(--card-footer-button-size);
@@ -672,6 +672,9 @@ input[type="range"] {
 .spotify-login h3 {
   margin: 0 0 var(--space-spotify-title-bottom);
   font-size: var(--font-size-spotify-login-title);
+  /* Without this the browser default (bold) makes it heavier than the matching
+     headings in the Images and Notes empty states. */
+  font-weight: var(--font-weight-semibold);
 }
 
 .spotify-login p,
@@ -1369,6 +1372,23 @@ input[type="range"] {
   background: var(--color-code-block-bg);
 }
 
+/* Matches the Images empty stage: an outcome heading above the primary action,
+   so the three panels' empty states read as one set. */
+.notes-empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--empty-stage-block-gap);
+  place-self: center;
+  text-align: center;
+}
+
+.notes-empty-state h3 {
+  margin: 0;
+  font-size: var(--type-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
 .empty-note-button {
   place-self: center;
 }
@@ -1541,7 +1561,7 @@ input[type="range"] {
 @media (max-width: 799px) {
   .app-chrome {
     grid-template-areas:
-      "identity sessions sessions"
+      "sessions sessions sessions"
       "canvas spacer tldraw";
     grid-template-columns: auto minmax(8px, 1fr) auto;
     row-gap: var(--space-top-toolbar-gap);
@@ -1565,18 +1585,10 @@ input[type="range"] {
 @media (max-width: 520px) {
   .app-chrome {
     grid-template-areas:
-      "identity sessions"
+      "sessions sessions"
       "canvas spacer"
       "tldraw tldraw";
     grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .app-chrome-identity strong {
-    display: block;
-    max-width: 110px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .session-toolbar select {
@@ -1591,10 +1603,6 @@ input[type="range"] {
 }
 
 @media (max-width: 380px) {
-  .app-chrome-identity strong {
-    max-width: 78px;
-  }
-
   .session-toolbar select {
     width: 100px;
   }
@@ -1639,8 +1647,10 @@ input[type="range"] {
   gap: clamp(6px, 1.5cqi, 10px);
 }
 
-.sample-collection-card,
-.empty-stage-folder-button {
+/* Secondary treatment. The folder button deliberately does NOT share it: it is
+   the panel's primary action and takes the accent styling that the Spotify and
+   Notes panels give theirs, so each panel shows exactly one obvious next step. */
+.sample-collection-card {
   border: var(--border-width-hairline) solid var(--card-button-border);
   border-radius: var(--button-radius);
   background: var(--card-button-bg);
@@ -1649,8 +1659,7 @@ input[type="range"] {
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.sample-collection-card:hover,
-.empty-stage-folder-button:hover {
+.sample-collection-card:hover {
   border-color: var(--card-button-active-border);
   background: var(--card-button-bg-hover);
 }
@@ -1737,33 +1746,18 @@ input[type="range"] {
   padding: clamp(12px, 3cqi, 28px);
 }
 
-.empty-stage-icon {
-  /* A fixed-size SVG in a stretched column sits at its start edge, so it needs
-     centring explicitly; every sibling centres itself through text-align. */
-  justify-self: center;
-  width: clamp(26px, 7cqmin, 48px);
-  height: clamp(26px, 7cqmin, 48px);
-  color: color-mix(in srgb, var(--accent) 72%, white);
-}
-
 .empty-stage h3 {
   margin: 0;
-  color: var(--color-text);
+  color: var(--color-panel-text);
   font-size: var(--type-lg);
   font-weight: var(--font-weight-semibold);
 }
 
+/* Sizing, colour and weight all come from `card-icon-button is-primary is-wide`,
+   the same trio the Spotify and Notes primary actions use. Only the label needs
+   holding on one line. */
 .empty-stage-folder-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-menu-item-gap);
-  min-height: clamp(34px, 8cqb, 44px);
-  padding: 7px clamp(12px, 3cqi, 18px);
-  color: var(--color-input-text);
-  font: inherit;
-  font-size: var(--type-md);
-  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }
 
 .empty-stage-divider {
@@ -1821,17 +1815,11 @@ input[type="range"] {
   line-height: var(--line-height-body);
 }
 
-/* Keep onboarding labels legible even when inherited panel styles are unavailable. */
+/* Colour now comes from .panel, which re-anchors the whole subtree off tldraw's
+   light-theme text colour; only the type scale is set here. */
 .panel-slideshow-surface .empty-stage h3 {
-  color: var(--color-text) !important;
   font-size: var(--empty-stage-title-size);
-  font-weight: var(--font-weight-strong);
-  line-height: var(--line-height-control);
-}
-
-.panel-slideshow-surface .empty-stage-folder-button {
-  color: var(--color-input-text) !important;
-  font-size: var(--empty-stage-action-size);
+  /* Semibold, matching the Music and Notes empty-state headings. */
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-control);
 }
@@ -1860,11 +1848,6 @@ input[type="range"] {
   text-wrap: balance;
 }
 
-.panel-slideshow-surface .empty-stage-folder-button {
-  min-height: var(--empty-stage-action-height);
-  white-space: nowrap;
-}
-
 /* The collections sit side by side and wrap only when the panel is too narrow
    to hold them, instead of always stacking into a single 340px column. */
 .panel-slideshow-surface .empty-stage-collections {
@@ -1872,10 +1855,6 @@ input[type="range"] {
   width: 100%;
 }
 
-.panel-slideshow-surface .empty-stage-icon {
-  width: var(--empty-stage-icon-size);
-  height: var(--empty-stage-icon-size);
-}
 .panel-slideshow-surface .sample-collection-popover {
   width: min(420px, calc(100cqw - (var(--card-padding) * 2)));
 }
@@ -1888,11 +1867,5 @@ input[type="range"] {
     align-content: start;
     gap: var(--space-slideshow-picker-gap);
     padding: 14px;
-  }
-
-  /* A short panel has no room for decoration. The words earn their space,
-     the illustration does not. */
-  .panel-slideshow-surface .empty-stage-icon {
-    display: none;
   }
 }

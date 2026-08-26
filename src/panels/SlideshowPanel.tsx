@@ -120,9 +120,8 @@ export function SlideshowPanel() {
           />
         ) : (
           <div className="empty-stage">
-            <Images className="empty-stage-icon" aria-hidden="true" />
             <h3>Add images</h3>
-            <button className="empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
+            <button className="card-icon-button is-primary is-wide empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
             <span className="empty-stage-divider">Or try a collection from these creators</span>
             <div className="empty-stage-collections">
               {collections.map((collection) => (
