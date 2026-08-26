@@ -592,7 +592,7 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
 
     try {
       const nextImages = await createImageItemsFromBundledCollection(collectionId) ?? []
-      setIsPlaying(false)
+      setIsPlaying(nextImages.length > 0)
       setImages((current) => {
         releaseImageItems(current)
         return nextImages
