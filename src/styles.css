@@ -1070,6 +1070,18 @@ input[type="range"] {
   font-size: var(--image-panel-label-size);
 }
 
+.slideshow-control-value {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.range-grid label:hover .slideshow-control-value,
+.range-grid label:focus-within .slideshow-control-value,
+.zoom-row label:hover .slideshow-control-value,
+.zoom-row label:focus-within .slideshow-control-value {
+  opacity: 1;
+}
+
 .zoom-row {
   display: grid;
   grid-template-columns:
@@ -1857,6 +1869,116 @@ input[type="range"] {
 
 .panel-slideshow-surface .sample-collection-popover {
   width: min(420px, calc(100cqw - (var(--card-padding) * 2)));
+}
+
+.architecture-report-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 55%);
+}
+
+.architecture-report {
+  width: min(1100px, 100%);
+  max-height: min(850px, 92vh);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-text);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 35%);
+}
+
+.architecture-report-header,
+.architecture-report-actions,
+.architecture-report-checks li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.architecture-report-header {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.architecture-report-header h2,
+.architecture-report h3 {
+  margin: 0 0 8px;
+}
+
+.architecture-report-header p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.architecture-report-actions button {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+  cursor: pointer;
+}
+
+.architecture-report-status {
+  margin: 20px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.architecture-report-status.is-pass { background: rgb(45 170 105 / 18%); color: #76e0a6; }
+.architecture-report-status.is-warning { background: rgb(224 166 62 / 18%); color: #f4ca70; }
+.architecture-report-status.is-error { background: rgb(220 82 82 / 18%); color: #ff9b9b; }
+
+.architecture-report-checks {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.architecture-report-check-status {
+  min-width: 76px;
+  font-size: 12px;
+}
+
+.architecture-report-check-status.is-pass { color: #76e0a6; }
+.architecture-report-check-status.is-warning { color: #f4ca70; }
+.architecture-report-check-status.is-error { color: #ff9b9b; }
+
+.architecture-report-table-wrap {
+  overflow: auto;
+  margin-bottom: 24px;
+}
+
+.architecture-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.architecture-report th,
+.architecture-report td {
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.architecture-report pre {
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 24%);
+  font-size: 12px;
 }
 
 

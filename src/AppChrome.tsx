@@ -22,6 +22,7 @@ interface AppChromeProps {
   onFitSelectedPanel(): void
   onResetSelectedPanel(): void
   onResetPanelLayout(): void
+  onOpenArchitectureReport?(): void
   onMeasure(rect: AppChromeRect): void
 }
 
@@ -34,6 +35,7 @@ export function AppChrome({
   onFitSelectedPanel,
   onResetSelectedPanel,
   onResetPanelLayout,
+  onOpenArchitectureReport,
   onMeasure,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -94,6 +96,11 @@ export function AppChrome({
           <DefaultQuickActions />
           <DefaultActionsMenu />
         </TldrawUiToolbar>
+        {import.meta.env.DEV && onOpenArchitectureReport ? (
+          <button className="app-chrome-control architecture-report-launcher" type="button" onClick={onOpenArchitectureReport} title="Inspect panel architecture">
+            Panel report
+          </button>
+        ) : null}
       </nav>
     </div>
   )

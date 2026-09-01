@@ -9,6 +9,7 @@ import {
 import type {
   CanvasState,
   Note,
+  Panel,
   SessionImage,
   SlideshowSettings,
   SpotifyPlaylistReference,
@@ -39,6 +40,7 @@ interface SessionManifest {
   canvas: CanvasState | null
   slideshow: SlideshowSettings
   spotify: SpotifyPlaylistReference
+  panels?: Panel[]
   notes: Array<{
     id: string
     title: string
@@ -48,6 +50,7 @@ interface SessionManifest {
   }>
   images: Array<{
     id: string
+    panelId?: string
     filename: string
     path: string
     mimeType: string
@@ -62,7 +65,11 @@ export async function exportSessionArchive(sessionId: string) {
   const [session, notes, assets] = await Promise.all([getSession(sessionId), getNotes(sessionId), getSessionAssets(sessionId)])
   if (!session) throw new Error('The selected session no longer exists.')
   // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
-  const exportedAssets = session.slideshow.imageSource.type === 'session-assets' ? assets : []
+  const slideshow = session.panels.find((panel) => panel.type === 'slideshow')
+  const spotify = session.panels.find((panel) => panel.type === 'spotify')
+  const notesPanel = session.panels.find((panel) => panel.type === 'notes')
+  const slideshowSettings = slideshow?.config
+  const exportedAssets = session.panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   validateExportContent(notes, exportedAssets)
 
   const files: Record<string, Uint8Array> = {}
@@ -72,11 +79,12 @@ export async function exportSessionArchive(sessionId: string) {
       name: session.name,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
-      activeNoteId: session.activeNoteId,
+      activeNoteId: notesPanel?.config.activeNoteId ?? null,
     },
     canvas: session.canvas,
-    slideshow: session.slideshow,
-    spotify: session.spotify,
+    slideshow: slideshowSettings!,
+    spotify: spotify?.config.playlist ?? { id: null, uri: null, name: null, url: null },
+    panels: session.panels,
     notes: [],
     images: [],
   }
@@ -100,6 +108,7 @@ export async function exportSessionArchive(sessionId: string) {
     files[path] = new Uint8Array(await asset.blob.arrayBuffer())
     manifest.images.push({
       id: asset.id,
+      ...(asset.panelId ? { panelId: asset.panelId } : {}),
       filename: asset.filename,
       path,
       mimeType: asset.mimeType,
@@ -140,6 +149,7 @@ export async function importSessionArchive(file: File) {
   }))
   const assets = manifest.images.map((image) => ({
     id: image.id,
+    ...(image.panelId ? { panelId: image.panelId } : {}),
     filename: image.filename,
     mimeType: image.mimeType,
     name: image.filename,
@@ -155,6 +165,7 @@ export async function importSessionArchive(file: File) {
     canvas: manifest.canvas,
     slideshow: manifest.slideshow,
     spotify: manifest.spotify,
+    panels: manifest.panels,
     activeNoteSourceId: manifest.session.activeNoteId,
     notes,
     assets,
@@ -261,7 +272,7 @@ function validateManifest(manifest: SessionManifest, files: Map<string, Uint8Arr
   if (!isRecord(manifest) || manifest.formatVersion !== FORMAT_VERSION) {
     throw new Error('This session archive uses an unsupported format version.')
   }
-  if (!isSessionMetadata(manifest.session) || !isSlideshowSettings(manifest.slideshow) || !isPlaylistReference(manifest.spotify)) {
+  if (!isSessionMetadata(manifest.session) || !isSlideshowSettings(manifest.slideshow) || !isPlaylistReference(manifest.spotify) || (manifest.panels !== undefined && !isPanels(manifest.panels))) {
     throw new Error('The session manifest has invalid metadata.')
   }
   if (!isCanvasState(manifest.canvas) || !Array.isArray(manifest.notes) || !Array.isArray(manifest.images)) {
@@ -292,7 +303,7 @@ function validateManifest(manifest: SessionManifest, files: Map<string, Uint8Arr
   }
 
   for (const image of manifest.images) {
-    if (!isRecord(image) || !isSafeId(image.id) || imageIds.has(image.id) || typeof image.filename !== 'string' || !supportedImageTypes.has(image.mimeType) || !isTimestamp(image.lastModified) || !isNullableDimension(image.width) || !isNullableDimension(image.height)) {
+    if (!isRecord(image) || !isSafeId(image.id) || (image.panelId !== undefined && !isSafeId(image.panelId)) || imageIds.has(image.id) || typeof image.filename !== 'string' || !supportedImageTypes.has(image.mimeType) || !isTimestamp(image.lastModified) || !isNullableDimension(image.width) || !isNullableDimension(image.height)) {
       throw new Error('The manifest contains an invalid image.')
     }
     const expectedPath = `images/${image.id}.${extensionForMimeType(image.mimeType)}`
@@ -464,11 +475,23 @@ function isCanvasState(value: unknown): value is CanvasState | null {
   if (!isRecord(value) || !isRecord(value.camera) || !Array.isArray(value.panels)) return false
   const camera = value.camera
   if (!['x', 'y', 'z'].every((key) => typeof camera[key] === 'number' && Number.isFinite(camera[key] as number))) return false
-  const types = new Set(['spotify', 'slideshow', 'notes'])
   return value.panels.every(
     (panel) =>
       isRecord(panel) &&
-      types.has(panel.panelType as string) &&
+      (isSafeId(panel.panelId) || ['spotify', 'slideshow', 'notes'].includes(panel.panelType as string)) &&
       ['x', 'y', 'w', 'h'].every((key) => typeof panel[key] === 'number' && Number.isFinite(panel[key] as number)),
   )
+}
+
+function isPanels(value: unknown): value is Panel[] {
+  if (!Array.isArray(value)) return false
+  const ids = new Set<string>()
+  return value.every((panel) => {
+    if (!isRecord(panel) || !isSafeId(panel.id) || ids.has(panel.id) || !isTimestamp(panel.createdAt) || !isTimestamp(panel.updatedAt)) return false
+    ids.add(panel.id)
+    if (panel.type === 'spotify') return isRecord(panel.config) && isPlaylistReference(panel.config.playlist)
+    if (panel.type === 'slideshow') return isRecord(panel.config) && isSlideshowSettings(panel.config)
+    if (panel.type === 'notes') return isRecord(panel.config) && (panel.config.activeNoteId === null || isSafeId(panel.config.activeNoteId))
+    return false
+  })
 }

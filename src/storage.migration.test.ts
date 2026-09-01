@@ -41,10 +41,12 @@ describe('legacy session migration', () => {
 
     expect(session).toMatchObject({
       name: 'Imported workspace',
-      activeNoteId: 'legacy_note',
+      panels: expect.arrayContaining([
+        expect.objectContaining({ type: 'notes', config: { activeNoteId: 'legacy_note' } }),
+        expect.objectContaining({ type: 'slideshow', config: expect.objectContaining({ folderName: 'references', intervalMs: 2500, shuffle: true }) }),
+        expect.objectContaining({ type: 'spotify', config: { playlist: expect.objectContaining({ id: 'legacy_playlist' }) } }),
+      ]),
       canvas: { camera: { x: 12, y: 34, z: 1.5 } },
-      slideshow: { folderName: 'references', imageSource: { type: 'none' }, intervalMs: 2500, shuffle: true },
-      spotify: { id: 'legacy_playlist' },
     })
     expect(notes).toEqual([expect.objectContaining({ id: 'legacy_note', sessionId: first.activeSessionId, content: 'Legacy note body' })])
     expect(window.localStorage.getItem('mic:canvas')).not.toBeNull()

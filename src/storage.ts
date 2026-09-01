@@ -3,6 +3,9 @@ import type {
   CanvasState,
   ImageMetadata,
   Note,
+  Panel,
+  PanelLayout,
+  PanelType,
   Session,
   SessionImage,
   SessionSummary,
@@ -14,7 +17,7 @@ import type {
 import { createId } from './utils'
 
 const DB_VERSION = 2
-const SESSION_SCHEMA_VERSION = 1
+const SESSION_SCHEMA_VERSION = 2
 const MIGRATION_KEY = 'session-migration-v1'
 const MIGRATION_PENDING_KEY = 'session-migration-v1-pending'
 const ACTIVE_SESSION_KEY = 'active-session-id'
@@ -81,8 +84,17 @@ interface MigrationVerificationRecord {
   directoryName: string | null
 }
 
+export function createDefaultPanels(now = Date.now()): Panel[] {
+  return [
+    { id: createId('panel'), type: 'spotify', createdAt: now, updatedAt: now, config: { playlist: { ...defaultSpotifyPlaylistReference } } },
+    { id: createId('panel'), type: 'slideshow', createdAt: now, updatedAt: now, config: { ...defaultSlideshowSettings } },
+    { id: createId('panel'), type: 'notes', createdAt: now, updatedAt: now, config: { activeNoteId: null } },
+  ]
+}
+
 export interface ImportedSessionContent {
   name: string
+  panels?: Panel[]
   canvas: CanvasState | null
   slideshow: SlideshowSettings
   spotify: SpotifyPlaylistReference
@@ -104,6 +116,8 @@ interface MusicImagesCanvasDb extends DBSchema {
     key: string
     value: {
       id: string
+      sessionId?: string
+      panelId?: string
       name: string
       handle: FileSystemDirectoryHandle
     }
@@ -206,10 +220,8 @@ function makeSession(name: string, initial?: Partial<Session>): Session {
     schemaVersion: SESSION_SCHEMA_VERSION,
     createdAt: now,
     updatedAt: now,
-    activeNoteId: null,
+    panels: createDefaultPanels(now),
     canvas: null,
-    slideshow: { ...defaultSlideshowSettings },
-    spotify: { ...defaultSpotifyPlaylistReference },
     ...initial,
   }
 }
@@ -266,18 +278,20 @@ async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<Migrat
   const legacyFolder = await db.get('directoryHandles', 'slideshow')
   const hasLegacyState = Boolean(legacyCanvas || legacyNotes.length || legacySlideshow.folderName || legacySpotify.id)
   const activeNoteId = legacyNotes.some((note) => note.id === legacyLastNoteId) ? legacyLastNoteId : legacyNotes[0]?.id ?? null
-  const session = makeSession(hasLegacyState ? 'Imported workspace' : 'My first session', {
-    canvas: legacyCanvas,
-    slideshow: legacySlideshow,
-    spotify: legacySpotify,
-    activeNoteId,
-  })
+  const panels = createDefaultPanels()
+  const spotifyPanel = panels.find((panel) => panel.type === 'spotify')!
+  const slideshowPanel = panels.find((panel) => panel.type === 'slideshow')!
+  const notesPanel = panels.find((panel) => panel.type === 'notes')!
+  spotifyPanel.config.playlist = legacySpotify
+  slideshowPanel.config = legacySlideshow
+  notesPanel.config.activeNoteId = activeNoteId
+  const session = makeSession(hasLegacyState ? 'Imported workspace' : 'My first session', { canvas: migrateCanvas(legacyCanvas, panels), panels })
   const verification: MigrationVerificationRecord = {
     sessionId: session.id,
     name: session.name,
     canvas: session.canvas,
-    slideshow: session.slideshow,
-    spotify: session.spotify,
+    slideshow: slideshowPanel.config,
+    spotify: spotifyPanel.config.playlist,
     activeNoteId,
     noteIds: legacyNotes.map((note) => note.id),
     directoryName: legacyFolder?.name ?? null,
@@ -315,10 +329,10 @@ async function verifyMigratedLegacyState(db: Awaited<typeof dbPromise>, expected
     && notes.every((note) => note.sessionId === expected.sessionId && expected.noteIds.includes(note.id))
   const sessionMatches = session
     && session.name === expected.name
-    && session.activeNoteId === expected.activeNoteId
+    && session.panels.find((panel) => panel.type === 'notes')?.config.activeNoteId === expected.activeNoteId
     && JSON.stringify(session.canvas) === JSON.stringify(expected.canvas)
-    && JSON.stringify(session.slideshow) === JSON.stringify(expected.slideshow)
-    && JSON.stringify(session.spotify) === JSON.stringify(expected.spotify)
+    && JSON.stringify(session.panels.find((panel) => panel.type === 'slideshow')?.config) === JSON.stringify(expected.slideshow)
+    && JSON.stringify(session.panels.find((panel) => panel.type === 'spotify')?.config.playlist) === JSON.stringify(expected.spotify)
   const directoryMatches = expected.directoryName === null
     ? !directory
     : directory?.name === expected.directoryName
@@ -349,9 +363,7 @@ function parseMigrationVerification(value: string): MigrationVerificationRecord 
 export async function getSessions(): Promise<Session[]> {
   const db = await dbPromise
   const sessions = await db.getAllFromIndex('sessions', 'by-updated')
-  const normalized = await Promise.all(sessions.map(async (session) =>
-    normalizeStoredSession(session, await db.countFromIndex('assets', 'by-session', session.id)),
-  ))
+  const normalized = await Promise.all(sessions.map(async (session) => normalizeAndPersistSession(session, await db.countFromIndex('assets', 'by-session', session.id))))
   return normalized.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -360,7 +372,7 @@ export async function getSession(sessionId: string) {
   const session = await db.get('sessions', sessionId)
   if (!session) return undefined
   const assetCount = await db.countFromIndex('assets', 'by-session', sessionId)
-  return normalizeStoredSession(session, assetCount)
+  return normalizeAndPersistSession(session, assetCount)
 }
 
 export async function createSession(name: string) {
@@ -372,7 +384,7 @@ export async function createSession(name: string) {
 
 export async function saveSession(session: Session) {
   const db = await dbPromise
-  const next = { ...session, name: normalizeSessionName(session.name), updatedAt: Date.now() }
+  const next = enforceSpotifySingleton({ ...session, name: normalizeSessionName(session.name), updatedAt: Date.now() })
   await db.put('sessions', next)
   return next
 }
@@ -410,13 +422,25 @@ export async function importSessionContent(content: ImportedSessionContent) {
     sourceNoteIds.add(note.id)
   }
 
+  const sourcePanels = enforceSpotifySingletonPanels(content.panels ?? createDefaultPanels())
+  const panelIdMap = new Map(sourcePanels.map((panel) => [panel.id, createId('panel')]))
+  const importedPanels = sourcePanels.map((panel) => ({ ...panel, id: panelIdMap.get(panel.id)! }))
   const session = makeSession(content.name, {
-    canvas: content.canvas,
-    slideshow: normalizeSlideshowSettings(content.slideshow, content.assets.length > 0),
-    spotify: content.spotify,
+    panels: importedPanels,
+    canvas: migrateCanvas(content.canvas, importedPanels, panelIdMap),
   })
+  const hasMultipleSlideshowPanels = (content.panels?.filter((panel) => panel.type === 'slideshow').length ?? 0) > 1
+  if (!hasMultipleSlideshowPanels) {
+    const slideshowPanel = session.panels.find((panel) => panel.type === 'slideshow')
+    if (slideshowPanel) slideshowPanel.config = normalizeSlideshowSettings(content.slideshow, content.assets.length > 0)
+    const spotifyPanel = session.panels.find((panel) => panel.type === 'spotify')
+    if (spotifyPanel) spotifyPanel.config.playlist = content.spotify
+  }
   const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
-  session.activeNoteId = content.activeNoteSourceId ? noteIdMap.get(content.activeNoteSourceId) ?? null : null
+  if (!content.panels || (content.panels.filter((panel) => panel.type === 'notes').length ?? 0) <= 1) {
+    const notesPanel = session.panels.find((panel) => panel.type === 'notes')
+    if (notesPanel) notesPanel.config.activeNoteId = content.activeNoteSourceId ? noteIdMap.get(content.activeNoteSourceId) ?? null : null
+  }
 
   const tx = (await dbPromise).transaction(['sessions', 'notes', 'assets'], 'readwrite')
   await tx.objectStore('sessions').put(session)
@@ -434,6 +458,7 @@ export async function importSessionContent(content: ImportedSessionContent) {
       ...asset,
       id: createId('image'),
       sessionId: session.id,
+      ...(asset.panelId && panelIdMap.has(asset.panelId) ? { panelId: panelIdMap.get(asset.panelId)! } : {}),
     })
   }
 
@@ -461,29 +486,31 @@ export async function deleteNote(id: string) {
   await db.delete('notes', id)
 }
 
-export async function getSessionAssets(sessionId: string) {
+export async function getSessionAssets(sessionId: string, panelId?: string) {
   const db = await dbPromise
-  return db.getAllFromIndex('assets', 'by-session', sessionId)
+  const assets = await db.getAllFromIndex('assets', 'by-session', sessionId)
+  return panelId ? assets.filter((asset) => !asset.panelId || asset.panelId === panelId) : assets
 }
 
-export async function saveSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>) {
+export async function saveSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>, panelId?: string) {
   validateAssets(assets)
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
   for (const asset of assets) {
-    await tx.store.put({ ...asset, sessionId })
+    await tx.store.put({ ...asset, sessionId, ...(panelId ? { panelId } : {}) })
   }
   await tx.done
 }
 
-export async function replaceSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>) {
+export async function replaceSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>, panelId?: string) {
   validateAssets(assets)
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
-  const existingIds = await tx.store.index('by-session').getAllKeys(sessionId)
+  const existing = await tx.store.index('by-session').getAll(sessionId)
+  const existingIds = existing.filter((asset) => !panelId || !asset.panelId || asset.panelId === panelId).map((asset) => asset.id)
   await Promise.all(existingIds.map((id) => tx.store.delete(id)))
   for (const asset of assets) {
-    await tx.store.put({ ...asset, sessionId })
+    await tx.store.put({ ...asset, sessionId, ...(panelId ? { panelId } : {}) })
   }
   await tx.done
 }
@@ -552,8 +579,90 @@ export function normalizeSlideshowSettings(
   return { ...defaultSlideshowSettings, ...slideshow, imageSource }
 }
 
-function normalizeStoredSession(session: Session, assetCount: number): Session {
-  return { ...session, slideshow: normalizeSlideshowSettings(session.slideshow, assetCount > 0) }
+async function normalizeAndPersistSession(raw: Session, assetCount: number): Promise<Session> {
+  const legacy = raw as Session & {
+    activeNoteId?: string | null
+    slideshow?: SlideshowSettings
+    spotify?: SpotifyPlaylistReference
+  }
+  if (raw.schemaVersion >= SESSION_SCHEMA_VERSION && Array.isArray(raw.panels)) {
+    const normalized = enforceSpotifySingleton(raw)
+    const slideshow = normalized.panels.find((panel) => panel.type === 'slideshow')
+    if (slideshow) slideshow.config = normalizeSlideshowSettings(slideshow.config, assetCount > 0)
+    if (normalized !== raw) await (await dbPromise).put('sessions', normalized)
+    return normalized
+  }
+
+  const panels = createDefaultPanels()
+  const spotify = panels.find((panel) => panel.type === 'spotify')!
+  const slideshow = panels.find((panel) => panel.type === 'slideshow')!
+  const notes = panels.find((panel) => panel.type === 'notes')!
+  spotify.config.playlist = legacy.spotify ?? defaultSpotifyPlaylistReference
+  slideshow.config = normalizeSlideshowSettings(legacy.slideshow ?? defaultSlideshowSettings, assetCount > 0)
+  notes.config.activeNoteId = legacy.activeNoteId ?? null
+  const migrated: Session = {
+    id: raw.id,
+    name: raw.name,
+    schemaVersion: SESSION_SCHEMA_VERSION,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    panels,
+    canvas: migrateCanvas(raw.canvas, panels),
+  }
+  const db = await dbPromise
+  await db.put('sessions', migrated)
+  return migrated
+}
+
+function enforceSpotifySingleton(session: Session): Session {
+  const panels = enforceSpotifySingletonPanels(session.panels)
+  if (panels.length === session.panels.length) return session
+  const retainedIds = new Set(panels.map((panel) => panel.id))
+  return {
+    ...session,
+    panels,
+    canvas: session.canvas ? { ...session.canvas, panels: session.canvas.panels.filter((layout) => retainedIds.has(layout.panelId)) } : null,
+  }
+}
+
+function enforceSpotifySingletonPanels(panels: Panel[]): Panel[] {
+  let spotifySeen = false
+  return panels.filter((panel) => {
+    if (panel.type !== 'spotify') return true
+    if (spotifySeen) return false
+    spotifySeen = true
+    return true
+  })
+}
+
+const panelDirectoryKey = (sessionId: string, panelId: string) => `${sessionId}:${panelId}`
+
+export async function savePanelDirectoryHandle(sessionId: string, panelId: string, handle: FileSystemDirectoryHandle) {
+  const db = await dbPromise
+  await db.put('directoryHandles', { id: panelDirectoryKey(sessionId, panelId), sessionId, panelId, name: handle.name, handle })
+}
+
+export async function getPanelDirectoryHandle(sessionId: string, panelId: string) {
+  const db = await dbPromise
+  return db.get('directoryHandles', panelDirectoryKey(sessionId, panelId))
+}
+
+export async function clearPanelDirectoryHandle(sessionId: string, panelId: string) {
+  const db = await dbPromise
+  await db.delete('directoryHandles', panelDirectoryKey(sessionId, panelId))
+}
+
+function migrateCanvas(canvas: CanvasState | null, panels: Panel[], panelIdMap = new Map<string, string>()): CanvasState | null {
+  if (!canvas) return null
+  const byType = new Map<PanelType, string>(panels.map((panel) => [panel.type, panel.id]))
+  return {
+    camera: canvas.camera,
+    panels: canvas.panels.flatMap((layout) => {
+      const legacyType = (layout as PanelLayout & { panelType?: PanelType }).panelType
+      const panelId = layout.panelId ? (panelIdMap.get(layout.panelId) ?? layout.panelId) : (legacyType ? byType.get(legacyType) : undefined)
+      return panelId ? [{ panelId, x: layout.x, y: layout.y, w: layout.w, h: layout.h }] : []
+    }),
+  }
 }
 
 function normalizeSessionName(name: string) {
