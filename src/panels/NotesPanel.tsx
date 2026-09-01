@@ -27,17 +27,20 @@ import {
 import { Download, FilePlus2, Trash2 } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note } from '../types'
+import type { Panel } from '../types'
 
-export function NotesPanel() {
-  const { notes } = useAppState()
+export function NotesPanel({ panelId }: { panelId: string }) {
+  const { notes, sessions } = useAppState()
+  const activeNoteId = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
+  const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
   async function handleDocumentSelection(documentId: string) {
     if (documentId === newDocumentSelectValue) {
-      await notes.createNote()
+      await notes.createNote(panelId)
       return
     }
 
-    notes.selectNote(documentId)
+    notes.selectNote(documentId, panelId)
   }
 
   return (
@@ -52,7 +55,7 @@ export function NotesPanel() {
             {...canvasEventBlockerProps}
             onClick={(event) => {
               stopCanvasEvent(event)
-              void notes.createNote()
+              void notes.createNote(panelId)
             }}
           >
             <FilePlus2 size={18} />
@@ -61,11 +64,11 @@ export function NotesPanel() {
             className="card-icon-button"
             type="button"
             title="Save markdown file"
-            disabled={!notes.activeNote}
+            disabled={!activeNote}
             {...canvasEventBlockerProps}
             onClick={(event) => {
               stopCanvasEvent(event)
-              if (notes.activeNote) exportMarkdownNote(notes.activeNote)
+              if (activeNote) exportMarkdownNote(activeNote)
             }}
           >
             <Download size={18} />
@@ -74,13 +77,13 @@ export function NotesPanel() {
             className="card-icon-button"
             type="button"
             title="Delete note"
-            disabled={!notes.activeNote}
+            disabled={!activeNote}
             {...canvasEventBlockerProps}
             onClick={(event) => {
               stopCanvasEvent(event)
-              if (!notes.activeNote) return
-              const confirmed = window.confirm(`Delete "${getDisplayNoteTitle(notes.activeNote)}"?`)
-              if (confirmed) void notes.deleteNote(notes.activeNote.id)
+              if (!activeNote) return
+              const confirmed = window.confirm(`Delete "${getDisplayNoteTitle(activeNote)}"?`)
+              if (confirmed) void notes.deleteNote(activeNote.id, panelId)
             }}
           >
             <Trash2 size={18} />
@@ -94,7 +97,7 @@ export function NotesPanel() {
             <span>Choose a note</span>
             <select
               className="note-select"
-              value={notes.activeNote?.id ?? ''}
+              value={activeNote?.id ?? ''}
               onChange={(event) => void handleDocumentSelection(event.target.value)}
               aria-label="Choose a note"
               {...canvasEventBlockerProps}
@@ -102,7 +105,7 @@ export function NotesPanel() {
               <option value={newDocumentSelectValue}>
                 Create new note
               </option>
-              {notes.activeNote ? null : (
+              {activeNote ? null : (
                 <option value="" disabled>
                   Select existing note
                 </option>
@@ -119,9 +122,9 @@ export function NotesPanel() {
             <span>Note title</span>
             <input
               className="note-title-input panel-interactive"
-              value={notes.activeNote?.title ?? ''}
-              onChange={(event) => notes.setActiveNoteTitle(event.target.value)}
-              disabled={!notes.activeNote}
+              value={activeNote?.title ?? ''}
+              onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
+              disabled={!activeNote}
               aria-label="Note title"
               placeholder="Name this note"
               {...canvasEventBlockerProps}
@@ -129,15 +132,15 @@ export function NotesPanel() {
           </label>
         </div>
 
-        {notes.activeNote ? (
+        {activeNote ? (
           <div className="notes-editor-blocker card-content" {...canvasEventBlockerProps}>
             <MDXEditor
-              key={notes.activeNote.id}
+              key={activeNote.id}
               className="notes-rich-editor dark-theme"
               contentEditableClassName="notes-editor-content"
-              markdown={notes.activeNote.content}
+              markdown={activeNote.content}
               placeholder="Start writing..."
-              onChange={notes.setActiveNoteContent}
+              onChange={(content) => notes.setActiveNoteContent(content, panelId)}
               plugins={notesEditorPlugins}
             />
           </div>
@@ -150,7 +153,7 @@ export function NotesPanel() {
               {...canvasEventBlockerProps}
               onClick={(event) => {
                 stopCanvasEvent(event)
-                void notes.createNote()
+                void notes.createNote(panelId)
               }}
             >
               <FilePlus2 size={18} />
@@ -162,7 +165,7 @@ export function NotesPanel() {
 
       <footer className="card-footer panel-interactive">
         <span className="card-footer-meta">
-          {notes.activeNote ? `${notes.activeNote.content.length} characters` : 'No note selected'}
+          {activeNote ? `${activeNote.content.length} characters` : 'No note selected'}
         </span>
         <div className="card-footer-status">
           <span>{notes.notes.length} notes</span>

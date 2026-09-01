@@ -13,12 +13,14 @@ import {
 } from 'lucide-react'
 import { useAppState } from '../AppState'
 import { formatDuration } from '../utils'
+import type { Panel } from '../types'
 
-export function SpotifyPanel() {
+export function SpotifyPanel({ panelId }: { panelId: string }) {
   const { spotify, sessions } = useAppState()
+  const panelPlaylist = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist ?? spotify.playlist
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'tracks' | 'playlists'>('tracks')
-  const [playlistUrl, setPlaylistUrl] = useState(spotify.playlist.url ?? '')
+  const [playlistUrl, setPlaylistUrl] = useState(panelPlaylist.url ?? '')
   const [volume, setVolume] = useState(70)
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -38,8 +40,8 @@ export function SpotifyPanel() {
   const error = localError ?? spotify.error
 
   useEffect(() => {
-    setPlaylistUrl(spotify.playlist.url ?? '')
-  }, [sessions.activeSession?.id, spotify.playlist.url])
+    setPlaylistUrl(panelPlaylist.url ?? '')
+  }, [sessions.activeSession?.id, panelPlaylist.url])
 
   function resetFields() {
     setQuery('')
@@ -98,7 +100,7 @@ export function SpotifyPanel() {
 
             <div className="track-copy">
               <div className="track-title-row">
-                <p className="track-title">{spotify.track?.title ?? spotify.playlist.name ?? 'No playlist playing'}</p>
+              <p className="track-title">{spotify.track?.title ?? panelPlaylist.name ?? 'No playlist playing'}</p>
                 {spotify.track?.url ? (
                   <a
                     className="current-playback-link"
@@ -135,7 +137,7 @@ export function SpotifyPanel() {
               <button className="card-icon-button" type="button" title="Previous track" onClick={() => void run(spotify.previousTrack)}>
                 <SkipBack size={18} />
               </button>
-              <button className="card-icon-button is-primary is-large" type="button" title="Play or pause" onClick={() => void run(spotify.togglePlay)}>
+              <button className="card-icon-button is-primary is-large" type="button" title="Play or pause" onClick={() => void run(() => spotify.togglePlay(panelId))}>
                 {spotify.track?.paused === false ? <Pause size={20} /> : <Play size={20} />}
               </button>
               <button className="card-icon-button" type="button" title="Next track" onClick={() => void run(spotify.nextTrack)}>
@@ -162,7 +164,7 @@ export function SpotifyPanel() {
               className="input-row"
               onSubmit={(event) => {
                 event.preventDefault()
-                void run(() => spotify.loadPlaylistFromUrl(playlistUrl))
+                void run(() => spotify.loadPlaylistFromUrl(playlistUrl, panelId))
               }}
             >
               <input aria-label="Spotify playlist URL" value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Spotify playlist URL" />
@@ -196,7 +198,7 @@ export function SpotifyPanel() {
             {searchType === 'tracks' ? (
               <div className="playlist-list" aria-label="Track search results">
                 {spotify.tracks.map((track) => (
-                  <button className="playlist-option" type="button" key={track.id} onClick={() => void run(() => spotify.playTrack(track))}>
+                  <button className="playlist-option" type="button" key={track.id} onClick={() => void run(() => spotify.playTrack(track, panelId))}>
                     {track.image ? <img src={track.image} alt="" /> : <div />}
                     <span>
                       <strong>{track.name}</strong>
@@ -212,7 +214,7 @@ export function SpotifyPanel() {
                     className="playlist-option"
                     type="button"
                     key={playlist.id}
-                    onClick={() => void run(() => spotify.playPlaylist(playlist))}
+                    onClick={() => void run(() => spotify.playPlaylist(playlist, panelId))}
                   >
                     {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
                     <span>
@@ -230,7 +232,7 @@ export function SpotifyPanel() {
       </div>
 
       <footer className="card-footer panel-interactive" {...canvasEventBlockerProps}>
-        <span className="card-footer-meta">{spotify.playlist.name ?? 'No playlist loaded'}</span>
+        <span className="card-footer-meta">{panelPlaylist.name ?? 'No playlist loaded'}</span>
         <div className="card-footer-status">
           {/* The panel is titled "Music", so the service is credited here instead —
               and it stays visible once logged in, where the body no longer names it. */}

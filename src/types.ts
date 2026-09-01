@@ -1,7 +1,7 @@
 export type PanelType = 'spotify' | 'slideshow' | 'notes'
 
 export interface PanelLayout {
-  panelType: PanelType
+  panelId: string
   x: number
   y: number
   w: number
@@ -16,6 +16,18 @@ export interface CanvasState {
   }
   panels: PanelLayout[]
 }
+
+export interface PanelBase {
+  id: string
+  type: PanelType
+  createdAt: number
+  updatedAt: number
+}
+
+export type Panel =
+  | (PanelBase & { type: 'spotify'; config: { playlist: SpotifyPlaylistReference } })
+  | (PanelBase & { type: 'slideshow'; config: SlideshowSettings })
+  | (PanelBase & { type: 'notes'; config: { activeNoteId: string | null } })
 
 export interface SlideshowSettings {
   folderName: string | null
@@ -43,6 +55,7 @@ export interface ImageMetadata {
 export interface SessionImage extends ImageMetadata {
   id: string
   sessionId: string
+  panelId?: string
   filename: string
   mimeType: string
 }
@@ -89,13 +102,11 @@ export interface SpotifyPlaylistReference {
 export interface Session {
   id: string
   name: string
-  schemaVersion: 1
+  schemaVersion: 2
   createdAt: number
   updatedAt: number
-  activeNoteId: string | null
+  panels: Panel[]
   canvas: CanvasState | null
-  slideshow: SlideshowSettings
-  spotify: SpotifyPlaylistReference
 }
 
 export interface SessionSummary {

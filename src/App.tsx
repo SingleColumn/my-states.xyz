@@ -4,9 +4,12 @@ import { AppChrome, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { PANEL_SHAPE_TYPE, PanelShape, PanelShapeUtil } from './PanelShape'
-import { mergePanelLayouts, resetAllPanelLayouts, resetPanelLayoutSize } from './panelLayout'
+import { getCanonicalPanelLayout, resetPanelLayoutSize } from './panelLayout'
 import { debounce } from './utils'
-import type { CanvasState, PanelLayout, PanelType } from './types'
+import { duplicatePanel } from './panelDuplication'
+import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
+import { PanelArchitectureReportView } from './PanelArchitectureReportView'
+import type { CanvasState, Panel, PanelLayout } from './types'
 
 const shapeUtils = [PanelShapeUtil]
 
@@ -25,16 +28,22 @@ function AppContent() {
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
   const [isCanvasReady, setIsCanvasReady] = useState(false)
   const [chromeHeight, setChromeHeight] = useState(0)
+  const [architectureReport, setArchitectureReport] = useState<PanelArchitectureReport | null>(null)
   const editorRef = useRef<Editor | null>(null)
   const chromeRectRef = useRef<AppChromeRect | null>(null)
   const restoringCanvasRef = useRef(false)
   const programmaticCanvasMutationRef = useRef(false)
   const persistCanvasRef = useRef<ReturnType<typeof debounce> | null>(null)
   const updateCanvasRef = useRef(sessions.updateCanvas)
+  const sessionPanelsRef = useRef<Panel[]>(sessions.activeSession?.panels ?? [])
 
   useEffect(() => {
     updateCanvasRef.current = sessions.updateCanvas
   }, [sessions.updateCanvas])
+
+  useEffect(() => {
+    sessionPanelsRef.current = sessions.activeSession?.panels ?? []
+  }, [sessions.activeSession?.panels])
 
   useEffect(() => {
     if (window.location.pathname !== '/callback') return
@@ -72,13 +81,18 @@ function AppContent() {
     try {
       const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
       if (existingPanels.length) editor.deleteShapes(existingPanels.map((shape) => shape.id))
-      const layouts = mergePanelLayouts(canvas?.panels ?? resetAllPanelLayouts())
+      const layouts = canvas?.panels?.length
+        ? canvas.panels
+        : sessionPanelsRef.current.map((panel) => {
+            const layout = getCanonicalPanelLayout(panel.type)
+            return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h }
+          })
       editor.createShapes(
         layouts.map((layout) => ({
           type: PANEL_SHAPE_TYPE,
           x: layout.x,
           y: layout.y,
-          props: { w: layout.w, h: layout.h, panelType: layout.panelType },
+          props: { w: layout.w, h: layout.h, panelId: layout.panelId },
         })) as never,
       )
       editor.selectNone()
@@ -104,12 +118,42 @@ function AppContent() {
     const unregisterCanvasFlush = sessions.registerCanvasFlush(() => {
       persist.flush()
     })
+    // Re-key duplicated panel shapes inside tldraw's creation transaction. A
+    // later store listener/update can race with the duplicate command and
+    // leave the new shape pointing at a panel that does not exist yet.
+    const removeDuplicatePanelHandler = editor.sideEffects.registerBeforeCreateHandler('shape', (record, source) => {
+      if (source !== 'user' || restoringCanvasRef.current || programmaticCanvasMutationRef.current) return record
+      if (record.type !== PANEL_SHAPE_TYPE) return record
+
+      const shape = record as PanelShape
+      const panel = sessionPanelsRef.current.find((candidate) => candidate.id === shape.props.panelId)
+      if (!panel) return record
+
+      const duplicate = duplicatePanel(panel)
+      if (!duplicate) return record
+
+      sessions.addPanels([duplicate])
+      return {
+        ...record,
+        props: {
+          ...shape.props,
+          panelId: duplicate.id,
+        },
+      }
+    })
+    const removeSpotifyDuplicateHandler = editor.sideEffects.registerAfterCreateHandler('shape', (record, source) => {
+      if (source !== 'user' || restoringCanvasRef.current || programmaticCanvasMutationRef.current) return
+      if (record.type !== PANEL_SHAPE_TYPE) return
+      const shape = record as PanelShape
+      const panel = sessionPanelsRef.current.find((candidate) => candidate.id === shape.props.panelId)
+      if (panel?.type === 'spotify') editor.deleteShapes([shape.id])
+    })
     const removeStoreListener = editor.store.listen(() => {
       if (!restoringCanvasRef.current && !programmaticCanvasMutationRef.current) persist()
     }, { source: 'user', scope: 'all' })
     const syncSelectedPanel = (selectedShapeIds = editor.getSelectedShapeIds()) => {
       const selected = selectedShapeIds.map((shapeId) => editor.getShape(shapeId)).filter((shape): shape is TLShape => Boolean(shape))
-      const nextId = selected.length === 1 && isPanelShape(selected[0]) ? selected[0].id : null
+      const nextId = selected.length === 1 && isPanelShape(selected[0]) ? selected[0].props.panelId : null
       setSelectedPanelId((current) => current === nextId ? current : nextId)
     }
     syncSelectedPanel()
@@ -132,6 +176,8 @@ function AppContent() {
     return () => {
       unregisterCanvasFlush()
       persist.cancel()
+      removeDuplicatePanelHandler()
+      removeSpotifyDuplicateHandler()
       persistCanvasRef.current = null
       removeStoreListener()
       removeSelectionListener()
@@ -192,17 +238,19 @@ function AppContent() {
     const changed = runProgrammaticCanvasMutation((editor) => {
       const shape = editor.getShape(selected[0].id)
       if (!shape || !isPanelShape(shape)) return
-      const reset = resetPanelLayoutSize(panelShapeToLayout(shape))
+      const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === shape.props.panelId)
+      if (!panel) return
+      const reset = resetPanelLayoutSize(panelShapeToLayout(shape), panel.type)
       editor.updateShapes([{
         id: shape.id,
         type: PANEL_SHAPE_TYPE,
         x: reset.x,
         y: reset.y,
-        props: { w: reset.w, h: reset.h },
+        props: { w: reset.w, h: reset.h, panelId: shape.props.panelId },
       }] as never)
     })
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
-  }, [runProgrammaticCanvasMutation])
+  }, [runProgrammaticCanvasMutation, sessions.activeSession?.panels])
 
   const resetPanelLayout = useCallback(() => {
     const confirmed = window.confirm('Reset panel layout? This replaces panel positions and dimensions, but preserves Spotify, images, and notes.')
@@ -210,12 +258,15 @@ function AppContent() {
 
     setCallbackStatus(null)
     const changed = runProgrammaticCanvasMutation((editor) => {
-      const canonicalLayouts = resetAllPanelLayouts()
+      const canonicalLayouts = (sessions.activeSession?.panels ?? []).map((panel) => {
+        const layout = getCanonicalPanelLayout(panel.type)
+        return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h }
+      })
       const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
       const retainedIds = new Set<string>()
 
       for (const layout of canonicalLayouts) {
-        const existing = existingPanels.find((shape) => shape.props.panelType === layout.panelType && !retainedIds.has(shape.id))
+        const existing = existingPanels.find((shape) => shape.props.panelId === layout.panelId)
         if (existing) {
           retainedIds.add(existing.id)
           editor.updateShapes([{
@@ -224,14 +275,14 @@ function AppContent() {
             x: layout.x,
             y: layout.y,
             rotation: 0,
-            props: { w: layout.w, h: layout.h, panelType: layout.panelType },
+            props: { w: layout.w, h: layout.h, panelId: layout.panelId },
           }] as never)
         } else {
           editor.createShapes([{
             type: PANEL_SHAPE_TYPE,
             x: layout.x,
             y: layout.y,
-            props: { w: layout.w, h: layout.h, panelType: layout.panelType },
+            props: { w: layout.w, h: layout.h, panelId: layout.panelId },
           }] as never)
         }
       }
@@ -243,7 +294,7 @@ function AppContent() {
       fitBoundsInUsableViewport(editor, getPanelBounds(editor), chromeRectRef.current)
     })
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
-  }, [runProgrammaticCanvasMutation])
+  }, [runProgrammaticCanvasMutation, sessions.activeSession?.panels])
 
   const togglePanMode = useCallback(() => {
     const editor = editorRef.current
@@ -259,6 +310,13 @@ function AppContent() {
     setChromeHeight((current) => Math.abs(current - rect.height) < 0.5 ? current : rect.height)
   }, [])
 
+  const openArchitectureReport = useCallback(() => {
+    const editor = editorRef.current
+    const session = sessions.activeSession
+    if (!editor || !session) return
+    setArchitectureReport(buildPanelArchitectureReport(session, editor))
+  }, [sessions.activeSession])
+
   useEffect(() => {
     if (editorRef.current && sessions.activeSession) restoreCanvas(editorRef.current, sessions.activeSession.canvas)
   }, [restoreCanvas, sessions.activeSession?.id])
@@ -273,6 +331,7 @@ function AppContent() {
       onFitSelectedPanel={fitSelectedPanel}
       onResetSelectedPanel={resetSelectedPanel}
       onResetPanelLayout={resetPanelLayout}
+      onOpenArchitectureReport={openArchitectureReport}
       onMeasure={handleChromeMeasure}
     />
   ), [fitAllPanels, fitSelectedPanel, handleChromeMeasure, isCanvasReady, isPanMode, resetPanelLayout, resetSelectedPanel, selectedPanelId, togglePanMode])
@@ -300,6 +359,7 @@ function AppContent() {
   return (
     <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
       <Tldraw shapeUtils={shapeUtils} components={components} onMount={handleMount} />
+      {architectureReport ? <PanelArchitectureReportView report={architectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       {sessions.error ? <div className="callback-toast">{sessions.error}</div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>
@@ -311,13 +371,13 @@ function persistCanvas(editor: Editor) {
     .getCurrentPageShapes()
     .filter(isPanelShape)
     .map<PanelLayout>((shape) => ({
-      panelType: shape.props.panelType as PanelType,
+      panelId: shape.props.panelId,
       x: shape.x,
       y: shape.y,
       w: shape.props.w,
       h: shape.props.h,
     }))
-  return { camera: editor.getCamera(), panels: mergePanelLayouts(panels) }
+  return { camera: editor.getCamera(), panels }
 }
 
 function isPanelShape(shape: TLShape): shape is PanelShape {
@@ -326,7 +386,7 @@ function isPanelShape(shape: TLShape): shape is PanelShape {
 
 function panelShapeToLayout(shape: PanelShape): PanelLayout {
   return {
-    panelType: shape.props.panelType as PanelType,
+    panelId: shape.props.panelId,
     x: shape.x,
     y: shape.y,
     w: shape.props.w,

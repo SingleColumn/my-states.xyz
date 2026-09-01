@@ -33,22 +33,10 @@ async function createCompleteArchive() {
   ])
   await saveSession({
     ...session,
-    activeNoteId: note.id,
+    panels: session.panels.map((panel) => panel.type === 'notes' ? { ...panel, config: { activeNoteId: note.id } } : panel.type === 'slideshow' ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' }, intervalMs: 3500, shuffle: true } } : panel.type === 'spotify' ? { ...panel, config: { playlist: { id: 'playlist_123', uri: 'spotify:playlist:playlist_123', name: 'Focus', url: 'https://open.spotify.com/playlist/playlist_123' } } } : panel),
     canvas: {
       camera: { x: 120, y: -80, z: 1.25 },
-      panels: [{ panelType: 'notes', x: 1, y: 2, w: 300, h: 400 }],
-    },
-    slideshow: {
-      ...defaultSlideshowSettings,
-      imageSource: { type: 'session-assets' },
-      intervalMs: 3500,
-      shuffle: true,
-    },
-    spotify: {
-      id: 'playlist_123',
-      uri: 'spotify:playlist:playlist_123',
-      name: 'Focus',
-      url: 'https://open.spotify.com/playlist/playlist_123',
+      panels: [{ panelId: session.panels.find((panel) => panel.type === 'notes')!.id, x: 1, y: 2, w: 300, h: 400 }],
     },
   })
   return exportSessionArchive(session.id)
@@ -86,6 +74,19 @@ function manifest(entries: Record<string, Uint8Array>) {
 }
 
 describe('portable session archives', () => {
+  it('exports and imports multiple slideshow panels independently', async () => {
+    const source = await createSession('Duplicate archive panels')
+    const slideshow = source.panels.find((panel) => panel.type === 'slideshow')!
+    const duplicate = { ...slideshow, id: 'slideshow_duplicate', config: { ...slideshow.config, currentIndex: 3, shuffle: true } }
+    await saveSession({ ...source, panels: [...source.panels, duplicate] })
+    const imported = await importSessionArchive(asFile(await exportSessionArchive(source.id)))
+    const slideshowPanels = (await getSession(imported.id))?.panels.filter((panel) => panel.type === 'slideshow') ?? []
+    expect(slideshowPanels).toHaveLength(2)
+    expect(new Set(slideshowPanels.map((panel) => panel.id)).size).toBe(2)
+    expect(slideshowPanels.map((panel) => panel.config.currentIndex)).toEqual(expect.arrayContaining([0, 3]))
+    expect(slideshowPanels.find((panel) => panel.config.currentIndex === 3)?.config.shuffle).toBe(true)
+  })
+
   it('exports and imports notes, embedded images, canvas state, and a playlist reference without Spotify tokens', async () => {
     saveSpotifyTokens({ accessToken: 'access-secret', refreshToken: 'refresh-secret', expiresAt: Date.now() + 60_000 })
     const archive = await createCompleteArchive()
@@ -104,8 +105,8 @@ describe('portable session archives', () => {
     ])
 
     expect(stored?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
-    expect(stored?.slideshow).toMatchObject({ intervalMs: 3500, shuffle: true })
-    expect(stored?.spotify).toEqual(exportedManifest.spotify)
+    expect(stored?.panels.find((panel) => panel.type === 'slideshow')?.config).toMatchObject({ intervalMs: 3500, shuffle: true })
+    expect(stored?.panels.find((panel) => panel.type === 'spotify')?.config.playlist).toEqual(exportedManifest.spotify)
     expect(notes).toHaveLength(1)
     expect(notes[0]).toMatchObject({ title: 'Lyrics', content: '# A portable note\n\nSaved without credentials.' })
     expect(assets.map((asset) => asset.filename).sort()).toEqual(['cover.png', 'scene.webp'])
@@ -118,7 +119,7 @@ describe('portable session archives', () => {
     const imported = await importSessionArchive(asFile(archive))
     const [stored, notes, assets] = await Promise.all([getSession(imported.id), getNotes(imported.id), getSessionAssets(imported.id)])
 
-    expect(stored?.spotify).toEqual({ id: null, uri: null, name: null, url: null })
+    expect(stored?.panels.find((panel) => panel.type === 'spotify')?.config.playlist).toEqual({ id: null, uri: null, name: null, url: null })
     expect(notes).toEqual([])
     expect(assets).toEqual([])
   })
@@ -128,11 +129,7 @@ describe('portable session archives', () => {
     await saveSessionAssets(source.id, [makeAsset('inactive_local', 'inactive.png', new Uint8Array([1, 2, 3]))])
     await saveSession({
       ...source,
-      slideshow: {
-        ...defaultSlideshowSettings,
-        folderName: 'eightbitstrana',
-        imageSource: { type: 'bundled', collectionId: 'eightbitstrana' },
-      },
+      panels: source.panels.map((panel) => panel.type === 'slideshow' ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'eightbitstrana', imageSource: { type: 'bundled', collectionId: 'eightbitstrana' } } } : panel),
     })
 
     const archive = await exportSessionArchive(source.id)
@@ -143,7 +140,7 @@ describe('portable session archives', () => {
     expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toEqual([])
 
     const imported = await importSessionArchive(asFile(archive))
-    expect((await getSession(imported.id))?.slideshow.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
+    expect((await getSession(imported.id))?.panels.find((panel) => panel.type === 'slideshow')?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
     expect(await getSessionAssets(imported.id)).toEqual([])
   })
 
@@ -156,7 +153,7 @@ describe('portable session archives', () => {
     entries['manifest.json'] = strToU8(JSON.stringify(sourceManifest))
 
     const imported = await importSessionArchive(asFile(new Blob([zipSync(entries)])))
-    expect((await getSession(imported.id))?.slideshow.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
+    expect((await getSession(imported.id))?.panels.find((panel) => panel.type === 'slideshow')?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
     expect(await getSessionAssets(imported.id)).toEqual([])
   })
 

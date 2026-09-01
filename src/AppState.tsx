@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import type {
   ImageItem,
   Note,
+  Panel,
   Session,
   SessionSummary,
   SlideshowSettings,
@@ -11,12 +12,14 @@ import type {
 } from './types'
 import {
   clearDirectoryHandle,
+  clearPanelDirectoryHandle,
   createSession as createStoredSession,
   defaultSlideshowSettings,
   defaultSpotifyPlaylistReference,
   deleteNote as deleteStoredNote,
   deleteSession as deleteStoredSession,
   getDirectoryHandle,
+  getPanelDirectoryHandle,
   getNotes,
   getSession,
   getSessionAssets,
@@ -24,6 +27,7 @@ import {
   initializeSessions,
   replaceSessionAssets,
   saveDirectoryHandle,
+  savePanelDirectoryHandle,
   saveNote,
   saveSession,
   saveSpotifyTokens,
@@ -61,31 +65,30 @@ const supportedImagePattern = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i
 
 interface NotesState {
   notes: Note[]
-  activeNote: Note | null
-  setActiveNoteContent(content: string): void
-  setActiveNoteTitle(title: string): void
-  createNote(): Promise<void>
-  selectNote(id: string): void
-  deleteNote(id: string): Promise<void>
+  setActiveNoteContent(content: string, panelId: string): void
+  setActiveNoteTitle(title: string, panelId: string): void
+  createNote(panelId: string): Promise<void>
+  selectNote(id: string, panelId: string): void
+  deleteNote(id: string, panelId: string): Promise<void>
   flush(): Promise<void>
 }
 
 interface SlideshowState {
-  settings: SlideshowSettings
-  images: ImageItem[]
-  isPlaying: boolean
-  status: string
-  error: string | null
-  selectFolder(): Promise<boolean>
-  importFiles(files: FileList | File[]): Promise<void>
-  selectBundledCollection(collectionId: string): Promise<void>
-  resetFolder(): Promise<void>
-  restoreFolder(): Promise<void>
-  setIsPlaying(value: boolean): void
-  stop(): void
-  next(): void
-  previous(): void
-  updateSettings(settings: Partial<SlideshowSettings>): void
+  settingsFor(panelId: string): SlideshowSettings
+  imagesFor(panelId: string): ImageItem[]
+  isPlayingFor(panelId: string): boolean
+  statusFor(panelId: string): string
+  errorFor(panelId: string): string | null
+  selectFolder(panelId: string): Promise<boolean>
+  importFiles(files: FileList | File[], panelId: string): Promise<void>
+  selectBundledCollection(collectionId: string, panelId: string): Promise<void>
+  resetFolder(panelId: string): Promise<void>
+  restoreFolder(panelId: string): Promise<void>
+  setIsPlaying(value: boolean, panelId?: string): void
+  stop(panelId?: string): void
+  next(panelId?: string): void
+  previous(panelId?: string): void
+  updateSettings(settings: Partial<SlideshowSettings>, panelId?: string): void
 }
 
 interface SpotifyState {
@@ -104,10 +107,10 @@ interface SpotifyState {
   handleCallback(code: string, state: string | null): Promise<void>
   searchPlaylists(query: string): Promise<void>
   searchTracks(query: string): Promise<void>
-  loadPlaylistFromUrl(url: string): Promise<void>
-  playPlaylist(summary?: SpotifyPlaylistSummary): Promise<void>
-  playTrack(summary: SpotifyTrackSummary): Promise<void>
-  togglePlay(): Promise<void>
+  loadPlaylistFromUrl(url: string, panelId?: string): Promise<void>
+  playPlaylist(summary?: SpotifyPlaylistSummary, panelId?: string): Promise<void>
+  playTrack(summary: SpotifyTrackSummary, panelId?: string): Promise<void>
+  togglePlay(panelId?: string): Promise<void>
   previousTrack(): Promise<void>
   nextTrack(): Promise<void>
   setVolume(value: number): Promise<void>
@@ -126,6 +129,8 @@ interface SessionsState {
   exportActive(): Promise<void>
   importFile(file: File): Promise<void>
   updateCanvas(canvas: Session['canvas']): void
+  addPanels(panels: Session['panels']): void
+  updatePanel(panelId: string, update: (panel: Panel) => Panel): void
   registerCanvasFlush(flush: () => void | Promise<void>): () => void
 }
 
@@ -180,6 +185,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await sessionCore.open(imported.id)
       },
       updateCanvas: sessionCore.updateCanvas,
+      addPanels: (panels) => sessionCore.patchActiveSession((current) => ({ ...current, panels: addAllowedPanels(current.panels, panels) })),
+      updatePanel: (panelId, update) => sessionCore.patchActiveSession((current) => ({ ...current, panels: current.panels.map((panel) => panel.id === panelId ? update(panel) : panel) })),
       registerCanvasFlush: sessionCore.registerCanvasFlush,
     }),
     [notes, sessionCore],
@@ -194,6 +201,17 @@ export function useAppState() {
   const value = useContext(AppStateContext)
   if (!value) throw new Error('useAppState must be used inside AppStateProvider')
   return value
+}
+
+export function addAllowedPanels(existing: Panel[], additions: Panel[]) {
+  let spotifyExists = existing.some((panel) => panel.type === 'spotify')
+  const allowed = additions.filter((panel) => {
+    if (panel.type !== 'spotify') return true
+    if (spotifyExists) return false
+    spotifyExists = true
+    return true
+  })
+  return [...existing, ...allowed]
 }
 
 function useSessionState() {
@@ -332,44 +350,53 @@ function useSessionState() {
 
 function useNotesState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): NotesState {
   const [notes, setNotes] = useState<Note[]>([])
-  const [activeNote, setActiveNote] = useState<Note | null>(null)
-  const activeNoteRef = useRef<Note | null>(null)
-  const dirtyRef = useRef(false)
-  const saveTimerRef = useRef<number | null>(null)
 
-  const persistActiveNote = useCallback(async () => {
-    const note = activeNoteRef.current
-    if (!note || !dirtyRef.current) return
-    dirtyRef.current = false
+  const persistPanelNote = useCallback(async (panelId: string) => {
+    const state = getNotesPanelRuntimeState(panelId)
+    const note = state.activeNote
+    if (!note || !state.dirty) return
+    state.dirty = false
     await saveNote(note)
     setNotes((current) => [note, ...current.filter((candidate) => candidate.id !== note.id)].sort((a, b) => b.updatedAt - a.updatedAt))
   }, [])
 
-  const flush = useCallback(async () => {
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = null
-    }
-    await persistActiveNote()
-  }, [persistActiveNote])
+  const flush = useCallback(async (panelId?: string) => {
+    const panelIds = panelId
+      ? [panelId]
+      : [...notesPanelRuntimeStates.keys()]
+    await Promise.all(panelIds.map(async (id) => {
+      const state = getNotesPanelRuntimeState(id)
+      if (state.saveTimer !== null) {
+        window.clearTimeout(state.saveTimer)
+        state.saveTimer = null
+      }
+      await persistPanelNote(id)
+    }))
+  }, [persistPanelNote])
 
   useEffect(() => {
     let cancelled = false
-    void flush()
-    activeNoteRef.current = null
-    setActiveNote(null)
-    setNotes([])
-
     const sessionId = session?.id ?? ''
-    const activeNoteId = session?.activeNoteId
-    if (!sessionId) return
+    const notePanels = session?.panels.filter((panel): panel is Extract<Panel, { type: 'notes' }> => panel.type === 'notes') ?? []
+
     async function load() {
+      await flush()
+      if (cancelled) return
+      for (const state of notesPanelRuntimeStates.values()) {
+        state.activeNote = null
+        state.dirty = false
+        if (state.saveTimer !== null) window.clearTimeout(state.saveTimer)
+        state.saveTimer = null
+      }
+      setNotes([])
+      if (!sessionId) return
       const storedNotes = await getNotes(sessionId)
       if (cancelled) return
-      const selected = storedNotes.find((note) => note.id === activeNoteId) ?? storedNotes[0] ?? null
-      activeNoteRef.current = selected
       setNotes(storedNotes)
-      setActiveNote(selected)
+      for (const panel of notePanels) {
+        const selected = storedNotes.find((note) => note.id === panel.config.activeNoteId) ?? storedNotes[0] ?? null
+        getNotesPanelRuntimeState(panel.id).activeNote = selected
+      }
     }
     void load()
 
@@ -377,18 +404,19 @@ function useNotesState(session: Session | null, patchSession: (patch: (current: 
       cancelled = true
       void flush()
     }
-  }, [session?.id]) // Session changes are the loading boundary.
+  }, [flush, session?.id]) // Session changes are the loading boundary.
 
-  const scheduleSave = useCallback(() => {
-    dirtyRef.current = true
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = window.setTimeout(() => {
-      saveTimerRef.current = null
-      void persistActiveNote()
+  const scheduleSave = useCallback((panelId: string) => {
+    const state = getNotesPanelRuntimeState(panelId)
+    state.dirty = true
+    if (state.saveTimer !== null) window.clearTimeout(state.saveTimer)
+    state.saveTimer = window.setTimeout(() => {
+      state.saveTimer = null
+      void persistPanelNote(panelId)
     }, 500)
-  }, [persistActiveNote])
+  }, [persistPanelNote])
 
-  const createNote = useCallback(async () => {
+  const createNote = useCallback(async (panelId: string) => {
     if (!session) return
     const now = Date.now()
     const note: Note = {
@@ -400,277 +428,334 @@ function useNotesState(session: Session | null, patchSession: (patch: (current: 
       updatedAt: now,
     }
     await saveNote(note)
-    activeNoteRef.current = note
+    const state = getNotesPanelRuntimeState(panelId)
+    state.activeNote = note
     setNotes((current) => [note, ...current])
-    setActiveNote(note)
-    patchSession((current) => ({ ...current, activeNoteId: note.id }))
+    patchNotesPanel(note.id, patchSession, panelId)
   }, [patchSession, session])
 
-  const selectNote = useCallback((id: string) => {
+  const selectNote = useCallback((id: string, panelId: string) => {
     const next = notes.find((note) => note.id === id)
     if (!next) return
-    void flush()
-    activeNoteRef.current = next
-    setActiveNote(next)
-    patchSession((current) => ({ ...current, activeNoteId: next.id }))
+    void flush(panelId)
+    getNotesPanelRuntimeState(panelId).activeNote = next
+    patchNotesPanel(next.id, patchSession, panelId)
   }, [flush, notes, patchSession])
 
-  const deleteNote = useCallback(async (id: string) => {
-    await flush()
+  const deleteNote = useCallback(async (id: string, panelId: string) => {
+    await flush(panelId)
     await deleteStoredNote(id)
     const nextNotes = notes.filter((note) => note.id !== id)
     setNotes(nextNotes)
-    if (activeNoteRef.current?.id === id) {
+    const state = getNotesPanelRuntimeState(panelId)
+    if (state.activeNote?.id === id) {
       const next = nextNotes[0] ?? null
-      activeNoteRef.current = next
-      setActiveNote(next)
-      patchSession((current) => ({ ...current, activeNoteId: next?.id ?? null }))
+      state.activeNote = next
+      patchNotesPanel(next?.id ?? null, patchSession, panelId)
     }
   }, [flush, notes, patchSession])
 
-  const setActiveNoteContent = useCallback((content: string) => {
-    const current = activeNoteRef.current
+  const setActiveNoteContent = useCallback((content: string, panelId: string) => {
+    const state = getNotesPanelRuntimeState(panelId)
+    const current = state.activeNote
     if (!current) return
     const next = { ...current, content, updatedAt: Date.now() }
-    activeNoteRef.current = next
-    setActiveNote(next)
-    scheduleSave()
+    state.activeNote = next
+    setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
+    scheduleSave(panelId)
   }, [scheduleSave])
 
-  const setActiveNoteTitle = useCallback((title: string) => {
-    const current = activeNoteRef.current
+  const setActiveNoteTitle = useCallback((title: string, panelId: string) => {
+    const state = getNotesPanelRuntimeState(panelId)
+    const current = state.activeNote
     if (!current) return
     const next = { ...current, title, updatedAt: Date.now() }
-    activeNoteRef.current = next
-    setActiveNote(next)
-    scheduleSave()
+    state.activeNote = next
+    setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
+    scheduleSave(panelId)
   }, [scheduleSave])
 
-  return { notes, activeNote, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
+  return { notes, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
 function useSlideshowState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): SlideshowState {
-  const [settings, setSettings] = useState<SlideshowSettings>(defaultSlideshowSettings)
-  const [images, setImages] = useState<ImageItem[]>([])
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [status, setStatus] = useState('Open a session to add images.')
-  const [error, setError] = useState<string | null>(null)
+  const [, rerender] = useState(0)
+  const touch = useCallback(() => rerender((value) => value + 1), [])
+  const panels = session?.panels.filter((panel): panel is Extract<Panel, { type: 'slideshow' }> => panel.type === 'slideshow') ?? []
 
   useEffect(() => {
     let cancelled = false
-    setIsPlaying(false)
-    setSettings(session?.slideshow ?? defaultSlideshowSettings)
-    setImages((current) => {
-      releaseImageItems(current)
-      return []
-    })
-    setError(null)
-
-    if (!session) {
-      setStatus('Open a session to add images.')
-      return
+    const activeIds = new Set(panels.map((panel) => panel.id))
+    for (const [panelId, state] of slideshowPanelRuntimeStates) {
+      if (!activeIds.has(panelId)) {
+        if (state.timerId !== null) window.clearTimeout(state.timerId)
+        releaseImageItems(state.images)
+        slideshowPanelRuntimeStates.delete(panelId)
+      }
     }
+    for (const panel of panels) {
+      const state = getSlideshowPanelRuntimeState(panel.id)
+      if (state.timerId !== null) window.clearTimeout(state.timerId)
+      state.timerId = null
+      state.isPlaying = false
+      state.status = statusForImageSource(panel.config.imageSource, 0)
+      state.error = null
+      releaseImageItems(state.images)
+      state.images = []
+    }
+    touch()
 
-    async function load() {
+    async function loadPanel(panel: Extract<Panel, { type: 'slideshow' }>) {
+      const state = getSlideshowPanelRuntimeState(panel.id)
       try {
-        const source = session!.slideshow.imageSource
+        const source = panel.config.imageSource
         if (source.type === 'none') {
-          setStatus('Choose your images or try a sample collection.')
+          state.status = 'Choose your images or try a sample collection.'
           return
         }
-
         let nextImages: ImageItem[]
         if (source.type === 'bundled') {
           if (!getBundledCollection(source.collectionId)) {
-            if (!cancelled) {
-              const message = `The sample collection "${source.collectionId}" is not available in this version.`
-              setStatus(message)
-              setError(message)
-            }
+            const message = `The sample collection "${source.collectionId}" is not available in this version.`
+            state.status = message
+            state.error = message
             return
           }
           nextImages = await createImageItemsFromBundledCollection(source.collectionId) ?? []
         } else {
-          const assets = await getSessionAssets(session!.id)
+          const assets = await getSessionAssets(session!.id, panel.id)
           nextImages = await Promise.all(assets.map(createImageItemFromAsset))
           nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
         }
-
         if (cancelled) {
           releaseImageItems(nextImages)
           return
         }
-        setImages(nextImages)
-        if (session!.slideshow.currentIndex >= nextImages.length && session!.slideshow.currentIndex !== 0) {
-          const resetIndex = { ...session!.slideshow, currentIndex: 0 }
-          setSettings(resetIndex)
-          patchSession((stored) => ({ ...stored, slideshow: resetIndex }))
+        state.images = nextImages
+        state.status = statusForImageSource(source, nextImages.length)
+        if (panel.config.currentIndex >= nextImages.length && panel.config.currentIndex !== 0) {
+          patchSlideshow({ ...panel.config, currentIndex: 0 }, patchSession, panel.id)
         }
-        setStatus(statusForImageSource(source, nextImages.length))
+        touch()
       } catch (caught) {
         if (!cancelled) {
           const message = caught instanceof Error ? caught.message : 'Could not load session images.'
-          setStatus(message)
-          setError(message)
+          state.status = message
+          state.error = message
+          touch()
         }
       }
     }
-    void load()
-
-    return () => {
-      cancelled = true
-    }
+    if (!session) return () => { cancelled = true }
+    for (const panel of panels) void loadPanel(panel)
+    return () => { cancelled = true }
   }, [session?.id])
 
-  useEffect(() => {
-    if (!isPlaying || images.length === 0) return
-    const intervalId = window.setInterval(() => {
-      setSettings((current) => {
-        const next = { ...current, currentIndex: getNextImageIndex(current.currentIndex, images.length, current.shuffle) }
-        patchSession((stored) => ({ ...stored, slideshow: next }))
-        return next
-      })
-    }, settings.intervalMs)
-    return () => window.clearInterval(intervalId)
-  }, [images.length, isPlaying, patchSession, settings.intervalMs, settings.shuffle])
+  const sessionRef = useRef(session)
+  const patchSessionRef = useRef(patchSession)
+  sessionRef.current = session
+  patchSessionRef.current = patchSession
 
-  const replaceImages = useCallback(async (files: FileList | File[], folderName: string) => {
+  const schedulePanelAdvance = useCallback((panelId: string) => {
+    const state = getSlideshowPanelRuntimeState(panelId)
+    if (!state.isPlaying || state.timerId !== null) return
+
+    const panel = sessionRef.current?.panels.find((candidate): candidate is Extract<Panel, { type: 'slideshow' }> => candidate.id === panelId && candidate.type === 'slideshow')
+    if (!panel) {
+      state.isPlaying = false
+      return
+    }
+
+    state.timerId = window.setTimeout(() => {
+      state.timerId = null
+      const currentPanel = sessionRef.current?.panels.find((candidate): candidate is Extract<Panel, { type: 'slideshow' }> => candidate.id === panelId && candidate.type === 'slideshow')
+      if (!currentPanel || !state.isPlaying) return
+      if (state.images.length) {
+        patchSlideshow({
+          ...currentPanel.config,
+          currentIndex: getNextImageIndex(currentPanel.config.currentIndex, state.images.length, currentPanel.config.shuffle),
+        }, patchSessionRef.current, panelId)
+      }
+      schedulePanelAdvance(panelId)
+    }, panel.config.intervalMs)
+  }, [])
+
+  const replaceImages = useCallback(async (files: FileList | File[], folderName: string, panelId: string) => {
     if (!session) return
     const selected = Array.from(files).filter(isSupportedImageFile)
     if (selected.length > sessionLimits.maxImageCount) throw new Error(`A session can contain at most ${sessionLimits.maxImageCount} images.`)
-
-    const assets = await Promise.all(selected.map((file) => createSessionAsset(file, session.id)))
-    await replaceSessionAssets(session.id, assets)
+    const assets = await Promise.all(selected.map((file) => createSessionAsset(file, session.id, panelId)))
+    await replaceSessionAssets(session.id, assets, panelId)
     const nextImages = await Promise.all(assets.map(createImageItemFromAsset))
     nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
+    const state = getSlideshowPanelRuntimeState(panelId)
+    if (state.timerId !== null) window.clearTimeout(state.timerId)
+    state.timerId = null
+    state.isPlaying = false
+    releaseImageItems(state.images)
+    state.images = nextImages
+    state.status = nextImages.length ? `${folderName} · ${nextImages.length} images` : 'No supported images were selected.'
+    state.error = null
+    const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
+    patchSlideshow(settingsForSessionAssets(current, folderName), patchSession, panelId)
+    touch()
+  }, [patchSession, session, touch])
 
-    setIsPlaying(false)
-    setImages((current) => {
-      releaseImageItems(current)
-      return nextImages
-    })
-    const nextSettings = settingsForSessionAssets(settings, folderName)
-    setSettings(nextSettings)
-    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-    setStatus(nextImages.length ? `${folderName} · ${nextImages.length} images` : 'No supported images were selected.')
-    setError(null)
-  }, [patchSession, session, settings])
-
-  const loadImagesFromHandle = useCallback(async (handle: FileSystemDirectoryHandle) => {
+  const loadImagesFromHandle = useCallback(async (handle: FileSystemDirectoryHandle, panelId: string) => {
     const files: File[] = []
     for await (const file of readImageFilesFromDirectory(handle)) files.push(file)
-    await replaceImages(files, handle.name)
+    await replaceImages(files, handle.name, panelId)
   }, [replaceImages])
 
-  const selectFolder = useCallback(async () => {
+  const selectFolder = useCallback(async (panelId: string) => {
     if (!session) return false
     if (!window.showDirectoryPicker) {
-      setError('Folder selection is unavailable in this browser. Use the file picker instead.')
+      getSlideshowPanelRuntimeState(panelId).error = 'Folder selection is unavailable in this browser. Use the file picker instead.'
+      touch()
       return false
     }
     try {
       const handle = await window.showDirectoryPicker()
-      await saveDirectoryHandle(session.id, handle)
-      await loadImagesFromHandle(handle)
+      await savePanelDirectoryHandle(session.id, panelId, handle)
+      await loadImagesFromHandle(handle, panelId)
       return true
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return true
-      setError(caught instanceof Error ? caught.message : 'Could not select the folder.')
+      const state = getSlideshowPanelRuntimeState(panelId)
+      state.error = caught instanceof Error ? caught.message : 'Could not select the folder.'
+      touch()
       return false
     }
-  }, [loadImagesFromHandle, session])
+  }, [loadImagesFromHandle, session, touch])
 
-  const selectBundledCollection = useCallback(async (collectionId: string) => {
+  const selectBundledCollection = useCallback(async (collectionId: string, panelId: string) => {
     if (!session) throw new Error('Open a session before selecting images.')
     const collection = getBundledCollection(collectionId)
+    const state = getSlideshowPanelRuntimeState(panelId)
     if (!collection) {
       const message = `The sample collection "${collectionId}" is not available in this version.`
-      setError(message)
-      setStatus(message)
+      state.error = message
+      state.status = message
+      touch()
       return
     }
-
     try {
       const nextImages = await createImageItemsFromBundledCollection(collectionId) ?? []
-      setIsPlaying(nextImages.length > 0)
-      setImages((current) => {
-        releaseImageItems(current)
-        return nextImages
-      })
-      const nextSettings = settingsForBundledCollection(settings, collection.id)
-      setSettings(nextSettings)
-      patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-      setStatus(statusForImageSource(nextSettings.imageSource, nextImages.length))
-      setError(null)
+      if (state.timerId !== null) window.clearTimeout(state.timerId)
+      state.timerId = null
+      releaseImageItems(state.images)
+      state.images = nextImages
+      state.isPlaying = nextImages.length > 0
+      const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
+      const nextSettings = settingsForBundledCollection(current, collection.id)
+      patchSlideshow(nextSettings, patchSession, panelId)
+      state.status = statusForImageSource(nextSettings.imageSource, nextImages.length)
+      state.error = null
+      if (state.isPlaying) schedulePanelAdvance(panelId)
+      touch()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not load the sample collection.')
+      state.error = caught instanceof Error ? caught.message : 'Could not load the sample collection.'
+      touch()
     }
-  }, [patchSession, session, settings])
+  }, [patchSession, schedulePanelAdvance, session, touch])
 
-  const restoreFolder = useCallback(async () => {
+  const restoreFolder = useCallback(async (panelId: string) => {
     if (!session) return
-    const stored = await getDirectoryHandle(session.id)
+    const stored = await getPanelDirectoryHandle(session.id, panelId) ?? await getDirectoryHandle(session.id)
     if (!stored) return
     try {
       if (!(await ensureReadPermission(stored.handle))) {
-        setStatus(`Permission is needed to reopen ${stored.name}.`)
+        getSlideshowPanelRuntimeState(panelId).status = `Permission is needed to reopen ${stored.name}.`
+        touch()
         return
       }
-      await loadImagesFromHandle(stored.handle)
+      await loadImagesFromHandle(stored.handle, panelId)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not reopen the image folder.')
+      getSlideshowPanelRuntimeState(panelId).error = caught instanceof Error ? caught.message : 'Could not reopen the image folder.'
+      touch()
     }
-  }, [loadImagesFromHandle, session])
+  }, [loadImagesFromHandle, session, touch])
 
-  const resetFolder = useCallback(async () => {
+  const resetFolder = useCallback(async (panelId: string) => {
     if (!session) return
-    setIsPlaying(false)
-    if (settings.imageSource.type === 'session-assets') {
-      await replaceSessionAssets(session.id, [])
+    const state = getSlideshowPanelRuntimeState(panelId)
+    const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
+    if (state.timerId !== null) window.clearTimeout(state.timerId)
+    state.timerId = null
+    state.isPlaying = false
+    if (current.imageSource.type === 'session-assets') {
+      await replaceSessionAssets(session.id, [], panelId)
+      await clearPanelDirectoryHandle(session.id, panelId)
       await clearDirectoryHandle(session.id)
     }
-    setImages((current) => {
-      releaseImageItems(current)
-      return []
-    })
-    const nextSettings = settingsForClearedImages(settings)
-    setSettings(nextSettings)
-    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-    setStatus('Choose your images or try a sample collection.')
-    setError(null)
-  }, [patchSession, session, settings])
+    releaseImageItems(state.images)
+    state.images = []
+    state.status = 'Choose your images or try a sample collection.'
+    state.error = null
+    patchSlideshow(settingsForClearedImages(current), patchSession, panelId)
+    touch()
+  }, [patchSession, session, touch])
 
-  const stop = useCallback(() => {
-    setIsPlaying(false)
-    const next = { ...settings, currentIndex: 0 }
-    setSettings(next)
-    patchSession((stored) => ({ ...stored, slideshow: next }))
-  }, [patchSession, settings])
+  const stop = useCallback((panelId?: string) => {
+    if (!panelId) return
+    const state = getSlideshowPanelRuntimeState(panelId)
+    if (state.timerId !== null) window.clearTimeout(state.timerId)
+    state.timerId = null
+    state.isPlaying = false
+    const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
+    patchSlideshow({ ...current, currentIndex: 0 }, patchSession, panelId)
+    touch()
+  }, [patchSession, session, touch])
 
-  const next = useCallback(() => {
-    const nextSettings = { ...settings, currentIndex: getNextImageIndex(settings.currentIndex, images.length, settings.shuffle) }
-    setSettings(nextSettings)
-    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-  }, [images.length, patchSession, settings])
+  const next = useCallback((panelId?: string) => {
+    if (!panelId) return
+    const state = getSlideshowPanelRuntimeState(panelId)
+    const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
+    patchSlideshow({ ...current, currentIndex: getNextImageIndex(current.currentIndex, state.images.length, current.shuffle) }, patchSession, panelId)
+  }, [patchSession, session])
 
-  const previous = useCallback(() => {
-    const nextSettings = { ...settings, currentIndex: images.length ? (settings.currentIndex - 1 + images.length) % images.length : 0 }
-    setSettings(nextSettings)
-    patchSession((stored) => ({ ...stored, slideshow: nextSettings }))
-  }, [images.length, patchSession, settings])
+  const previous = useCallback((panelId?: string) => {
+    if (!panelId) return
+    const state = getSlideshowPanelRuntimeState(panelId)
+    const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
+    patchSlideshow({ ...current, currentIndex: state.images.length ? (current.currentIndex - 1 + state.images.length) % state.images.length : 0 }, patchSession, panelId)
+  }, [patchSession, session])
 
-  const updateSettings = useCallback((partial: Partial<SlideshowSettings>) => {
-    setSettings((current) => {
-      const next = { ...current, ...partial }
-      patchSession((stored) => ({ ...stored, slideshow: next }))
-      return next
-    })
-  }, [patchSession])
+  const updateSettings = useCallback((partial: Partial<SlideshowSettings>, panelId?: string) => {
+    if (!panelId) return
+    const current = getSlideshowSettingsForPanel(sessionRef.current, panelId, defaultSlideshowSettings)
+    const state = getSlideshowPanelRuntimeState(panelId)
+    if (partial.intervalMs !== undefined && state.timerId !== null) {
+      window.clearTimeout(state.timerId)
+      state.timerId = null
+    }
+    patchSlideshow({ ...current, ...partial }, patchSessionRef.current, panelId)
+    if (partial.intervalMs !== undefined && state.isPlaying) schedulePanelAdvance(panelId)
+  }, [schedulePanelAdvance])
 
   return {
-    settings, images, isPlaying, status, error, selectFolder, selectBundledCollection,
-    importFiles: (files) => replaceImages(files, 'Imported images'), resetFolder, restoreFolder,
-    setIsPlaying, stop, next, previous, updateSettings,
+    settingsFor: (panelId) => getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings),
+    imagesFor: (panelId) => getSlideshowPanelRuntimeState(panelId).images,
+    isPlayingFor: (panelId) => getSlideshowPanelRuntimeState(panelId).isPlaying,
+    statusFor: (panelId) => getSlideshowPanelRuntimeState(panelId).status,
+    errorFor: (panelId) => getSlideshowPanelRuntimeState(panelId).error,
+    selectFolder,
+    selectBundledCollection,
+    importFiles: (files, panelId) => replaceImages(files, 'Imported images', panelId),
+    resetFolder,
+    restoreFolder,
+    setIsPlaying: (value, panelId) => {
+      if (!panelId) return
+      const state = getSlideshowPanelRuntimeState(panelId)
+      state.isPlaying = value
+      if (value) schedulePanelAdvance(panelId)
+      else if (state.timerId !== null) {
+        window.clearTimeout(state.timerId)
+        state.timerId = null
+      }
+      touch()
+    },
+    stop, next, previous, updateSettings,
   }
 }
 
@@ -692,7 +777,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
   }, [tokens])
 
   useEffect(() => {
-    setPlaylist(session?.spotify ?? defaultSpotifyPlaylistReference)
+    setPlaylist(session?.panels.find((panel) => panel.type === 'spotify')?.config.playlist ?? defaultSpotifyPlaylistReference)
     setPlaylists([])
     setTracks([])
     setTrack(null)
@@ -782,9 +867,13 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     }
   }, [endExpiredSession, tokens?.accessToken])
 
-  const setSessionPlaylist = useCallback((next: SpotifyPlaylistReference) => {
+  const setSessionPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string) => {
     setPlaylist(next)
-    patchSession((current) => ({ ...current, spotify: next }))
+    patchSession((current) => {
+      const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'spotify')
+        ?? current.panels.find((candidate) => candidate.type === 'spotify')
+      return panel ? { ...current, panels: current.panels.map((candidate) => candidate.id === panel.id ? { ...candidate, config: { playlist: next }, updatedAt: Date.now() } : candidate) as Panel[] } : current
+    })
   }, [patchSession])
 
   const login = useCallback(async () => startSpotifyLogin(), [])
@@ -841,7 +930,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     setError(null)
   }, [ensureFreshTokens, requestSpotify])
 
-  const loadPlaylistFromUrl = useCallback(async (url: string) => {
+  const loadPlaylistFromUrl = useCallback(async (url: string, panelId?: string) => {
     const id = parseSpotifyPlaylistUrl(url)
     if (!id) throw new Error('Paste a valid Spotify playlist URL or URI.')
     const fresh = await ensureFreshTokens()
@@ -851,25 +940,26 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
-    setSessionPlaylist(selected)
+    setSessionPlaylist(selected, panelId)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
     setStatus(`Playing ${summary.name}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify, setSessionPlaylist])
 
-  const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary) => {
-    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : playlist
+  const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary, panelId?: string) => {
+    const panelPlaylist = (session?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
+    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : panelPlaylist ?? playlist
     if (!selected.uri) throw new Error('Choose a playlist first.')
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
-    setSessionPlaylist(selected)
+    setSessionPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, playlist, requestSpotify, setSessionPlaylist])
 
-  const playTrack = useCallback(async (summary: SpotifyTrackSummary) => {
+  const playTrack = useCallback(async (summary: SpotifyTrackSummary, _panelId?: string) => {
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
@@ -878,10 +968,12 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify])
 
-  const togglePlay = useCallback(async () => {
-    const action = getSpotifyPlaybackAction(Boolean(track), playlist.uri)
+  const togglePlay = useCallback(async (panelId?: string) => {
+    const panelPlaylist = (session?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
+    const selectedPlaylist = panelPlaylist ?? playlist
+    const action = getSpotifyPlaybackAction(Boolean(track), selectedPlaylist.uri)
     if (action === 'load-saved-playlist') {
-      await playPlaylist()
+      await playPlaylist(undefined, panelId)
       return
     }
     if (action === 'missing-playlist') {
@@ -891,7 +983,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     const player = playerRef.current
     if (!player) throw new Error('Spotify browser device is not ready yet.')
     await player.togglePlay()
-  }, [playPlaylist, playlist.uri, track])
+  }, [playPlaylist, playlist, session, track])
 
   return {
     tokens, playlist, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
@@ -901,6 +993,83 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     setVolume: async (value) => playerRef.current?.setVolume(value),
     seek: async (positionMs) => playerRef.current?.seek(positionMs),
   }
+}
+
+function patchSlideshow(settings: SlideshowSettings, patchSession: (patch: (current: Session) => Session) => void, panelId?: string) {
+  patchSession((current) => {
+    if (!panelId) return current
+    const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'slideshow')
+    return panel ? { ...current, panels: current.panels.map((candidate) => candidate.id === panel.id ? { ...candidate, config: settings, updatedAt: Date.now() } : candidate) as Panel[] } : current
+  })
+}
+
+interface NotesPanelRuntimeState {
+  activeNote: Note | null
+  dirty: boolean
+  saveTimer: number | null
+}
+
+interface SlideshowPanelRuntimeState {
+  images: ImageItem[]
+  isPlaying: boolean
+  timerId: number | null
+  status: string
+  error: string | null
+}
+
+const notesPanelRuntimeStates = new Map<string, NotesPanelRuntimeState>()
+const slideshowPanelRuntimeStates = new Map<string, SlideshowPanelRuntimeState>()
+function getNotesPanelRuntimeState(panelId: string): NotesPanelRuntimeState {
+  const existing = notesPanelRuntimeStates.get(panelId)
+  if (existing) return existing
+  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null }
+  notesPanelRuntimeStates.set(panelId, created)
+  return created
+}
+
+function getSlideshowPanelRuntimeState(panelId: string): SlideshowPanelRuntimeState {
+  const existing = slideshowPanelRuntimeStates.get(panelId)
+  if (existing) return existing
+  const created: SlideshowPanelRuntimeState = {
+    images: [],
+    isPlaying: false,
+    timerId: null,
+    status: 'Choose your images or try a sample collection.',
+    error: null,
+  }
+  slideshowPanelRuntimeStates.set(panelId, created)
+  return created
+}
+
+// This is the panel-scoped runtime seam used by the Notes implementation and acceptance tests.
+// The Spotify and slideshow runtime seams remain intentionally unchanged in this turn.
+export const panelRuntime = {
+  notes: {
+    forPanel: (panelId: string) => getNotesPanelRuntimeState(panelId) as unknown as Record<string, unknown>,
+    update: (panelId: string, patch: Record<string, unknown>) => {
+      const state = getNotesPanelRuntimeState(panelId)
+      Object.assign(state, patch)
+    },
+  },
+  slideshow: {
+    forPanel: (panelId: string) => getSlideshowPanelRuntimeState(panelId) as unknown as Record<string, unknown>,
+    update: (panelId: string, patch: Record<string, unknown>) => {
+      const state = getSlideshowPanelRuntimeState(panelId)
+      Object.assign(state, patch)
+    },
+  },
+  restorePanel: (panelId: string) => getNotesPanelRuntimeState(panelId),
+}
+
+function getSlideshowSettingsForPanel(session: Session | null, panelId: string | undefined, fallback: SlideshowSettings) {
+  return (session?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined)?.config ?? fallback
+}
+
+function patchNotesPanel(activeNoteId: string | null, patchSession: (patch: (current: Session) => Session) => void, panelId: string) {
+  patchSession((current) => {
+    const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'notes')
+    return panel ? { ...current, panels: current.panels.map((candidate) => candidate.id === panel.id ? { ...candidate, config: { activeNoteId }, updatedAt: Date.now() } : candidate) as Panel[] } : current
+  })
 }
 
 function spotifyUrlFromUri(uri?: string) {
@@ -961,7 +1130,7 @@ function isSupportedImageFile(file: File) {
   return file.type.startsWith('image/') || supportedImagePattern.test(file.name)
 }
 
-async function createSessionAsset(file: File, sessionId: string) {
+async function createSessionAsset(file: File, sessionId: string, panelId?: string) {
   if (file.size > sessionLimits.maxImageBytes) throw new Error(`${file.name} exceeds the 25 MB per-image limit.`)
   const mimeType = normaliseImageMimeType(file)
   if (!mimeType) throw new Error(`${file.name} is not a supported image type.`)
@@ -971,6 +1140,7 @@ async function createSessionAsset(file: File, sessionId: string) {
   return {
     id: createId('image'),
     sessionId,
+    ...(panelId ? { panelId } : {}),
     filename: file.name,
     name: file.webkitRelativePath || file.name,
     mimeType,

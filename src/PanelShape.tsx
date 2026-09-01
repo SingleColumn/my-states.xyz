@@ -6,22 +6,28 @@ import {
   T,
   TLBaseShape,
 } from 'tldraw'
+import { useAppState } from './AppState'
 import type { PanelType } from './types'
 import { getCanonicalPanelLayout, getPanelMinimumSize } from './panelLayout'
 import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
+import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 
-export const PANEL_SHAPE_TYPE = 'music-panel'
+export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 
 export type PanelShape = TLBaseShape<
   typeof PANEL_SHAPE_TYPE,
   {
     w: number
     h: number
-    panelType: string
+    panelId: string
   }
 >
+
+export function getPanelIdFromShape(shape: PanelShape) {
+  return shape.props.panelId
+}
 
 export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   static override type = PANEL_SHAPE_TYPE
@@ -29,7 +35,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   static override props: RecordProps<PanelShape> = {
     w: T.number,
     h: T.number,
-    panelType: T.string,
+    panelId: T.string,
   }
 
   override getDefaultProps(): PanelShape['props'] {
@@ -37,14 +43,14 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     return {
       w: layout.w,
       h: layout.h,
-      panelType: 'slideshow',
+      panelId: '',
     }
   }
 
   override component(shape: PanelShape) {
     return (
       <HTMLContainer
-        className={`canvas-panel-shell panel-${shape.props.panelType}`}
+        className="canvas-panel-shell"
         onPointerDownCapture={handlePanelPointerDownCapture}
         onTouchStartCapture={handlePanelPointerDownCapture}
         style={{
@@ -52,7 +58,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
           height: shape.props.h,
         }}
       >
-        <PanelContent panelType={shape.props.panelType as PanelType} />
+        <PanelContent panelId={shape.props.panelId} />
       </HTMLContainer>
     )
   }
@@ -71,7 +77,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
 
   override onResize(shape: PanelShape, info: Parameters<BaseBoxShapeUtil<PanelShape>['onResize']>[1]) {
     const resized = super.onResize(shape, info) as PanelShape
-    const minimum = getPanelMinimumSize(shape.props.panelType as PanelType)
+    const minimum = getPanelMinimumSize('slideshow')
     return {
       ...resized,
       props: {
@@ -83,10 +89,13 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   }
 }
 
-function PanelContent({ panelType }: { panelType: PanelType }) {
-  if (panelType === 'spotify') return <SpotifyPanel />
-  if (panelType === 'notes') return <NotesPanel />
-  return <SlideshowPanel />
+function PanelContent({ panelId }: { panelId: string }) {
+  const { sessions } = useAppState()
+  const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+  if (!panel) return <div className="panel">This panel is no longer available.</div>
+  if (panel.type === 'spotify') return <SpotifyPanel panelId={panel.id} />
+  if (panel.type === 'notes') return <NotesPanel panelId={panel.id} />
+  return <SlideshowPanel panelId={panel.id} />
 }
 
 function handlePanelPointerDownCapture(event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) {

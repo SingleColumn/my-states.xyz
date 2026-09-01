@@ -2,6 +2,7 @@ import 'react'
 
 declare global {
   interface ImportMetaEnv {
+    readonly DEV: boolean
     readonly VITE_SPOTIFY_CLIENT_ID?: string
     readonly VITE_SPOTIFY_REDIRECT_URI?: string
   }
