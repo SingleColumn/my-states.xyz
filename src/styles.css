@@ -650,6 +650,20 @@ select {
   outline: none;
 }
 
+/* Labels that provide names for controls should remain available to assistive
+   technology without taking up space in a compact toolbar. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 input:focus,
 select:focus,
 button:focus-visible {
@@ -1274,6 +1288,10 @@ input[type="range"] {
   margin-left: 0 !important;
 }
 
+.notes-editor-toolbar-interaction-surface {
+  display: contents;
+}
+
 .notes-editor-toolbar [class*="diffSourceToggleWrapper"] {
   order: 99;
 }
@@ -1293,6 +1311,10 @@ input[type="range"] {
   height: var(--size-notes-toolbar-control) !important;
   min-height: var(--size-notes-toolbar-control) !important;
   padding: 0 calc(var(--size-notes-toolbar-control) * 0.2) !important;
+  border: var(--border-width-hairline) solid var(--color-control-border) !important;
+  border-radius: var(--radius-control);
+  background: var(--color-control) !important;
+  color: var(--color-input-text) !important;
   font-size: var(--font-size-notes-toolbar) !important;
 }
 
@@ -1310,6 +1332,29 @@ input[type="range"] {
   height: var(--size-notes-toolbar-icon) !important;
 }
 
+/* MDXEditor keeps dropdown content in a Radix portal inside the editor root.
+   Its default base page color is white, which makes the light text disappear
+   until an option receives a hover highlight. */
+.notes-rich-editor .mdxeditor-select-content {
+  z-index: 4;
+  overflow: hidden;
+  border: var(--border-width-hairline) solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-note-control-bg);
+  color: var(--color-input-text);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 28%);
+}
+
+.notes-rich-editor .mdxeditor-select-content [role="option"] {
+  color: var(--color-input-text);
+}
+
+.notes-rich-editor .mdxeditor-select-content [role="option"][data-highlighted],
+.notes-rich-editor .mdxeditor-select-content [role="option"][data-state="checked"] {
+  background: var(--color-note-control-bg-hover);
+  color: var(--color-input-text);
+}
+
 .notes-rich-editor .mdxeditor-root-contenteditable {
   flex: 1;
   min-height: 0;
@@ -1320,8 +1365,22 @@ input[type="range"] {
   min-height: 100%;
   padding: var(--card-padding);
   color: var(--color-input-text);
-  font-size: var(--font-size-notes-editor);
+  font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
   line-height: var(--line-height-rich-content);
+}
+
+.notes-font-size-control {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.notes-font-size-control select {
+  width: auto !important;
+  min-width: 0 !important;
+  padding-inline: calc(var(--size-notes-toolbar-control) * 0.2) !important;
+  background: var(--color-note-control-bg) !important;
+  color: var(--color-input-text) !important;
 }
 
 .notes-editor-content:focus {

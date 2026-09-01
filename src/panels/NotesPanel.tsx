@@ -1,4 +1,4 @@
-import type { SyntheticEvent } from 'react'
+import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type SyntheticEvent } from 'react'
 import {
   BlockTypeSelect,
   BoldItalicUnderlineToggles,
@@ -31,6 +31,7 @@ import type { Panel } from '../types'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const { notes, sessions } = useAppState()
+  const [fontSize, setFontSize] = useState('16px')
   const activeNoteId = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
@@ -133,7 +134,11 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         </div>
 
         {activeNote ? (
-          <div className="notes-editor-blocker card-content" {...canvasEventBlockerProps}>
+          <div
+            className="notes-editor-blocker card-content"
+            style={{ '--notes-editor-font-size': fontSize } as CSSProperties}
+            {...canvasEventBlockerProps}
+          >
             <MDXEditor
               key={activeNote.id}
               className="notes-rich-editor dark-theme"
@@ -141,7 +146,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               markdown={activeNote.content}
               placeholder="Start writing..."
               onChange={(content) => notes.setActiveNoteContent(content, panelId)}
-              plugins={notesEditorPlugins}
+              plugins={createNotesEditorPlugins(fontSize, setFontSize)}
             />
           </div>
         ) : (
@@ -196,7 +201,8 @@ const canvasEventBlockerProps = {
   onWheel: stopCanvasEvent,
 }
 
-const notesEditorPlugins = [
+function createNotesEditorPlugins(fontSize: string, onFontSizeChange: (value: string) => void) {
+  return [
   headingsPlugin(),
   listsPlugin(),
   quotePlugin(),
@@ -210,10 +216,24 @@ const notesEditorPlugins = [
   toolbarPlugin({
     toolbarClassName: 'notes-editor-toolbar',
     toolbarContents: () => (
-      <DiffSourceToggleWrapper>
+      <div className="notes-editor-toolbar-interaction-surface" onPointerDownCapture={handleToolbarPointerDownCapture}>
+        <DiffSourceToggleWrapper>
         <UndoRedo />
         <Separator />
         <BlockTypeSelect />
+        <label className="notes-font-size-control">
+          <span className="sr-only">Editor font size</span>
+          <select
+            aria-label="Editor font size"
+            value={fontSize}
+            onChange={(event) => onFontSizeChange(event.target.value)}
+          >
+            <option value="14px">Small</option>
+            <option value="16px">Standard</option>
+            <option value="18px">Large</option>
+            <option value="20px">Extra large</option>
+          </select>
+        </label>
         <BoldItalicUnderlineToggles />
         <CodeToggle />
         <Separator />
@@ -223,12 +243,38 @@ const notesEditorPlugins = [
         <InsertTable />
         <InsertThematicBreak />
         <InsertCodeBlock />
-      </DiffSourceToggleWrapper>
+        </DiffSourceToggleWrapper>
+      </div>
     ),
   }),
-]
+  ]
+}
+
+function handleToolbarPointerDownCapture(event: ReactPointerEvent<HTMLDivElement>) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+
+  const trigger = target.closest('[role="combobox"]')
+  if (!(trigger instanceof HTMLElement) || trigger.dataset.state !== 'open') return
+
+  // Radix Select closes on Escape. Prevent its pointer handler from toggling
+  // the trigger back open after this explicit close action.
+  event.preventDefault()
+  trigger.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'Escape',
+    code: 'Escape',
+    bubbles: true,
+  }))
+}
 
 function stopCanvasEvent(event: SyntheticEvent) {
+  // Radix uses document-level pointer events to detect outside clicks. Let
+  // select triggers and options bubble so clicking the open trigger can close
+  // the menu again.
+  if (event.target instanceof Element && event.target.closest('[role="combobox"], [role="option"], [data-radix-select-viewport]')) {
+    return
+  }
+
   event.stopPropagation()
 }
 

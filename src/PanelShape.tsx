@@ -100,11 +100,17 @@ function PanelContent({ panelId }: { panelId: string }) {
 
 function handlePanelPointerDownCapture(event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) {
   const target = event.target
-  if (!(target instanceof HTMLElement)) return
+  if (!(target instanceof Element)) return
 
-  if (target.closest('button, input, select, textarea, label, .cm-editor, .mdxeditor, [contenteditable="true"], [role="textbox"], .panel-interactive')) {
+  if (target.closest('button, input, select, textarea, label, .cm-editor, [contenteditable="true"], [role="textbox"], [role="option"], [role="combobox"], [data-radix-select-viewport], .mdxeditor-toolbar, .mdxeditor-popup-container, .panel-interactive')) {
     ;(event as unknown as { isKilled?: boolean }).isKilled = true
     ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-    event.stopPropagation()
+
+    // Radix needs the pointer event to reach its select trigger so a second
+    // click can close the menu. The killed flag still keeps the canvas from
+    // treating the interaction as panel manipulation.
+    if (!target.closest('[role="combobox"], [role="option"], [data-radix-select-viewport]')) {
+      event.stopPropagation()
+    }
   }
 }
