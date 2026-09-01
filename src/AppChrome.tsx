@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { DefaultActionsMenu, DefaultPageMenu, DefaultQuickActions, TldrawUiToolbar } from 'tldraw'
 import { Hand } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
+import { isPanelReportEnabled } from './panelReportFeature'
 import { SessionToolbar } from './SessionToolbar'
 
 export interface AppChromeRect {
@@ -96,7 +97,7 @@ export function AppChrome({
           <DefaultQuickActions />
           <DefaultActionsMenu />
         </TldrawUiToolbar>
-        {import.meta.env.DEV && onOpenArchitectureReport ? (
+        {isPanelReportEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_PANEL_REPORT) && onOpenArchitectureReport ? (
           <button className="app-chrome-control architecture-report-launcher" type="button" onClick={onOpenArchitectureReport} title="Inspect panel architecture">
             Panel report
           </button>
