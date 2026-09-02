@@ -893,6 +893,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
   const handleCallback = useCallback(async (code: string, state: string | null) => {
     setTokens(await exchangeSpotifyCode(code, state))
     setStatus('Spotify login complete.')
+    setError(null)
   }, [])
 
   const searchPlaylists = useCallback(async (query: string) => {

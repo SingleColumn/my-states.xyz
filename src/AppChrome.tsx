@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { DefaultActionsMenu, DefaultPageMenu, DefaultQuickActions, TldrawUiToolbar } from 'tldraw'
+import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultPageMenu, DefaultQuickActions, TldrawUiMenuItem, TldrawUiToolbar } from 'tldraw'
 import { Hand } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
 import { isPanelReportEnabled } from './panelReportFeature'
@@ -24,8 +24,12 @@ interface AppChromeProps {
   onResetSelectedPanel(): void
   onResetPanelLayout(): void
   onOpenArchitectureReport?(): void
+  onOpenHelpAbout(): void
   onMeasure(rect: AppChromeRect): void
 }
+
+export const HELP_ABOUT_MENU_LABEL = 'Help & About'
+export const HELP_ABOUT_MENU_ICON = 'question-mark-circle'
 
 export function AppChrome({
   isCanvasReady,
@@ -37,6 +41,7 @@ export function AppChrome({
   onResetSelectedPanel,
   onResetPanelLayout,
   onOpenArchitectureReport,
+  onOpenHelpAbout,
   onMeasure,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -95,7 +100,12 @@ export function AppChrome({
         <DefaultPageMenu />
         <TldrawUiToolbar className="app-chrome-tldraw-actions tlui-buttons__horizontal" label="Canvas actions">
           <DefaultQuickActions />
-          <DefaultActionsMenu />
+          <DefaultActionsMenu>
+            <>
+              <DefaultActionsMenuContent />
+              <TldrawUiMenuItem id="help-and-about" label={HELP_ABOUT_MENU_LABEL} icon={HELP_ABOUT_MENU_ICON} readonlyOk onSelect={onOpenHelpAbout} />
+            </>
+          </DefaultActionsMenu>
         </TldrawUiToolbar>
         {isPanelReportEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_PANEL_REPORT) && onOpenArchitectureReport ? (
           <button className="app-chrome-control architecture-report-launcher" type="button" onClick={onOpenArchitectureReport} title="Inspect panel architecture">

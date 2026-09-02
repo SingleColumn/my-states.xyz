@@ -9,6 +9,7 @@ import { debounce } from './utils'
 import { duplicatePanel } from './panelDuplication'
 import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
+import { HelpAbout } from './HelpAbout'
 import type { CanvasState, Panel, PanelLayout } from './types'
 
 const shapeUtils = [PanelShapeUtil]
@@ -24,11 +25,14 @@ export default function App() {
 function AppContent() {
   const { spotify, sessions } = useAppState()
   const [callbackStatus, setCallbackStatus] = useState<string | null>(null)
+  const callbackHandledRef = useRef(false)
   const [isPanMode, setIsPanMode] = useState(false)
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
   const [isCanvasReady, setIsCanvasReady] = useState(false)
   const [chromeHeight, setChromeHeight] = useState(0)
   const [architectureReport, setArchitectureReport] = useState<PanelArchitectureReport | null>(null)
+  const [isHelpAboutOpen, setIsHelpAboutOpen] = useState(false)
+  const helpAboutReturnFocusRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<Editor | null>(null)
   const chromeRectRef = useRef<AppChromeRect | null>(null)
   const restoringCanvasRef = useRef(false)
@@ -46,7 +50,11 @@ function AppContent() {
   }, [sessions.activeSession?.panels])
 
   useEffect(() => {
-    if (window.location.pathname !== '/callback') return
+    if (window.location.pathname !== '/callback' || callbackHandledRef.current) return
+    // The Spotify authorization code is single-use. Mark this callback as
+    // handled before starting the exchange because updating Spotify state can
+    // re-run this effect while the request is still in flight.
+    callbackHandledRef.current = true
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     const state = params.get('state')
@@ -64,15 +72,16 @@ function AppContent() {
     }
 
     setCallbackStatus('Finishing Spotify login...')
+    // Remove the one-time code before awaiting the exchange. This also keeps
+    // a later render from attempting to process the same authorization code.
+    window.history.replaceState({}, '', '/')
     spotify
       .handleCallback(code, state)
       .then(() => {
         setCallbackStatus(null)
-        window.history.replaceState({}, '', '/')
       })
       .catch((caught) => {
         setCallbackStatus(caught instanceof Error ? caught.message : 'Spotify callback failed.')
-        window.history.replaceState({}, '', '/')
       })
   }, [spotify])
 
@@ -317,6 +326,13 @@ function AppContent() {
     setArchitectureReport(buildPanelArchitectureReport(session, editor))
   }, [sessions.activeSession])
 
+  const openHelpAbout = useCallback(() => {
+    helpAboutReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setIsHelpAboutOpen(true)
+  }, [])
+
+  const closeHelpAbout = useCallback(() => setIsHelpAboutOpen(false), [])
+
   useEffect(() => {
     if (editorRef.current && sessions.activeSession) restoreCanvas(editorRef.current, sessions.activeSession.canvas)
   }, [restoreCanvas, sessions.activeSession?.id])
@@ -332,9 +348,10 @@ function AppContent() {
       onResetSelectedPanel={resetSelectedPanel}
       onResetPanelLayout={resetPanelLayout}
       onOpenArchitectureReport={openArchitectureReport}
+      onOpenHelpAbout={openHelpAbout}
       onMeasure={handleChromeMeasure}
     />
-  ), [fitAllPanels, fitSelectedPanel, handleChromeMeasure, isCanvasReady, isPanMode, resetPanelLayout, resetSelectedPanel, selectedPanelId, togglePanMode])
+  ), [fitAllPanels, fitSelectedPanel, handleChromeMeasure, isCanvasReady, isPanMode, openArchitectureReport, openHelpAbout, resetPanelLayout, resetSelectedPanel, selectedPanelId, togglePanMode])
 
   const components = useMemo(
     () => ({
@@ -360,6 +377,7 @@ function AppContent() {
     <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
       <Tldraw shapeUtils={shapeUtils} components={components} onMount={handleMount} />
       {architectureReport ? <PanelArchitectureReportView report={architectureReport} onClose={() => setArchitectureReport(null)} /> : null}
+      <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
       {sessions.error ? <div className="callback-toast">{sessions.error}</div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>

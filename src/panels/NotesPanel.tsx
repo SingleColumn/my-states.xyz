@@ -31,7 +31,7 @@ import type { Panel } from '../types'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const { notes, sessions } = useAppState()
-  const [fontSize, setFontSize] = useState('16px')
+  const [fontSize, setFontSize] = useState(() => readEditorFontSize())
   const activeNoteId = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
@@ -146,7 +146,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               markdown={activeNote.content}
               placeholder="Start writing..."
               onChange={(content) => notes.setActiveNoteContent(content, panelId)}
-              plugins={createNotesEditorPlugins(fontSize, setFontSize)}
+              plugins={createNotesEditorPlugins(fontSize, (value) => {
+                setFontSize(value)
+                window.localStorage.setItem(editorFontSizeStorageKey, value)
+              })}
             />
           </div>
         ) : (
@@ -181,6 +184,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 }
 
 const newDocumentSelectValue = '__new_document__'
+const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
+const editorFontSizes = new Set(['14px', '16px', '18px', '20px'])
+
+function readEditorFontSize() {
+  const stored = window.localStorage.getItem(editorFontSizeStorageKey)
+  return stored && editorFontSizes.has(stored) ? stored : '16px'
+}
 
 const canvasEventBlockerProps = {
   onBeforeInput: stopCanvasEvent,
