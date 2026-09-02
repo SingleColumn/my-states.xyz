@@ -136,7 +136,10 @@ export async function exchangeSpotifyCode(code: string, state: string | null): P
   })
 
   if (!response.ok) {
-    throw new Error(`Spotify token exchange failed (${response.status}).`)
+    const message = await readSpotifyErrorMessage(response)
+    throw new Error(message
+      ? `Spotify token exchange failed (${response.status}): ${message}`
+      : `Spotify token exchange failed (${response.status}).`)
   }
 
   const json = (await response.json()) as {

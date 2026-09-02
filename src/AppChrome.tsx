@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultPageMenu, DefaultQuickActions, TldrawUiMenuItem, TldrawUiToolbar } from 'tldraw'
+import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiMenuItem, TldrawUiToolbar } from 'tldraw'
 import { Hand } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
 import { isPanelReportEnabled } from './panelReportFeature'
@@ -96,8 +96,7 @@ export function AppChrome({
 
       <div className="app-chrome-spacer" aria-hidden="true" />
 
-      <nav className="app-chrome-tldraw" aria-label="Canvas history and page controls">
-        <DefaultPageMenu />
+      <nav className="app-chrome-tldraw" aria-label="Canvas history controls">
         <TldrawUiToolbar className="app-chrome-tldraw-actions tlui-buttons__horizontal" label="Canvas actions">
           <DefaultQuickActions />
           <DefaultActionsMenu>
