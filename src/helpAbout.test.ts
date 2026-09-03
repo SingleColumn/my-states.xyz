@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { HelpAbout } from './HelpAbout'
-import { HELP_ABOUT_MENU_ICON, HELP_ABOUT_MENU_LABEL } from './AppChrome'
+import { HELP_ABOUT_LABEL } from './AppChrome'
 import { HELP_ABOUT_GITHUB_URL, HELP_ABOUT_LICENSE_URL, HELP_ABOUT_MAIN_SECTION, HELP_ABOUT_TLDRAW_URL } from './HelpAbout'
 import { appVersion } from './appMetadata'
 
@@ -31,9 +31,8 @@ describe('Help & About feature contract', () => {
     expect(markup).toContain('href="/licenses/tldraw-3.15.6.txt"')
   })
 
-  it('adds Help & About to the existing overflow menu without removing its actions', () => {
-    expect(HELP_ABOUT_MENU_LABEL).toBe('Help & About')
-    expect(HELP_ABOUT_MENU_ICON).toBe('question-mark-circle')
+  it('provides a clearly labelled About toolbar action', () => {
+    expect(HELP_ABOUT_LABEL).toBe('About')
   })
 
   it('defines an accessible, closable dialog with the required first section', () => {

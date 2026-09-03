@@ -50,7 +50,6 @@ playwright-report/
 test-results/
 
 # Local planning/session notes
-design-and-architecture.md
 project_docs/
 
 # Temporary files
