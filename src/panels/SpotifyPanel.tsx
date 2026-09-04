@@ -252,9 +252,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
 }
 
 function stopCanvasEvent(event: SyntheticEvent) {
+  if ('button' in event && event.button === 2) return
   ;(event as unknown as { isKilled?: boolean }).isKilled = true
   ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-  event.stopPropagation()
 }
 
 const canvasEventBlockerProps = {

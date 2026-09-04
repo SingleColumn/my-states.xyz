@@ -22,6 +22,8 @@ export interface CanvasState {
 export interface PanelBase {
   id: string
   type: PanelType
+  /** Absent means visible for sessions written before panel visibility existed. */
+  visible?: boolean
   createdAt: number
   updatedAt: number
 }

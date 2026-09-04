@@ -1,5 +1,6 @@
-import { Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop } from 'lucide-react'
+import { EyeOff, Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import type { PanelType } from './types'
 
 interface CanvasViewControlsProps {
   isReady: boolean
@@ -8,6 +9,10 @@ interface CanvasViewControlsProps {
   onFitSelectedPanel(): void
   onResetSelectedPanel(): void
   onResetPanelLayout(): void
+  canHideSelectedPanel: boolean
+  hiddenPanels: Array<{ id: string; type: PanelType }>
+  onHideSelectedPanel(): void
+  onRestorePanel(panelId: string): void
 }
 
 export function CanvasViewControls({
@@ -17,6 +22,10 @@ export function CanvasViewControls({
   onFitSelectedPanel,
   onResetSelectedPanel,
   onResetPanelLayout,
+  canHideSelectedPanel,
+  hiddenPanels,
+  onHideSelectedPanel,
+  onRestorePanel,
 }: CanvasViewControlsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -107,8 +116,33 @@ export function CanvasViewControls({
             <PanelsTopLeft size={16} aria-hidden="true" />
             <span>Reset panel layout</span>
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!canHideSelectedPanel}
+            title={canHideSelectedPanel ? 'Hide the selected panel without deleting it' : 'Select exactly one panel to hide it'}
+            onClick={() => runMenuAction(onHideSelectedPanel)}
+          >
+            <EyeOff size={16} aria-hidden="true" />
+            <span>Hide selected panel</span>
+          </button>
+          {hiddenPanels.length ? (
+            <div className="canvas-view-menu-section" role="group" aria-label="Hidden panels">
+              <span className="canvas-view-menu-heading">Hidden panels</span>
+              {hiddenPanels.map((panel, index) => (
+                <button key={panel.id} type="button" role="menuitem" onClick={() => runMenuAction(() => onRestorePanel(panel.id))}>
+                  <RotateCcw size={16} aria-hidden="true" />
+                  <span>Restore {panelTypeLabel(panel.type)} {index + 1}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
   )
+}
+
+function panelTypeLabel(type: PanelType) {
+  return type === 'spotify' ? 'Spotify' : type === 'slideshow' ? 'Images' : 'Notes'
 }

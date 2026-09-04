@@ -1,4 +1,4 @@
-import type { PanelLayout, PanelType } from './types'
+import type { CanvasState, Panel, PanelLayout, PanelType } from './types'
 
 export const PANEL_TYPES = ['spotify', 'slideshow', 'notes'] as const satisfies readonly PanelType[]
 
@@ -22,6 +22,70 @@ export function getCanonicalPanelLayout(panelType: PanelType): Omit<PanelLayout,
 
 export function getPanelMinimumSize(panelType: PanelType) {
   return PANEL_MINIMUM_SIZES[panelType]
+}
+
+export function isPanelVisible(panel: Pick<Panel, 'visible'>) {
+  return panel.visible !== false
+}
+
+export function setPanelVisibility(panels: readonly Panel[], panelId: string, visible: boolean): Panel[] {
+  return panels.map((panel) => panel.id === panelId ? { ...panel, visible } : panel)
+}
+
+export function getVisiblePanels(panels: readonly Panel[]) {
+  return panels.filter(isPanelVisible)
+}
+
+export function showAllPanels(panels: readonly Panel[]): Panel[] {
+  return panels.map((panel) => isPanelVisible(panel) ? panel : { ...panel, visible: true })
+}
+
+export function getRenderablePanelLayouts(panels: readonly Panel[], canvas: CanvasState | null): PanelLayout[] {
+  const byId = new Map(panels.map((panel) => [panel.id, panel]))
+  const layouts = canvas
+    ? canvas.panels.filter((layout) => {
+        const panel = byId.get(layout.panelId)
+        return panel !== undefined && isPanelVisible(panel)
+      })
+    : []
+  if (canvas) return layouts.map((layout, order) => ({ ...layout, order: layout.order ?? order }))
+  const presentIds = new Set(layouts.map((layout) => layout.panelId))
+  const missing = getVisiblePanels(panels)
+    .filter((panel) => !presentIds.has(panel.id))
+    .map((panel, order) => {
+      const layout = getCanonicalPanelLayout(panel.type)
+      return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h, rotation: 0, order: layouts.length + order }
+    })
+  return [...layouts, ...missing].map((layout, order) => ({ ...layout, order: layout.order ?? order }))
+}
+
+export function mergeVisiblePanelLayouts(
+  panels: readonly Panel[],
+  existingCanvas: CanvasState | null,
+  visibleLayouts: readonly PanelLayout[],
+): PanelLayout[] {
+  const panelById = new Map(panels.map((panel) => [panel.id, panel]))
+  const visibleById = new Map(visibleLayouts.map((layout) => [layout.panelId, layout]))
+  const result: PanelLayout[] = []
+  const seen = new Set<string>()
+  for (const layout of existingCanvas?.panels ?? []) {
+    const panel = panelById.get(layout.panelId)
+    if (!panel || seen.has(layout.panelId)) continue
+    if (isPanelVisible(panel)) {
+      const current = visibleById.get(panel.id)
+      if (!current) continue
+      result.push({ ...current, order: layout.order ?? result.length })
+    } else {
+      result.push({ ...layout, order: layout.order ?? result.length })
+    }
+    seen.add(panel.id)
+  }
+  for (const layout of visibleLayouts) {
+    if (!panelById.has(layout.panelId) || seen.has(layout.panelId)) continue
+    result.push({ ...layout, order: layout.order ?? result.length })
+    seen.add(layout.panelId)
+  }
+  return result
 }
 
 export function mergePanelLayouts(layouts: readonly PanelLayout[]): PanelLayout[] {

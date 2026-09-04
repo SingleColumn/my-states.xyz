@@ -14,7 +14,10 @@ class MemoryStorage implements Storage {
 Object.defineProperty(globalThis, 'window', {
   configurable: true,
   value: {
+    navigator: { languages: ['en'], userAgent: 'vitest', platform: 'test' },
     localStorage: new MemoryStorage(),
+    addEventListener() {},
+    removeEventListener() {},
     setTimeout: globalThis.setTimeout.bind(globalThis),
     clearTimeout: globalThis.clearTimeout.bind(globalThis),
   },

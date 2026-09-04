@@ -490,6 +490,7 @@ function isPanels(value: unknown): value is Panel[] {
   const ids = new Set<string>()
   return value.every((panel) => {
     if (!isRecord(panel) || !isSafeId(panel.id) || ids.has(panel.id) || !isTimestamp(panel.createdAt) || !isTimestamp(panel.updatedAt)) return false
+    if (panel.visible !== undefined && typeof panel.visible !== 'boolean') return false
     ids.add(panel.id)
     if (panel.type === 'spotify') return isRecord(panel.config) && isPlaylistReference(panel.config.playlist)
     if (panel.type === 'slideshow') return isRecord(panel.config) && isSlideshowSettings(panel.config)

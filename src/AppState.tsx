@@ -38,6 +38,7 @@ import {
 import { downloadSessionArchive, exportSessionArchive, importSessionArchive } from './sessionArchive'
 import { createId } from './utils'
 import { createImageItemsFromBundledCollection, getBundledCollection } from './imageCollections'
+import { setPanelVisibility } from './panelLayout'
 import {
   releaseImageItems,
   settingsForBundledCollection,
@@ -129,7 +130,9 @@ interface SessionsState {
   importFile(file: File): Promise<void>
   updateCanvas(canvas: Session['canvas']): void
   addPanels(panels: Session['panels']): void
+  removePanel(panelId: string): void
   updatePanel(panelId: string, update: (panel: Panel) => Panel): void
+  setPanelVisibility(panelId: string, visible: boolean): void
   registerCanvasFlush(flush: () => void | Promise<void>): () => void
 }
 
@@ -185,7 +188,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       updateCanvas: sessionCore.updateCanvas,
       addPanels: (panels) => sessionCore.patchActiveSession((current) => ({ ...current, panels: addAllowedPanels(current.panels, panels) })),
+      removePanel: (panelId) => sessionCore.patchActiveSession((current) => ({
+        ...current,
+        panels: current.panels.filter((panel) => panel.id !== panelId),
+        canvas: current.canvas ? { ...current.canvas, panels: current.canvas.panels.filter((layout) => layout.panelId !== panelId) } : null,
+      })),
       updatePanel: (panelId, update) => sessionCore.patchActiveSession((current) => ({ ...current, panels: current.panels.map((panel) => panel.id === panelId ? update(panel) : panel) })),
+      setPanelVisibility: (panelId, visible) => sessionCore.patchActiveSession((current) => ({ ...current, panels: setPanelVisibility(current.panels, panelId, visible) })),
       registerCanvasFlush: sessionCore.registerCanvasFlush,
     }),
     [notes, sessionCore],
@@ -285,15 +294,19 @@ function useSessionState() {
     await saveQueueRef.current
   }, [])
 
-  const open = useCallback(async (sessionId: string) => {
-    await flush()
+  const loadSession = useCallback(async (sessionId: string) => {
     const session = await getSession(sessionId)
     if (!session) throw new Error('The requested session no longer exists.')
     await setActiveSessionId(sessionId)
     activeSessionRef.current = session
     setActiveSession(session)
     setError(null)
-  }, [flush])
+  }, [])
+
+  const open = useCallback(async (sessionId: string) => {
+    await flush()
+    await loadSession(sessionId)
+  }, [flush, loadSession])
 
   const create = useCallback(async (name: string) => {
     const session = await createStoredSession(name)
@@ -318,14 +331,14 @@ function useSessionState() {
     if (!removingActive) return
 
     if (remaining[0]) {
-      await open(remaining[0].id)
+      await loadSession(remaining[0].id)
       return
     }
 
     const replacement = await createStoredSession('My first session')
     setSessions(await getSessionSummaries())
-    await open(replacement.id)
-  }, [open])
+    await loadSession(replacement.id)
+  }, [loadSession])
 
   const updateCanvas = useCallback((canvas: Session['canvas']) => {
     patchActiveSession((current) => ({ ...current, canvas }))

@@ -4,6 +4,7 @@ import { Hand } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
 import { isPanelReportEnabled } from './panelReportFeature'
 import { SessionToolbar } from './SessionToolbar'
+import type { PanelType } from './types'
 
 export interface AppChromeRect {
   top: number
@@ -26,6 +27,10 @@ interface AppChromeProps {
   onOpenArchitectureReport?(): void
   onOpenHelpAbout(): void
   onMeasure(rect: AppChromeRect): void
+  canHideSelectedPanel: boolean
+  hiddenPanels: Array<{ id: string; type: PanelType }>
+  onHideSelectedPanel(): void
+  onRestorePanel(panelId: string): void
 }
 
 export const HELP_ABOUT_LABEL = 'About'
@@ -42,6 +47,10 @@ export function AppChrome({
   onOpenArchitectureReport,
   onOpenHelpAbout,
   onMeasure,
+  canHideSelectedPanel,
+  hiddenPanels,
+  onHideSelectedPanel,
+  onRestorePanel,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -90,6 +99,10 @@ export function AppChrome({
           onFitSelectedPanel={onFitSelectedPanel}
           onResetSelectedPanel={onResetSelectedPanel}
           onResetPanelLayout={onResetPanelLayout}
+          canHideSelectedPanel={canHideSelectedPanel}
+          hiddenPanels={hiddenPanels}
+          onHideSelectedPanel={onHideSelectedPanel}
+          onRestorePanel={onRestorePanel}
         />
       </section>
 

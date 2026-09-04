@@ -278,6 +278,7 @@ function handleToolbarPointerDownCapture(event: ReactPointerEvent<HTMLDivElement
 }
 
 function stopCanvasEvent(event: SyntheticEvent) {
+  if ('button' in event && event.button === 2) return
   // Radix uses document-level pointer events to detect outside clicks. Let
   // select triggers and options bubble so clicking the open trigger can close
   // the menu again.
@@ -285,7 +286,6 @@ function stopCanvasEvent(event: SyntheticEvent) {
     return
   }
 
-  event.stopPropagation()
 }
 
 function exportMarkdownNote(note: Note) {

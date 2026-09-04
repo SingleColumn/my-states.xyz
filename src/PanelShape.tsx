@@ -5,6 +5,7 @@ import {
   Rectangle2d,
   T,
   TLBaseShape,
+  useEditor,
 } from 'tldraw'
 import { useAppState } from './AppState'
 import type { PanelType } from './types'
@@ -48,11 +49,14 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   }
 
   override component(shape: PanelShape) {
+    const editor = useEditor()
+
     return (
       <HTMLContainer
         className="canvas-panel-shell"
-        onPointerDownCapture={handlePanelPointerDownCapture}
-        onTouchStartCapture={handlePanelPointerDownCapture}
+        onPointerDownCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
+        onTouchStartCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
+        onContextMenu={() => editor.select(shape.id)}
         style={{
           width: shape.props.w,
           height: shape.props.h,
@@ -98,7 +102,16 @@ function PanelContent({ panelId }: { panelId: string }) {
   return <SlideshowPanel panelId={panel.id} />
 }
 
-function handlePanelPointerDownCapture(event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) {
+function handlePanelPointerDownCapture(
+  editor: ReturnType<typeof useEditor>,
+  shapeId: PanelShape['id'],
+  event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
+) {
+  if (!('button' in event) || event.button === 0 || event.button === 2) {
+    editor.select(shapeId)
+  }
+
+  if ('button' in event && event.button === 2) return
   const target = event.target
   if (!(target instanceof Element)) return
 
@@ -106,11 +119,8 @@ function handlePanelPointerDownCapture(event: React.PointerEvent<HTMLDivElement>
     ;(event as unknown as { isKilled?: boolean }).isKilled = true
     ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
 
-    // Radix needs the pointer event to reach its select trigger so a second
-    // click can close the menu. The killed flag still keeps the canvas from
-    // treating the interaction as panel manipulation.
-    if (!target.closest('[role="combobox"], [role="option"], [data-radix-select-viewport]')) {
-      event.stopPropagation()
-    }
+    // Keep the event on the document so tldraw's context menu can observe an
+    // outside click and close before a later right-click opens a new menu.
+    // The killed flag still prevents canvas manipulation.
   }
 }
