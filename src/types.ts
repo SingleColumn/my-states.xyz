@@ -6,6 +6,8 @@ export interface PanelLayout {
   y: number
   w: number
   h: number
+  rotation?: number
+  order?: number
 }
 
 export interface CanvasState {

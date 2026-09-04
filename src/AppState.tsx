@@ -93,7 +93,6 @@ interface SlideshowState {
 
 interface SpotifyState {
   tokens: SpotifyTokens | null
-  playlist: SpotifyPlaylistReference
   playlists: SpotifyPlaylistSummary[]
   tracks: SpotifyTrackSummary[]
   track: SpotifyTrackState | null
@@ -761,7 +760,6 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
 
 function useSpotifyState(session: Session | null, patchSession: (patch: (current: Session) => Session) => void): SpotifyState {
   const [tokens, setTokens] = useState<SpotifyTokens | null>(loadSpotifyTokens)
-  const [playlist, setPlaylist] = useState<SpotifyPlaylistReference>(defaultSpotifyPlaylistReference)
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
   const [track, setTrack] = useState<SpotifyTrackState | null>(null)
@@ -777,7 +775,6 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
   }, [tokens])
 
   useEffect(() => {
-    setPlaylist(session?.panels.find((panel) => panel.type === 'spotify')?.config.playlist ?? defaultSpotifyPlaylistReference)
     setPlaylists([])
     setTracks([])
     setTrack(null)
@@ -868,7 +865,6 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
   }, [endExpiredSession, tokens?.accessToken])
 
   const setSessionPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string) => {
-    setPlaylist(next)
     patchSession((current) => {
       const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'spotify')
         ?? current.panels.find((candidate) => candidate.type === 'spotify')
@@ -949,7 +945,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
 
   const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary, panelId?: string) => {
     const panelPlaylist = (session?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
-    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : panelPlaylist ?? playlist
+    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : panelPlaylist ?? defaultSpotifyPlaylistReference
     if (!selected.uri) throw new Error('Choose a playlist first.')
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()
@@ -958,7 +954,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     setSessionPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, playlist, requestSpotify, setSessionPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, session, setSessionPlaylist])
 
   const playTrack = useCallback(async (summary: SpotifyTrackSummary, _panelId?: string) => {
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
@@ -971,7 +967,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
 
   const togglePlay = useCallback(async (panelId?: string) => {
     const panelPlaylist = (session?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
-    const selectedPlaylist = panelPlaylist ?? playlist
+    const selectedPlaylist = panelPlaylist ?? defaultSpotifyPlaylistReference
     const action = getSpotifyPlaybackAction(Boolean(track), selectedPlaylist.uri)
     if (action === 'load-saved-playlist') {
       await playPlaylist(undefined, panelId)
@@ -984,10 +980,10 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     const player = playerRef.current
     if (!player) throw new Error('Spotify browser device is not ready yet.')
     await player.togglePlay()
-  }, [playPlaylist, playlist, session, track])
+  }, [playPlaylist, session, track])
 
   return {
-    tokens, playlist, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
+    tokens, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
     togglePlay,
     previousTrack: async () => playerRef.current?.previousTrack(),
     nextTrack: async () => playerRef.current?.nextTrack(),

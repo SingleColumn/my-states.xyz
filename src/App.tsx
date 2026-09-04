@@ -91,16 +91,17 @@ function AppContent() {
       const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
       if (existingPanels.length) editor.deleteShapes(existingPanels.map((shape) => shape.id))
       const layouts = canvas?.panels?.length
-        ? canvas.panels
-        : sessionPanelsRef.current.map((panel) => {
+        ? canvas.panels.map((layout, order) => ({ ...layout, order: layout.order ?? order })).sort((left, right) => left.order! - right.order!)
+        : sessionPanelsRef.current.map((panel, order) => {
             const layout = getCanonicalPanelLayout(panel.type)
-            return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h }
+            return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h, rotation: 0, order }
           })
       editor.createShapes(
         layouts.map((layout) => ({
           type: PANEL_SHAPE_TYPE,
           x: layout.x,
           y: layout.y,
+          rotation: layout.rotation ?? 0,
           props: { w: layout.w, h: layout.h, panelId: layout.panelId },
         })) as never,
       )
@@ -267,9 +268,9 @@ function AppContent() {
 
     setCallbackStatus(null)
     const changed = runProgrammaticCanvasMutation((editor) => {
-      const canonicalLayouts = (sessions.activeSession?.panels ?? []).map((panel) => {
+      const canonicalLayouts = (sessions.activeSession?.panels ?? []).map((panel, order) => {
         const layout = getCanonicalPanelLayout(panel.type)
-        return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h }
+        return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h, rotation: 0, order }
       })
       const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
       const retainedIds = new Set<string>()
@@ -388,12 +389,14 @@ function persistCanvas(editor: Editor) {
   const panels = editor
     .getCurrentPageShapes()
     .filter(isPanelShape)
-    .map<PanelLayout>((shape) => ({
+    .map<PanelLayout>((shape, order) => ({
       panelId: shape.props.panelId,
       x: shape.x,
       y: shape.y,
       w: shape.props.w,
       h: shape.props.h,
+      rotation: shape.rotation,
+      order,
     }))
   return { camera: editor.getCamera(), panels }
 }

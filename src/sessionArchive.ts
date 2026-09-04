@@ -479,7 +479,9 @@ function isCanvasState(value: unknown): value is CanvasState | null {
     (panel) =>
       isRecord(panel) &&
       (isSafeId(panel.panelId) || ['spotify', 'slideshow', 'notes'].includes(panel.panelType as string)) &&
-      ['x', 'y', 'w', 'h'].every((key) => typeof panel[key] === 'number' && Number.isFinite(panel[key] as number)),
+      ['x', 'y', 'w', 'h'].every((key) => typeof panel[key] === 'number' && Number.isFinite(panel[key] as number)) &&
+      (panel.rotation === undefined || (typeof panel.rotation === 'number' && Number.isFinite(panel.rotation))) &&
+      (panel.order === undefined || (typeof panel.order === 'number' && Number.isFinite(panel.order))),
   )
 }
 

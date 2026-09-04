@@ -36,7 +36,7 @@ async function createCompleteArchive() {
     panels: session.panels.map((panel) => panel.type === 'notes' ? { ...panel, config: { activeNoteId: note.id } } : panel.type === 'slideshow' ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' }, intervalMs: 3500, shuffle: true } } : panel.type === 'spotify' ? { ...panel, config: { playlist: { id: 'playlist_123', uri: 'spotify:playlist:playlist_123', name: 'Focus', url: 'https://open.spotify.com/playlist/playlist_123' } } } : panel),
     canvas: {
       camera: { x: 120, y: -80, z: 1.25 },
-      panels: [{ panelId: session.panels.find((panel) => panel.type === 'notes')!.id, x: 1, y: 2, w: 300, h: 400 }],
+      panels: [{ panelId: session.panels.find((panel) => panel.type === 'notes')!.id, x: 1, y: 2, w: 300, h: 400, rotation: 0.25, order: 2 }],
     },
   })
   return exportSessionArchive(session.id)
@@ -105,6 +105,7 @@ describe('portable session archives', () => {
     ])
 
     expect(stored?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
+    expect(stored?.canvas?.panels[0]).toMatchObject({ rotation: 0.25, order: 2 })
     expect(stored?.panels.find((panel) => panel.type === 'slideshow')?.config).toMatchObject({ intervalMs: 3500, shuffle: true })
     expect(stored?.panels.find((panel) => panel.type === 'spotify')?.config.playlist).toEqual(exportedManifest.spotify)
     expect(notes).toHaveLength(1)

@@ -660,7 +660,15 @@ function migrateCanvas(canvas: CanvasState | null, panels: Panel[], panelIdMap =
     panels: canvas.panels.flatMap((layout) => {
       const legacyType = (layout as PanelLayout & { panelType?: PanelType }).panelType
       const panelId = layout.panelId ? (panelIdMap.get(layout.panelId) ?? layout.panelId) : (legacyType ? byType.get(legacyType) : undefined)
-      return panelId ? [{ panelId, x: layout.x, y: layout.y, w: layout.w, h: layout.h }] : []
+      return panelId ? [{
+        panelId,
+        x: layout.x,
+        y: layout.y,
+        w: layout.w,
+        h: layout.h,
+        ...(typeof layout.rotation === 'number' && Number.isFinite(layout.rotation) ? { rotation: layout.rotation } : {}),
+        ...(typeof layout.order === 'number' && Number.isFinite(layout.order) ? { order: layout.order } : {}),
+      }] : []
     }),
   }
 }

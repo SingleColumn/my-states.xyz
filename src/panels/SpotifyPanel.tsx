@@ -12,12 +12,13 @@ import {
   Volume2,
 } from 'lucide-react'
 import { useAppState } from '../AppState'
+import { defaultSpotifyPlaylistReference } from '../storage'
 import { formatDuration } from '../utils'
 import type { Panel } from '../types'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
   const { spotify, sessions } = useAppState()
-  const panelPlaylist = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist ?? spotify.playlist
+  const panelPlaylist = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist ?? defaultSpotifyPlaylistReference
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'tracks' | 'playlists'>('tracks')
   const [playlistUrl, setPlaylistUrl] = useState(panelPlaylist.url ?? '')
