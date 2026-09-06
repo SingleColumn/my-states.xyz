@@ -84,12 +84,18 @@ interface MigrationVerificationRecord {
   directoryName: string | null
 }
 
+export function createPanel(type: PanelType, now = Date.now()): Panel {
+  if (type === 'spotify') {
+    return { id: createId('panel'), type, createdAt: now, updatedAt: now, config: { playlist: { ...defaultSpotifyPlaylistReference } } }
+  }
+  if (type === 'slideshow') {
+    return { id: createId('panel'), type, createdAt: now, updatedAt: now, config: { ...defaultSlideshowSettings, imageSource: { ...defaultSlideshowSettings.imageSource } } }
+  }
+  return { id: createId('panel'), type, createdAt: now, updatedAt: now, config: { activeNoteId: null } }
+}
+
 export function createDefaultPanels(now = Date.now()): Panel[] {
-  return [
-    { id: createId('panel'), type: 'spotify', createdAt: now, updatedAt: now, config: { playlist: { ...defaultSpotifyPlaylistReference } } },
-    { id: createId('panel'), type: 'slideshow', createdAt: now, updatedAt: now, config: { ...defaultSlideshowSettings } },
-    { id: createId('panel'), type: 'notes', createdAt: now, updatedAt: now, config: { activeNoteId: null } },
-  ]
+  return [createPanel('spotify', now), createPanel('slideshow', now), createPanel('notes', now)]
 }
 
 export interface ImportedSessionContent {

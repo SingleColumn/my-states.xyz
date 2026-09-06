@@ -31,6 +31,7 @@ interface AppChromeProps {
   hiddenPanels: Array<{ id: string; type: PanelType }>
   onHideSelectedPanel(): void
   onRestorePanel(panelId: string): void
+  onAddPanel(panelType: PanelType): void
 }
 
 export const HELP_ABOUT_LABEL = 'About'
@@ -51,6 +52,7 @@ export function AppChrome({
   hiddenPanels,
   onHideSelectedPanel,
   onRestorePanel,
+  onAddPanel,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -94,6 +96,7 @@ export function AppChrome({
         </button>
         <CanvasViewControls
           isReady={isCanvasReady}
+          onAddPanel={onAddPanel}
           canUseSelectedPanel={canUseSelectedPanel}
           onFitPanels={onFitAllPanels}
           onFitSelectedPanel={onFitSelectedPanel}

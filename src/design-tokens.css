@@ -21,6 +21,8 @@
   --color-control-border: rgba(255, 255, 255, 0.14);
   --color-control-border-hover: rgba(255, 255, 255, 0.25);
   --color-input-bg: rgba(0, 0, 0, 0.24);
+  --color-dropdown-bg: #000;
+  --color-dropdown-text: var(--card-button-icon-color);
   --color-note-control-bg: rgba(7, 13, 14, 0.94);
   --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
   --color-focus-ring: rgba(255, 255, 255, 0.46);
@@ -130,6 +132,7 @@
   --font-size-panel-label: var(--type-sm);
   --font-size-app-badge-title: 13px;
   --font-size-app-badge-meta: 12px;
+  --font-size-dropdown: var(--font-size-app-badge-meta);
   --font-size-spotify-login-title: var(--type-lg);
   --font-size-track-title: var(--type-lg);
   --font-size-track-meta: var(--type-sm);

@@ -1,9 +1,21 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { duplicatePanel } from './panelDuplication'
-import { createSession, getSession, saveSession } from './storage'
+import { createPanel, createSession, getSession, saveSession } from './storage'
 
 describe('panel duplication', () => {
+  it('creates a fresh persistent panel for each add-panel type', () => {
+    const music = createPanel('spotify', 123)
+    const images = createPanel('slideshow', 123)
+    const notes = createPanel('notes', 123)
+
+    expect(new Set([music.id, images.id, notes.id]).size).toBe(3)
+    expect(music.type).toBe('spotify')
+    expect(images.type).toBe('slideshow')
+    expect(notes.type).toBe('notes')
+    expect(notes).toMatchObject({ type: 'notes', config: { activeNoteId: null } })
+  })
+
   it('creates a new ID while copying persistent state', async () => {
     const session = await createSession('Duplicate panels')
     const source = session.panels.find((panel) => panel.type === 'slideshow')!

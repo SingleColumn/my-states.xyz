@@ -9,11 +9,12 @@ import { getCanonicalPanelLayout, getRenderablePanelLayouts, isPanelVisible, mer
 import { getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { PanelCommandsProvider } from './PanelHeader'
 import { debounce } from './utils'
+import { createPanel } from './storage'
 import { duplicatePanel } from './panelDuplication'
 import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
-import type { CanvasState, Panel, PanelLayout } from './types'
+import type { CanvasState, Panel, PanelLayout, PanelType } from './types'
 
 const shapeUtils = [PanelShapeUtil]
 
@@ -157,13 +158,6 @@ function AppContent() {
         },
       }
     })
-    const removeSpotifyDuplicateHandler = editor.sideEffects.registerAfterCreateHandler('shape', (record, source) => {
-      if (source !== 'user' || restoringCanvasRef.current || programmaticCanvasMutationRef.current) return
-      if (record.type !== PANEL_SHAPE_TYPE) return
-      const shape = record as PanelShape
-      const panel = sessionPanelsRef.current.find((candidate) => candidate.id === shape.props.panelId)
-      if (panel?.type === 'spotify') editor.deleteShapes([shape.id])
-    })
     const removePanelAfterDeleteHandler = editor.sideEffects.registerAfterDeleteHandler('shape', (record) => {
       if (restoringCanvasRef.current || programmaticCanvasMutationRef.current || !isPanelShape(record)) return
       sessions.removePanel(record.props.panelId)
@@ -202,7 +196,6 @@ function AppContent() {
       unregisterCanvasFlush()
       persist.cancel()
       removeDuplicatePanelHandler()
-      removeSpotifyDuplicateHandler()
       removePanelAfterDeleteHandler()
       persistCanvasRef.current = null
       removeStoreListener()
@@ -290,6 +283,31 @@ function AppContent() {
       currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
     })
   }, [runProgrammaticCanvasMutation, sessions.activeSession?.panels])
+
+  const addPanel = useCallback((panelType: PanelType) => {
+    const editor = editorRef.current
+    const session = sessions.activeSession
+    if (!editor || !session) return
+    if (panelType === 'spotify' && session.panels.some((panel) => panel.type === 'spotify')) {
+      setCallbackStatus('Only one Music panel is allowed on the canvas. Restore the existing panel from the panel view menu if it is hidden.')
+      return
+    }
+
+    const panel = createPanel(panelType)
+    const canonical = getCanonicalPanelLayout(panelType)
+    sessionPanelsRef.current = [...sessionPanelsRef.current, panel]
+    sessions.addPanels([panel])
+    const changed = runProgrammaticCanvasMutation((currentEditor) => {
+      currentEditor.createShapes([{
+        type: PANEL_SHAPE_TYPE,
+        x: canonical.x,
+        y: canonical.y,
+        props: { w: canonical.w, h: canonical.h, panelId: panel.id },
+      }] as never)
+    })
+    if (!changed) setCallbackStatus('The canvas is not ready yet.')
+    else setCallbackStatus(null)
+  }, [runProgrammaticCanvasMutation, sessions])
 
   const hideSelectedPanelRef = useRef(hideSelectedPanel)
 
@@ -466,11 +484,12 @@ function AppContent() {
       hiddenPanels={(sessions.activeSession?.panels ?? []).filter((panel) => !isPanelVisible(panel)).map((panel) => ({ id: panel.id, type: panel.type }))}
       onHideSelectedPanel={hideSelectedPanel}
       onRestorePanel={restorePanel}
+      onAddPanel={addPanel}
       onOpenArchitectureReport={openArchitectureReport}
       onOpenHelpAbout={openHelpAbout}
       onMeasure={handleChromeMeasure}
     />
-  ), [fitAllPanels, fitSelectedPanel, handleChromeMeasure, hideSelectedPanel, isCanvasReady, isPanMode, openArchitectureReport, openHelpAbout, resetPanelLayout, resetSelectedPanel, restorePanel, selectedPanelId, sessions.activeSession?.panels, togglePanMode])
+  ), [addPanel, fitAllPanels, fitSelectedPanel, handleChromeMeasure, hideSelectedPanel, isCanvasReady, isPanMode, openArchitectureReport, openHelpAbout, resetPanelLayout, resetSelectedPanel, restorePanel, selectedPanelId, sessions.activeSession?.panels, togglePanMode])
 
   // One session is one page, so tldraw's "Move to page" has nowhere to move a
   // panel to. Declaring the limit hides that submenu instead of leaving a
@@ -478,14 +497,29 @@ function AppContent() {
   const editorOptions = useMemo(() => ({ maxPages: 1 }), [])
 
   const uiOverrides = useMemo<TLUiOverrides>(() => ({
-    actions: (_editor, actions) => {
+    actions: (editor, actions) => {
       // Neither of these applies to a panel: "Flatten to image" rasterises a
       // shape, and panels are live HTML; locking one leaves it stuck with no
       // way back now that the Edit submenu is gone. Removing the actions also
       // unbinds their keyboard shortcuts, which a hidden menu item would not.
-      const { 'flatten-to-image': _flattenToImage, 'toggle-lock': _toggleLock, ...remaining } = actions
+      const { 'flatten-to-image': _flattenToImage, 'toggle-lock': _toggleLock, duplicate, ...remaining } = actions
       return {
         ...remaining,
+        duplicate: {
+          ...duplicate,
+          onSelect: (source) => {
+            const selected = editor.getSelectedShapes()
+            const selectedShape = selected.length === 1 ? selected[0] : undefined
+            const selectedPanel = selectedShape && isPanelShape(selectedShape) ? selectedShape : undefined
+            const selectedMusicPanel = selectedPanel !== undefined
+              && sessionPanelsRef.current.find((panel) => panel.id === selectedPanel.props.panelId)?.type === 'spotify'
+            if (selectedMusicPanel) {
+              setCallbackStatus('Music panel cannot be duplicated. Only one Music panel is allowed on the canvas.')
+              return
+            }
+            duplicate.onSelect(source)
+          },
+        },
         'hide-panel': {
           id: 'hide-panel',
           label: 'action.hide-panel',

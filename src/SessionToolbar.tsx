@@ -78,6 +78,7 @@ export function SessionToolbar() {
   return (
     <section ref={rootRef} className="session-toolbar panel-interactive" aria-label="Session controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
       <select
+        className="app-dropdown"
         aria-label="Open session"
         value={sessions.activeSession?.id ?? ''}
         disabled={busy}

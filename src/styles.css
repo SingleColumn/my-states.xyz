@@ -82,17 +82,6 @@ button {
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
   padding: 0 var(--space-detail-3);
-  border: var(--border-width-hairline) solid var(--card-button-border);
-  border-radius: var(--button-radius);
-  background: var(--color-note-control-bg);
-  color: var(--color-input-text);
-  font-size: var(--font-size-app-badge-meta);
-  line-height: var(--line-height-tight);
-}
-
-.session-toolbar select option {
-  background: var(--color-note-control-bg);
-  color: var(--color-input-text);
 }
 
 .session-toolbar .card-icon-button {
@@ -515,6 +504,11 @@ button {
   gap: var(--space-control-inner-gap);
 }
 
+.app-chrome-panel-add-control {
+  width: 112px;
+  padding-right: var(--space-detail-2);
+}
+
 .card-header > .card-title { min-width: 0; }
 
 .card-icon-button {
@@ -688,6 +682,30 @@ select:focus,
 button:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: var(--focus-ring-offset);
+}
+
+.app-dropdown {
+  border: var(--border-width-hairline) solid var(--card-button-border) !important;
+  border-radius: var(--button-radius) !important;
+  background: var(--color-dropdown-bg) !important;
+  color: var(--color-dropdown-text) !important;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-dropdown) !important;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
+}
+
+.app-dropdown:hover {
+  border-color: var(--card-button-border-hover, var(--card-button-border)) !important;
+  background: var(--color-dropdown-bg) !important;
+}
+
+.app-dropdown option {
+  background: var(--color-dropdown-bg);
+  color: var(--color-dropdown-text);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-dropdown);
+  font-weight: var(--font-weight-medium);
 }
 
 input[type="range"] {
@@ -1230,23 +1248,11 @@ input[type="range"] {
   width: 100%;
   height: var(--size-input-height);
   padding: 0 var(--size-input-padding-x);
-  background: var(--color-note-control-bg);
-  color: var(--color-input-text);
-  font-size: var(--font-size-notes-selector);
-  font-weight: var(--font-weight-medium);
   line-height: var(--line-height-control);
 }
 
-.note-select:hover,
 .note-title-input:hover {
   background: var(--color-note-control-bg-hover);
-}
-
-.note-select option {
-  background: var(--color-note-control-bg);
-  color: var(--color-input-text);
-  font-size: var(--font-size-notes-selector);
-  font-weight: var(--font-weight-medium);
 }
 
 .cm-editor {
@@ -1398,8 +1404,6 @@ input[type="range"] {
   width: auto !important;
   min-width: 0 !important;
   padding-inline: calc(var(--size-notes-toolbar-control) * 0.2) !important;
-  background: var(--color-note-control-bg) !important;
-  color: var(--color-input-text) !important;
 }
 
 .notes-editor-content:focus {

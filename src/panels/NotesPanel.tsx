@@ -95,7 +95,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           <label className="note-control-field" {...canvasEventBlockerProps}>
             <span>Choose a note</span>
             <select
-              className="note-select"
+              className="app-dropdown note-select"
               value={activeNote?.id ?? ''}
               onChange={(event) => void handleDocumentSelection(event.target.value)}
               aria-label="Choose a note"
@@ -232,6 +232,7 @@ function createNotesEditorPlugins(fontSize: string, onFontSizeChange: (value: st
         <label className="notes-font-size-control">
           <span className="sr-only">Editor font size</span>
           <select
+            className="app-dropdown"
             aria-label="Editor font size"
             value={fontSize}
             onChange={(event) => onFontSizeChange(event.target.value)}

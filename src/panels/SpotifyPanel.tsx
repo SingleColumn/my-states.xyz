@@ -177,7 +177,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                 void run(() => searchType === 'tracks' ? spotify.searchTracks(query) : spotify.searchPlaylists(query))
               }}
             >
-              <select aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
+              <select className="app-dropdown" aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
                 <option value="tracks">Song</option>
                 <option value="playlists">Playlist</option>
               </select>

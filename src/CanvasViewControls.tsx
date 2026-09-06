@@ -4,6 +4,7 @@ import type { PanelType } from './types'
 
 interface CanvasViewControlsProps {
   isReady: boolean
+  onAddPanel(panelType: PanelType): void
   canUseSelectedPanel: boolean
   onFitPanels(): void
   onFitSelectedPanel(): void
@@ -17,6 +18,7 @@ interface CanvasViewControlsProps {
 
 export function CanvasViewControls({
   isReady,
+  onAddPanel,
   canUseSelectedPanel,
   onFitPanels,
   onFitSelectedPanel,
@@ -28,6 +30,7 @@ export function CanvasViewControls({
   onRestorePanel,
 }: CanvasViewControlsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [panelTypeToAdd, setPanelTypeToAdd] = useState<PanelType | ''>('')
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
@@ -57,6 +60,12 @@ export function CanvasViewControls({
     action()
   }
 
+  function handleAddPanel(event: React.ChangeEvent<HTMLSelectElement>) {
+    const panelType = event.target.value as PanelType | ''
+    setPanelTypeToAdd('')
+    if (panelType) onAddPanel(panelType)
+  }
+
   return (
     <div
       ref={rootRef}
@@ -65,6 +74,19 @@ export function CanvasViewControls({
       onMouseDown={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
+      <select
+        className="app-dropdown app-chrome-control app-chrome-panel-add-control"
+        aria-label="Add panel"
+        title="Choose a panel type to add"
+        value={panelTypeToAdd}
+        disabled={!isReady}
+        onChange={handleAddPanel}
+      >
+        <option value="">Add panel</option>
+        <option value="spotify">Music</option>
+        <option value="slideshow">Images</option>
+        <option value="notes">Notes</option>
+      </select>
       <button
         className="app-chrome-control app-chrome-fit-control"
         type="button"
