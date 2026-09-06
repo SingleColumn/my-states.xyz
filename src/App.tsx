@@ -36,6 +36,10 @@ function AppContent() {
   const [chromeHeight, setChromeHeight] = useState(0)
   const [architectureReport, setArchitectureReport] = useState<PanelArchitectureReport | null>(null)
   const [isHelpAboutOpen, setIsHelpAboutOpen] = useState(false)
+  // previousPanelGeometryRef stays the source of truth for restoring geometry;
+  // this mirrors it purely so the root element re-renders when a panel enters
+  // or leaves full screen.
+  const [fullScreenPanelId, setFullScreenPanelId] = useState<string | null>(null)
   const helpAboutReturnFocusRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<Editor | null>(null)
   const chromeRectRef = useRef<AppChromeRect | null>(null)
@@ -257,9 +261,11 @@ function AppContent() {
       if (previous) {
         currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: previous.x, y: previous.y, rotation: previous.rotation ?? 0, props: { w: previous.w, h: previous.h, panelId } }] as never)
         previousPanelGeometryRef.current.delete(panelId)
+        setFullScreenPanelId(null)
         return
       }
       previousPanelGeometryRef.current.set(panelId, panelShapeToLayout(shape))
+      setFullScreenPanelId(panelId)
       const viewport = currentEditor.getViewportScreenBounds()
       const bounds = getFullScreenPanelLayout(
         { x: viewport.x, y: viewport.y, w: viewport.w, h: viewport.h },
@@ -298,6 +304,7 @@ function AppContent() {
       // had before being expanded becomes the size focus view gives back.
       preFocusPanelGeometryRef.current.set(panelId, previousPanelGeometryRef.current.get(panelId) ?? panelShapeToLayout(shape))
       previousPanelGeometryRef.current.delete(panelId)
+      setFullScreenPanelId(null)
       const layout = applyPanelFocusViewSize(panelShapeToLayout(shape), panel.type)
       currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
       currentEditor.bringToFront([shape.id])
@@ -311,6 +318,7 @@ function AppContent() {
     if (!editor || !shape || !isPanelShape(shape) || !panel) return
     previousPanelGeometryRef.current.delete(panelId)
     preFocusPanelGeometryRef.current.delete(panelId)
+    setFullScreenPanelId(null)
     // The default size is the whole panel, so it also leaves the focus view.
     if (isPanelInFocusView(panel)) sessions.updatePanel(panelId, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
     runProgrammaticCanvasMutation((currentEditor) => {
@@ -598,7 +606,11 @@ function AppContent() {
   }
 
   return (
-    <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
+    <main
+      className="app-root"
+      data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
+      style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
+    >
       <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView }}>
         <AppChromePropsProvider value={appChromeProps}>
           <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />

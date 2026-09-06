@@ -157,6 +157,17 @@
   --font-size-notes-heading-2: var(--type-xl);
   --font-size-notes-heading-3: var(--type-lg);
 
+  /* Writing mode (Notes at full screen). The measure is the load-bearing
+     value: ~66 characters at the 18px default, which is the range prose stays
+     comfortable to read and to write in. Tune this first when judging it. */
+  --writing-measure: 600px;
+  --font-size-writing-title: 30px;
+  --space-writing-title-top: 44px;
+  --space-writing-title-bottom: 20px;
+  --space-writing-bottom: 96px;
+  --size-writing-note-select-width: 150px;
+  --opacity-writing-toolbar: 0.55;
+
   /* "Inter Variable" is the family name the self-hosted @fontsource-variable
      package declares; plain "Inter" only matches a system install, so both are
      listed. Loaded in main.tsx — without that import this stack silently fell

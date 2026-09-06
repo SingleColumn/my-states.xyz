@@ -24,15 +24,22 @@ import {
   toolbarPlugin,
   UndoRedo,
 } from '@mdxeditor/editor'
-import { Download, FilePlus2, Trash2 } from 'lucide-react'
+import { Download, FilePlus2, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note } from '../types'
 import type { Panel } from '../types'
-import { PanelHeader } from '../PanelHeader'
+import { PanelHeader, usePanelCommands } from '../PanelHeader'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const { notes, sessions } = useAppState()
+  const commands = usePanelCommands()
+  // Full screen is treated as the writing state: the panel sheds its form
+  // chrome and becomes a page. The default panel size is deliberately left
+  // untouched so the two treatments can be compared side by side.
+  const isWritingMode = commands.isPanelFullScreen(panelId)
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
+  const [isToolbarVisible, setIsToolbarVisible] = useState(() => readToolbarVisible())
+  const showToolbar = !isWritingMode || isToolbarVisible
   const activeNoteId = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
@@ -45,9 +52,57 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     notes.selectNote(documentId, panelId)
   }
 
+  const noteSelect = (
+    <select
+      className="app-dropdown note-select"
+      value={activeNote?.id ?? ''}
+      onChange={(event) => void handleDocumentSelection(event.target.value)}
+      aria-label="Choose a note"
+      {...canvasEventBlockerProps}
+    >
+      <option value={newDocumentSelectValue}>
+        Create new note
+      </option>
+      {activeNote ? null : (
+        <option value="" disabled>
+          Select existing note
+        </option>
+      )}
+      {notes.notes.map((note) => (
+        <option key={note.id} value={note.id}>
+          {getDisplayNoteTitle(note)}
+        </option>
+      ))}
+    </select>
+  )
+
   return (
-    <section className="panel panel-notes-surface">
+    <section className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}`}>
       <PanelHeader panelId={panelId} panelType="notes" title="Notes">
+          {isWritingMode ? (
+            <>
+              <label className="writing-note-picker" {...canvasEventBlockerProps}>
+                <span className="sr-only">Choose a note</span>
+                {noteSelect}
+              </label>
+              <button
+                className={`card-icon-button${isToolbarVisible ? ' is-active' : ''}`}
+                type="button"
+                title={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
+                aria-label={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
+                aria-pressed={isToolbarVisible}
+                {...canvasEventBlockerProps}
+                onClick={(event) => {
+                  stopCanvasEvent(event)
+                  const next = !isToolbarVisible
+                  setIsToolbarVisible(next)
+                  window.localStorage.setItem(toolbarVisibleStorageKey, next ? 'true' : 'false')
+                }}
+              >
+                <Type size={18} />
+              </button>
+            </>
+          ) : null}
           <button
             className="card-icon-button"
             type="button"
@@ -90,59 +145,56 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </button>
       </PanelHeader>
 
-      <div className="panel-body notes-body">
-        <div className="notes-document-controls">
-          <label className="note-control-field" {...canvasEventBlockerProps}>
-            <span>Choose a note</span>
-            <select
-              className="app-dropdown note-select"
-              value={activeNote?.id ?? ''}
-              onChange={(event) => void handleDocumentSelection(event.target.value)}
-              aria-label="Choose a note"
-              {...canvasEventBlockerProps}
-            >
-              <option value={newDocumentSelectValue}>
-                Create new note
-              </option>
-              {activeNote ? null : (
-                <option value="" disabled>
-                  Select existing note
-                </option>
-              )}
-              {notes.notes.map((note) => (
-                <option key={note.id} value={note.id}>
-                  {getDisplayNoteTitle(note)}
-                </option>
-              ))}
-            </select>
-          </label>
+      <div className={`panel-body notes-body${isWritingMode ? ' notes-body-writing' : ''}`}>
+        {isWritingMode ? null : (
+          <div className="notes-document-controls">
+            <label className="note-control-field" {...canvasEventBlockerProps}>
+              <span>Choose a note</span>
+              {noteSelect}
+            </label>
 
-          <label className="note-control-field" {...canvasEventBlockerProps}>
-            <span>Note title</span>
-            <input
-              className="note-title-input panel-interactive"
-              value={activeNote?.title ?? ''}
-              onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
-              disabled={!activeNote}
-              aria-label="Note title"
-              placeholder="Name this note"
-              {...canvasEventBlockerProps}
-            />
-          </label>
-        </div>
+            <label className="note-control-field" {...canvasEventBlockerProps}>
+              <span>Note title</span>
+              <input
+                className="note-title-input panel-interactive"
+                value={activeNote?.title ?? ''}
+                onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
+                disabled={!activeNote}
+                aria-label="Note title"
+                placeholder="Name this note"
+                {...canvasEventBlockerProps}
+              />
+            </label>
+          </div>
+        )}
 
         {activeNote ? (
           <div
-            className="notes-editor-blocker card-content"
+            className={[
+              'notes-editor-blocker',
+              'card-content',
+              isWritingMode ? 'is-writing' : '',
+              showToolbar ? '' : 'is-toolbar-hidden',
+            ].filter(Boolean).join(' ')}
             style={{ '--notes-editor-font-size': fontSize } as CSSProperties}
             {...canvasEventBlockerProps}
           >
+            {isWritingMode ? (
+              <input
+                className="writing-title panel-interactive"
+                value={activeNote.title}
+                onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
+                aria-label="Note title"
+                placeholder="Untitled"
+                {...canvasEventBlockerProps}
+              />
+            ) : null}
             <MDXEditor
               key={activeNote.id}
               className="notes-rich-editor dark-theme"
               contentEditableClassName="notes-editor-content"
               markdown={activeNote.content}
-              placeholder="Start writing..."
+              placeholder={isWritingMode ? writingPlaceholder : 'Start writing...'}
               onChange={(content) => notes.setActiveNoteContent(content, panelId)}
               plugins={createNotesEditorPlugins(fontSize, (value) => {
                 setFontSize(value)
@@ -171,7 +223,11 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
       <footer className="card-footer panel-interactive">
         <span className="card-footer-meta">
-          {activeNote ? `${activeNote.content.length} characters` : 'No note selected'}
+          {activeNote
+            ? isWritingMode
+              ? formatWordCount(countWords(activeNote.content))
+              : `${activeNote.content.length} characters`
+            : 'No note selected'}
         </span>
         <div className="card-footer-status">
           <span>{notes.notes.length} notes</span>
@@ -183,11 +239,32 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
 const newDocumentSelectValue = '__new_document__'
 const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
+const toolbarVisibleStorageKey = 'mic:notes-toolbar-visible'
 const editorFontSizes = new Set(['14px', '16px', '18px', '20px'])
+
+// The empty page has to carry the discoverability that the hidden toolbar
+// gives up, so it names the two routes to formatting that exist today.
+const writingPlaceholder = 'Start writing. Type # for a heading or - for a list, or open Aa above for all formatting.'
 
 function readEditorFontSize() {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)
-  return stored && editorFontSizes.has(stored) ? stored : '16px'
+  return stored && editorFontSizes.has(stored) ? stored : '18px'
+}
+
+function readToolbarVisible() {
+  return window.localStorage.getItem(toolbarVisibleStorageKey) === 'true'
+}
+
+// Counts the markdown source, so syntax like "##" or "*" inflates the total
+// slightly. Close enough to be useful while writing, and far more meaningful
+// to a writer than a character count.
+function countWords(markdown: string) {
+  const words = markdown.trim().match(/\S+/g)
+  return words ? words.length : 0
+}
+
+function formatWordCount(count: number) {
+  return `${count} ${count === 1 ? 'word' : 'words'}`
 }
 
 const canvasEventBlockerProps = {
@@ -221,6 +298,9 @@ function createNotesEditorPlugins(fontSize: string, onFontSizeChange: (value: st
   codeBlockPlugin({ defaultCodeBlockLanguage: 'text' }),
   markdownShortcutPlugin(),
   diffSourcePlugin(),
+  // The toolbar plugin stays mounted in every mode and the bar is hidden with
+  // CSS instead. Dropping the plugin would remount the editor on each toggle,
+  // losing the caret position and the undo history mid-sentence.
   toolbarPlugin({
     toolbarClassName: 'notes-editor-toolbar',
     toolbarContents: () => (

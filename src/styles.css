@@ -1714,6 +1714,106 @@ input[type="range"] {
   place-self: center;
 }
 
+/*
+ * Writing mode - the Notes panel at full screen.
+ *
+ * The panel sheds its form chrome and becomes a page: prose is held to a
+ * readable measure, the formatting bar is hidden until the Aa button asks for
+ * it, and the editor's own box is removed so the writing surface *is* the
+ * panel rather than a field sitting inside one. The default panel size is
+ * left untouched, so the two treatments can be compared side by side.
+ */
+.panel-body.notes-body-writing {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.notes-editor-blocker.is-writing {
+  flex-direction: column;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.writing-title {
+  width: 100%;
+  max-width: var(--writing-measure);
+  margin: var(--space-writing-title-top) auto var(--space-writing-title-bottom);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-note-title);
+  font-family: inherit;
+  font-size: var(--font-size-writing-title);
+  font-weight: var(--font-weight-note-title);
+  line-height: var(--line-height-panel-title);
+}
+
+.writing-title:focus {
+  outline: none;
+}
+
+.writing-title::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Reserving the scrollbar on both edges keeps the centred text column on the
+   same axis as the title above it once the note grows past one screen. */
+.notes-editor-blocker.is-writing .mdxeditor-root-contenteditable {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* The contenteditable stays full width so clicking anywhere still places the
+   caret; only the blocks inside it are held to the measure. */
+.notes-editor-blocker.is-writing .notes-editor-content > * {
+  max-width: var(--writing-measure);
+  margin-inline: auto;
+}
+
+.notes-editor-blocker.is-writing .notes-editor-content {
+  padding-block: 0 var(--space-writing-bottom);
+}
+
+.notes-editor-blocker.is-writing .notes-editor-toolbar {
+  border-bottom: none;
+  opacity: var(--opacity-writing-toolbar);
+  transition: opacity var(--transition-fast);
+}
+
+.notes-editor-blocker.is-writing .notes-editor-toolbar:hover,
+.notes-editor-blocker.is-writing .notes-editor-toolbar:focus-within {
+  opacity: 1;
+}
+
+/* The base toolbar rule sets `display: flex !important`, so hiding it has to
+   match that weight. The plugin stays mounted either way - see NotesPanel. */
+.notes-editor-blocker.is-toolbar-hidden .notes-editor-toolbar {
+  display: none !important;
+}
+
+.writing-note-picker {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.writing-note-picker .note-select {
+  width: var(--size-writing-note-select-width);
+  height: var(--card-header-button-size);
+  padding-block: 0;
+}
+
+/* A full-screen panel is a place to work inside, not a shape to manipulate.
+   The selection outline and resize handles would otherwise frame the page.
+   tldraw's watermark is deliberately left alone - it is a licence term, not
+   decoration. */
+.app-root[data-panel-full-screen='true'] .tl-selection__fg,
+.app-root[data-panel-full-screen='true'] .tl-shape-indicator,
+.app-root[data-panel-full-screen='true'] .tl-handle {
+  display: none;
+}
+
 @container panel-shell (max-width: 520px) {
   .panel-spotify-surface .panel-body {
     overflow: auto;
