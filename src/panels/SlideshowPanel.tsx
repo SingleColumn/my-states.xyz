@@ -5,6 +5,7 @@ import { getBundledCollections } from '../imageCollections'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 import { SampleCollectionCard, useSampleCollectionPreviews } from './SampleCollectionCard'
+import { PanelHeader } from '../PanelHeader'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 5000
@@ -48,9 +49,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
 
   return (
     <section className="panel panel-slideshow-surface">
-      <header className="card-header">
-        <div><h2 className="card-title">Images</h2></div>
-        <div className="card-header-actions">
+      <PanelHeader panelId={panelId} panelType="slideshow" title="Images">
           <button
             className={`card-icon-button ${isImagePickerOpen ? 'is-active' : ''}`}
             type="button"
@@ -77,8 +76,6 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           <button className="card-icon-button" type="button" title="Clear images" aria-label="Clear images" onPointerDown={stopCanvasEvent} onClick={() => void slideshow.resetFolder(panelId)}>
             <Trash2 size={18} />
           </button>
-        </div>
-
         {isImagePickerOpen ? (
           <section className="slideshow-image-picker panel-interactive" id="loaded-images-picker" aria-label="Loaded images" onPointerDown={stopCanvasEvent} onClick={stopCanvasEvent}>
             <div className="slideshow-image-picker-heading"><span>Loaded images</span><span>{panelImages.length ? `${panelImages.length} total` : 'None yet'}</span></div>
@@ -112,7 +109,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         ) : null}
 
         <input ref={folderInputRef} className="visually-hidden-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.svg,image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,image/svg+xml" multiple webkitdirectory="" directory="" onChange={(event) => { const files = event.target.files; if (files?.length) void slideshow.importFiles(files, panelId); event.currentTarget.value = '' }} />
-      </header>
+      </PanelHeader>
 
       <div className="slideshow-stage card-content" style={{ aspectRatio: stageAspectRatio }}>
         {currentImage ? (

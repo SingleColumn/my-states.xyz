@@ -5,7 +5,9 @@ import { AppChrome, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { PANEL_SHAPE_TYPE, PanelShape, PanelShapeUtil } from './PanelShape'
-import { getCanonicalPanelLayout, getRenderablePanelLayouts, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, resetPanelLayoutSize, showAllPanels } from './panelLayout'
+import { getCanonicalPanelLayout, getRenderablePanelLayouts, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, showAllPanels } from './panelLayout'
+import { getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
+import { PanelCommandsProvider } from './PanelHeader'
 import { debounce } from './utils'
 import { duplicatePanel } from './panelDuplication'
 import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
@@ -42,6 +44,7 @@ function AppContent() {
   const updateCanvasRef = useRef(sessions.updateCanvas)
   const sessionPanelsRef = useRef<Panel[]>(sessions.activeSession?.panels ?? [])
   const sessionCanvasRef = useRef<CanvasState | null>(sessions.activeSession?.canvas ?? null)
+  const previousPanelGeometryRef = useRef(new Map<string, PanelLayout>())
 
   useEffect(() => {
     updateCanvasRef.current = sessions.updateCanvas
@@ -226,26 +229,67 @@ function AppContent() {
     }
   }, [])
 
-  const hideSelectedPanel = useCallback(() => {
+  const hidePanel = useCallback((panelId: string) => {
     const editor = editorRef.current
-    const selected = editor?.getSelectedShapes() ?? []
-    if (selected.length !== 1 || !isPanelShape(selected[0])) return
-    const panelId = selected[0].props.panelId
+    const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
+    if (!editor || !shape || !isPanelShape(shape)) return
     sessionCanvasRef.current = {
-      camera: editor!.getCamera(),
+      camera: editor.getCamera(),
       panels: [
         ...(sessionCanvasRef.current?.panels ?? []).filter((layout) => layout.panelId !== panelId),
-        panelShapeToLayout(selected[0]),
+        panelShapeToLayout(shape),
       ],
     }
     sessionPanelsRef.current = sessionPanelsRef.current.map((panel) => panel.id === panelId ? { ...panel, visible: false } : panel)
     sessions.setPanelVisibility(panelId, false)
     runProgrammaticCanvasMutation((editor) => {
-      editor.deleteShapes([selected[0].id])
+      editor.deleteShapes([shape.id])
       editor.selectNone()
       setSelectedPanelId(null)
     })
   }, [runProgrammaticCanvasMutation, sessions])
+
+  const hideSelectedPanel = useCallback(() => {
+    const selected = editorRef.current?.getSelectedShapes() ?? []
+    if (selected.length === 1 && isPanelShape(selected[0])) hidePanel(selected[0].props.panelId)
+  }, [hidePanel])
+
+  const togglePanelFullScreen = useCallback((panelId: string) => {
+    const editor = editorRef.current
+    const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
+    if (!editor || !shape || !isPanelShape(shape)) return
+    const previous = previousPanelGeometryRef.current.get(panelId)
+    runProgrammaticCanvasMutation((currentEditor) => {
+      if (previous) {
+        currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: previous.x, y: previous.y, rotation: previous.rotation ?? 0, props: { w: previous.w, h: previous.h, panelId } }] as never)
+        previousPanelGeometryRef.current.delete(panelId)
+        return
+      }
+      previousPanelGeometryRef.current.set(panelId, panelShapeToLayout(shape))
+      const viewport = currentEditor.getViewportScreenBounds()
+      const bounds = getFullScreenPanelLayout(
+        { x: viewport.x, y: viewport.y, w: viewport.w, h: viewport.h },
+        chromeRectRef.current?.bottom,
+        (point) => currentEditor.screenToPage(point),
+      )
+      currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: bounds.x, y: bounds.y, props: { w: bounds.w, h: bounds.h, panelId } }] as never)
+      // A full-screen panel may overlap existing panels. Keep it above them
+      // so the action is immediately useful without a second arrange command.
+      currentEditor.bringToFront([shape.id])
+    })
+  }, [runProgrammaticCanvasMutation])
+
+  const restorePanelDefaultSizeForId = useCallback((panelId: string) => {
+    const editor = editorRef.current
+    const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
+    const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+    if (!editor || !shape || !isPanelShape(shape) || !panel) return
+    previousPanelGeometryRef.current.delete(panelId)
+    runProgrammaticCanvasMutation((currentEditor) => {
+      const layout = restorePanelDefaultLayout(panelShapeToLayout(shape), panel.type)
+      currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
+    })
+  }, [runProgrammaticCanvasMutation, sessions.activeSession?.panels])
 
   const hideSelectedPanelRef = useRef(hideSelectedPanel)
 
@@ -305,7 +349,7 @@ function AppContent() {
       if (!shape || !isPanelShape(shape)) return
       const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === shape.props.panelId)
       if (!panel) return
-      const reset = resetPanelLayoutSize(panelShapeToLayout(shape), panel.type)
+      const reset = restorePanelDefaultSize(panelShapeToLayout(shape), panel.type)
       editor.updateShapes([{
         id: shape.id,
         type: PANEL_SHAPE_TYPE,
@@ -475,7 +519,9 @@ function AppContent() {
 
   return (
     <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
-      <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />
+      <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId) }}>
+        <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />
+      </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
       {sessions.error ? <div className="callback-toast">{sessions.error}</div> : null}

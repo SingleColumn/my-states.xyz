@@ -28,6 +28,7 @@ import { Download, FilePlus2, Trash2 } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note } from '../types'
 import type { Panel } from '../types'
+import { PanelHeader } from '../PanelHeader'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const { notes, sessions } = useAppState()
@@ -46,9 +47,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
   return (
     <section className="panel panel-notes-surface">
-      <header className="card-header">
-        <h2 className="card-title">Notes</h2>
-        <div className="card-header-actions">
+      <PanelHeader panelId={panelId} panelType="notes" title="Notes">
           <button
             className="card-icon-button"
             type="button"
@@ -89,8 +88,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           >
             <Trash2 size={18} />
           </button>
-        </div>
-      </header>
+      </PanelHeader>
 
       <div className="panel-body notes-body">
         <div className="notes-document-controls">
@@ -285,6 +283,13 @@ function stopCanvasEvent(event: SyntheticEvent) {
   if (event.target instanceof Element && event.target.closest('[role="combobox"], [role="option"], [data-radix-select-viewport]')) {
     return
   }
+
+  // The notes editor needs the browser's native drag-to-select behavior. The
+  // killed flag prevents most tldraw handling, while stopping propagation
+  // keeps the canvas pointer handlers from starting a panel drag during a
+  // selection gesture.
+  event.stopPropagation()
+  event.nativeEvent.stopPropagation()
 
 }
 

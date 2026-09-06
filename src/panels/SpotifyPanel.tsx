@@ -15,6 +15,7 @@ import { useAppState } from '../AppState'
 import { defaultSpotifyPlaylistReference } from '../storage'
 import { formatDuration } from '../utils'
 import type { Panel } from '../types'
+import { PanelHeader } from '../PanelHeader'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
   const { spotify, sessions } = useAppState()
@@ -53,12 +54,8 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
 
   return (
     <section className="panel panel-spotify-surface">
-      <header className="card-header">
-        <div>
-          <h2 className="card-title">Music</h2>
-        </div>
-        <div className="card-header-actions">
-          {spotify.tokens ? (
+      <PanelHeader panelId={panelId} panelType="spotify" title="Music">
+        {spotify.tokens ? (
             <button
               className="card-icon-button"
               type="button"
@@ -72,9 +69,8 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             >
               <LogOut size={18} />
             </button>
-          ) : null}
-        </div>
-      </header>
+        ) : null}
+      </PanelHeader>
 
       <div className="panel-body panel-interactive" {...canvasEventBlockerProps}>
         {!spotify.tokens ? (

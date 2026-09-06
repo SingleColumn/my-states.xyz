@@ -515,6 +515,8 @@ button {
   gap: var(--space-control-inner-gap);
 }
 
+.card-header > .card-title { min-width: 0; }
+
 .card-icon-button {
   display: inline-flex;
   flex-shrink: 0;
