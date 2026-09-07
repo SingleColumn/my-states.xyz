@@ -29,6 +29,8 @@ When you interact with a panel's buttons, fields, sliders, editor, or other cont
 
 Select **Log in** to connect to Spotify. After logging in, search for songs or playlists, or paste a Spotify playlist URL or URI and load it. Search results can be selected for playback. When a track is playing, use the previous, play/pause, next, seek, and volume controls. Spotify playback requires an eligible Spotify Premium account and a working Spotify Developer app configuration. Select **Log out** to disconnect.
 
+The panel shows the playlist that is loaded, with its cover. To keep only the playlist, the current track, and the playback controls while you work elsewhere, select **Reduce panel to focus view** at the top of the panel; the panel becomes smaller and stays that way until you select **Expand panel to full view**.
+
 ### Images
 
 Select **Choose a local folder** to load supported images from a folder. If folder access is unavailable, the browser uses its directory file picker. You can also select **Load a sample collection** and choose one of the bundled collections. **Loaded images** opens a list where you can select an image to show; **Clear images** removes the loaded images from the panel.

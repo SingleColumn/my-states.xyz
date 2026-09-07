@@ -885,6 +885,32 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     })
   }, [patchSession])
 
+  // A playlist saved before the panel showed artwork - or restored from an
+  // exported session - has a name but no image. Look the artwork up once so the
+  // panel can still show which playlist is loaded.
+  const savedPlaylist = (session?.panels.find((panel) => panel.type === 'spotify') as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
+  const playlistMissingArtwork = savedPlaylist?.id && !savedPlaylist.image ? savedPlaylist.id : null
+  const artworkLookupsRef = useRef(new Set<string>())
+
+  useEffect(() => {
+    if (!playlistMissingArtwork || !tokens || artworkLookupsRef.current.has(playlistMissingArtwork)) return
+    artworkLookupsRef.current.add(playlistMissingArtwork)
+    let cancelled = false
+    void (async () => {
+      try {
+        const fresh = await ensureFreshTokens()
+        const summary = mapPlaylist(await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${playlistMissingArtwork}`, fresh.accessToken))
+        if (cancelled || !summary.image) return
+        setSessionPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image })
+      } catch {
+        // Artwork is decoration: a failed lookup must not interrupt playback.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [ensureFreshTokens, playlistMissingArtwork, setSessionPlaylist, tokens])
+
   const login = useCallback(async () => startSpotifyLogin(), [])
   const clearSearchResults = useCallback(() => {
     setPlaylists([])
@@ -946,7 +972,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
     const fresh = await ensureFreshTokens()
     const item = await requestSpotify(() => spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${id}`, fresh.accessToken))
     const summary = mapPlaylist(item)
-    const selected = { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url }
+    const selected = { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
@@ -958,7 +984,7 @@ function useSpotifyState(session: Session | null, patchSession: (patch: (current
 
   const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary, panelId?: string) => {
     const panelPlaylist = (session?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
-    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url } : panelPlaylist ?? defaultSpotifyPlaylistReference
+    const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image } : panelPlaylist ?? defaultSpotifyPlaylistReference
     if (!selected.uri) throw new Error('Choose a playlist first.')
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()

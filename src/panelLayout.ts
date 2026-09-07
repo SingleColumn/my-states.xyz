@@ -14,6 +14,14 @@ export const PANEL_MINIMUM_SIZES: Readonly<Record<PanelType, { w: number; h: num
   notes: { w: 320, h: 260 },
 }
 
+/**
+ * Focus view is offered by the Music panel only: it drops the playlist URL,
+ * search, and results and keeps playback, so it needs far less room.
+ */
+export const PANEL_FOCUS_VIEW_SIZES: Partial<Record<PanelType, { w: number; h: number }>> = {
+  spotify: { w: 380, h: 460 },
+}
+
 export function getCanonicalPanelLayout(panelType: PanelType): Omit<PanelLayout, 'panelId'> & { panelType: PanelType } {
   const layout = CANONICAL_PANEL_LAYOUTS.find((candidate) => candidate.panelType === panelType)
   if (!layout) throw new Error(`No canonical layout exists for ${panelType}.`)
@@ -22,6 +30,17 @@ export function getCanonicalPanelLayout(panelType: PanelType): Omit<PanelLayout,
 
 export function getPanelMinimumSize(panelType: PanelType) {
   return PANEL_MINIMUM_SIZES[panelType]
+}
+
+export function getPanelFocusViewSize(panelType: PanelType) {
+  const focusView = PANEL_FOCUS_VIEW_SIZES[panelType]
+  if (focusView) return focusView
+  const { w, h } = getCanonicalPanelLayout(panelType)
+  return { w, h }
+}
+
+export function isPanelInFocusView(panel: Pick<Panel, 'focusView'>) {
+  return panel.focusView === true
 }
 
 export function isPanelVisible(panel: Pick<Panel, 'visible'>) {

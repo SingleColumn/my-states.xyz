@@ -24,6 +24,8 @@ export interface PanelBase {
   type: PanelType
   /** Absent means visible for sessions written before panel visibility existed. */
   visible?: boolean
+  /** Absent means the full panel. True keeps the Music panel's playback controls only. */
+  focusView?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -101,6 +103,8 @@ export interface SpotifyPlaylistReference {
   uri: string | null
   name: string | null
   url: string | null
+  /** Optional: sessions saved before the panel showed playlist artwork have none. */
+  image?: string | null
 }
 
 export interface Session {

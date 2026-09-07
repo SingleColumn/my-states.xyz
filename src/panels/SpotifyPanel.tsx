@@ -1,5 +1,7 @@
 import { type SyntheticEvent, useEffect, useState } from 'react'
 import {
+  ChevronsDownUp,
+  ChevronsUpDown,
   ExternalLink,
   LogIn,
   LogOut,
@@ -15,11 +17,16 @@ import { useAppState } from '../AppState'
 import { defaultSpotifyPlaylistReference } from '../storage'
 import { formatDuration } from '../utils'
 import type { Panel } from '../types'
-import { PanelHeader } from '../PanelHeader'
+import { PanelHeader, stopPanelHeaderEvent, usePanelCommands } from '../PanelHeader'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
   const { spotify, sessions } = useAppState()
-  const panelPlaylist = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist ?? defaultSpotifyPlaylistReference
+  const commands = usePanelCommands()
+  const panel = sessions.activeSession?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined
+  const panelPlaylist = panel?.config.playlist ?? defaultSpotifyPlaylistReference
+  // Focus view keeps what someone glances at while they write or look at
+  // images: the playlist, the track, and the playback controls.
+  const focusView = panel?.focusView === true
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'tracks' | 'playlists'>('tracks')
   const [playlistUrl, setPlaylistUrl] = useState(panelPlaylist.url ?? '')
@@ -53,9 +60,12 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   }
 
   return (
-    <section className="panel panel-spotify-surface">
-      <PanelHeader panelId={panelId} panelType="spotify" title="Music">
-        {spotify.tokens ? (
+    <section className={focusView ? 'panel panel-spotify-surface is-focus-view' : 'panel panel-spotify-surface'}>
+      <PanelHeader
+        panelId={panelId}
+        panelType="spotify"
+        title="Music"
+        trailing={spotify.tokens ? (
             <button
               className="card-icon-button"
               type="button"
@@ -70,6 +80,22 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               <LogOut size={18} />
             </button>
         ) : null}
+      >
+        <button
+          className="card-icon-button"
+          type="button"
+          title={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
+          aria-label={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
+          aria-pressed={focusView}
+          onPointerDown={stopPanelHeaderEvent}
+          onMouseDown={stopPanelHeaderEvent}
+          onClick={(event) => {
+            stopPanelHeaderEvent(event)
+            commands.togglePanelFocusView(panelId)
+          }}
+        >
+          {focusView ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}
+        </button>
       </PanelHeader>
 
       <div className="panel-body panel-interactive" {...canvasEventBlockerProps}>
@@ -87,6 +113,16 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           </div>
         ) : (
           <>
+            {panelPlaylist.name ? (
+              <div className="loaded-playlist">
+                {panelPlaylist.image ? <img src={panelPlaylist.image} alt="" /> : <div className="loaded-playlist-art-empty" />}
+                <span>
+                  <small>Playlist</small>
+                  <strong>{panelPlaylist.name}</strong>
+                </span>
+              </div>
+            ) : null}
+
             <div className="card-content album-frame">
               {spotify.track?.albumArt ? (
                 <img src={spotify.track.albumArt} alt="" />
@@ -157,72 +193,76 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               </label>
             </div>
 
-            <form
-              className="input-row"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void run(() => spotify.loadPlaylistFromUrl(playlistUrl, panelId))
-              }}
-            >
-              <input aria-label="Spotify playlist URL" value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Spotify playlist URL" />
-              <button className="card-icon-button" type="submit" title="Load Spotify playlist URL" aria-label="Load Spotify playlist URL" disabled={busy}>
-                <ExternalLink size={18} aria-hidden="true" />
-              </button>
-            </form>
-
-            <form
-              className="input-row spotify-search-row"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void run(() => searchType === 'tracks' ? spotify.searchTracks(query) : spotify.searchPlaylists(query))
-              }}
-            >
-              <select className="app-dropdown" aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
-                <option value="tracks">Song</option>
-                <option value="playlists">Playlist</option>
-              </select>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchType === 'tracks' ? 'Search songs' : 'Search playlists'} />
-              <button className="card-icon-button" type="submit" title={`Search ${searchType}`} disabled={busy}>
-                <Search size={18} />
-              </button>
-            </form>
-
-            <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields}>
-              <RotateCcw size={18} />
-              Reset fields
-            </button>
-
-            {searchType === 'tracks' ? (
-              <div className="playlist-list" aria-label="Track search results">
-                {spotify.tracks.map((track) => (
-                  <button className="playlist-option" type="button" key={track.id} onClick={() => void run(() => spotify.playTrack(track, panelId))}>
-                    {track.image ? <img src={track.image} alt="" /> : <div />}
-                    <span>
-                      <strong>{track.name}</strong>
-                      <small>{track.artists} - {track.album}</small>
-                    </span>
+            {focusView ? null : (
+              <>
+                <form
+                  className="input-row"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void run(() => spotify.loadPlaylistFromUrl(playlistUrl, panelId))
+                  }}
+                >
+                  <input aria-label="Spotify playlist URL" value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Spotify playlist URL" />
+                  <button className="card-icon-button" type="submit" title="Load Spotify playlist URL" aria-label="Load Spotify playlist URL" disabled={busy}>
+                    <ExternalLink size={18} aria-hidden="true" />
                   </button>
-                ))}
-              </div>
-            ) : (
-              <div className="playlist-list" aria-label="Playlist search results">
-                {spotify.playlists.map((playlist) => (
-                  <button
-                    className="playlist-option"
-                    type="button"
-                    key={playlist.id}
-                    onClick={() => void run(() => spotify.playPlaylist(playlist, panelId))}
-                  >
-                    {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
-                    <span>
-                      <strong>{playlist.name}</strong>
-                      <small>
-                        {playlist.owner} - {playlist.trackCount} tracks
-                      </small>
-                    </span>
+                </form>
+
+                <form
+                  className="input-row spotify-search-row"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void run(() => searchType === 'tracks' ? spotify.searchTracks(query) : spotify.searchPlaylists(query))
+                  }}
+                >
+                  <select className="app-dropdown" aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
+                    <option value="tracks">Song</option>
+                    <option value="playlists">Playlist</option>
+                  </select>
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchType === 'tracks' ? 'Search songs' : 'Search playlists'} />
+                  <button className="card-icon-button" type="submit" title={`Search ${searchType}`} disabled={busy}>
+                    <Search size={18} />
                   </button>
-                ))}
-              </div>
+                </form>
+
+                <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields}>
+                  <RotateCcw size={18} />
+                  Reset fields
+                </button>
+
+                {searchType === 'tracks' ? (
+                  <div className="playlist-list" aria-label="Track search results">
+                    {spotify.tracks.map((track) => (
+                      <button className="playlist-option" type="button" key={track.id} onClick={() => void run(() => spotify.playTrack(track, panelId))}>
+                        {track.image ? <img src={track.image} alt="" /> : <div />}
+                        <span>
+                          <strong>{track.name}</strong>
+                          <small>{track.artists} - {track.album}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="playlist-list" aria-label="Playlist search results">
+                    {spotify.playlists.map((playlist) => (
+                      <button
+                        className="playlist-option"
+                        type="button"
+                        key={playlist.id}
+                        onClick={() => void run(() => spotify.playPlaylist(playlist, panelId))}
+                      >
+                        {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
+                        <span>
+                          <strong>{playlist.name}</strong>
+                          <small>
+                            {playlist.owner} - {playlist.trackCount} tracks
+                          </small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

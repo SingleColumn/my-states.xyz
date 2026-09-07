@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getFullScreenPanelLayout, getDefaultPanelSize, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
+import { applyPanelFocusViewSize, getFullScreenPanelLayout, getDefaultPanelSize, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
+import { isPanelInFocusView } from './panelLayout'
 
 describe('panel geometry commands', () => {
   it('derives full-screen geometry from the current screen viewport and converts to page space', () => {
@@ -23,6 +24,19 @@ describe('panel geometry commands', () => {
     const layout = { panelId: 'panel-a', x: 123, y: 456, w: 900, h: 700 }
     expect(restorePanelDefaultLayout(layout, 'notes')).toEqual({ panelId: 'panel-a', x: 280, y: -300, w: 460, h: 720 })
     expect(restorePanelDefaultLayout(layout, 'spotify')).toEqual({ panelId: 'panel-a', x: -720, y: -300, w: 460, h: 720 })
+  })
+
+  it('shrinks a panel to its focus view size where one exists, leaving it in place', () => {
+    const layout = { panelId: 'panel-a', x: 123, y: 456, w: 900, h: 700 }
+    expect(applyPanelFocusViewSize(layout, 'spotify')).toEqual({ ...layout, w: 380, h: 460 })
+    // Only the Music panel offers a focus view; the others keep their own size.
+    expect(applyPanelFocusViewSize(layout, 'notes')).toEqual({ ...layout, w: 460, h: 720 })
+  })
+
+  it('treats a panel saved before focus view existed as showing its whole contents', () => {
+    expect(isPanelInFocusView({})).toBe(false)
+    expect(isPanelInFocusView({ focusView: false })).toBe(false)
+    expect(isPanelInFocusView({ focusView: true })).toBe(true)
   })
 
   it('keeps previous geometry independent for duplicated panel IDs', () => {

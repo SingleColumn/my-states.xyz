@@ -736,6 +736,66 @@ input[type="range"] {
   line-height: var(--line-height-body);
 }
 
+/* The playlist that is loaded, with its cover, so it stays visible after the
+   search results are cleared and in the focus view. */
+.loaded-playlist {
+  display: grid;
+  grid-template-columns: var(--size-loaded-playlist-art) minmax(0, 1fr);
+  gap: var(--space-playlist-image-gap);
+  align-items: center;
+  min-width: 0;
+  margin-bottom: var(--space-now-playing-bottom);
+}
+
+.loaded-playlist img,
+.loaded-playlist-art-empty {
+  width: var(--size-loaded-playlist-art);
+  height: var(--size-loaded-playlist-art);
+  border-radius: var(--radius-playlist-art);
+  background: var(--color-control);
+  object-fit: cover;
+}
+
+.loaded-playlist span {
+  min-width: 0;
+}
+
+.loaded-playlist small,
+.loaded-playlist strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loaded-playlist small {
+  color: var(--card-eyebrow-color);
+  font-size: var(--card-eyebrow-size);
+  font-weight: var(--card-eyebrow-weight);
+  letter-spacing: var(--card-eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.loaded-playlist strong {
+  font-size: var(--font-size-playlist-title);
+  font-weight: var(--font-weight-semibold);
+}
+
+/*
+ * Focus view — the Music panel shrunk to what someone glances at while they
+ * write or look at images. The playlist URL, the search, and the results are
+ * not rendered, so this only has to keep what remains centred and give the
+ * album art more of the smaller panel than the full layout would.
+ */
+.panel-spotify-surface.is-focus-view .panel-body {
+  justify-content: center;
+  overflow: auto;
+}
+
+.panel-spotify-surface.is-focus-view {
+  --size-album-frame-max: clamp(96px, min(34cqi, 26cqb), 900px);
+}
+
 .album-frame {
   width: 100%;
   max-width: var(--size-album-frame-max);

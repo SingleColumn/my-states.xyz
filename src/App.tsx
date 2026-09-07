@@ -5,8 +5,8 @@ import { AppChrome, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { PANEL_SHAPE_TYPE, PanelShape, PanelShapeUtil } from './PanelShape'
-import { getCanonicalPanelLayout, getRenderablePanelLayouts, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, showAllPanels } from './panelLayout'
-import { getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
+import { getCanonicalPanelLayout, getRenderablePanelLayouts, isPanelInFocusView, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, showAllPanels } from './panelLayout'
+import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { PanelCommandsProvider } from './PanelHeader'
 import { debounce } from './utils'
 import { createPanel } from './storage'
@@ -46,6 +46,7 @@ function AppContent() {
   const sessionPanelsRef = useRef<Panel[]>(sessions.activeSession?.panels ?? [])
   const sessionCanvasRef = useRef<CanvasState | null>(sessions.activeSession?.canvas ?? null)
   const previousPanelGeometryRef = useRef(new Map<string, PanelLayout>())
+  const preFocusPanelGeometryRef = useRef(new Map<string, PanelLayout>())
 
   useEffect(() => {
     updateCanvasRef.current = sessions.updateCanvas
@@ -272,17 +273,47 @@ function AppContent() {
     })
   }, [runProgrammaticCanvasMutation])
 
+  const togglePanelFocusView = useCallback((panelId: string) => {
+    const editor = editorRef.current
+    const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
+    const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+    if (!editor || !shape || !isPanelShape(shape) || !panel) return
+    const focused = isPanelInFocusView(panel)
+    const beforeFocus = preFocusPanelGeometryRef.current.get(panelId)
+    // The focus view is part of the panel, not of this canvas session, so it is
+    // saved with the panel and survives a reload alongside its smaller geometry.
+    sessions.updatePanel(panelId, (current) => ({ ...current, focusView: !focused, updatedAt: Date.now() }))
+    runProgrammaticCanvasMutation((currentEditor) => {
+      if (focused) {
+        const restored = beforeFocus ?? restorePanelDefaultSize(panelShapeToLayout(shape), panel.type)
+        preFocusPanelGeometryRef.current.delete(panelId)
+        currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: restored.x, y: restored.y, props: { w: restored.w, h: restored.h, panelId } }] as never)
+        return
+      }
+      // A panel shrunk from full screen is no longer full screen, so the size it
+      // had before being expanded becomes the size focus view gives back.
+      preFocusPanelGeometryRef.current.set(panelId, previousPanelGeometryRef.current.get(panelId) ?? panelShapeToLayout(shape))
+      previousPanelGeometryRef.current.delete(panelId)
+      const layout = applyPanelFocusViewSize(panelShapeToLayout(shape), panel.type)
+      currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
+      currentEditor.bringToFront([shape.id])
+    })
+  }, [runProgrammaticCanvasMutation, sessions])
+
   const restorePanelDefaultSizeForId = useCallback((panelId: string) => {
     const editor = editorRef.current
     const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
     const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
     if (!editor || !shape || !isPanelShape(shape) || !panel) return
     previousPanelGeometryRef.current.delete(panelId)
+    preFocusPanelGeometryRef.current.delete(panelId)
+    // The default size is the whole panel, so it also leaves the focus view.
+    if (isPanelInFocusView(panel)) sessions.updatePanel(panelId, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
     runProgrammaticCanvasMutation((currentEditor) => {
       const layout = restorePanelDefaultLayout(panelShapeToLayout(shape), panel.type)
       currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
     })
-  }, [runProgrammaticCanvasMutation, sessions.activeSession?.panels])
+  }, [runProgrammaticCanvasMutation, sessions])
 
   const addPanel = useCallback((panelType: PanelType) => {
     const editor = editorRef.current
@@ -367,6 +398,11 @@ function AppContent() {
       if (!shape || !isPanelShape(shape)) return
       const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === shape.props.panelId)
       if (!panel) return
+      previousPanelGeometryRef.current.delete(panel.id)
+      preFocusPanelGeometryRef.current.delete(panel.id)
+      // Same rule as the panel header's restore button: a default-sized panel
+      // shows its whole contents rather than the focus view.
+      if (isPanelInFocusView(panel)) sessions.updatePanel(panel.id, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
       const reset = restorePanelDefaultSize(panelShapeToLayout(shape), panel.type)
       editor.updateShapes([{
         id: shape.id,
@@ -377,7 +413,7 @@ function AppContent() {
       }] as never)
     })
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
-  }, [runProgrammaticCanvasMutation, sessions.activeSession?.panels])
+  }, [runProgrammaticCanvasMutation, sessions])
 
   const resetPanelLayout = useCallback(() => {
     const confirmed = window.confirm('Reset panel layout? This puts every panel back to its original position and size, and brings back any hidden panels. Your Spotify, images, and notes are kept.')
@@ -427,7 +463,12 @@ function AppContent() {
       // panel is visible again while the menu still offers to restore it.
       for (const panel of sessionPanelsRef.current) {
         if (!isPanelVisible(panel)) sessions.setPanelVisibility(panel.id, true)
+        // Every panel is back at its original size, so none of them is in the
+        // reduced focus view any more.
+        if (isPanelInFocusView(panel)) sessions.updatePanel(panel.id, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
       }
+      previousPanelGeometryRef.current.clear()
+      preFocusPanelGeometryRef.current.clear()
       sessionPanelsRef.current = showAllPanels(sessionPanelsRef.current)
       if (editor) sessions.updateCanvas({ camera: editor.getCamera(), panels: resetAllPanelLayouts(sessions.activeSession?.panels ?? []) })
     }
@@ -553,7 +594,7 @@ function AppContent() {
 
   return (
     <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
-      <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId) }}>
+      <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView }}>
         <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />
       </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}

@@ -1,5 +1,5 @@
 import type { PanelLayout, PanelType } from './types'
-import { getCanonicalPanelLayout } from './panelLayout'
+import { getCanonicalPanelLayout, getPanelFocusViewSize } from './panelLayout'
 
 export interface ScreenRect { x: number; y: number; w: number; h: number }
 
@@ -10,6 +10,12 @@ export function getDefaultPanelSize(panelType: PanelType) {
 
 export function restorePanelDefaultSize(layout: PanelLayout, panelType: PanelType): PanelLayout {
   const { w, h } = getDefaultPanelSize(panelType)
+  return { ...layout, w, h }
+}
+
+/** Shrink a panel to the size its focus view needs, leaving it where it sits. */
+export function applyPanelFocusViewSize(layout: PanelLayout, panelType: PanelType): PanelLayout {
+  const { w, h } = getPanelFocusViewSize(panelType)
   return { ...layout, w, h }
 }
 
