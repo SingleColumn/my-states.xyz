@@ -166,6 +166,7 @@
   --space-writing-title-bottom: 20px;
   --space-writing-bottom: 96px;
   --size-writing-note-select-width: 150px;
+  --space-header-group-gap: 12px;
   --opacity-writing-toolbar: 0.55;
 
   /* "Inter Variable" is the family name the self-hosted @fontsource-variable

@@ -30,7 +30,7 @@ export function stopPanelHeaderEvent(event: SyntheticEvent) {
   ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
 }
 
-export function PanelHeader({ panelId, panelType, title, children, trailing }: { panelId: string; panelType: PanelType; title: string; children?: ReactNode; trailing?: ReactNode }) {
+export function PanelHeader({ panelId, panelType, title, leadingActions, children, trailing }: { panelId: string; panelType: PanelType; title: string; leadingActions?: ReactNode; children?: ReactNode; trailing?: ReactNode }) {
   const commands = usePanelCommands()
   const fullScreen = commands.isPanelFullScreen(panelId)
   const stop = stopPanelHeaderEvent
@@ -38,13 +38,17 @@ export function PanelHeader({ panelId, panelType, title, children, trailing }: {
     <header className="card-header" data-panel-type={panelType}>
       <h2 className="card-title">{title}</h2>
       <div className="card-header-actions">
-        {children}
-        <button className="card-icon-button" type="button" title="Hide panel" aria-label="Hide panel" onPointerDown={stop} onClick={(event) => { stop(event); commands.hidePanel(panelId) }}><EyeOff size={18} /></button>
-        <button className="card-icon-button" type="button" title={fullScreen ? 'Restore previous panel size' : 'Expand panel to full screen'} aria-label={fullScreen ? 'Restore previous panel size' : 'Expand panel to full screen'} onPointerDown={stop} onClick={(event) => { stop(event); commands.togglePanelFullScreen(panelId) }}>{fullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
-        <button className="card-icon-button" type="button" title="Restore panel to default size" aria-label="Restore panel to default size" onPointerDown={stop} onClick={(event) => { stop(event); commands.restorePanelDefaultSize(panelId) }}><RotateCcw size={18} /></button>
-        {/* Rendered after the shared panel controls, so a panel can put a button
-            of its own furthest to the right — e.g. Music's Log out. */}
-        {trailing}
+        {/* Header actions read as blocks separated by a rule, grouped by what
+            they act on: the content, the note, the panel. `trailing` keeps its
+            own block furthest to the right — e.g. Music's Log out. */}
+        {leadingActions ? <div className="card-header-group">{leadingActions}</div> : null}
+        {children ? <div className="card-header-group">{children}</div> : null}
+        <div className="card-header-group">
+          <button className="card-icon-button" type="button" title="Hide panel" aria-label="Hide panel" onPointerDown={stop} onClick={(event) => { stop(event); commands.hidePanel(panelId) }}><EyeOff size={18} /></button>
+          <button className="card-icon-button" type="button" title={fullScreen ? 'Restore previous panel size' : 'Expand panel to full screen'} aria-label={fullScreen ? 'Restore previous panel size' : 'Expand panel to full screen'} onPointerDown={stop} onClick={(event) => { stop(event); commands.togglePanelFullScreen(panelId) }}>{fullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
+          <button className="card-icon-button" type="button" title="Restore panel to default size" aria-label="Restore panel to default size" onPointerDown={stop} onClick={(event) => { stop(event); commands.restorePanelDefaultSize(panelId) }}><RotateCcw size={18} /></button>
+        </div>
+        {trailing ? <div className="card-header-group">{trailing}</div> : null}
       </div>
     </header>
   )

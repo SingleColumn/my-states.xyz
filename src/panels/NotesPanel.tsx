@@ -78,30 +78,34 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
   return (
     <section className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}`}>
-      <PanelHeader panelId={panelId} panelType="notes" title="Notes">
+      <PanelHeader
+        panelId={panelId}
+        panelType="notes"
+        title="Notes"
+        leadingActions={isWritingMode ? (
+          <button
+            className={`card-icon-button${isToolbarVisible ? ' is-active' : ''}`}
+            type="button"
+            title={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
+            aria-label={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
+            aria-pressed={isToolbarVisible}
+            {...canvasEventBlockerProps}
+            onClick={(event) => {
+              stopCanvasEvent(event)
+              const next = !isToolbarVisible
+              setIsToolbarVisible(next)
+              window.localStorage.setItem(toolbarVisibleStorageKey, next ? 'true' : 'false')
+            }}
+          >
+            <Type size={18} />
+          </button>
+        ) : undefined}
+      >
           {isWritingMode ? (
-            <>
-              <label className="writing-note-picker" {...canvasEventBlockerProps}>
-                <span className="sr-only">Choose a note</span>
-                {noteSelect}
-              </label>
-              <button
-                className={`card-icon-button${isToolbarVisible ? ' is-active' : ''}`}
-                type="button"
-                title={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
-                aria-label={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
-                aria-pressed={isToolbarVisible}
-                {...canvasEventBlockerProps}
-                onClick={(event) => {
-                  stopCanvasEvent(event)
-                  const next = !isToolbarVisible
-                  setIsToolbarVisible(next)
-                  window.localStorage.setItem(toolbarVisibleStorageKey, next ? 'true' : 'false')
-                }}
-              >
-                <Type size={18} />
-              </button>
-            </>
+            <label className="writing-note-picker" {...canvasEventBlockerProps}>
+              <span className="sr-only">Choose a note</span>
+              {noteSelect}
+            </label>
           ) : null}
           <button
             className="card-icon-button"

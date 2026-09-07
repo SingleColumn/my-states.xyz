@@ -555,7 +555,21 @@ button {
 .card-header-actions {
   display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-header-group-gap);
+}
+
+/* Header actions are grouped by what they act on - the content, the note, the
+   panel - and every group after the first carries a rule on its left. */
+.card-header-group {
+  display: flex;
+  align-items: center;
   gap: var(--space-control-inner-gap);
+}
+
+.card-header-group + .card-header-group {
+  padding-left: var(--space-header-group-gap);
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
 }
 
 .app-chrome-panel-add-control {
@@ -1775,8 +1789,42 @@ input[type="range"] {
   padding-block: 0 var(--space-writing-bottom);
 }
 
+/* Flattening the editor wrapper makes the toolbar and the text siblings of
+   the title, so the bar can be ordered above the whole document instead of
+   interrupting it between the title and the first paragraph. */
+.notes-editor-blocker.is-writing .notes-rich-editor {
+  display: contents;
+}
+
+/* Flattening the wrapper hands its height duty to the elements it used to
+   contain, so the chain down to the scroller has to fill again. Without this
+   the page stops at the height of the text and the space below it is dead.
+   The rich-text wrapper in the middle is filled by height rather than by
+   flex: MDXEditor sets its `display` inline to swap between the rich-text,
+   source and diff views, so overriding that property here would leave every
+   view visible at once. */
+.notes-editor-blocker.is-writing .mdxeditor-diff-source-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The rich-text, source and diff views are swapped in this slot, so fill
+   whichever one is mounted rather than naming them. */
+.notes-editor-blocker.is-writing .mdxeditor-diff-source-wrapper > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.notes-editor-blocker.is-writing .mdxeditor-root-contenteditable {
+  height: 100%;
+  overflow: auto;
+}
+
 .notes-editor-blocker.is-writing .notes-editor-toolbar {
-  border-bottom: none;
+  order: -1;
+  border-bottom: var(--card-border);
   opacity: var(--opacity-writing-toolbar);
   transition: opacity var(--transition-fast);
 }
