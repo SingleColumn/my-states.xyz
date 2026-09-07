@@ -15,8 +15,10 @@ export const PANEL_MINIMUM_SIZES: Readonly<Record<PanelType, { w: number; h: num
 }
 
 /**
- * Focus view is offered by the Music panel only: it drops the playlist URL,
- * search, and results and keeps playback, so it needs far less room.
+ * The size a panel shrinks to in focus view. The Music panel drops the playlist
+ * URL, search, and results and keeps playback, so it needs far less room. A
+ * panel with no entry keeps the size it has: the Images panel gives the room
+ * the controls used to take to the picture instead of shrinking away from it.
  */
 export const PANEL_FOCUS_VIEW_SIZES: Partial<Record<PanelType, { w: number; h: number }>> = {
   spotify: { w: 380, h: 460 },
@@ -32,11 +34,9 @@ export function getPanelMinimumSize(panelType: PanelType) {
   return PANEL_MINIMUM_SIZES[panelType]
 }
 
+/** Null when this kind of panel keeps its size in focus view. */
 export function getPanelFocusViewSize(panelType: PanelType) {
-  const focusView = PANEL_FOCUS_VIEW_SIZES[panelType]
-  if (focusView) return focusView
-  const { w, h } = getCanonicalPanelLayout(panelType)
-  return { w, h }
+  return PANEL_FOCUS_VIEW_SIZES[panelType] ?? null
 }
 
 export function isPanelInFocusView(panel: Pick<Panel, 'focusView'>) {

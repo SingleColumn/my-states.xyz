@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiToolbar } from 'tldraw'
 import { Hand } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
@@ -36,6 +36,10 @@ interface AppChromeProps {
 
 export const HELP_ABOUT_LABEL = 'About'
 
+// Draws first-time visitors' attention to the About button without blocking the canvas.
+const ABOUT_PULSE_SEEN_KEY = 'mic:about-pulse-seen'
+const ABOUT_PULSE_DURATION_MS = 20000
+
 export function AppChrome({
   isCanvasReady,
   isPanMode,
@@ -55,6 +59,32 @@ export function AppChrome({
   onAddPanel,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const [pulseAbout, setPulseAbout] = useState(false)
+  // Read once at mount (a lazy initializer is safe under StrictMode's dev
+  // double-invoke). Re-reading localStorage from inside the effect below
+  // would break under that same double-invoke: the first invocation writes
+  // the "seen" flag, so a second invocation reading it fresh would see its
+  // own write and skip setting up the timer that turns the pulse back off.
+  const [wasAlreadySeen] = useState(() => {
+    try {
+      return window.localStorage.getItem(ABOUT_PULSE_SEEN_KEY) === '1'
+    } catch {
+      return true
+    }
+  })
+
+  useEffect(() => {
+    if (wasAlreadySeen) return
+
+    setPulseAbout(true)
+    try {
+      window.localStorage.setItem(ABOUT_PULSE_SEEN_KEY, '1')
+    } catch {
+      // Private browsing or storage disabled: pulse will simply reappear next visit.
+    }
+    const timeout = window.setTimeout(() => setPulseAbout(false), ABOUT_PULSE_DURATION_MS)
+    return () => window.clearTimeout(timeout)
+  }, [wasAlreadySeen])
 
   useLayoutEffect(() => {
     const element = rootRef.current
@@ -123,12 +153,39 @@ export function AppChrome({
             Panel report
           </button>
         ) : null}
-        <button className="app-chrome-control about-launcher" type="button" onClick={onOpenHelpAbout} title="About Music Images Canvas">
+        <button
+          className={`app-chrome-control about-launcher${pulseAbout ? ' about-launcher-pulse' : ''}`}
+          type="button"
+          onClick={() => {
+            setPulseAbout(false)
+            onOpenHelpAbout()
+          }}
+          title="About Music Images Canvas"
+        >
           {HELP_ABOUT_LABEL}
         </button>
       </nav>
     </div>
   )
+}
+
+const AppChromePropsContext = createContext<AppChromeProps | null>(null)
+
+export function AppChromePropsProvider({ value, children }: { value: AppChromeProps; children: ReactNode }) {
+  return <AppChromePropsContext.Provider value={value}>{children}</AppChromePropsContext.Provider>
+}
+
+/**
+ * A stable component reference for tldraw's `components.MenuPanel` slot. tldraw
+ * unmounts and remounts that slot whenever the component reference changes, so
+ * this reads AppChrome's props from context instead of closing over them
+ * directly - closing over them would give a new function (and a lost AppChrome
+ * state, e.g. the About-button pulse) on every render that touched any prop.
+ */
+export function AppChromeMenuPanel() {
+  const props = useContext(AppChromePropsContext)
+  if (!props) return null
+  return <AppChrome {...props} />
 }
 
 function stopCanvasEvent(event: React.SyntheticEvent) {

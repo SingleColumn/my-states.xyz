@@ -1,11 +1,11 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Editor, Tldraw, TLShape, type TLUiOverrides } from 'tldraw'
 import { CanvasContextMenu } from './CanvasContextMenu'
-import { AppChrome, type AppChromeRect } from './AppChrome'
+import { AppChromeMenuPanel, AppChromePropsProvider, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { PANEL_SHAPE_TYPE, PanelShape, PanelShapeUtil } from './PanelShape'
-import { getCanonicalPanelLayout, getRenderablePanelLayouts, isPanelInFocusView, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, showAllPanels } from './panelLayout'
+import { getCanonicalPanelLayout, getPanelFocusViewSize, getRenderablePanelLayouts, isPanelInFocusView, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, showAllPanels } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { PanelCommandsProvider } from './PanelHeader'
 import { debounce } from './utils'
@@ -283,6 +283,10 @@ function AppContent() {
     // The focus view is part of the panel, not of this canvas session, so it is
     // saved with the panel and survives a reload alongside its smaller geometry.
     sessions.updatePanel(panelId, (current) => ({ ...current, focusView: !focused, updatedAt: Date.now() }))
+    // A panel whose focus view has no size of its own keeps the one it has, so
+    // there is no geometry to swap: the Images panel hands the room its controls
+    // used to take to the picture rather than shrinking away from it.
+    if (!getPanelFocusViewSize(panel.type)) return
     runProgrammaticCanvasMutation((currentEditor) => {
       if (focused) {
         const restored = beforeFocus ?? restorePanelDefaultSize(panelShapeToLayout(shape), panel.type)
@@ -511,26 +515,27 @@ function AppContent() {
     if (editorRef.current && sessions.activeSession) restoreCanvas(editorRef.current, sessions.activeSession.canvas)
   }, [restoreCanvas, sessions.activeSession?.id])
 
-  const ChromeMenuPanel = useCallback(() => (
-    <AppChrome
-      isCanvasReady={isCanvasReady}
-      isPanMode={isPanMode}
-      canUseSelectedPanel={selectedPanelId !== null}
-      onTogglePanMode={togglePanMode}
-      onFitAllPanels={fitAllPanels}
-      onFitSelectedPanel={fitSelectedPanel}
-      onResetSelectedPanel={resetSelectedPanel}
-      onResetPanelLayout={resetPanelLayout}
-      canHideSelectedPanel={selectedPanelId !== null}
-      hiddenPanels={(sessions.activeSession?.panels ?? []).filter((panel) => !isPanelVisible(panel)).map((panel) => ({ id: panel.id, type: panel.type }))}
-      onHideSelectedPanel={hideSelectedPanel}
-      onRestorePanel={restorePanel}
-      onAddPanel={addPanel}
-      onOpenArchitectureReport={openArchitectureReport}
-      onOpenHelpAbout={openHelpAbout}
-      onMeasure={handleChromeMeasure}
-    />
-  ), [addPanel, fitAllPanels, fitSelectedPanel, handleChromeMeasure, hideSelectedPanel, isCanvasReady, isPanMode, openArchitectureReport, openHelpAbout, resetPanelLayout, resetSelectedPanel, restorePanel, selectedPanelId, sessions.activeSession?.panels, togglePanMode])
+  // tldraw remounts components.MenuPanel whenever its reference changes, which would wipe
+  // AppChrome's internal state (e.g. the About-button pulse) on almost every interaction.
+  // AppChromeMenuPanel is a stable reference that reads these props from context instead.
+  const appChromeProps = {
+    isCanvasReady,
+    isPanMode,
+    canUseSelectedPanel: selectedPanelId !== null,
+    onTogglePanMode: togglePanMode,
+    onFitAllPanels: fitAllPanels,
+    onFitSelectedPanel: fitSelectedPanel,
+    onResetSelectedPanel: resetSelectedPanel,
+    onResetPanelLayout: resetPanelLayout,
+    canHideSelectedPanel: selectedPanelId !== null,
+    hiddenPanels: (sessions.activeSession?.panels ?? []).filter((panel) => !isPanelVisible(panel)).map((panel) => ({ id: panel.id, type: panel.type })),
+    onHideSelectedPanel: hideSelectedPanel,
+    onRestorePanel: restorePanel,
+    onAddPanel: addPanel,
+    onOpenArchitectureReport: openArchitectureReport,
+    onOpenHelpAbout: openHelpAbout,
+    onMeasure: handleChromeMeasure,
+  }
 
   // One session is one page, so tldraw's "Move to page" has nowhere to move a
   // panel to. Declaring the limit hides that submenu instead of leaving a
@@ -581,11 +586,11 @@ function AppContent() {
       StylePanel: null,
       Toolbar: null,
       NavigationPanel: null,
-      MenuPanel: ChromeMenuPanel,
+      MenuPanel: AppChromeMenuPanel,
       TopPanel: null,
       ContextMenu: CanvasContextMenu,
     }),
-    [ChromeMenuPanel],
+    [],
   )
 
   if (!sessions.isReady) {
@@ -595,7 +600,9 @@ function AppContent() {
   return (
     <main className="app-root" style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}>
       <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView }}>
-        <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />
+        <AppChromePropsProvider value={appChromeProps}>
+          <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />
+        </AppChromePropsProvider>
       </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />

@@ -324,6 +324,47 @@ button {
   opacity: var(--opacity-disabled);
 }
 
+.about-launcher-pulse {
+  animation: about-launcher-pulse var(--about-pulse-duration, 20s) ease-in-out 1;
+}
+
+/* Each pulse rises over ~1.4s, holds ~1.6s, then fades over ~2s, so the glow
+   lingers long enough to be noticed rather than reading as a blink. */
+@keyframes about-launcher-pulse {
+  0%,
+  5%,
+  30%,
+  38%,
+  63%,
+  71%,
+  96%,
+  100% {
+    border-color: var(--card-button-border);
+    background: var(--card-button-bg);
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 0 0 transparent;
+  }
+  12%,
+  20%,
+  45%,
+  53%,
+  78%,
+  86% {
+    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-button-border));
+    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-button-bg));
+    box-shadow:
+      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
+      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-launcher-pulse {
+    animation: none;
+  }
+}
+
 .canvas-view-controls {
   position: relative;
   display: inline-flex;
@@ -444,6 +485,16 @@ button {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   background: var(--card-bg-gradient);
+}
+
+/* Focus view — the header and the picture only. The slideshow controls and the
+   footer are not rendered, so the stage takes the two rows they used to hold. */
+.panel-slideshow-surface.is-focus-view {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.panel-slideshow-surface.is-focus-view .slideshow-stage {
+  height: calc(100% - (var(--image-panel-stage-inset) * 2));
 }
 
 .panel-notes-surface {

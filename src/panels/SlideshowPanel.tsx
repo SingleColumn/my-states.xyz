@@ -1,11 +1,11 @@
-import { FolderOpen, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FolderOpen, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../AppState'
 import { getBundledCollections } from '../imageCollections'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 import { SampleCollectionCard, useSampleCollectionPreviews } from './SampleCollectionCard'
-import { PanelHeader } from '../PanelHeader'
+import { PanelHeader, stopPanelHeaderEvent, usePanelCommands } from '../PanelHeader'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 5000
@@ -13,7 +13,12 @@ const maxSpeed = 20
 
 export function SlideshowPanel({ panelId }: { panelId: string }) {
   const { slideshow, sessions } = useAppState()
-  const panelSettings = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined)?.config ?? slideshow.settingsFor(panelId)
+  const commands = usePanelCommands()
+  const panel = sessions.activeSession?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined
+  const panelSettings = panel?.config ?? slideshow.settingsFor(panelId)
+  // Focus view leaves the picture and the header buttons: the slideshow is
+  // already running, so its controls and the footer only compete with it.
+  const focusView = panel?.focusView === true
   const collections = getBundledCollections()
   const collectionPreviews = useSampleCollectionPreviews()
   const panelImages = slideshow.imagesFor(panelId)
@@ -48,7 +53,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   }
 
   return (
-    <section className="panel panel-slideshow-surface">
+    <section className={focusView ? 'panel panel-slideshow-surface is-focus-view' : 'panel panel-slideshow-surface'}>
       <PanelHeader panelId={panelId} panelType="slideshow" title="Images">
           <button
             className={`card-icon-button ${isImagePickerOpen ? 'is-active' : ''}`}
@@ -76,6 +81,16 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           <button className="card-icon-button" type="button" title="Clear images" aria-label="Clear images" onPointerDown={stopCanvasEvent} onClick={() => void slideshow.resetFolder(panelId)}>
             <Trash2 size={18} />
           </button>
+          <button
+            className="card-icon-button"
+            type="button"
+            title={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
+            aria-label={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
+            aria-pressed={focusView}
+            onPointerDown={stopPanelHeaderEvent}
+            onMouseDown={stopPanelHeaderEvent}
+            onClick={(event) => { stopPanelHeaderEvent(event); commands.togglePanelFocusView(panelId) }}
+          >{focusView ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}</button>
         {isImagePickerOpen ? (
           <section className="slideshow-image-picker panel-interactive" id="loaded-images-picker" aria-label="Loaded images" onPointerDown={stopCanvasEvent} onClick={stopCanvasEvent}>
             <div className="slideshow-image-picker-heading"><span>Loaded images</span><span>{panelImages.length ? `${panelImages.length} total` : 'None yet'}</span></div>
@@ -111,7 +126,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         <input ref={folderInputRef} className="visually-hidden-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.svg,image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,image/svg+xml" multiple webkitdirectory="" directory="" onChange={(event) => { const files = event.target.files; if (files?.length) void slideshow.importFiles(files, panelId); event.currentTarget.value = '' }} />
       </PanelHeader>
 
-      <div className="slideshow-stage card-content" style={{ aspectRatio: stageAspectRatio }}>
+      {/* Focus view drops the aspect-ratio box so the stage fills the panel and the
+          picture, which is contained inside it, gets every pixel the panel allows. */}
+      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView ? undefined : stageAspectRatio }}>
         {currentImage ? (
           <CrossfadeImage
             image={currentImage}
@@ -141,31 +158,35 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         )}
       </div>
 
-      <div className="panel-body panel-interactive slideshow-controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent} onDragStart={(event) => event.preventDefault()}>
-        <div className="transport-row">
-          <button className="card-icon-button" type="button" title="Previous image" aria-label="Previous image" onClick={() => slideshow.previous(panelId)}><SkipBack size={18} /></button>
-          <button className="card-icon-button is-primary is-large" type="button" title="Start or pause" aria-label={slideshow.isPlayingFor(panelId) ? 'Pause slideshow' : 'Start slideshow'} onClick={() => slideshow.setIsPlaying(!slideshow.isPlayingFor(panelId), panelId)}>{slideshow.isPlayingFor(panelId) ? <Pause size={20} /> : <Play size={20} />}</button>
-          <button className="card-icon-button" type="button" title="Next image" aria-label="Next image" onClick={() => slideshow.next(panelId)}><SkipForward size={18} /></button>
-          <button className="card-icon-button" type="button" title="Stop" aria-label="Stop slideshow" onClick={() => slideshow.stop(panelId)}><Square size={16} /></button>
+      {focusView ? null : (
+        <>
+        <div className="panel-body panel-interactive slideshow-controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent} onDragStart={(event) => event.preventDefault()}>
+          <div className="transport-row">
+            <button className="card-icon-button" type="button" title="Previous image" aria-label="Previous image" onClick={() => slideshow.previous(panelId)}><SkipBack size={18} /></button>
+            <button className="card-icon-button is-primary is-large" type="button" title="Start or pause" aria-label={slideshow.isPlayingFor(panelId) ? 'Pause slideshow' : 'Start slideshow'} onClick={() => slideshow.setIsPlaying(!slideshow.isPlayingFor(panelId), panelId)}>{slideshow.isPlayingFor(panelId) ? <Pause size={20} /> : <Play size={20} />}</button>
+            <button className="card-icon-button" type="button" title="Next image" aria-label="Next image" onClick={() => slideshow.next(panelId)}><SkipForward size={18} /></button>
+            <button className="card-icon-button" type="button" title="Stop" aria-label="Stop slideshow" onClick={() => slideshow.stop(panelId)}><Square size={16} /></button>
+            <button className={`card-icon-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={18} /></button>
+          </div>
+          <div className="range-grid">
+            <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={1} max={maxSpeed} step={1} value={speedValue} onChange={(event) => slideshow.updateSettings({ intervalMs: speedToInterval(Number(event.target.value)) }, panelId)} /></label>
+            <label><span>Fade <output className="slideshow-control-value">{panelSettings.transitionMs} ms</output></span><input type="range" min={0} max={2000} step={50} value={panelSettings.transitionMs} onChange={(event) => slideshow.updateSettings({ transitionMs: Number(event.target.value) }, panelId)} /></label>
+          </div>
+          <div className="zoom-row">
+            <label><span>Zoom <output className="slideshow-control-value">{Math.round(panelSettings.zoom * 100)}%</output></span><input type="range" min={0.5} max={2.4} step={0.05} value={panelSettings.zoom} onChange={(event) => slideshow.updateSettings({ zoom: Number(event.target.value) }, panelId)} /></label>
+            <span className="zoom-readout">{Math.round(panelSettings.zoom * 100)}%</span>
+            <button className="card-icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: DEFAULT_SLIDESHOW_ZOOM }, panelId)}><RotateCcw size={17} /></button>
+          </div>
         </div>
-        <div className="range-grid">
-          <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={1} max={maxSpeed} step={1} value={speedValue} onChange={(event) => slideshow.updateSettings({ intervalMs: speedToInterval(Number(event.target.value)) }, panelId)} /></label>
-          <label><span>Fade <output className="slideshow-control-value">{panelSettings.transitionMs} ms</output></span><input type="range" min={0} max={2000} step={50} value={panelSettings.transitionMs} onChange={(event) => slideshow.updateSettings({ transitionMs: Number(event.target.value) }, panelId)} /></label>
-        </div>
-        <div className="zoom-row">
-          <label><span>Zoom <output className="slideshow-control-value">{Math.round(panelSettings.zoom * 100)}%</output></span><input type="range" min={0.5} max={2.4} step={0.05} value={panelSettings.zoom} onChange={(event) => slideshow.updateSettings({ zoom: Number(event.target.value) }, panelId)} /></label>
-          <span className="zoom-readout">{Math.round(panelSettings.zoom * 100)}%</span>
-          <button className="card-icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: DEFAULT_SLIDESHOW_ZOOM }, panelId)}><RotateCcw size={17} /></button>
-        </div>
-      </div>
 
-      <footer className="card-footer panel-interactive" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-          <span className="card-footer-meta">{currentImage?.name ?? panelStatus}</span>
-        <div className="card-footer-status">
-          {panelError ? <span className="error-text">{panelError}</span> : <span>{panelImages.length ? `${panelSettings.currentIndex + 1} / ${panelImages.length}` : '0 / 0'}</span>}
-          <button className={`card-icon-button card-footer-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={14} /></button>
-        </div>
-      </footer>
+        <footer className="card-footer panel-interactive" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+            <span className="card-footer-meta">{currentImage?.name ?? panelStatus}</span>
+          <div className="card-footer-status">
+            {panelError ? <span className="error-text">{panelError}</span> : <span>{panelImages.length ? `${panelSettings.currentIndex + 1} / ${panelImages.length}` : '0 / 0'}</span>}
+          </div>
+        </footer>
+        </>
+      )}
     </section>
   )
 }

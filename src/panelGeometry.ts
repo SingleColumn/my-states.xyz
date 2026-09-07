@@ -13,10 +13,13 @@ export function restorePanelDefaultSize(layout: PanelLayout, panelType: PanelTyp
   return { ...layout, w, h }
 }
 
-/** Shrink a panel to the size its focus view needs, leaving it where it sits. */
+/**
+ * Shrink a panel to the size its focus view needs, leaving it where it sits.
+ * A panel whose focus view has no size of its own is returned unchanged.
+ */
 export function applyPanelFocusViewSize(layout: PanelLayout, panelType: PanelType): PanelLayout {
-  const { w, h } = getPanelFocusViewSize(panelType)
-  return { ...layout, w, h }
+  const size = getPanelFocusViewSize(panelType)
+  return size ? { ...layout, w: size.w, h: size.h } : { ...layout }
 }
 
 /** Restore the same canonical position and size used by Reset panel layout. */

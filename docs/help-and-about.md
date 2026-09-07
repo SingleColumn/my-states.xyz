@@ -35,7 +35,9 @@ The panel shows the playlist that is loaded, with its cover. To keep only the pl
 
 Select **Choose a local folder** to load supported images from a folder. If folder access is unavailable, the browser uses its directory file picker. You can also select **Load a sample collection** and choose one of the bundled collections. **Loaded images** opens a list where you can select an image to show; **Clear images** removes the loaded images from the panel.
 
-Use **Previous image**, **Next image**, **Start slideshow**, **Pause slideshow**, and **Stop** to control the slideshow. **Shuffle** changes the order behavior. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
+These four buttons sit on their own row below the picture, directly above the playback buttons. Use **Shuffle**, **Previous image**, **Start slideshow**, **Pause slideshow**, **Next image**, and **Stop** on the row beneath them to control the slideshow; **Shuffle** changes the order behavior. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
+
+To watch the slideshow on its own, select **Reduce panel to focus view** at the top of the panel: the panel keeps its size and shows only the picture, so the image takes the room the controls had. The image and folder buttons are part of those controls, so they are hidden too. Select **Expand panel to full view** to bring them all back.
 
 ### Notes
 
