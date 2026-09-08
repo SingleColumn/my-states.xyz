@@ -37,7 +37,7 @@ import {
 } from './storage'
 import { downloadSessionArchive, exportSessionArchive, importSessionArchive } from './sessionArchive'
 import { createId } from './utils'
-import { createImageItemsFromBundledCollection, getBundledCollection } from './imageCollections'
+import { createImageItemsFromBundledCollection } from './imageCollections'
 import { setPanelVisibility } from './panelLayout'
 import {
   releaseImageItems,
@@ -527,13 +527,14 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
         }
         let nextImages: ImageItem[]
         if (source.type === 'bundled') {
-          if (!getBundledCollection(source.collectionId)) {
+          const loaded = await createImageItemsFromBundledCollection(source.collectionId)
+          if (!loaded) {
             const message = `The sample collection "${source.collectionId}" is not available in this version.`
             state.status = message
             state.error = message
             return
           }
-          nextImages = await createImageItemsFromBundledCollection(source.collectionId) ?? []
+          nextImages = loaded
         } else {
           const assets = await getSessionAssets(session!.id, panel.id)
           nextImages = await Promise.all(assets.map(createImageItemFromAsset))
@@ -642,24 +643,23 @@ function useSlideshowState(session: Session | null, patchSession: (patch: (curre
 
   const selectBundledCollection = useCallback(async (collectionId: string, panelId: string) => {
     if (!session) throw new Error('Open a session before selecting images.')
-    const collection = getBundledCollection(collectionId)
     const state = getSlideshowPanelRuntimeState(panelId)
-    if (!collection) {
-      const message = `The sample collection "${collectionId}" is not available in this version.`
-      state.error = message
-      state.status = message
-      touch()
-      return
-    }
     try {
-      const nextImages = await createImageItemsFromBundledCollection(collectionId) ?? []
+      const nextImages = await createImageItemsFromBundledCollection(collectionId)
+      if (!nextImages) {
+        const message = `The sample collection "${collectionId}" is not available in this version.`
+        state.error = message
+        state.status = message
+        touch()
+        return
+      }
       if (state.timerId !== null) window.clearTimeout(state.timerId)
       state.timerId = null
       releaseImageItems(state.images)
       state.images = nextImages
       state.isPlaying = nextImages.length > 0
       const current = getSlideshowSettingsForPanel(session, panelId, defaultSlideshowSettings)
-      const nextSettings = settingsForBundledCollection(current, collection.id)
+      const nextSettings = settingsForBundledCollection(current, collectionId)
       patchSlideshow(nextSettings, patchSession, panelId)
       state.status = statusForImageSource(nextSettings.imageSource, nextImages.length)
       state.error = null

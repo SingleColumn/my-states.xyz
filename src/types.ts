@@ -66,6 +66,13 @@ export interface SessionImage extends ImageMetadata {
   mimeType: string
 }
 
+/** Who made a picture, and where the original can be seen. */
+export interface ImageAttribution {
+  creator: string
+  creatorUrl?: string
+  sourceUrl?: string
+}
+
 export interface ImageItem extends ImageMetadata {
   id: string
   sessionId: string | null
@@ -73,6 +80,8 @@ export interface ImageItem extends ImageMetadata {
   mimeType: string
   url: string
   urlKind: 'object-url' | 'static'
+  /** Sample collections credit every image; a viewer's own folder cannot. */
+  attribution?: ImageAttribution
 }
 
 export interface Note {

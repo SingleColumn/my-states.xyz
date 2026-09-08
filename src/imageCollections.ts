@@ -1,62 +1,49 @@
-import type { ImageItem } from './types'
+import type { ImageAttribution, ImageItem } from './types'
 
-/* Collections are named after the Instagram profile of the creator whose work
-   they contain, so the name is a credit and is never shortened or replaced.
-   `cover` names the image that represents the collection on screen; leaving it
-   null falls back to whichever file sorts first, which is rarely the best one. */
-export const bundledImageCollections = [
-  {
-    id: 'teemu-jpeg',
-    name: 'teemu-jpeg',
-    basePath: '/sample-images/teemu-jpeg/',
-    cover: '/sample-images/teemu-jpeg/teemu_jpeg_BaLy4m7ATYt_0.jpg',
-  },
-  {
-    id: 'eightbitstrana',
-    name: 'eightbitstrana',
-    basePath: '/sample-images/eightbitstrana/',
-    cover: '/sample-images/eightbitstrana/eightbitstrana_DF-os2-NtPL_0.jpg',
-  },
-  {
-    id: 'jaumecopilotos-ai',
-    name: 'jaumecopilotos-ai',
-    basePath: '/sample-images/jaumecopilotos-ai/',
-    cover: '/sample-images/jaumecopilotos-ai/jaumecopilotos_ai_DC3nykmC5TJ_0.webp',
-  },
-] as const
+/* Collections describe themselves: each folder under public/sample-images
+   carries a collection.json naming the collection and crediting every picture
+   in it, and the build turns those into the manifest read here. Nothing about
+   the set of collections is written down in this file, so adding one is a
+   matter of dropping a folder in. */
 
-export type BundledImageCollectionId = (typeof bundledImageCollections)[number]['id']
-
-export interface BundledCollectionPreview {
+export interface BundledCollection {
   id: string
+  title: string
   coverUrl: string | null
+  imageCount: number
+}
+
+interface ManifestImage extends ImageAttribution {
+  url: string
 }
 
 interface ManifestCollection {
   id: string
-  name: string
-  images: string[]
+  title: string
+  cover: string | null
+  images: ManifestImage[]
 }
 
-export function getBundledCollections() {
-  return bundledImageCollections
-}
-
-export function getBundledCollection(id: string) {
-  return bundledImageCollections.find((collection) => collection.id === id)
+export async function loadBundledCollections(
+  fetchManifest: typeof fetch = fetch,
+): Promise<BundledCollection[]> {
+  const collections = await readManifest(fetchManifest)
+  return collections.map(({ id, title, cover, images }) => ({
+    id,
+    title,
+    coverUrl: cover ?? images[0]?.url ?? null,
+    imageCount: images.length,
+  }))
 }
 
 export async function createImageItemsFromBundledCollection(
   id: string,
   fetchManifest: typeof fetch = fetch,
 ): Promise<ImageItem[] | null> {
-  if (!getBundledCollection(id)) return null
+  const collection = (await readManifest(fetchManifest)).find((candidate) => candidate.id === id)
+  if (!collection) return null
 
-  const manifest = await fetchManifestDocument(fetchManifest)
-  const collection = readManifestCollection(manifest, id)
-  if (!collection) return []
-
-  return collection.images.map((url, index) => {
+  return collection.images.map(({ url, ...attribution }, index) => {
     const filename = imageNameFromUrl(url)
     return {
       id: `bundled-${id}-${index}`,
@@ -69,52 +56,43 @@ export async function createImageItemsFromBundledCollection(
       width: null,
       height: null,
       url,
-      urlKind: 'static',
+      urlKind: 'static' as const,
+      attribution,
     }
   })
 }
 
-/**
- * The cover image for every registered collection, read from the generated
- * manifest so a card can never point at a file that is not on disk.
- */
-export async function loadBundledCollectionPreviews(
-  fetchManifest: typeof fetch = fetch,
-): Promise<BundledCollectionPreview[]> {
-  const manifest = await fetchManifestDocument(fetchManifest)
-
-  return bundledImageCollections.map((collection) => {
-    const images = readManifestCollection(manifest, collection.id)?.images ?? []
-    const cover: string = collection.cover
-    return {
-      id: collection.id,
-      coverUrl: images.includes(cover) ? cover : images[0] ?? null,
-    }
-  })
-}
-
-async function fetchManifestDocument(fetchManifest: typeof fetch): Promise<unknown> {
+async function readManifest(fetchManifest: typeof fetch): Promise<ManifestCollection[]> {
   const response = await fetchManifest('/sample-images/manifest.json', { cache: 'no-cache' })
   if (!response.ok) throw new Error('Sample collections could not be loaded.')
-  return await response.json() as unknown
-}
+  const value = await response.json() as unknown
 
-function readManifestCollection(value: unknown, id: string): ManifestCollection | null {
   if (!isRecord(value) || !Array.isArray(value.collections)) {
     throw new Error('The sample image manifest is invalid.')
   }
-  const candidate = value.collections.find((item) => isRecord(item) && item.id === id)
-  if (!candidate) return null
-  if (typeof candidate.name !== 'string' || !Array.isArray(candidate.images) || !candidate.images.every(isValidImageUrl)) {
-    throw new Error(`The sample collection "${id}" is invalid.`)
-  }
-  return { id, name: candidate.name, images: candidate.images }
+  return value.collections.map(readManifestCollection)
 }
 
-function isValidImageUrl(value: unknown): value is string {
-  return typeof value === 'string'
-    && value.startsWith('/sample-images/')
-    && /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i.test(value)
+function readManifestCollection(value: unknown): ManifestCollection {
+  if (
+    !isRecord(value)
+    || typeof value.id !== 'string'
+    || typeof value.title !== 'string'
+    || (value.cover !== null && typeof value.cover !== 'string')
+    || !Array.isArray(value.images)
+    || !value.images.every(isValidManifestImage)
+  ) {
+    throw new Error('The sample image manifest is invalid.')
+  }
+  return { id: value.id, title: value.title, cover: value.cover, images: value.images }
+}
+
+function isValidManifestImage(value: unknown): value is ManifestImage {
+  return isRecord(value)
+    && typeof value.url === 'string'
+    && value.url.startsWith('/sample-images/')
+    && /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i.test(value.url)
+    && typeof value.creator === 'string'
 }
 
 function imageNameFromUrl(url: string) {

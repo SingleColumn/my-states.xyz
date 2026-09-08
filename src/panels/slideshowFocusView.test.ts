@@ -60,13 +60,20 @@ function renderImagesPanel(focusView: boolean) {
 }
 
 describe('Images panel focus view', () => {
-  it('keeps the picture and the header buttons', () => {
+  it('keeps the picture and nothing else', () => {
     const markup = renderImagesPanel(true)
     expect(markup).toContain('is-focus-view')
     expect(markup).toContain('slideshow-stage')
     expect(markup).toContain('blob:dusk')
-    expect(markup).toContain('aria-label="Hide panel"')
-    expect(markup).toContain('aria-label="Expand panel to full view"')
+    expect(markup).not.toContain('card-header')
+    expect(markup).not.toContain('aria-label="Hide panel"')
+  })
+
+  it('tells the viewer that Escape brings the controls back', () => {
+    // The header is gone with everything else, so the hint is the only thing
+    // naming the way out.
+    expect(renderImagesPanel(true)).toContain('focus-view-hint')
+    expect(renderImagesPanel(false)).not.toContain('focus-view-hint')
   })
 
   it('drops the slideshow controls, the sliders, and the footer from the focus view', () => {
@@ -74,9 +81,8 @@ describe('Images panel focus view', () => {
     expect(focused).not.toContain('slideshow-controls')
     expect(focused).not.toContain('aria-label="Next image"')
     expect(focused).not.toContain('aria-label="Stop slideshow"')
-    // The source buttons are header buttons, and focus view keeps the header.
-    expect(focused).toContain('aria-label="Choose a local folder"')
-    expect(focused).toContain('aria-label="Clear images"')
+    expect(focused).not.toContain('aria-label="Choose a local folder"')
+    expect(focused).not.toContain('aria-label="Clear images"')
     expect(focused).not.toContain('>Speed ')
     expect(focused).not.toContain('>Fade ')
     expect(focused).not.toContain('>Zoom ')
@@ -98,7 +104,6 @@ describe('Images panel focus view', () => {
   it('offers the focus view toggle from the panel header, before the hide button', () => {
     const markup = renderImagesPanel(false)
     expect(markup.indexOf('Reduce panel to focus view')).toBeLessThan(markup.indexOf('Hide panel'))
-    expect(renderImagesPanel(true)).toContain('Expand panel to full view')
   })
 
   it('keeps the source buttons in the panel header', () => {

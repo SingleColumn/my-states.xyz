@@ -14,7 +14,7 @@ export const HELP_ABOUT_LICENSE_URL = '/licenses/tldraw-3.15.6.txt'
 export const HELP_ABOUT_TLDRAW_URL = 'https://tldraw.dev/'
 
 /**
- * This view intentionally mirrors docs/help-and-about.md. Keep the headings,
+ * This view intentionally mirrors docs/about.md. Keep the headings,
  * links, and user-facing instructions aligned when either source changes.
  */
 export function HelpAbout({ isOpen, onClose, returnFocusRef }: HelpAboutProps) {

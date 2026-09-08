@@ -1,43 +1,39 @@
 import { Images } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { loadBundledCollectionPreviews, type BundledCollectionPreview } from '../imageCollections'
+import { loadBundledCollections, type BundledCollection } from '../imageCollections'
 
 /**
- * Cover art and image counts for every sample collection, keyed by ID.
- * The manifest is fetched once per mount; a failure leaves the map empty and
- * the cards fall back to their name-only form rather than blocking onboarding.
+ * Every sample collection, with its title and cover art. The manifest is
+ * fetched once per mount; a failure leaves the list empty so onboarding falls
+ * back to the folder button rather than blocking on the network.
  */
-export function useSampleCollectionPreviews() {
-  const [previews, setPreviews] = useState<Record<string, BundledCollectionPreview>>({})
+export function useBundledCollections() {
+  const [collections, setCollections] = useState<BundledCollection[]>([])
 
   useEffect(() => {
     let cancelled = false
-    void loadBundledCollectionPreviews()
-      .then((loaded) => {
-        if (cancelled) return
-        setPreviews(Object.fromEntries(loaded.map((preview) => [preview.id, preview])))
-      })
+    void loadBundledCollections()
+      .then((loaded) => { if (!cancelled) setCollections(loaded) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
-  return previews
+  return collections
 }
 
 /**
- * One sample collection, shown as a cover image credited to the creator whose
- * profile the collection is named after. `tile` stacks the cover above the
- * name for the onboarding grid; `row` puts them side by side for the picker.
+ * One sample collection, shown as its cover art and title. A collection can
+ * hold work from several creators, so the credit belongs on each picture
+ * rather than here. `tile` stacks cover above title for the onboarding grid;
+ * `row` puts them side by side for the picker.
  */
 export function SampleCollectionCard({
-  name,
-  preview,
+  collection,
   variant,
   onSelect,
   onPointerDown,
 }: {
-  name: string
-  preview: BundledCollectionPreview | undefined
+  collection: BundledCollection
   variant: 'tile' | 'row'
   onSelect(): void
   onPointerDown?(event: React.SyntheticEvent): void
@@ -46,17 +42,17 @@ export function SampleCollectionCard({
     <button
       className={`sample-collection-card is-${variant}`}
       type="button"
-      title={`Load the collection by ${name}`}
+      title={`Load the ${collection.title} collection`}
       onPointerDown={onPointerDown}
       onClick={onSelect}
     >
       <span className="sample-collection-cover">
-        {preview?.coverUrl
-          ? <img src={preview.coverUrl} alt="" decoding="async" draggable={false} />
+        {collection.coverUrl
+          ? <img src={collection.coverUrl} alt="" decoding="async" draggable={false} />
           : <Images className="sample-collection-cover-fallback" aria-hidden="true" />}
       </span>
       <span className="sample-collection-text">
-        <span className="sample-collection-name">{name}</span>
+        <span className="sample-collection-name">{collection.title}</span>
       </span>
     </button>
   )

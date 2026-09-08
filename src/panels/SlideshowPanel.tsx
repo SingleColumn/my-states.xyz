@@ -1,26 +1,31 @@
 import { ChevronsDownUp, ChevronsUpDown, FolderOpen, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../AppState'
-import { getBundledCollections } from '../imageCollections'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
-import { SampleCollectionCard, useSampleCollectionPreviews } from './SampleCollectionCard'
+import { SampleCollectionCard, useBundledCollections } from './SampleCollectionCard'
 import { PanelHeader, stopPanelHeaderEvent, usePanelCommands } from '../PanelHeader'
+import { ImageAttributionOverlay } from './imageAttribution'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 5000
 const maxSpeed = 20
+const focusHintDurationMs = 3500
+
+/* Escape has to reach exactly one panel. Several panels can be in focus view at
+   once, and each listens on the window, so they share a stack and only the one
+   entered most recently acts. */
+const focusViewStack: string[] = []
 
 export function SlideshowPanel({ panelId }: { panelId: string }) {
   const { slideshow, sessions } = useAppState()
   const commands = usePanelCommands()
   const panel = sessions.activeSession?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined
   const panelSettings = panel?.config ?? slideshow.settingsFor(panelId)
-  // Focus view leaves the picture and the header buttons: the slideshow is
-  // already running, so its controls and the footer only compete with it.
+  // Focus view leaves the picture alone on the panel: every control is dropped,
+  // including the header, so Escape is the only way back out.
   const focusView = panel?.focusView === true
-  const collections = getBundledCollections()
-  const collectionPreviews = useSampleCollectionPreviews()
+  const collections = useBundledCollections()
   const panelImages = slideshow.imagesFor(panelId)
   const panelStatus = slideshow.statusFor(panelId)
   const panelError = slideshow.errorFor(panelId)
@@ -31,6 +36,54 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const [isSamplePickerOpen, setIsSamplePickerOpen] = useState(false)
   const speedValue = intervalToSpeed(panelSettings.intervalMs)
   const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
+  const attribution = currentImage?.attribution ?? null
+  const [isFocusHintVisible, setIsFocusHintVisible] = useState(false)
+  const focusHintTimeoutRef = useRef<number | null>(null)
+
+  function revealFocusHint() {
+    if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
+    setIsFocusHintVisible(true)
+    focusHintTimeoutRef.current = window.setTimeout(() => setIsFocusHintVisible(false), focusHintDurationMs)
+  }
+
+  function hideFocusHint() {
+    if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
+    setIsFocusHintVisible(false)
+  }
+
+  useEffect(() => {
+    if (!focusView) return
+    focusViewStack.push(panelId)
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      if (focusViewStack[focusViewStack.length - 1] !== panelId) return
+      // A dialog or a menu owns Escape for as long as it is open.
+      if (document.querySelector('[role="dialog"], [role="menu"]')) return
+      // Capture phase, and the canvas must not also see this: tldraw answers
+      // Escape by clearing the selection, which swallowed the key whenever the
+      // panel being focused was the selected shape.
+      event.preventDefault()
+      event.stopPropagation()
+      commands.togglePanelFocusView(panelId)
+    }
+
+    const options = { capture: true } as const
+    window.addEventListener('keydown', handleKeyDown, options)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, options)
+      const index = focusViewStack.lastIndexOf(panelId)
+      if (index >= 0) focusViewStack.splice(index, 1)
+    }
+  }, [focusView, panelId, commands])
+
+  // The hint names the only way out, so it shows on entry and whenever the
+  // pointer is over a panel that has no visible controls.
+  useEffect(() => {
+    if (focusView) revealFocusHint()
+    else hideFocusHint()
+    return () => { if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current) }
+  }, [focusView])
 
   async function chooseFolder() {
     setIsSamplePickerOpen(false)
@@ -53,7 +106,12 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   }
 
   return (
-    <section className={focusView ? 'panel panel-slideshow-surface is-focus-view' : 'panel panel-slideshow-surface'}>
+    <section
+      className={focusView ? 'panel panel-slideshow-surface is-focus-view' : 'panel panel-slideshow-surface'}
+      onPointerMove={focusView ? revealFocusHint : undefined}
+      onPointerLeave={focusView ? hideFocusHint : undefined}
+    >
+      {focusView ? null : (
       <PanelHeader panelId={panelId} panelType="slideshow" title="Images">
           <button
             className={`card-icon-button ${isImagePickerOpen ? 'is-active' : ''}`}
@@ -113,8 +171,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
               {collections.map((collection) => (
                 <SampleCollectionCard
                   key={collection.id}
-                  name={collection.name}
-                  preview={collectionPreviews[collection.id]}
+                  collection={collection}
                   variant="row"
                   onSelect={() => void chooseSample(collection.id)}
                 />
@@ -125,28 +182,36 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
 
         <input ref={folderInputRef} className="visually-hidden-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.svg,image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,image/svg+xml" multiple webkitdirectory="" directory="" onChange={(event) => { const files = event.target.files; if (files?.length) void slideshow.importFiles(files, panelId); event.currentTarget.value = '' }} />
       </PanelHeader>
+      )}
 
       {/* Focus view drops the aspect-ratio box so the stage fills the panel and the
           picture, which is contained inside it, gets every pixel the panel allows. */}
       <div className="slideshow-stage card-content" style={{ aspectRatio: focusView ? undefined : stageAspectRatio }}>
         {currentImage ? (
+          <>
           <CrossfadeImage
             image={currentImage}
             transitionMs={panelSettings.transitionMs}
             zoom={panelSettings.zoom}
             onPointerDown={stopCanvasEvent}
           />
+          {attribution ? <ImageAttributionOverlay attribution={attribution} onPointerDown={stopCanvasEvent} /> : null}
+          {focusView ? (
+            <p className={isFocusHintVisible ? 'focus-view-hint is-visible' : 'focus-view-hint'} role="status">
+              Press <kbd>Esc</kbd> to show the controls
+            </p>
+          ) : null}
+          </>
         ) : (
           <div className="empty-stage">
             <h3>Add images</h3>
             <button className="card-icon-button is-primary is-wide empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
-            <span className="empty-stage-divider">Or try a collection from these creators</span>
+            <span className="empty-stage-divider">Or try a sample collection</span>
             <div className="empty-stage-collections">
               {collections.map((collection) => (
                 <SampleCollectionCard
                   key={collection.id}
-                  name={collection.name}
-                  preview={collectionPreviews[collection.id]}
+                  collection={collection}
                   variant="tile"
                   onSelect={() => void chooseSample(collection.id)}
                   onPointerDown={stopCanvasEvent}
