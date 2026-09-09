@@ -24,6 +24,13 @@
   --color-dropdown-bg: #000;
   --color-dropdown-text: var(--card-button-icon-color);
   --color-note-control-bg: rgba(7, 13, 14, 0.94);
+  /* The formatting bar is sticky over the text (MDXEditor pins it at top: 0),
+     so it needs a surface of its own - a transparent bar lets the note scroll
+     visibly through the buttons. */
+  --background-notes-toolbar: rgba(9, 17, 17, 0.97);
+  /* Marks where the writing column ends, so wrapping is not mistaken for the
+     note's own line breaks. */
+  --color-writing-guide: rgba(255, 255, 255, 0.09);
   --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
   --color-focus-ring: rgba(255, 255, 255, 0.46);
   /* The slideshow accent lifted toward light. Glows read as emitted light, and

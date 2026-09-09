@@ -1538,7 +1538,11 @@ input[type="range"] {
   justify-content: flex-start !important;
   gap: var(--space-notes-toolbar-gap) !important;
   border-bottom: var(--card-border);
-  background: transparent !important;
+  /* MDXEditor pins this bar with `position: sticky; top: 0`, so it sits over
+     the note as it scrolls. It has to be opaque or the text shows through the
+     buttons. */
+  background: var(--background-notes-toolbar) !important;
+  backdrop-filter: var(--blur-panel);
   font-size: var(--font-size-notes-toolbar);
   min-height: calc(var(--size-notes-toolbar-control) + 2 * var(--space-notes-toolbar-padding));
   padding: var(--space-notes-toolbar-padding) !important;
@@ -1744,10 +1748,33 @@ input[type="range"] {
 }
 
 .notes-editor-blocker.is-writing {
+  position: relative;
   flex-direction: column;
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* The text column is far narrower than the panel, so a wrapped line can read
+   as a line break the writer put there. This marks where the column actually
+   ends, and only while they are working in it. */
+.notes-editor-blocker.is-writing::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--writing-measure);
+  transform: translateX(-50%);
+  border-inline: var(--border-width-hairline) solid var(--color-writing-guide);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+  content: "";
+}
+
+.notes-editor-blocker.is-writing:hover::after,
+.notes-editor-blocker.is-writing:focus-within::after {
+  opacity: 1;
 }
 
 .writing-title {

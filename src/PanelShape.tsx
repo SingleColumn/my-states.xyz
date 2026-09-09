@@ -56,7 +56,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
         className="canvas-panel-shell"
         onPointerDownCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
         onTouchStartCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
-        onContextMenu={() => editor.select(shape.id)}
+        onContextMenu={(event) => handlePanelContextMenu(editor, shape.id, event)}
         style={{
           width: shape.props.w,
           height: shape.props.h,
@@ -102,16 +102,54 @@ function PanelContent({ panelId }: { panelId: string }) {
   return <SlideshowPanel panelId={panel.id} />
 }
 
+// The surfaces where a right-click means "act on this text", not "act on this
+// panel" - so the browser's own Cut/Copy/Paste should be offered instead of
+// tldraw's shape clipboard.
+const textEditingSelector = 'input, textarea, .cm-editor, [contenteditable="true"], [role="textbox"]'
+
+function isTextEditingTarget(target: EventTarget | null) {
+  return target instanceof Element && target.closest(textEditingSelector) !== null
+}
+
+/**
+ * tldraw's canvas menu offers clipboard actions that operate on shapes, so its
+ * Paste dropped the clipboard onto the canvas as a new shape instead of into
+ * the note the user had right-clicked. Letting the event through unhandled
+ * gives the browser's own menu, whose Cut/Copy/Paste act on the text selection
+ * -- the same thing Ctrl+V already did.
+ */
+function handlePanelContextMenu(
+  editor: ReturnType<typeof useEditor>,
+  shapeId: PanelShape['id'],
+  event: React.MouseEvent<HTMLDivElement>,
+) {
+  if (isTextEditingTarget(event.target)) {
+    event.stopPropagation()
+    return
+  }
+  editor.select(shapeId)
+}
+
 function handlePanelPointerDownCapture(
   editor: ReturnType<typeof useEditor>,
   shapeId: PanelShape['id'],
   event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
 ) {
-  if (!('button' in event) || event.button === 0 || event.button === 2) {
+  const isRightClick = 'button' in event && event.button === 2
+
+  // Selecting the panel here would pull focus out of the caret, and tldraw
+  // would open its own menu over the text. Leave both alone.
+  if (isRightClick && isTextEditingTarget(event.target)) {
+    ;(event as unknown as { isKilled?: boolean }).isKilled = true
+    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
+    return
+  }
+
+  if (!('button' in event) || event.button === 0 || isRightClick) {
     editor.select(shapeId)
   }
 
-  if ('button' in event && event.button === 2) return
+  if (isRightClick) return
   const target = event.target
   if (!(target instanceof Element)) return
 
