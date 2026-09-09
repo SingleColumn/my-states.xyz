@@ -7,7 +7,6 @@ import {
   T,
   TLBaseShape,
   useEditor,
-  useValue,
 } from 'tldraw'
 import { useAppState } from './AppState'
 import type { PanelType } from './types'
@@ -50,22 +49,25 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     }
   }
 
-  // A panel can own content that wants keyboard and clipboard input for
-  // itself -- typing into the Notes editor, in particular -- rather than
-  // having tldraw treat Delete/Escape/Ctrl+C as canvas shortcuts. tldraw
-  // already has a built-in escape hatch for exactly this: its keyboard and
-  // clipboard shortcut handlers stand down while a shape is the "editing"
-  // shape, the same way they do while one of tldraw's own text shapes is
-  // being typed into. See useKeepShapeEditingWhileSelected below for how a
-  // panel becomes that shape, and useNativeWheelScrollScope for why wheel
-  // needs a separate fix rather than also riding on this one.
-  override canEdit() {
-    return true
-  }
+  // Deliberately NOT editable, and panel selection deliberately does not set
+  // tldraw's `editingShapeId`. Both look tempting as a way to stop tldraw
+  // treating Delete/Ctrl+C as canvas shortcuts while someone types in a note,
+  // and an earlier version did exactly that -- but `editingShapeId` is not a
+  // passive flag. tldraw's default side effects put the select tool into
+  // `select.editing_shape` whenever it is set, and that state ignores
+  // pointer-down on the edited shape and hides every resize handle, so panels
+  // could no longer be dragged or resized.
+  //
+  // It was also unnecessary. Every handler it was meant to stand down already
+  // checks the focused element instead: the canvas keydown handler via
+  // `activeElementShouldCaptureKeys`, native copy/cut/paste via its own
+  // `areShortcutsDisabled`, and the UI action hotkeys via hotkeys-js's default
+  // filter. All three ignore keys typed into a contenteditable or input, which
+  // is exactly where a panel's text lives. Wheel is the one thing they do not
+  // cover -- see useNativeWheelScrollScope below.
 
   override component(shape: PanelShape) {
     const editor = useEditor()
-    useKeepShapeEditingWhileSelected(editor, shape.id)
     const wheelScopeRef = useNativeWheelScrollScope()
 
     return (
@@ -113,48 +115,20 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
 }
 
 /**
- * Mirrors panel selection into tldraw's `editingShapeId`. That field is what
- * tldraw's keyboard and clipboard shortcut handlers check before intercepting
- * Ctrl+C/V, Delete and Escape -- the same mechanism tldraw's built-in text
- * shapes rely on while being typed into. Setting it here means content inside
- * the selected panel owns that input for as long as it stays selected,
- * without touching those events by hand. Wheel is handled separately, by
- * useNativeWheelScrollScope below -- see its comment for why this field alone
- * does not cover it.
- */
-function useKeepShapeEditingWhileSelected(editor: ReturnType<typeof useEditor>, shapeId: PanelShape['id']) {
-  const isOnlySelected = useValue(
-    'panel is only selected shape',
-    () => editor.getOnlySelectedShapeId() === shapeId,
-    [editor, shapeId],
-  )
-
-  useEffect(() => {
-    if (!isOnlySelected) return
-    editor.setEditingShape(shapeId)
-    return () => {
-      // Selection can move directly from one panel to another in the same
-      // commit, in which case the next panel's effect can run before this
-      // one's cleanup. Only clear the field if it still names this panel.
-      if (editor.getEditingShapeId() === shapeId) editor.setEditingShape(null)
-    }
-  }, [editor, isOnlySelected, shapeId])
-}
-
-/**
  * Lets a genuinely scrollable region inside a panel -- the Notes editor, in
  * particular -- own the wheel instead of the canvas panning underneath it.
  *
- * tldraw's own gesture handler has a matching escape hatch (`canScroll` on
- * the shape util, gated by the shape being tldraw's "editing" shape), but it
- * depends on tldraw's own pointer-position tracking, which panel content
- * starves: a click or drag on interactive/text content is deliberately kept
- * from reaching tldraw at all (see handlePanelPointerDownCapture and
- * canvasEventBlockerProps in NotesPanel), so tldraw's tracked pointer
- * position goes stale the moment the cursor is over that content -- exactly
- * where a wheel-scroll fix is needed. Rather than widen what reaches tldraw's
- * pointer pipeline just to keep that position fresh, this intercepts the
- * wheel event directly.
+ * tldraw's own gesture handler has an escape hatch for this (`canScroll` on
+ * the shape util), but it is gated on the shape being tldraw's "editing"
+ * shape, which panels deliberately never are -- see the comment on the shape
+ * util above. It also depends on tldraw's own pointer-position tracking,
+ * which panel content starves: a click or drag on interactive/text content is
+ * deliberately kept from reaching tldraw at all (see
+ * handlePanelPointerDownCapture and canvasEventBlockerProps in NotesPanel),
+ * so tldraw's tracked pointer position goes stale the moment the cursor is
+ * over that content -- exactly where a wheel-scroll fix is needed. Rather
+ * than widen what reaches tldraw's pointer pipeline just to keep that
+ * position fresh, this intercepts the wheel event directly.
  *
  * tldraw's canvas-pan/zoom listener is bound in bubble phase on an ancestor,
  * so a capture-phase listener here always runs first regardless of that
