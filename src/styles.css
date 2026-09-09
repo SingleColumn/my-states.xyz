@@ -443,6 +443,14 @@ button {
   pointer-events: none !important;
 }
 
+/* A real DOM node purely as an anchor for the native wheel listener in
+   PanelShape.tsx -- see useNativeWheelScrollScope there. `display: contents`
+   keeps it out of layout entirely, so .panel still sizes directly against
+   .canvas-panel-shell as if this wrapper were not there. */
+.canvas-panel-wheel-scope {
+  display: contents;
+}
+
 .canvas-panel-shell button,
 .canvas-panel-shell input,
 .canvas-panel-shell select,
@@ -1625,12 +1633,6 @@ input[type="range"] {
   color: var(--color-input-text);
 }
 
-.notes-rich-editor .mdxeditor-root-contenteditable {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
 .notes-editor-content {
   min-height: 100%;
   padding: var(--card-padding);
@@ -1800,14 +1802,17 @@ input[type="range"] {
   display: contents;
 }
 
-/* Flattening the wrapper hands its height duty to the elements it used to
-   contain, so the chain down to the scroller has to fill again. Without this
-   the page stops at the height of the text and the space below it is dead.
-   The rich-text wrapper in the middle is filled by height rather than by
-   flex: MDXEditor sets its `display` inline to swap between the rich-text,
-   source and diff views, so overriding that property here would leave every
-   view visible at once. */
-.notes-editor-blocker.is-writing .mdxeditor-diff-source-wrapper {
+/* MDXEditor nests the toolbar and every view (rich-text, source, diff) inside
+   several of its own wrapper elements, none of which fill the height they're
+   given by default -- they size to content and rely on a fixed-height page to
+   clip them, which this app doesn't have. Without this, a note longer than
+   the panel just overflows and gets hard-clipped by the nearest
+   `overflow: hidden` ancestor instead of scrolling: there is no scrollbar and
+   no way to reach the rest of it, in either the default panel or writing
+   mode. Unscoped from any mode, since the wrapper chain is identical in both
+   -- only which ancestor is the real flex container changes (`.notes-rich-editor`
+   normally, or `.notes-editor-blocker.is-writing` once writing mode flattens it). */
+.notes-editor-blocker .mdxeditor-diff-source-wrapper {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -1816,12 +1821,17 @@ input[type="range"] {
 
 /* The rich-text, source and diff views are swapped in this slot, so fill
    whichever one is mounted rather than naming them. */
-.notes-editor-blocker.is-writing .mdxeditor-diff-source-wrapper > * {
+.notes-editor-blocker .mdxeditor-diff-source-wrapper > * {
   flex: 1;
   min-height: 0;
 }
 
-.notes-editor-blocker.is-writing .mdxeditor-root-contenteditable {
+/* The rich-text wrapper in the middle is filled by height rather than by
+   flex: MDXEditor sets its `display` inline to swap between the rich-text,
+   source and diff views, so overriding that property here would leave every
+   view visible at once. The rule above already gives it a determinate height
+   as a flex item, so `height: 100%` on its child resolves against that. */
+.notes-editor-blocker .mdxeditor-root-contenteditable {
   height: 100%;
   overflow: auto;
 }

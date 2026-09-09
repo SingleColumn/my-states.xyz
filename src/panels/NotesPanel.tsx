@@ -38,8 +38,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // untouched so the two treatments can be compared side by side.
   const isWritingMode = commands.isPanelFullScreen(panelId)
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
+  // The formatting bar is a lot of buttons for two sentences of text, so it
+  // starts folded away behind the Aa toggle in both the default panel and
+  // writing mode -- one preference, remembered across both.
   const [isToolbarVisible, setIsToolbarVisible] = useState(() => readToolbarVisible())
-  const showToolbar = !isWritingMode || isToolbarVisible
   const activeNoteId = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
@@ -82,7 +84,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         panelId={panelId}
         panelType="notes"
         title="Notes"
-        leadingActions={isWritingMode ? (
+        leadingActions={
           <button
             className={`card-icon-button${isToolbarVisible ? ' is-active' : ''}`}
             type="button"
@@ -99,7 +101,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           >
             <Type size={18} />
           </button>
-        ) : undefined}
+        }
       >
           {isWritingMode ? (
             <label className="writing-note-picker" {...canvasEventBlockerProps}>
@@ -178,7 +180,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               'notes-editor-blocker',
               'card-content',
               isWritingMode ? 'is-writing' : '',
-              showToolbar ? '' : 'is-toolbar-hidden',
+              isToolbarVisible ? '' : 'is-toolbar-hidden',
             ].filter(Boolean).join(' ')}
             style={{ '--notes-editor-font-size': fontSize } as CSSProperties}
             {...canvasEventBlockerProps}
@@ -198,7 +200,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               className="notes-rich-editor dark-theme"
               contentEditableClassName="notes-editor-content"
               markdown={activeNote.content}
-              placeholder={isWritingMode ? writingPlaceholder : 'Start writing...'}
+              placeholder={editorPlaceholder}
               onChange={(content) => notes.setActiveNoteContent(content, panelId)}
               plugins={createNotesEditorPlugins(fontSize, (value) => {
                 setFontSize(value)
@@ -248,7 +250,7 @@ const editorFontSizes = new Set(['14px', '16px', '18px', '20px'])
 
 // The empty page has to carry the discoverability that the hidden toolbar
 // gives up, so it names the two routes to formatting that exist today.
-const writingPlaceholder = 'Start writing. Type # for a heading or - for a list, or open Aa above for all formatting.'
+const editorPlaceholder = 'Start writing. Type # for a heading or - for a list, or open Aa above for all formatting.'
 
 function readEditorFontSize() {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)

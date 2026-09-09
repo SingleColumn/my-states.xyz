@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
@@ -6,6 +7,7 @@ import {
   T,
   TLBaseShape,
   useEditor,
+  useValue,
 } from 'tldraw'
 import { useAppState } from './AppState'
 import type { PanelType } from './types'
@@ -48,8 +50,23 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     }
   }
 
+  // A panel can own content that wants keyboard and clipboard input for
+  // itself -- typing into the Notes editor, in particular -- rather than
+  // having tldraw treat Delete/Escape/Ctrl+C as canvas shortcuts. tldraw
+  // already has a built-in escape hatch for exactly this: its keyboard and
+  // clipboard shortcut handlers stand down while a shape is the "editing"
+  // shape, the same way they do while one of tldraw's own text shapes is
+  // being typed into. See useKeepShapeEditingWhileSelected below for how a
+  // panel becomes that shape, and useNativeWheelScrollScope for why wheel
+  // needs a separate fix rather than also riding on this one.
+  override canEdit() {
+    return true
+  }
+
   override component(shape: PanelShape) {
     const editor = useEditor()
+    useKeepShapeEditingWhileSelected(editor, shape.id)
+    const wheelScopeRef = useNativeWheelScrollScope()
 
     return (
       <HTMLContainer
@@ -62,7 +79,9 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
           height: shape.props.h,
         }}
       >
-        <PanelContent panelId={shape.props.panelId} />
+        <div ref={wheelScopeRef} className="canvas-panel-wheel-scope">
+          <PanelContent panelId={shape.props.panelId} />
+        </div>
       </HTMLContainer>
     )
   }
@@ -91,6 +110,100 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
       },
     }
   }
+}
+
+/**
+ * Mirrors panel selection into tldraw's `editingShapeId`. That field is what
+ * tldraw's keyboard and clipboard shortcut handlers check before intercepting
+ * Ctrl+C/V, Delete and Escape -- the same mechanism tldraw's built-in text
+ * shapes rely on while being typed into. Setting it here means content inside
+ * the selected panel owns that input for as long as it stays selected,
+ * without touching those events by hand. Wheel is handled separately, by
+ * useNativeWheelScrollScope below -- see its comment for why this field alone
+ * does not cover it.
+ */
+function useKeepShapeEditingWhileSelected(editor: ReturnType<typeof useEditor>, shapeId: PanelShape['id']) {
+  const isOnlySelected = useValue(
+    'panel is only selected shape',
+    () => editor.getOnlySelectedShapeId() === shapeId,
+    [editor, shapeId],
+  )
+
+  useEffect(() => {
+    if (!isOnlySelected) return
+    editor.setEditingShape(shapeId)
+    return () => {
+      // Selection can move directly from one panel to another in the same
+      // commit, in which case the next panel's effect can run before this
+      // one's cleanup. Only clear the field if it still names this panel.
+      if (editor.getEditingShapeId() === shapeId) editor.setEditingShape(null)
+    }
+  }, [editor, isOnlySelected, shapeId])
+}
+
+/**
+ * Lets a genuinely scrollable region inside a panel -- the Notes editor, in
+ * particular -- own the wheel instead of the canvas panning underneath it.
+ *
+ * tldraw's own gesture handler has a matching escape hatch (`canScroll` on
+ * the shape util, gated by the shape being tldraw's "editing" shape), but it
+ * depends on tldraw's own pointer-position tracking, which panel content
+ * starves: a click or drag on interactive/text content is deliberately kept
+ * from reaching tldraw at all (see handlePanelPointerDownCapture and
+ * canvasEventBlockerProps in NotesPanel), so tldraw's tracked pointer
+ * position goes stale the moment the cursor is over that content -- exactly
+ * where a wheel-scroll fix is needed. Rather than widen what reaches tldraw's
+ * pointer pipeline just to keep that position fresh, this intercepts the
+ * wheel event directly.
+ *
+ * tldraw's canvas-pan/zoom listener is bound in bubble phase on an ancestor,
+ * so a capture-phase listener here always runs first regardless of that
+ * pointer state -- capture listeners along a path finish before any bubble
+ * listener anywhere on it starts. The scroll itself is applied by hand rather
+ * than left to the browser's default action: tldraw also registers a
+ * non-passive wheel listener further up, and stopping propagation before a
+ * non-passive listener gets to run leaves some browsers unable to resolve
+ * whether the gesture was prevented, so the default scroll silently never
+ * happens. Applying it directly removes that ambiguity.
+ */
+function useNativeWheelScrollScope() {
+  const ref = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    node.addEventListener('wheel', handleNativeWheel, { capture: true, passive: false })
+    return () => node.removeEventListener('wheel', handleNativeWheel, { capture: true })
+  }, [])
+
+  return ref
+}
+
+function handleNativeWheel(event: WheelEvent) {
+  // Ctrl/Cmd+wheel is a zoom gesture, not a scroll -- leave it for tldraw to
+  // zoom the canvas even while the pointer is over scrollable content.
+  if (event.ctrlKey || event.metaKey) return
+  if (!(event.currentTarget instanceof Element) || !(event.target instanceof Node)) return
+  const scrollable = findScrollableAncestor(event.target, event.currentTarget)
+  if (!scrollable) return
+  event.preventDefault()
+  event.stopPropagation()
+  scrollable.scrollTop += event.deltaY
+  scrollable.scrollLeft += event.deltaX
+}
+
+function findScrollableAncestor(start: Node, boundary: Element): HTMLElement | null {
+  let node: Node | null = start
+  while (node) {
+    if (node instanceof HTMLElement) {
+      const style = getComputedStyle(node)
+      const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight
+      if (canScrollY) return node
+    }
+    if (node === boundary) break
+    node = node.parentNode
+  }
+  return null
 }
 
 function PanelContent({ panelId }: { panelId: string }) {
