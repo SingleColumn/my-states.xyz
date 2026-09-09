@@ -1,6 +1,133 @@
 {
   "collections": [
     {
+      "id": "artigen-ai",
+      "title": "artigen-ai",
+      "cover": "/sample-images/artigen-ai/01-artigen-ai-9e1e9e5e871a.jpg",
+      "images": [
+        {
+          "url": "/sample-images/artigen-ai/01-artigen-ai-9e1e9e5e871a.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DcrI3HfjbhL/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/02-artigen-ai-77af4c0d48a5.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DcrI3HfjbhL/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/03-artigen-ai-9b919a15db87.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/Dcy8yeZDWVi/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/04-artigen-ai-90d82dff7f6b.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DILumIGoRvu/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/05-artigen-ai-9286dba56b18.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DILumIGoRvu/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/06-artigen-ai-23baf7a5255c.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DILumIGoRvu/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/07-artigen-ai-e82db9ffdb61.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DILumIGoRvu/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/08-artigen-ai-a55d0b9c90ba.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DILumIGoRvu/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/09-artigen-ai-ceb8ab3d229b.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DILumIGoRvu/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/10-artigen-ai-ccf6b070f7c4.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/11-artigen-ai-b1a6de3360e2.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/12-artigen-ai-4c5b6e4de44d.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/13-artigen-ai-0bdffac595c6.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/14-artigen-ai-bcd6b27d02c6.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/15-artigen-ai-c4db651ffdba.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/16-artigen-ai-b7b8613805d4.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/17-artigen-ai-850fa5dfa74b.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/18-artigen-ai-0afe8591ed9f.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/19-artigen-ai-cea1044add31.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        },
+        {
+          "url": "/sample-images/artigen-ai/20-artigen-ai-b35b4878ef4a.jpg",
+          "creator": "artigen.ai",
+          "creatorUrl": "https://www.instagram.com/artigen.ai/",
+          "sourceUrl": "https://www.instagram.com/p/DMr9IThoa3P/"
+        }
+      ]
+    },
+    {
       "id": "eightbitstrana",
       "title": "eightbitstrana",
       "cover": "/sample-images/eightbitstrana/01-eightbitstrana-15ae5aca8b4c.jpg",
@@ -124,6 +251,133 @@
           "creator": "eightbitstrana",
           "creatorUrl": "https://www.instagram.com/eightbitstrana/",
           "sourceUrl": "https://www.instagram.com/p/DItfAlkIIH7/"
+        }
+      ]
+    },
+    {
+      "id": "iamsentient",
+      "title": "iamsentient",
+      "cover": "/sample-images/iamsentient/01-iamsentient-e66b778a3e57.jpg",
+      "images": [
+        {
+          "url": "/sample-images/iamsentient/01-iamsentient-e66b778a3e57.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DNg5pdGTvvu/"
+        },
+        {
+          "url": "/sample-images/iamsentient/02-iamsentient-ad4885e9665f.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DNj5dliTRaH/"
+        },
+        {
+          "url": "/sample-images/iamsentient/03-iamsentient-8299859d0186.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DNme1tKziw2/"
+        },
+        {
+          "url": "/sample-images/iamsentient/04-iamsentient-82b7967a8ffb.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DNx_CDZ5M6k/"
+        },
+        {
+          "url": "/sample-images/iamsentient/05-iamsentient-6b0bbe3b2639.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DNx_CDZ5M6k/"
+        },
+        {
+          "url": "/sample-images/iamsentient/06-iamsentient-381b2df2b15d.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DN6FWQNkpjx/"
+        },
+        {
+          "url": "/sample-images/iamsentient/07-iamsentient-49af745362aa.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DN8wsi4kjk1/"
+        },
+        {
+          "url": "/sample-images/iamsentient/08-iamsentient-2d52a67672fc.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DN8wsi4kjk1/"
+        },
+        {
+          "url": "/sample-images/iamsentient/09-iamsentient-2848e46c199c.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOSSsQcklzb/"
+        },
+        {
+          "url": "/sample-images/iamsentient/10-iamsentient-0121e5fbbfee.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOcFl3kEl3X/"
+        },
+        {
+          "url": "/sample-images/iamsentient/11-iamsentient-0061e33a14b9.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOcFl3kEl3X/"
+        },
+        {
+          "url": "/sample-images/iamsentient/12-iamsentient-965197c05ff9.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOfAyMKEuHi/"
+        },
+        {
+          "url": "/sample-images/iamsentient/13-iamsentient-47b73e0e82c2.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOhzXpLEolB/"
+        },
+        {
+          "url": "/sample-images/iamsentient/14-iamsentient-8d4dd62d66b4.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOsch7TklJ7/"
+        },
+        {
+          "url": "/sample-images/iamsentient/15-iamsentient-c5156e05ad23.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DPW1IirErEp/"
+        },
+        {
+          "url": "/sample-images/iamsentient/16-iamsentient-6595590a6c66.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DPmKWqzkl34/"
+        },
+        {
+          "url": "/sample-images/iamsentient/17-iamsentient-823fecbba913.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOXVIoyEmhk/"
+        },
+        {
+          "url": "/sample-images/iamsentient/18-iamsentient-aa939730f83b.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DQUzYfdk3XK/"
+        },
+        {
+          "url": "/sample-images/iamsentient/19-iamsentient-c786132ff896.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DQUzYfdk3XK/"
+        },
+        {
+          "url": "/sample-images/iamsentient/20-iamsentient-d423a7eed834.jpg",
+          "creator": "iamsentient_",
+          "creatorUrl": "https://www.instagram.com/iamsentient_/",
+          "sourceUrl": "https://www.instagram.com/p/DOMPQhcElKn/"
         }
       ]
     },
@@ -311,6 +565,133 @@
           "creator": "jaumecopilotos_ai",
           "creatorUrl": "https://www.instagram.com/jaumecopilotos_ai/",
           "sourceUrl": "https://www.instagram.com/p/DG7xOdxCjfV/"
+        }
+      ]
+    },
+    {
+      "id": "rbnks",
+      "title": "rbnks",
+      "cover": "/sample-images/rbnks/01-rbnks-af0720d6b7b4.jpg",
+      "images": [
+        {
+          "url": "/sample-images/rbnks/01-rbnks-af0720d6b7b4.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/CvdLVbQtOWl/"
+        },
+        {
+          "url": "/sample-images/rbnks/02-rbnks-a2d74d97a9bc.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/Cv2lua7NJef/"
+        },
+        {
+          "url": "/sample-images/rbnks/03-rbnks-e7ab55c88b39.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/Cv8RbPnt4kS/"
+        },
+        {
+          "url": "/sample-images/rbnks/04-rbnks-c08941ad3405.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/CwEA3VzMVJO/"
+        },
+        {
+          "url": "/sample-images/rbnks/05-rbnks-9d64844e55c5.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/Cy1uid-N2fd/"
+        },
+        {
+          "url": "/sample-images/rbnks/06-rbnks-68ec1602d798.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/CzuEPKOt9XW/"
+        },
+        {
+          "url": "/sample-images/rbnks/07-rbnks-d6e68bddb376.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/C1Vbwp7NFwQ/"
+        },
+        {
+          "url": "/sample-images/rbnks/08-rbnks-602b54a5b176.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/C1F5odCtU0S/"
+        },
+        {
+          "url": "/sample-images/rbnks/09-rbnks-6f2ad83779d7.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/C2ixjKnoXJz/"
+        },
+        {
+          "url": "/sample-images/rbnks/10-rbnks-7b5a085b9b63.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/C5hFhtctNLS/"
+        },
+        {
+          "url": "/sample-images/rbnks/11-rbnks-32a7c144f125.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/C5y89XmNB_v/"
+        },
+        {
+          "url": "/sample-images/rbnks/12-rbnks-4d986c8bccbe.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DABwWpRtkJl/"
+        },
+        {
+          "url": "/sample-images/rbnks/13-rbnks-81608f8feebb.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DAq_g1WtW7n/"
+        },
+        {
+          "url": "/sample-images/rbnks/14-rbnks-72b0cf371628.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DGWb87Atjia/"
+        },
+        {
+          "url": "/sample-images/rbnks/15-rbnks-4156055126da.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DUoognojIC6/"
+        },
+        {
+          "url": "/sample-images/rbnks/16-rbnks-6e301324507a.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DS7_uYtjFYh/"
+        },
+        {
+          "url": "/sample-images/rbnks/17-rbnks-713627a5c901.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DQM-TeXjaoa/"
+        },
+        {
+          "url": "/sample-images/rbnks/18-rbnks-f85b4d705388.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DKni31ht5Ai/"
+        },
+        {
+          "url": "/sample-images/rbnks/19-rbnks-f481f08fe01a.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DG6aakGtqSQ/"
+        },
+        {
+          "url": "/sample-images/rbnks/20-rbnks-3c3f1640c0ff.jpg",
+          "creator": "rbnks",
+          "creatorUrl": "https://www.instagram.com/rbnks/",
+          "sourceUrl": "https://www.instagram.com/p/DF8yyGKNj0V/"
         }
       ]
     },

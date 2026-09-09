@@ -204,19 +204,25 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           </>
         ) : (
           <div className="empty-stage">
-            <h3>Add images</h3>
-            <button className="card-icon-button is-primary is-wide empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
-            <span className="empty-stage-divider">Or try a sample collection</span>
-            <div className="empty-stage-collections">
-              {collections.map((collection) => (
-                <SampleCollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  variant="tile"
-                  onSelect={() => void chooseSample(collection.id)}
-                  onPointerDown={stopCanvasEvent}
-                />
-              ))}
+            {/* Two ways in, weighted the same: peer headings over peer controls,
+                so neither the folder nor the samples read as the afterthought. */}
+            <div className="empty-stage-option">
+              <h3>Select images from a folder</h3>
+              <button className="card-icon-button is-wide empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
+            </div>
+            <div className="empty-stage-option">
+              <h3>Or try a sample collection</h3>
+              <div className="empty-stage-collections">
+                {collections.map((collection) => (
+                  <SampleCollectionCard
+                    key={collection.id}
+                    collection={collection}
+                    variant="tile"
+                    onSelect={() => void chooseSample(collection.id)}
+                    onPointerDown={stopCanvasEvent}
+                  />
+                ))}
+              </div>
             </div>
             {panelSettings.imageSource.type === 'bundled' || panelError ? <p className="empty-stage-status" role="status">{panelStatus}</p> : null}
           </div>

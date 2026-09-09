@@ -777,9 +777,11 @@ input[type="range"] {
 .spotify-login h3 {
   margin: 0 0 var(--space-spotify-title-bottom);
   font-size: var(--font-size-spotify-login-title);
-  /* Without this the browser default (bold) makes it heavier than the matching
-     headings in the Images and Notes empty states. */
-  font-weight: var(--font-weight-semibold);
+  /* Explicit because the browser default (bold) would otherwise make this
+     heavier than the matching headings in the Images and Notes empty states.
+     Medium across all three: at semibold every line in a panel was bold, so
+     weight had stopped separating anything. */
+  font-weight: var(--font-weight-medium);
 }
 
 .spotify-login p,
@@ -1277,8 +1279,13 @@ input[type="range"] {
      grows. A real column lets the actions fill the width they are given. */
   grid-template-columns: min(100%, var(--empty-stage-content-max));
   justify-content: center;
+  /* `safe` matters once the stage carries six samples: in a short panel the
+     centred block overflows both edges, and the part above the top is scrolled
+     past already at scrollTop 0, so the first heading could never be reached.
+     Safe centring drops back to start-alignment exactly in that case. */
   align-content: center;
-  gap: var(--space-empty-stage-gap);
+  align-content: safe center;
+  gap: var(--empty-stage-option-gap);
   height: 100%;
   color: var(--color-text-muted);
   text-align: center;
@@ -1699,8 +1706,8 @@ input[type="range"] {
 
 .notes-empty-state h3 {
   margin: 0;
-  font-size: var(--type-lg);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-md);
+  font-weight: var(--font-weight-medium);
 }
 
 .empty-note-button {
@@ -1961,39 +1968,53 @@ input[type="range"] {
   gap: clamp(6px, 1.5cqi, 10px);
 }
 
-/* Secondary treatment. The folder button deliberately does NOT share it: it is
-   the panel's primary action and takes the accent styling that the Spotify and
-   Notes panels give theirs, so each panel shows exactly one obvious next step. */
-.sample-collection-card {
-  border: var(--border-width-hairline) solid var(--card-button-border);
-  border-radius: var(--button-radius);
-  background: var(--card-button-bg);
-  color: var(--color-input-text);
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.sample-collection-card:hover {
-  border-color: var(--card-button-active-border);
-  background: var(--card-button-bg-hover);
-}
-
 /* A cover image says what a folder name cannot, so the name is free to stay
    exactly as it is: the creator's profile, shown as the credit it is. */
 .sample-collection-card {
   display: grid;
   min-width: 0;
   padding: 0;
-  overflow: hidden;
-  border-radius: var(--content-radius);
+  /* The global reset zeroes button borders but not backgrounds, and only the
+     row variant paints a surface now, so the tiles would otherwise sit on the
+     browser's default button grey. */
+  background: none;
+  color: var(--color-input-text);
+  cursor: pointer;
   text-align: left;
 }
 
+/* The plate belongs to the picker's rows, not to the onboarding tiles. A row is
+   a line of text and needs a surface to sit on; a tile already has one in its
+   cover, and six bordered boxes made the empty stage read as chrome first and
+   artwork second. Secondary treatment either way, shared with the folder button
+   in the empty stage, so the two ways into the panel stay peers. */
 .sample-collection-card.is-row {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--sample-card-gap);
   padding: var(--sample-card-padding);
+  overflow: hidden;
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--content-radius);
+  background: var(--card-button-bg);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.sample-collection-card.is-row:hover {
+  border-color: var(--card-button-active-border);
+  background: var(--card-button-bg-hover);
+}
+
+/* The caption sits under the artwork at the distance the plate's padding used
+   to hold it, and centres because everything else in the stage does. */
+.sample-collection-card.is-tile {
+  gap: var(--sample-card-padding);
+  text-align: center;
+}
+
+/* With no plate left to tint, the artwork itself answers the pointer. */
+.sample-collection-card.is-tile:hover .sample-collection-cover {
+  filter: brightness(var(--sample-card-cover-hover-brightness));
 }
 
 .sample-collection-cover {
@@ -2022,6 +2043,8 @@ input[type="range"] {
   width: 100%;
   aspect-ratio: 1 / 1;
   max-height: var(--sample-card-cover-tile-max);
+  border-radius: var(--content-radius);
+  transition: filter var(--transition-fast);
 }
 
 .sample-collection-card.is-row .sample-collection-cover {
@@ -2035,17 +2058,19 @@ input[type="range"] {
   min-width: 0;
 }
 
-.sample-collection-card.is-tile .sample-collection-text {
-  padding: var(--sample-card-padding);
-}
-
 .sample-collection-name {
   color: var(--color-input-text);
   font-size: var(--sample-card-name-size);
-  font-weight: var(--font-weight-semibold);
+  /* Regular, not smaller: --type-sm is already the smallest body step and these
+     are people's handles, some of which wrap to a second line. Weight is the
+     lever that quietens them without costing legibility. */
+  font-weight: var(--font-weight-regular);
   line-height: var(--line-height-control);
   /* A handle is someone's name: it may wrap at a separator, but it is never
-     truncated and never broken mid-word. */
+     truncated. As a grid item it would otherwise hold its min-content width and
+     spill past the card's hidden overflow, clipping the tail of a long handle;
+     min-width lets it shrink so the wrap below can happen instead. */
+  min-width: 0;
   overflow-wrap: break-word;
 }
 
@@ -2060,38 +2085,49 @@ input[type="range"] {
   padding: clamp(12px, 3cqi, 28px);
 }
 
+/* Both onboarding labels are h3s and share every one of these values: matching
+   size, weight and colour is what makes the two options read as equal choices. */
 .empty-stage h3 {
   margin: 0;
   color: var(--color-panel-text);
-  font-size: var(--type-lg);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-md);
+  font-weight: var(--font-weight-medium);
+  /* Wraps onto an even second line in a narrow panel rather than being clipped. */
+  text-wrap: balance;
 }
 
-/* Sizing, colour and weight all come from `card-icon-button is-primary is-wide`,
-   the same trio the Spotify and Notes primary actions use. Only the label needs
-   holding on one line. */
+/* A heading and its control travel together, tighter than the gap between the
+   two options, so the stage reads as two blocks rather than four loose rows. */
+.empty-stage-option {
+  display: grid;
+  justify-items: center;
+  gap: var(--empty-stage-block-gap);
+}
+
+/* Sizing and weight come from `card-icon-button is-wide`. The accent fill is
+   deliberately absent: this button and the sample cards below it are the same
+   offer made twice, so they wear the same quiet surface. The icon colour that
+   surface normally carries is too dim for a label, hence the text colour the
+   sample collection names use. */
 .empty-stage-folder-button {
+  color: var(--color-input-text);
   white-space: nowrap;
-}
-
-.empty-stage-divider {
-  color: var(--color-text-muted);
-  font-size: var(--type-sm);
 }
 
 .empty-stage-collections {
   display: grid;
-  /* Three samples, so auto-fit is the wrong tool: at middling widths it fits
-     two and drops the third onto a lonely second row. One column or all three,
-     switched on the panel's own width. */
+  /* Six samples, so auto-fit is the wrong tool: at middling widths it fits four
+     and leaves a ragged pair on the last row. One column or all three, switched
+     on the panel's own width, so the grid is always evenly filled. */
   grid-template-columns: minmax(0, 1fr);
   gap: var(--empty-stage-block-gap);
   width: 100%;
 }
 
-/* Three across only once each tile is wide enough to hold the longest handle;
-   below that the tiles turn into rows so the covers stay small and the names
-   keep a full line to themselves. */
+/* Three across only once each tile is wide enough to hold the longest handle,
+   which with six collections lands them as two full rows of three; below that
+   the tiles turn into rows so the covers stay small and the names keep a full
+   line to themselves. */
 @container panel-shell (min-width: 440px) {
   .empty-stage-collections {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2099,11 +2135,30 @@ input[type="range"] {
 }
 
 @container panel-shell (max-width: 439px) {
+  /* Down here a tile is a row, so it takes the row's plate and alignment back:
+     a bare cover beside a bare name has nothing holding the pair together, and
+     a centred caption next to a 40px thumbnail reads as a mistake. */
   .sample-collection-card.is-tile {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: var(--sample-card-gap);
     padding: var(--sample-card-padding);
+    overflow: hidden;
+    border: var(--border-width-hairline) solid var(--card-button-border);
+    border-radius: var(--content-radius);
+    background: var(--card-button-bg);
+    text-align: left;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .sample-collection-card.is-tile:hover {
+    border-color: var(--card-button-active-border);
+    background: var(--card-button-bg-hover);
+  }
+
+  /* The plate answers the pointer again, so the cover should not do it twice. */
+  .sample-collection-card.is-tile:hover .sample-collection-cover {
+    filter: none;
   }
 
   .sample-collection-card.is-tile .sample-collection-cover {
@@ -2111,10 +2166,6 @@ input[type="range"] {
     height: var(--sample-card-cover-row);
     aspect-ratio: auto;
     border-radius: var(--radius-slideshow-thumbnail);
-  }
-
-  .sample-collection-card.is-tile .sample-collection-text {
-    padding: 0;
   }
 
   .sample-collection-card.is-tile .sample-collection-name {
@@ -2133,8 +2184,10 @@ input[type="range"] {
    light-theme text colour; only the type scale is set here. */
 .panel-slideshow-surface .empty-stage h3 {
   font-size: var(--empty-stage-title-size);
-  /* Semibold, matching the Music and Notes empty-state headings. */
-  font-weight: var(--font-weight-semibold);
+  /* Medium, deliberately lighter than the Music and Notes empty-state headings.
+     Those announce one outcome above one action; these two label a choice, and
+     boldface claimed an importance the sentences do not need. */
+  font-weight: var(--font-weight-medium);
   line-height: var(--line-height-control);
 }
 
@@ -2142,24 +2195,18 @@ input[type="range"] {
   color: var(--color-input-text) !important;
 }
 
-/* Keep the empty state centered, while giving its controls comfortable rhythm. */
+/* Keep the empty state centered, while giving its controls comfortable rhythm.
+   Safe centring for the same reason as the base rule: never clip the top of the
+   stack out of reach in a panel too short to hold it. */
 .panel-slideshow-surface .empty-stage {
   align-content: center;
-  gap: var(--empty-stage-block-gap);
+  align-content: safe center;
+  gap: var(--empty-stage-option-gap);
   padding: clamp(20px, 4cqi, 36px) clamp(16px, 5cqi, 44px);
 }
 
 .panel-slideshow-surface .empty-stage h3 {
   margin: 0;
-}
-
-.panel-slideshow-surface .empty-stage-divider {
-  color: var(--color-text-soft) !important;
-  font-size: var(--empty-stage-hint-size);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-hint);
-  /* Wraps onto an even second line in a narrow panel rather than being clipped. */
-  text-wrap: balance;
 }
 
 /* The collections sit side by side and wrap only when the panel is too narrow

@@ -137,7 +137,7 @@
   --font-size-app-badge-title: 13px;
   --font-size-app-badge-meta: 12px;
   --font-size-dropdown: var(--font-size-app-badge-meta);
-  --font-size-spotify-login-title: var(--type-lg);
+  --font-size-spotify-login-title: var(--type-md);
   --font-size-track-title: var(--type-lg);
   --font-size-track-meta: var(--type-sm);
   --font-size-progress: var(--type-xs);
@@ -238,14 +238,16 @@
   --size-empty-stage-copy-max: 260px;
   --size-empty-stage-button: 74px;
   /* Static fallbacks; the .panel block below scales these with the panel. */
-  --empty-stage-title-size: var(--type-lg);
-  --empty-stage-hint-size: var(--type-sm);
+  --empty-stage-title-size: var(--type-md);
   --empty-stage-content-max: 340px;
   --empty-stage-block-gap: 12px;
+  --empty-stage-option-gap: 22px;
   --sample-card-padding: 10px;
   --sample-card-gap: 10px;
   --sample-card-cover-row: 44px;
-  --sample-card-cover-tile-max: 200px;
+  --sample-card-cover-tile-max: 120px;
+  /* Not panel-scaled: a hover lift is the same amount of lift at every size. */
+  --sample-card-cover-hover-brightness: 1.12;
   --sample-card-name-size: var(--type-sm);
   --size-zoom-readout-min: 44px;
   --size-toast-max-width: 520px;
@@ -356,7 +358,7 @@
   --font-size-panel-label: var(--type-sm);
 
   /* Spotify. */
-  --font-size-spotify-login-title: var(--type-lg);
+  --font-size-spotify-login-title: var(--type-md);
   --font-size-track-title: var(--type-lg);
   --font-size-track-meta: var(--type-sm);
   --font-size-progress: var(--type-xs);
@@ -408,20 +410,27 @@
 
   /* The onboarding state scales with the panel like the rest of the chrome.
      Sized just under --card-title-size so the panel title stays dominant. */
-  /* A section heading sits one rung below the panel title, never level with
-     it and never above it. The actions read as body text, like every other
-     button in the app. */
-  --empty-stage-title-size: var(--type-lg);
-  --empty-stage-hint-size: var(--type-sm);
+  /* Two rungs below the panel title, not one. These label the two ways into
+     the panel rather than announcing an outcome, and at --type-lg semibold they
+     sat close enough to the 20px title that weight and size stopped separating
+     anything: every line in the panel was bold, so the hierarchy read flat.
+     Body size carries an instruction perfectly well on this dark ground. */
+  --empty-stage-title-size: var(--type-md);
   /* Widened from 66cqi now that the onboarding row carries cover images: the
      tiles need the room to hold the longest creator name on one line at the
      default panel size, and the stage no longer reads as mostly empty. */
   --empty-stage-content-max: clamp(300px, 84cqi, 760px);
   --empty-stage-block-gap: clamp(10px, min(2.6cqi, 2.1cqb), 110px);
+  /* Wider than the block gap, so a heading stays visibly attached to the
+     control it names instead of floating between the two options. */
+  --empty-stage-option-gap: clamp(16px, min(4.4cqi, 3.6cqb), 190px);
   --sample-card-padding: clamp(8px, min(1.9cqi, 1.6cqb), 80px);
   --sample-card-gap: clamp(9px, min(2cqi, 1.7cqb), 84px);
   --sample-card-cover-row: clamp(40px, min(9cqi, 7.5cqb), 200px);
-  --sample-card-cover-tile-max: clamp(110px, 22cqb, 300px);
+  /* Halved now that the samples fill two rows rather than one: the covers keep
+     the grid to about the height a single row of taller tiles used to take, and
+     the whole onboarding stack still clears a default-sized panel unscrolled. */
+  --sample-card-cover-tile-max: clamp(60px, 9.5cqb, 150px);
   --sample-card-name-size: var(--type-sm);
   --image-panel-control-x: clamp(12px, min(3cqi, 2.4cqb), 120px);
   --image-panel-control-bottom: clamp(12px, min(2.8cqi, 2.2cqb), 110px);
