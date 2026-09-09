@@ -28,9 +28,6 @@
      so it needs a surface of its own - a transparent bar lets the note scroll
      visibly through the buttons. */
   --background-notes-toolbar: rgba(9, 17, 17, 0.97);
-  /* Marks where the writing column ends, so wrapping is not mistaken for the
-     note's own line breaks. */
-  --color-writing-guide: rgba(255, 255, 255, 0.09);
   --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
   --color-focus-ring: rgba(255, 255, 255, 0.46);
   /* The slideshow accent lifted toward light. Glows read as emitted light, and
