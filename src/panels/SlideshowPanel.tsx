@@ -189,11 +189,15 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
       <div className="slideshow-stage card-content" style={{ aspectRatio: focusView ? undefined : stageAspectRatio }}>
         {currentImage ? (
           <>
+          {/* In focus view the picture covers the whole panel and the header that
+              normally drags it is gone, so the image has to let the press reach the
+              canvas. Everywhere else it still swallows the press, which keeps a
+              click on the picture from moving the panel. */}
           <CrossfadeImage
             image={currentImage}
             transitionMs={panelSettings.transitionMs}
             zoom={panelSettings.zoom}
-            onPointerDown={stopCanvasEvent}
+            onPointerDown={focusView ? undefined : stopCanvasEvent}
           />
           {attribution ? <ImageAttributionOverlay attribution={attribution} onPointerDown={stopCanvasEvent} /> : null}
           {focusView ? (
@@ -272,7 +276,7 @@ function CrossfadeImage({
   image: ImageItem
   transitionMs: number
   zoom: number
-  onPointerDown(event: React.SyntheticEvent): void
+  onPointerDown?(event: React.SyntheticEvent): void
 }) {
   const [displayedImage, setDisplayedImage] = useState(image)
   const [outgoingImage, setOutgoingImage] = useState<ImageItem | null>(null)
@@ -302,7 +306,7 @@ function CrossfadeImage({
           alt=""
           aria-hidden="true"
           draggable={false}
-          onDragStart={(event) => { event.preventDefault(); onPointerDown(event) }}
+          onDragStart={(event) => { event.preventDefault(); onPointerDown?.(event) }}
           onPointerDown={onPointerDown}
           style={imageStyle}
         />
@@ -313,7 +317,7 @@ function CrossfadeImage({
         src={displayedImage.url}
         alt={displayedImage.name}
         draggable={false}
-        onDragStart={(event) => { event.preventDefault(); onPointerDown(event) }}
+        onDragStart={(event) => { event.preventDefault(); onPointerDown?.(event) }}
         onPointerDown={onPointerDown}
         style={{ ...imageStyle, animationDuration: `${transitionMs}ms` }}
       />
