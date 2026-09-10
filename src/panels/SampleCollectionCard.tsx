@@ -31,19 +31,16 @@ export function SampleCollectionCard({
   collection,
   variant,
   onSelect,
-  onPointerDown,
 }: {
   collection: BundledCollection
   variant: 'tile' | 'row'
   onSelect(): void
-  onPointerDown?(event: React.SyntheticEvent): void
 }) {
   return (
     <button
       className={`sample-collection-card is-${variant}`}
       type="button"
       title={`Load the ${collection.title} collection`}
-      onPointerDown={onPointerDown}
       onClick={onSelect}
     >
       <span className="sample-collection-cover">

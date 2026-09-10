@@ -451,15 +451,29 @@ button {
   display: contents;
 }
 
-.canvas-panel-shell button,
-.canvas-panel-shell input,
-.canvas-panel-shell select,
-.canvas-panel-shell textarea,
-.canvas-panel-shell label,
-.canvas-panel-shell .cm-editor,
-.canvas-panel-shell .mdxeditor,
-.canvas-panel-shell [contenteditable="true"],
-.canvas-panel-shell [role="textbox"] {
+/* The rule (src/panelSurface.ts): a declared content region gets the pointer
+   back; everything else on the panel stays transparent, so a press there
+   reaches tldraw's canvas and behaves like a press on any shape. This is the
+   only pointer-events rule a panel needs. */
+.canvas-panel-shell [data-panel-content] {
+  pointer-events: auto !important;
+}
+
+/* PROTOTYPE SCAFFOLDING: the pre-rule allowlist, now scoped to the two panels
+   that have not been converted yet (Music, Notes). It must agree with the
+   selector list in PanelShape.tsx, which is exactly the problem the rule
+   removes. Delete both once those panels declare their content regions. */
+.canvas-panel-shell :is(.panel-spotify-surface, .panel-notes-surface) :is(
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  .cm-editor,
+  .mdxeditor,
+  [contenteditable="true"],
+  [role="textbox"]
+) {
   pointer-events: auto !important;
 }
 
@@ -1080,7 +1094,6 @@ input[type="range"] {
   min-height: 0;
   margin: var(--image-panel-stage-inset) var(--image-panel-stage-inset-x);
   overflow: hidden;
-  pointer-events: auto !important;
 }
 
 .slideshow-stage img {
@@ -1311,7 +1324,6 @@ input[type="range"] {
   height: 100%;
   color: var(--color-text-muted);
   text-align: center;
-  pointer-events: auto !important;
 }
 
 .empty-stage p {
@@ -1331,7 +1343,6 @@ input[type="range"] {
   background: var(--color-empty-control);
   color: var(--color-input-text);
   cursor: pointer;
-  pointer-events: auto !important;
 }
 
 .empty-stage-button:hover {

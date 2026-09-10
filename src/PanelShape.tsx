@@ -15,6 +15,7 @@ import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
+import { isInsidePanelContent, markPointerEventHandled } from './panelSurface'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 
@@ -73,8 +74,10 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     return (
       <HTMLContainer
         className="canvas-panel-shell"
-        onPointerDownCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
-        onTouchStartCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
+        onPointerDownCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
+        onTouchStartCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
+        onPointerDown={claimPointerDownForContent}
+        onTouchStart={claimPointerDownForContent}
         onContextMenu={(event) => handlePanelContextMenu(editor, shape.id, event)}
         style={{
           width: shape.props.w,
@@ -217,35 +220,72 @@ function handlePanelContextMenu(
   editor.select(shapeId)
 }
 
-function handlePanelPointerDownCapture(
-  editor: ReturnType<typeof useEditor>,
-  shapeId: PanelShape['id'],
-  event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
-) {
+type PanelPressEvent = React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+
+/**
+ * Capture phase: a press anywhere on the panel selects it, before the content
+ * underneath gets to react. Selection is all that happens here -- see
+ * claimPointerDownForContent for why the "this press is the content's" mark
+ * cannot be made in this phase.
+ */
+function selectPanelOnPointerDown(editor: ReturnType<typeof useEditor>, shapeId: PanelShape['id'], event: PanelPressEvent) {
   const isRightClick = 'button' in event && event.button === 2
 
   // Selecting the panel here would pull focus out of the caret, and tldraw
   // would open its own menu over the text. Leave both alone.
-  if (isRightClick && isTextEditingTarget(event.target)) {
-    ;(event as unknown as { isKilled?: boolean }).isKilled = true
-    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-    return
-  }
+  if (isRightClick && isTextEditingTarget(event.target)) return
 
   if (!('button' in event) || event.button === 0 || isRightClick) {
     editor.select(shapeId)
   }
+}
 
-  if (isRightClick) return
+/**
+ * Bubble phase, on the shell: the rule from panelSurface.ts applied once. A
+ * press inside a declared content region is marked as handled so tldraw's
+ * canvas handler, which runs later in this same phase, ignores it; every
+ * other press falls through untouched and tldraw treats it as a press on the
+ * shape.
+ *
+ * This has to be a bubble-phase handler, and the reason is worth knowing.
+ * React dispatches its capture-phase and bubble-phase listeners from two
+ * separate native listeners on the root, and builds a fresh synthetic event
+ * for each, so a flag set on the synthetic event during capture is gone by
+ * the time tldraw's bubble-phase `onPointerDown` on `.tl-canvas` reads it.
+ * The version of this file on main marked the event in a capture handler and
+ * relied, without saying so, on per-widget bubble handlers to do the real
+ * work. Marking here shares the bubble-phase event with tldraw's handler.
+ *
+ * The event is marked rather than stopped so it still reaches the document,
+ * where Radix's outside-click detection and tldraw's own menu-closing logic
+ * listen.
+ */
+function claimPointerDownForContent(event: PanelPressEvent) {
+  const isRightClick = 'button' in event && event.button === 2
   const target = event.target
   if (!(target instanceof Element)) return
 
-  if (target.closest('button, input, select, textarea, label, .cm-editor, [contenteditable="true"], [role="textbox"], [role="option"], [role="combobox"], [data-radix-select-viewport], .mdxeditor-toolbar, .mdxeditor-popup-container, .panel-interactive')) {
-    ;(event as unknown as { isKilled?: boolean }).isKilled = true
-    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-
-    // Keep the event on the document so tldraw's context menu can observe an
-    // outside click and close before a later right-click opens a new menu.
-    // The killed flag still prevents canvas manipulation.
+  // A right-click on text is the browser's: its menu has Cut/Copy/Paste for
+  // the selection, where tldraw's would paste onto the canvas.
+  if (isRightClick) {
+    if (isTextEditingTarget(target)) markPointerEventHandled(event)
+    return
   }
+
+  if (isInsidePanelContent(target) || isLegacyInteractiveTarget(target)) {
+    markPointerEventHandled(event)
+  }
+}
+
+// PROTOTYPE SCAFFOLDING. The Music and Notes panels still use the mechanism
+// that predates the rule: this allowlist, a different allowlist in
+// styles.css, and per-widget stop handlers. Both lists are now scoped to
+// those two panels so the converted Images panel and the shared header rely
+// on nothing but `data-panel-content`. Converting Music and Notes deletes
+// this function, the CSS allowlist, and every stop handler they carry.
+const legacyPanelSelector = '.panel-spotify-surface, .panel-notes-surface'
+const legacyInteractiveSelector = 'button, input, select, textarea, label, .cm-editor, [contenteditable="true"], [role="textbox"], [role="option"], [role="combobox"], [data-radix-select-viewport], .mdxeditor-toolbar, .mdxeditor-popup-container, .panel-interactive'
+
+function isLegacyInteractiveTarget(target: Element) {
+  return target.closest(legacyPanelSelector) !== null && target.closest(legacyInteractiveSelector) !== null
 }
