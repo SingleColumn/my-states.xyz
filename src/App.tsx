@@ -51,6 +51,14 @@ function AppContent() {
   const sessionCanvasRef = useRef<CanvasState | null>(sessions.activeSession?.canvas ?? null)
   const previousPanelGeometryRef = useRef(new Map<string, PanelLayout>())
   const preFocusPanelGeometryRef = useRef(new Map<string, PanelLayout>())
+  // Deleting a panel removes two things that live in different stores: the
+  // tldraw shape, and the Panel record holding its type and configuration.
+  // Only the shape is in tldraw's undo history, so an undo brought back a
+  // shape whose panel was gone and rendered "This panel is no longer
+  // available". The removed record is kept here so the shape's return can put
+  // it back. Entries are only reachable while the history that created them
+  // is, so loading a session clears both together.
+  const deletedPanelsRef = useRef(new Map<string, Panel>())
 
   useEffect(() => {
     updateCanvasRef.current = sessions.updateCanvas
@@ -128,6 +136,7 @@ function AppContent() {
         else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
       }, { history: 'ignore' })
       editor.clearHistory()
+      deletedPanelsRef.current.clear()
     } finally {
       restoringCanvasRef.current = false
     }
@@ -176,7 +185,29 @@ function AppContent() {
     })
     const removePanelAfterDeleteHandler = editor.sideEffects.registerAfterDeleteHandler('shape', (record) => {
       if (restoringCanvasRef.current || programmaticCanvasMutationRef.current || !isPanelShape(record)) return
-      sessions.removePanel(record.props.panelId)
+      const panelId = record.props.panelId
+      const panel = sessionPanelsRef.current.find((candidate) => candidate.id === panelId)
+      if (panel) deletedPanelsRef.current.set(panelId, panel)
+      // Drop it from the ref here rather than waiting for the session state to
+      // round-trip through React. The create handlers read this ref to decide
+      // whether a shape's panel is missing, and an undo can re-create the
+      // shape before that re-render has happened.
+      sessionPanelsRef.current = sessionPanelsRef.current.filter((candidate) => candidate.id !== panelId)
+      sessions.removePanel(panelId)
+    })
+    // The other half of the delete above: a panel shape that comes back
+    // without its record came back through undo, so give the record back too.
+    // Deliberately not gated on the change source, because what matters is
+    // that this exact panel was deleted here and its shape has returned.
+    const restorePanelAfterCreateHandler = editor.sideEffects.registerAfterCreateHandler('shape', (record) => {
+      if (restoringCanvasRef.current || programmaticCanvasMutationRef.current || !isPanelShape(record)) return
+      const panelId = record.props.panelId
+      if (sessionPanelsRef.current.some((candidate) => candidate.id === panelId)) return
+      const deleted = deletedPanelsRef.current.get(panelId)
+      if (!deleted) return
+      deletedPanelsRef.current.delete(panelId)
+      sessionPanelsRef.current = [...sessionPanelsRef.current, deleted]
+      sessions.addPanels([deleted])
     })
     const removeStoreListener = editor.store.listen(() => {
       if (!restoringCanvasRef.current && !programmaticCanvasMutationRef.current) persist()
@@ -213,6 +244,7 @@ function AppContent() {
       persist.cancel()
       removeDuplicatePanelHandler()
       removePanelAfterDeleteHandler()
+      restorePanelAfterCreateHandler()
       persistCanvasRef.current = null
       removeStoreListener()
       removeSelectionListener()
