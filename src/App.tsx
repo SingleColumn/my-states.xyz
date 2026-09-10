@@ -100,23 +100,34 @@ function AppContent() {
   const restoreCanvas = useCallback((editor: Editor, canvas: CanvasState | null) => {
     restoringCanvasRef.current = true
     try {
-      const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
-      if (existingPanels.length) editor.deleteShapes(existingPanels.map((shape) => shape.id))
-      const layouts = getRenderablePanelLayouts(sessionPanelsRef.current, canvas)
-        .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
-      editor.createShapes(
-        layouts.map((layout) => ({
-          type: PANEL_SHAPE_TYPE,
-          x: layout.x,
-          y: layout.y,
-          rotation: layout.rotation ?? 0,
-          props: { w: layout.w, h: layout.h, panelId: layout.panelId },
-        })) as never,
-      )
-      editor.selectNone()
-      setSelectedPanelId(null)
-      if (canvas?.camera) editor.setCamera(canvas.camera)
-      else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
+      // Loading a session is not something the user did on the canvas, so it
+      // must not become an undo step. Left in history, Undo after opening a
+      // session reversed the load: it deleted the freshly created shapes --
+      // and, through the after-delete side effect, the new session's panel
+      // records with them -- and brought back the previous session's shapes,
+      // now pointing at panels that live in another session. Any history
+      // that survives the switch refers to shapes that no longer exist, so it
+      // is cleared outright rather than merely bypassed.
+      editor.run(() => {
+        const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
+        if (existingPanels.length) editor.deleteShapes(existingPanels.map((shape) => shape.id))
+        const layouts = getRenderablePanelLayouts(sessionPanelsRef.current, canvas)
+          .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+        editor.createShapes(
+          layouts.map((layout) => ({
+            type: PANEL_SHAPE_TYPE,
+            x: layout.x,
+            y: layout.y,
+            rotation: layout.rotation ?? 0,
+            props: { w: layout.w, h: layout.h, panelId: layout.panelId },
+          })) as never,
+        )
+        editor.selectNone()
+        setSelectedPanelId(null)
+        if (canvas?.camera) editor.setCamera(canvas.camera)
+        else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
+      }, { history: 'ignore' })
+      editor.clearHistory()
     } finally {
       restoringCanvasRef.current = false
     }
