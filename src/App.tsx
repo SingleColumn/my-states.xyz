@@ -9,6 +9,7 @@ import { getCanonicalPanelLayout, getPanelFocusViewSize, getRenderablePanelLayou
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
+import { applyTheme, builtInTheme } from './theme'
 import { debounce } from './utils'
 import { createPanel } from './storage'
 import { duplicatePanel } from './panelDuplication'
@@ -20,6 +21,7 @@ import type { CanvasState, Panel, PanelLayout, PanelType } from './types'
 const shapeUtils = [PanelShapeUtil]
 
 export default function App() {
+  useEffect(() => applyTheme(builtInTheme), [])
   return (
     <AppStateProvider>
       <AppContent />
@@ -148,8 +150,11 @@ function AppContent() {
     setIsCanvasReady(true)
     // tldraw otherwise picks its menu language from the browser, so the same
     // build reads differently machine to machine. This app is written in
-    // English, so keep its wording fixed.
-    editor.user.updateUserPreferences({ locale: 'en' })
+    // English, so keep its wording fixed. The colour scheme is the theme's
+    // to choose: theme.css hands tldraw the app's palette under the names of
+    // that scheme, so the two must agree or tldraw's menus and outlines fall
+    // back to its own colours.
+    editor.user.updateUserPreferences({ locale: 'en', colorScheme: builtInTheme.tldrawColorScheme })
     restoreCanvas(editor, moments.activeMoment?.canvas ?? null)
 
     const persist = debounce(() => {

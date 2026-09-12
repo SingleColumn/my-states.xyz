@@ -7,6 +7,7 @@ import '@mdxeditor/editor/style.css'
 // The default entry carries the wght axis, which is the only one we vary.
 import '@fontsource-variable/inter'
 import './design-tokens.css'
+import './theme.css'
 import './styles.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

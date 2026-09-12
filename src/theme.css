@@ -1,0 +1,139 @@
+/*
+ * The theme: every token that a theme sets, and nothing else. Palette,
+ * surfaces, text colours, glow, shadow strength and the identity of each
+ * card. Structure (type ladder, spacing, radii, container-query sizes) lives
+ * in design-tokens.css and never changes between themes.
+ *
+ * A custom theme is a data object of these same names (see theme.ts); applied
+ * as inline properties on :root it overrides everything below, including the
+ * values handed to tldraw at the bottom of this file.
+ */
+:root {
+  color-scheme: dark;
+
+  --color-canvas: #101114;
+  --text-primary: #f5f3ee;
+  --color-text: var(--text-primary);
+  --color-text-muted: rgba(245, 243, 238, 0.64);
+  --color-text-soft: rgba(245, 243, 238, 0.8);
+  --danger: #ffb4a9;
+  --color-danger: var(--danger);
+  --color-panel-border: rgba(255, 255, 255, 0.16);
+  --color-control: rgba(255, 255, 255, 0.1);
+  --color-control-border: rgba(255, 255, 255, 0.14);
+  --color-control-border-hover: rgba(255, 255, 255, 0.25);
+  --color-input-bg: rgba(0, 0, 0, 0.24);
+  --color-dropdown-bg: #000;
+  --color-dropdown-text: var(--card-button-icon-color);
+  --color-note-control-bg: rgba(7, 13, 14, 0.94);
+  /* The formatting bar is sticky over the text (MDXEditor pins it at top: 0),
+     so it needs a surface of its own - a transparent bar lets the note scroll
+     visibly through the buttons. */
+  --background-notes-toolbar: rgba(9, 17, 17, 0.97);
+  --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
+  --color-focus-ring: rgba(255, 255, 255, 0.46);
+  /* The slideshow accent lifted toward light. Glows read as emitted light, and
+     #7f77dd itself is too dark to radiate against the near-black chrome, while
+     lifting much further than this washes out to white and loses the palette. */
+  --color-attention-glow: #a49cf0;
+  --color-panel-divider: rgba(255, 255, 255, 0.1);
+  --color-panel-frame: rgba(255, 255, 255, 0.11);
+  --color-card-bg: rgba(0, 0, 0, 0.18);
+  --color-card-bg-hover: rgba(255, 255, 255, 0.11);
+  --color-empty-control: rgba(255, 255, 255, 0.09);
+  --color-empty-control-hover: rgba(255, 255, 255, 0.15);
+  --color-album-empty: rgba(255, 255, 255, 0.08);
+  --color-album-empty-highlight: rgba(255, 255, 255, 0.16);
+  --color-app-badge-border: rgba(255, 255, 255, 0.12);
+  --color-app-badge-text: #f6f2ea;
+  --color-toast-border: rgba(255, 255, 255, 0.15);
+  --color-toast-text: #f8f4ef;
+  --color-input-text: #fffaf2;
+  --color-note-title: #fff8ee;
+  --color-editor-border: rgba(255, 255, 255, 0.12);
+  --color-editor-bg: rgba(12, 23, 22, 0.78);
+
+  --background-app:
+    radial-gradient(circle at 25% 20%, rgba(55, 79, 92, 0.26), transparent 32%),
+    radial-gradient(circle at 80% 12%, rgba(117, 85, 62, 0.2), transparent 27%),
+    linear-gradient(135deg, #101114 0%, #181715 54%, #12151a 100%);
+  --background-canvas-grid:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  --background-album-empty:
+    linear-gradient(135deg, var(--color-album-empty-highlight), transparent),
+    var(--color-album-empty);
+  --background-app-badge: rgba(12, 13, 15, 0.68);
+  --background-toast: rgba(14, 15, 18, 0.92);
+
+  --shadow-panel: 0 26px 70px rgba(0, 0, 0, 0.34);
+  --shadow-app-badge: 0 14px 34px rgba(0, 0, 0, 0.28);
+  --shadow-album-art: 0 14px 32px rgba(0, 0, 0, 0.35);
+
+  --blur-app-badge: blur(18px);
+  --blur-panel: blur(20px);
+
+  /* Card shell colours; the shell's dimensions are in design-tokens.css. */
+  --card-border: 0.5px solid rgba(255, 255, 255, 0.09);
+  --card-title-color: rgba(255, 255, 255, 0.94);
+  --card-footer-meta-color: rgba(255, 255, 255, 0.32);
+  --card-button-bg: rgba(255, 255, 255, 0.04);
+  --card-button-border: rgba(255, 255, 255, 0.1);
+  --card-button-icon-color: rgba(255, 255, 255, 0.58);
+  --card-button-bg-hover: rgba(255, 255, 255, 0.08);
+  --card-button-active-bg: rgba(255, 255, 255, 0.12);
+  --card-button-active-border: rgba(255, 255, 255, 0.18);
+  --card-button-active-icon: rgba(255, 255, 255, 0.75);
+}
+
+/* Per-card identity: the only tokens each card needs to define. Everything
+   else about a card derives from these two in design-tokens.css. */
+.panel-slideshow-surface {
+  --accent: #7f77dd;
+  --bg: #16121f;
+}
+
+.panel-spotify-surface {
+  --accent: #1db954;
+  --bg: #0e1712;
+}
+
+.panel-notes-surface {
+  --accent: #8fb7a2;
+  --bg: #101918;
+}
+
+/*
+ * The bridge into tldraw. tldraw runs in its own dark theme (set from
+ * App.tsx) and reads these names for its canvas chrome: selection outline,
+ * marquee, menus and their text. Handing it the app's values here means the
+ * menus and outlines follow the theme, and it also ends the shadowing that
+ * tldraw's own definitions of --color-text and --color-danger caused inside
+ * the canvas: panels can use those names again.
+ *
+ * Only names tldraw defines are set here. Its remaining dark-theme values are
+ * close to this palette and are left alone.
+ */
+.tl-container.tl-theme__dark {
+  --color-text: var(--text-primary);
+  --color-text-0: var(--text-primary);
+  --color-text-1: var(--color-text-soft);
+  --color-text-3: var(--color-text-muted);
+  --color-danger: var(--danger);
+  --color-background: var(--color-canvas);
+  --color-grid: var(--color-text-muted);
+  --color-panel: var(--color-dropdown-bg);
+  --color-panel-contrast: var(--color-control-border);
+  --color-low: var(--color-control);
+  --color-low-border: var(--color-control-border);
+  --color-divider: var(--color-panel-divider);
+  --color-hint: var(--color-control);
+  --color-muted-1: var(--color-control-border);
+  --color-muted-2: var(--color-control);
+  --color-focus: var(--color-focus-ring);
+  --color-selected: var(--color-attention-glow);
+  --color-selection-stroke: var(--color-attention-glow);
+  --color-selection-fill: color-mix(in srgb, var(--color-attention-glow) 12%, transparent);
+  --color-brush-stroke: var(--color-control-border-hover);
+  --color-brush-fill: var(--color-control);
+}
