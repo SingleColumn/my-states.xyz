@@ -46,6 +46,19 @@ export function isInsidePanelContent(target: EventTarget | null): boolean {
 }
 
 /**
+ * Whether a press or a key landed on something that takes text: a form
+ * field, or any element inside a contenteditable. This is the same test
+ * tldraw applies before it claims a key, so the app and the library agree on
+ * where typing goes without either keeping a list of editor widgets.
+ */
+export function isTextInputTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  if (target instanceof HTMLElement && target.isContentEditable) return true
+  const tag = target.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || tag === 'select'
+}
+
+/**
  * tldraw's own convention for "another handler already dealt with this
  * pointer event": every canvas, selection and handle listener returns early
  * when the event carries `isKilled`. Setting it lets the event keep bubbling

@@ -8,6 +8,7 @@ import { PANEL_SHAPE_TYPE, PanelShape, PanelShapeUtil } from './PanelShape'
 import { getCanonicalPanelLayout, getPanelFocusViewSize, getRenderablePanelLayouts, isPanelInFocusView, isPanelVisible, mergeVisiblePanelLayouts, resetAllPanelLayouts, showAllPanels } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { PanelCommandsProvider } from './PanelHeader'
+import { isTextInputTarget } from './panelSurface'
 import { debounce } from './utils'
 import { createPanel } from './storage'
 import { duplicatePanel } from './panelDuplication'
@@ -226,7 +227,7 @@ function AppContent() {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Delete' && event.key !== 'Backspace') return
-      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"], .cm-editor, .mdxeditor')) return
+      if (isTextInputTarget(event.target)) return
       const selectedShapeIds = editor.getSelectedShapeIds()
       if (!selectedShapeIds.length) return
       event.preventDefault()

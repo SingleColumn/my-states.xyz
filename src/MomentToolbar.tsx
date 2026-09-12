@@ -76,7 +76,7 @@ export function MomentToolbar() {
   }
 
   return (
-    <section ref={rootRef} className="moment-toolbar panel-interactive" aria-label="Moment controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+    <section ref={rootRef} className="moment-toolbar" aria-label="Moment controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
       <select
         className="app-dropdown"
         aria-label="Open moment"

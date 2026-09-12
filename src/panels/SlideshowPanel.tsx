@@ -19,9 +19,8 @@ const focusHintDurationMs = 3500
 const focusViewStack: string[] = []
 
 /**
- * PROTOTYPE: this panel is converted to the content-region rule in
- * panelSurface.ts. Compared with the version on main it carries no pointer
- * handlers of its own and no `.panel-interactive` classes: each region the
+ * This panel follows the content-region rule in panelSurface.ts. It carries no pointer
+ * handlers of its own and no pointer-events overrides: each region the
  * user operates -- the header actions, the picture, the controls, the footer
  * -- is declared with `panelContentProps`, and nothing else is.
  */

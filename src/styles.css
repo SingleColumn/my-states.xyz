@@ -452,30 +452,14 @@ button {
 }
 
 /* The rule (src/panelSurface.ts): a declared content region gets the pointer
-   back; everything else on the panel stays transparent, so a press there
-   reaches tldraw's canvas and behaves like a press on any shape. This is the
-   only pointer-events rule a panel needs. */
+   back, and its text becomes selectable; everything else on the panel stays
+   transparent, so a press there reaches tldraw's canvas and behaves like a
+   press on any shape. This is the only pointer-events rule a panel needs. */
 .canvas-panel-shell [data-panel-content] {
   pointer-events: auto !important;
+  user-select: text;
 }
 
-/* PROTOTYPE SCAFFOLDING: the pre-rule allowlist, now scoped to the two panels
-   that have not been converted yet (Music, Notes). It must agree with the
-   selector list in PanelShape.tsx, which is exactly the problem the rule
-   removes. Delete both once those panels declare their content regions. */
-.canvas-panel-shell :is(.panel-spotify-surface, .panel-notes-surface) :is(
-  button,
-  input,
-  select,
-  textarea,
-  label,
-  .cm-editor,
-  .mdxeditor,
-  [contenteditable="true"],
-  [role="textbox"]
-) {
-  pointer-events: auto !important;
-}
 
 .panel {
   display: flex;
@@ -725,14 +709,6 @@ button {
   height: var(--card-footer-button-size);
 }
 
-.panel-interactive {
-  pointer-events: auto;
-}
-
-.panel-interactive,
-.panel-interactive * {
-  user-select: text;
-}
 
 .visually-hidden-file-input {
   position: fixed;
@@ -1529,13 +1505,12 @@ input[type="range"] {
   line-height: var(--line-height-code);
 }
 
-.notes-editor-blocker {
+.notes-editor {
   display: flex;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--color-editor-bg);
-  pointer-events: auto !important;
 }
 
 .notes-rich-editor {
@@ -1760,7 +1735,7 @@ input[type="range"] {
   padding: 0;
 }
 
-.notes-editor-blocker.is-writing {
+.notes-editor.is-writing {
   flex-direction: column;
   border: none;
   border-radius: 0;
@@ -1791,25 +1766,25 @@ input[type="range"] {
 
 /* Reserving the scrollbar on both edges keeps the centred text column on the
    same axis as the title above it once the note grows past one screen. */
-.notes-editor-blocker.is-writing .mdxeditor-root-contenteditable {
+.notes-editor.is-writing .mdxeditor-root-contenteditable {
   scrollbar-gutter: stable both-edges;
 }
 
 /* The contenteditable stays full width so clicking anywhere still places the
    caret; only the blocks inside it are held to the measure. */
-.notes-editor-blocker.is-writing .notes-editor-content > * {
+.notes-editor.is-writing .notes-editor-content > * {
   max-width: var(--writing-measure);
   margin-inline: auto;
 }
 
-.notes-editor-blocker.is-writing .notes-editor-content {
+.notes-editor.is-writing .notes-editor-content {
   padding-block: 0 var(--space-writing-bottom);
 }
 
 /* Flattening the editor wrapper makes the toolbar and the text siblings of
    the title, so the bar can be ordered above the whole document instead of
    interrupting it between the title and the first paragraph. */
-.notes-editor-blocker.is-writing .notes-rich-editor {
+.notes-editor.is-writing .notes-rich-editor {
   display: contents;
 }
 
@@ -1822,8 +1797,8 @@ input[type="range"] {
    no way to reach the rest of it, in either the default panel or writing
    mode. Unscoped from any mode, since the wrapper chain is identical in both
    -- only which ancestor is the real flex container changes (`.notes-rich-editor`
-   normally, or `.notes-editor-blocker.is-writing` once writing mode flattens it). */
-.notes-editor-blocker .mdxeditor-diff-source-wrapper {
+   normally, or `.notes-editor.is-writing` once writing mode flattens it). */
+.notes-editor .mdxeditor-diff-source-wrapper {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -1832,7 +1807,7 @@ input[type="range"] {
 
 /* The rich-text, source and diff views are swapped in this slot, so fill
    whichever one is mounted rather than naming them. */
-.notes-editor-blocker .mdxeditor-diff-source-wrapper > * {
+.notes-editor .mdxeditor-diff-source-wrapper > * {
   flex: 1;
   min-height: 0;
 }
@@ -1842,26 +1817,26 @@ input[type="range"] {
    source and diff views, so overriding that property here would leave every
    view visible at once. The rule above already gives it a determinate height
    as a flex item, so `height: 100%` on its child resolves against that. */
-.notes-editor-blocker .mdxeditor-root-contenteditable {
+.notes-editor .mdxeditor-root-contenteditable {
   height: 100%;
   overflow: auto;
 }
 
-.notes-editor-blocker.is-writing .notes-editor-toolbar {
+.notes-editor.is-writing .notes-editor-toolbar {
   order: -1;
   border-bottom: var(--card-border);
   opacity: var(--opacity-writing-toolbar);
   transition: opacity var(--transition-fast);
 }
 
-.notes-editor-blocker.is-writing .notes-editor-toolbar:hover,
-.notes-editor-blocker.is-writing .notes-editor-toolbar:focus-within {
+.notes-editor.is-writing .notes-editor-toolbar:hover,
+.notes-editor.is-writing .notes-editor-toolbar:focus-within {
   opacity: 1;
 }
 
 /* The base toolbar rule sets `display: flex !important`, so hiding it has to
    match that weight. The plugin stays mounted either way - see NotesPanel. */
-.notes-editor-blocker.is-toolbar-hidden .notes-editor-toolbar {
+.notes-editor.is-toolbar-hidden .notes-editor-toolbar {
   display: none !important;
 }
 

@@ -1,7 +1,7 @@
 import { EyeOff, Maximize2, RotateCcw, Minimize2 } from 'lucide-react'
-import { createContext, useContext, type ReactNode, type SyntheticEvent } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import type { PanelType } from './types'
-import { markPointerEventHandled, panelContentProps } from './panelSurface'
+import { panelContentProps } from './panelSurface'
 
 export interface PanelCommands {
   hidePanel(panelId: string): void
@@ -24,15 +24,6 @@ export function usePanelCommands(): PanelCommands {
   return commands
 }
 
-/**
- * LEGACY. Only the Music and Notes panels still call this; the header's own
- * buttons no longer need it because the actions area is a declared content
- * region (see panelSurface.ts). Delete once those two panels are converted.
- */
-export function stopPanelHeaderEvent(event: SyntheticEvent) {
-  event.stopPropagation()
-  markPointerEventHandled(event)
-}
 
 export function PanelHeader({ panelId, panelType, title, leadingActions, children, trailing }: { panelId: string; panelType: PanelType; title: string; leadingActions?: ReactNode; children?: ReactNode; trailing?: ReactNode }) {
   const commands = usePanelCommands()

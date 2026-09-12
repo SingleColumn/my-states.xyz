@@ -15,7 +15,7 @@ import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
-import { isInsidePanelContent, markPointerEventHandled } from './panelSurface'
+import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled } from './panelSurface'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 
@@ -192,14 +192,6 @@ function PanelContent({ panelId }: { panelId: string }) {
   return <SlideshowPanel panelId={panel.id} />
 }
 
-// The surfaces where a right-click means "act on this text", not "act on this
-// panel" - so the browser's own Cut/Copy/Paste should be offered instead of
-// tldraw's shape clipboard.
-const textEditingSelector = 'input, textarea, .cm-editor, [contenteditable="true"], [role="textbox"]'
-
-function isTextEditingTarget(target: EventTarget | null) {
-  return target instanceof Element && target.closest(textEditingSelector) !== null
-}
 
 /**
  * tldraw's canvas menu offers clipboard actions that operate on shapes, so its
@@ -213,7 +205,7 @@ function handlePanelContextMenu(
   shapeId: PanelShape['id'],
   event: React.MouseEvent<HTMLDivElement>,
 ) {
-  if (isTextEditingTarget(event.target)) {
+  if (isTextInputTarget(event.target)) {
     event.stopPropagation()
     return
   }
@@ -233,7 +225,7 @@ function selectPanelOnPointerDown(editor: ReturnType<typeof useEditor>, shapeId:
 
   // Selecting the panel here would pull focus out of the caret, and tldraw
   // would open its own menu over the text. Leave both alone.
-  if (isRightClick && isTextEditingTarget(event.target)) return
+  if (isRightClick && isTextInputTarget(event.target)) return
 
   if (!('button' in event) || event.button === 0 || isRightClick) {
     editor.select(shapeId)
@@ -268,24 +260,12 @@ function claimPointerDownForContent(event: PanelPressEvent) {
   // A right-click on text is the browser's: its menu has Cut/Copy/Paste for
   // the selection, where tldraw's would paste onto the canvas.
   if (isRightClick) {
-    if (isTextEditingTarget(target)) markPointerEventHandled(event)
+    if (isTextInputTarget(target)) markPointerEventHandled(event)
     return
   }
 
-  if (isInsidePanelContent(target) || isLegacyInteractiveTarget(target)) {
+  if (isInsidePanelContent(target)) {
     markPointerEventHandled(event)
   }
 }
 
-// PROTOTYPE SCAFFOLDING. The Music and Notes panels still use the mechanism
-// that predates the rule: this allowlist, a different allowlist in
-// styles.css, and per-widget stop handlers. Both lists are now scoped to
-// those two panels so the converted Images panel and the shared header rely
-// on nothing but `data-panel-content`. Converting Music and Notes deletes
-// this function, the CSS allowlist, and every stop handler they carry.
-const legacyPanelSelector = '.panel-spotify-surface, .panel-notes-surface'
-const legacyInteractiveSelector = 'button, input, select, textarea, label, .cm-editor, [contenteditable="true"], [role="textbox"], [role="option"], [role="combobox"], [data-radix-select-viewport], .mdxeditor-toolbar, .mdxeditor-popup-container, .panel-interactive'
-
-function isLegacyInteractiveTarget(target: Element) {
-  return target.closest(legacyPanelSelector) !== null && target.closest(legacyInteractiveSelector) !== null
-}
