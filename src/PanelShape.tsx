@@ -1,32 +1,35 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ComponentType } from 'react'
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
   RecordProps,
   Rectangle2d,
-  T,
-  TLBaseShape,
   useEditor,
 } from 'tldraw'
-import { useAppState } from './AppState'
 import type { PanelType } from './types'
-import { getCanonicalPanelLayout, getPanelMinimumSize } from './panelLayout'
+import { getPanelMinimumSize } from './panelLayout'
 import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
+import { panelShapeMigrations, panelShapeProps, type PanelShape } from './panelShapeSchema'
+import { createPanelProps, panelFromShape } from './panelStore'
 import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled } from './panelSurface'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
+export type { PanelShape } from './panelShapeSchema'
 
-export type PanelShape = TLBaseShape<
-  typeof PANEL_SHAPE_TYPE,
-  {
-    w: number
-    h: number
-    panelId: string
-  }
->
+/**
+ * The component that renders each kind of panel. This is the one place a
+ * panel type meets React; the rest of what a type is lives in
+ * panelRegistry.ts. Typed as a record over PanelType so that a type added to
+ * the registry without a renderer is a compile error here.
+ */
+const panelComponents: { readonly [K in PanelType]: ComponentType<{ panelId: string }> } = {
+  spotify: SpotifyPanel,
+  slideshow: SlideshowPanel,
+  notes: NotesPanel,
+}
 
 export function getPanelIdFromShape(shape: PanelShape) {
   return shape.props.panelId
@@ -34,20 +37,22 @@ export function getPanelIdFromShape(shape: PanelShape) {
 
 export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   static override type = PANEL_SHAPE_TYPE
-
-  static override props: RecordProps<PanelShape> = {
-    w: T.number,
-    h: T.number,
-    panelId: T.string,
-  }
+  static override props: RecordProps<PanelShape> = panelShapeProps
+  static override migrations = panelShapeMigrations
 
   override getDefaultProps(): PanelShape['props'] {
-    const layout = getCanonicalPanelLayout('slideshow')
-    return {
-      w: layout.w,
-      h: layout.h,
-      panelId: '',
-    }
+    return createPanelProps('slideshow')
+  }
+
+  // A hidden panel keeps its shape (and so its place and configuration) but
+  // draws nothing and, being locked, is not selectable, movable or deletable
+  // from the canvas. Showing it again is a single write to the shape.
+  override hideSelectionBoundsBg(shape: PanelShape) {
+    return !shape.props.visible
+  }
+
+  override hideSelectionBoundsFg(shape: PanelShape) {
+    return !shape.props.visible
   }
 
   // Deliberately NOT editable, and panel selection deliberately does not set
@@ -70,6 +75,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   override component(shape: PanelShape) {
     const editor = useEditor()
     const wheelScopeRef = useNativeWheelScrollScope()
+    if (!shape.props.visible) return null
 
     return (
       <HTMLContainer
@@ -85,13 +91,14 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
         }}
       >
         <div ref={wheelScopeRef} className="canvas-panel-wheel-scope">
-          <PanelContent panelId={shape.props.panelId} />
+          <PanelContent shape={shape} />
         </div>
       </HTMLContainer>
     )
   }
 
   override indicator(shape: PanelShape) {
+    if (!shape.props.visible) return null
     return <rect width={shape.props.w} height={shape.props.h} rx={22} ry={22} />
   }
 
@@ -105,7 +112,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
 
   override onResize(shape: PanelShape, info: Parameters<BaseBoxShapeUtil<PanelShape>['onResize']>[1]) {
     const resized = super.onResize(shape, info) as PanelShape
-    const minimum = getPanelMinimumSize('slideshow')
+    const minimum = getPanelMinimumSize(shape.props.panel.type)
     return {
       ...resized,
       props: {
@@ -183,13 +190,10 @@ function findScrollableAncestor(start: Node, boundary: Element): HTMLElement | n
   return null
 }
 
-function PanelContent({ panelId }: { panelId: string }) {
-  const { moments } = useAppState()
-  const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === panelId)
-  if (!panel) return <div className="panel">This panel is no longer available.</div>
-  if (panel.type === 'spotify') return <SpotifyPanel panelId={panel.id} />
-  if (panel.type === 'notes') return <NotesPanel panelId={panel.id} />
-  return <SlideshowPanel panelId={panel.id} />
+function PanelContent({ shape }: { shape: PanelShape }) {
+  const panel = panelFromShape(shape)
+  const Component = panelComponents[panel.type]
+  return <Component panelId={panel.id} />
 }
 
 

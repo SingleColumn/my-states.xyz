@@ -2,6 +2,7 @@ import { DBSchema, openDB } from 'idb'
 import type {
   CanvasState,
   ImageMetadata,
+  LegacyCanvasContent,
   Note,
   Panel,
   PanelLayout,
@@ -15,9 +16,12 @@ import type {
   SpotifyTokens,
 } from './types'
 import { createId } from './utils'
+import { PANEL_TYPES, defaultSlideshowSettings, defaultSpotifyPlaylistReference, getPanelDefinition, isPanelType } from './panelRegistry'
+
+export { DEFAULT_SLIDESHOW_ZOOM, defaultSlideshowSettings, defaultSpotifyPlaylistReference } from './panelRegistry'
 
 const DB_VERSION = 2
-const MOMENT_SCHEMA_VERSION = 2
+const MOMENT_SCHEMA_VERSION = 3
 // Moments were called sessions when these keys, the store and index names below, and the
 // createId('session') prefix were first persisted. They keep the old spelling so existing
 // browser data keeps loading; only the vocabulary in code and UI changed.
@@ -40,31 +44,12 @@ export const momentLimits = {
   maxArchiveBytes: 260 * 1024 * 1024,
 } as const
 
-export const DEFAULT_SLIDESHOW_ZOOM = 1.1
-
-export const defaultSlideshowSettings: SlideshowSettings = {
-  folderName: null,
-  imageSource: { type: 'none' },
-  currentIndex: 0,
-  intervalMs: 5000,
-  transitionMs: 450,
-  shuffle: false,
-  zoom: DEFAULT_SLIDESHOW_ZOOM,
-}
-
 export const defaultSpotifyPlaylistState: SpotifyPlaylistState = {
   id: null,
   uri: null,
   name: null,
   url: null,
   lastSearch: '',
-}
-
-export const defaultSpotifyPlaylistReference: SpotifyPlaylistReference = {
-  id: null,
-  uri: null,
-  name: null,
-  url: null,
 }
 
 interface MomentAssetRecord extends MomentImage {
@@ -87,18 +72,13 @@ interface MigrationVerificationRecord {
   directoryName: string | null
 }
 
-export function createPanel(type: PanelType, now = Date.now()): Panel {
-  if (type === 'spotify') {
-    return { id: createId('panel'), type, createdAt: now, updatedAt: now, config: { playlist: { ...defaultSpotifyPlaylistReference } } }
-  }
-  if (type === 'slideshow') {
-    return { id: createId('panel'), type, createdAt: now, updatedAt: now, config: { ...defaultSlideshowSettings, imageSource: { ...defaultSlideshowSettings.imageSource } } }
-  }
-  return { id: createId('panel'), type, createdAt: now, updatedAt: now, config: { activeNoteId: null } }
+export function createPanel<Type extends PanelType>(type: Type): Panel<Type> {
+  return { id: createId('panel'), type, config: getPanelDefinition(type).createConfig() } as Panel<Type>
 }
 
-export function createDefaultPanels(now = Date.now()): Panel[] {
-  return [createPanel('spotify', now), createPanel('slideshow', now), createPanel('notes', now)]
+/** One of each kind, in the registry's order. */
+export function createDefaultPanels(): Panel[] {
+  return PANEL_TYPES.map((type) => createPanel(type))
 }
 
 export interface ImportedMomentContent {
@@ -141,7 +121,7 @@ interface MusicImagesCanvasDb extends DBSchema {
   }
   sessions: {
     key: string
-    value: Moment
+    value: StoredMoment
     indexes: {
       'by-updated': number
     }
@@ -221,7 +201,13 @@ function legacyPlaylistReference(): SpotifyPlaylistReference {
   }
 }
 
-function makeMoment(name: string, initial?: Partial<Moment>): Moment {
+/**
+ * A moment starts life with its panels in the pre-snapshot shape. The canvas
+ * turns that into a tldraw document the first time the moment is opened;
+ * storage never builds a document itself, because only the editor knows the
+ * schema the document has to carry.
+ */
+function makeMoment(name: string, legacy: LegacyCanvasContent = { panels: createDefaultPanels(), canvas: null }): Moment {
   const now = Date.now()
   return {
     id: createId('session'),
@@ -229,9 +215,9 @@ function makeMoment(name: string, initial?: Partial<Moment>): Moment {
     schemaVersion: MOMENT_SCHEMA_VERSION,
     createdAt: now,
     updatedAt: now,
-    panels: createDefaultPanels(now),
-    canvas: null,
-    ...initial,
+    camera: legacy.canvas?.camera ?? null,
+    document: null,
+    legacy,
   }
 }
 
@@ -294,11 +280,11 @@ async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<Migrat
   spotifyPanel.config.playlist = legacySpotify
   slideshowPanel.config = legacySlideshow
   notesPanel.config.activeNoteId = activeNoteId
-  const moment = makeMoment(hasLegacyState ? 'Imported workspace' : 'My first moment', { canvas: migrateCanvas(legacyCanvas, panels), panels })
+  const moment = makeMoment(hasLegacyState ? 'Imported workspace' : 'My first moment', { panels, canvas: migrateCanvas(legacyCanvas, panels) })
   const verification: MigrationVerificationRecord = {
     sessionId: moment.id,
     name: moment.name,
-    canvas: moment.canvas,
+    canvas: moment.legacy?.canvas ?? null,
     slideshow: slideshowPanel.config,
     spotify: spotifyPanel.config.playlist,
     activeNoteId,
@@ -336,12 +322,13 @@ async function verifyMigratedLegacyState(db: Awaited<typeof dbPromise>, expected
 
   const hasExpectedNotes = notes.length === expected.noteIds.length
     && notes.every((note) => note.sessionId === expected.sessionId && expected.noteIds.includes(note.id))
+  const panels = (moment as Moment | undefined)?.legacy?.panels ?? []
   const momentMatches = moment
     && moment.name === expected.name
-    && moment.panels.find((panel) => panel.type === 'notes')?.config.activeNoteId === expected.activeNoteId
-    && JSON.stringify(moment.canvas) === JSON.stringify(expected.canvas)
-    && JSON.stringify(moment.panels.find((panel) => panel.type === 'slideshow')?.config) === JSON.stringify(expected.slideshow)
-    && JSON.stringify(moment.panels.find((panel) => panel.type === 'spotify')?.config.playlist) === JSON.stringify(expected.spotify)
+    && panels.find((panel) => panel.type === 'notes')?.config.activeNoteId === expected.activeNoteId
+    && JSON.stringify((moment as Moment).legacy?.canvas ?? null) === JSON.stringify(expected.canvas)
+    && JSON.stringify(panels.find((panel) => panel.type === 'slideshow')?.config) === JSON.stringify(expected.slideshow)
+    && JSON.stringify(panels.find((panel) => panel.type === 'spotify')?.config.playlist) === JSON.stringify(expected.spotify)
   const directoryMatches = expected.directoryName === null
     ? !directory
     : directory?.name === expected.directoryName
@@ -398,6 +385,17 @@ export async function saveMoment(moment: Moment) {
   return next
 }
 
+/** The canvas has produced the document for a moment; the pre-snapshot content has done its job. */
+export async function saveMomentDocument(momentId: string, document: NonNullable<Moment['document']>, camera: Moment['camera']) {
+  const db = await dbPromise
+  const current = await db.get('sessions', momentId)
+  if (!current) return undefined
+  const { legacy: _legacy, ...rest } = current as Moment
+  const next: Moment = { ...rest, schemaVersion: MOMENT_SCHEMA_VERSION, document, camera, updatedAt: Date.now() }
+  await db.put('sessions', next)
+  return next
+}
+
 export async function setActiveMomentId(momentId: string) {
   const db = await dbPromise
   await db.put('preferences', { key: ACTIVE_MOMENT_KEY, value: momentId })
@@ -431,23 +429,24 @@ export async function importMomentContent(content: ImportedMomentContent) {
     sourceNoteIds.add(note.id)
   }
 
-  const sourcePanels = enforceSpotifySingletonPanels(content.panels ?? createDefaultPanels())
+  const sourcePanels = enforceSpotifySingletonPanels((content.panels ?? createDefaultPanels()).filter((panel) => isPanelType(panel.type)))
   const panelIdMap = new Map(sourcePanels.map((panel) => [panel.id, createId('panel')]))
-  const importedPanels = sourcePanels.map((panel) => ({ ...panel, id: panelIdMap.get(panel.id)! }))
+  const importedPanels = sourcePanels.map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...panel }) => ({ ...panel, id: panelIdMap.get(panel.id)! }) as Panel)
   const moment = makeMoment(content.name, {
     panels: importedPanels,
     canvas: migrateCanvas(content.canvas, importedPanels, panelIdMap),
   })
+  const panels = moment.legacy!.panels
   const hasMultipleSlideshowPanels = (content.panels?.filter((panel) => panel.type === 'slideshow').length ?? 0) > 1
   if (!hasMultipleSlideshowPanels) {
-    const slideshowPanel = moment.panels.find((panel) => panel.type === 'slideshow')
+    const slideshowPanel = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     if (slideshowPanel) slideshowPanel.config = normalizeSlideshowSettings(content.slideshow, content.assets.length > 0)
-    const spotifyPanel = moment.panels.find((panel) => panel.type === 'spotify')
+    const spotifyPanel = panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
     if (spotifyPanel) spotifyPanel.config.playlist = content.spotify
   }
   const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
   if (!content.panels || (content.panels.filter((panel) => panel.type === 'notes').length ?? 0) <= 1) {
-    const notesPanel = moment.panels.find((panel) => panel.type === 'notes')
+    const notesPanel = panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')
     if (notesPanel) notesPanel.config.activeNoteId = content.activeNoteSourceId ? noteIdMap.get(content.activeNoteSourceId) ?? null : null
   }
 
@@ -588,49 +587,75 @@ export function normalizeSlideshowSettings(
   return { ...defaultSlideshowSettings, ...slideshow, imageSource }
 }
 
-async function normalizeAndPersistMoment(raw: Moment, assetCount: number): Promise<Moment> {
-  const legacy = raw as Moment & {
-    activeNoteId?: string | null
-    slideshow?: SlideshowSettings
-    spotify?: SpotifyPlaylistReference
-  }
-  if (raw.schemaVersion >= MOMENT_SCHEMA_VERSION && Array.isArray(raw.panels)) {
-    const normalized = enforceSpotifySingleton(raw)
-    const slideshow = normalized.panels.find((panel) => panel.type === 'slideshow')
+/** What a moment looked like in each earlier schema, as far as this code still reads it. */
+export type StoredMoment = Moment | (Omit<Moment, 'schemaVersion' | 'camera' | 'document' | 'legacy'> & {
+  schemaVersion: 1 | 2
+  panels?: Panel[]
+  canvas?: CanvasState | null
+  activeNoteId?: string | null
+  slideshow?: SlideshowSettings
+  spotify?: SpotifyPlaylistReference
+})
+
+/**
+ * Brings a stored moment up to the current schema. Schema 3 holds a tldraw
+ * document; a schema 2 moment carried its panels and layout directly, and a
+ * schema 1 moment carried one of each panel's settings at its top level.
+ * Both become schema 3 moments with legacy content, which the canvas turns
+ * into a document on first open.
+ */
+async function normalizeAndPersistMoment(raw: StoredMoment, assetCount: number): Promise<Moment> {
+  const db = await dbPromise
+  if (raw.schemaVersion >= MOMENT_SCHEMA_VERSION) {
+    const current = raw as Moment
+    if (!current.legacy) return current
+    const normalized = enforceSpotifySingleton(current)
+    const slideshow = normalized.legacy?.panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     if (slideshow) slideshow.config = normalizeSlideshowSettings(slideshow.config, assetCount > 0)
-    if (normalized !== raw) await (await dbPromise).put('sessions', normalized)
+    if (normalized !== current) await db.put('sessions', normalized)
     return normalized
   }
 
-  const panels = createDefaultPanels()
-  const spotify = panels.find((panel) => panel.type === 'spotify')!
-  const slideshow = panels.find((panel) => panel.type === 'slideshow')!
-  const notes = panels.find((panel) => panel.type === 'notes')!
-  spotify.config.playlist = legacy.spotify ?? defaultSpotifyPlaylistReference
-  slideshow.config = normalizeSlideshowSettings(legacy.slideshow ?? defaultSlideshowSettings, assetCount > 0)
-  notes.config.activeNoteId = legacy.activeNoteId ?? null
+  const earlier = raw as Exclude<StoredMoment, Moment>
+  let legacy: LegacyCanvasContent
+  if (earlier.schemaVersion === 2 && Array.isArray(earlier.panels)) {
+    const panels = enforceSpotifySingletonPanels(earlier.panels.filter((panel) => isPanelType(panel.type)))
+    const slideshow = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+    if (slideshow) slideshow.config = normalizeSlideshowSettings(slideshow.config, assetCount > 0)
+    legacy = { panels, canvas: migrateCanvas(earlier.canvas ?? null, panels) }
+  } else {
+    const panels = createDefaultPanels()
+    const spotify = panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')!
+    const slideshow = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')!
+    const notes = panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
+    spotify.config.playlist = earlier.spotify ?? defaultSpotifyPlaylistReference
+    slideshow.config = normalizeSlideshowSettings(earlier.slideshow ?? defaultSlideshowSettings, assetCount > 0)
+    notes.config.activeNoteId = earlier.activeNoteId ?? null
+    legacy = { panels, canvas: migrateCanvas(earlier.canvas ?? null, panels) }
+  }
   const migrated: Moment = {
     id: raw.id,
     name: raw.name,
     schemaVersion: MOMENT_SCHEMA_VERSION,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
-    panels,
-    canvas: migrateCanvas(raw.canvas, panels),
+    camera: earlier.canvas?.camera ?? null,
+    document: null,
+    legacy,
   }
-  const db = await dbPromise
   await db.put('sessions', migrated)
   return migrated
 }
 
 function enforceSpotifySingleton(moment: Moment): Moment {
-  const panels = enforceSpotifySingletonPanels(moment.panels)
-  if (panels.length === moment.panels.length) return moment
+  if (!moment.legacy) return moment
+  const panels = enforceSpotifySingletonPanels(moment.legacy.panels)
+  if (panels.length === moment.legacy.panels.length) return moment
   const retainedIds = new Set(panels.map((panel) => panel.id))
+  const canvas = moment.legacy.canvas
   return {
     ...moment,
-    panels,
-    canvas: moment.canvas ? { ...moment.canvas, panels: moment.canvas.panels.filter((layout) => retainedIds.has(layout.panelId)) } : null,
+    legacy: { panels, canvas: canvas ? { ...canvas, panels: canvas.panels.filter((layout) => retainedIds.has(layout.panelId)) } : null },
   }
 }
 

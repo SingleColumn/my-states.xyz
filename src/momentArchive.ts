@@ -1,13 +1,17 @@
 import { strFromU8, strToU8, Unzip, UnzipInflate, zipSync } from 'fflate'
 import {
+  defaultSlideshowSettings,
   getNotes,
   getMoment,
   getMomentAssets,
   importMomentContent,
   momentLimits,
 } from './storage'
+import { legacyContentFromDocument } from './panelStore'
 import type {
   CanvasState,
+  LegacyCanvasContent,
+  Moment,
   Note,
   Panel,
   MomentImage,
@@ -65,12 +69,16 @@ interface MomentManifest {
 export async function exportMomentArchive(momentId: string) {
   const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
   if (!moment) throw new Error('The selected moment no longer exists.')
+  // The archive keeps the pre-snapshot shape of a moment, so a file written by
+  // any version of the app opens in any other: the tldraw document is the
+  // app's persistence format, not its interchange format.
+  const { panels, canvas } = momentContentForArchive(moment)
   // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
-  const slideshow = moment.panels.find((panel) => panel.type === 'slideshow')
-  const spotify = moment.panels.find((panel) => panel.type === 'spotify')
-  const notesPanel = moment.panels.find((panel) => panel.type === 'notes')
-  const slideshowSettings = slideshow?.config
-  const exportedAssets = moment.panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
+  const slideshow = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+  const spotify = panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
+  const notesPanel = panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')
+  const slideshowSettings = slideshow?.config ?? defaultSlideshowSettings
+  const exportedAssets = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   validateExportContent(notes, exportedAssets)
 
   const files: Record<string, Uint8Array> = {}
@@ -82,10 +90,10 @@ export async function exportMomentArchive(momentId: string) {
       updatedAt: moment.updatedAt,
       activeNoteId: notesPanel?.config.activeNoteId ?? null,
     },
-    canvas: moment.canvas,
-    slideshow: slideshowSettings!,
+    canvas,
+    slideshow: slideshowSettings,
     spotify: spotify?.config.playlist ?? { id: null, uri: null, name: null, url: null },
-    panels: moment.panels,
+    panels: panels.map((panel) => ({ ...panel, createdAt: moment.createdAt, updatedAt: moment.updatedAt })),
     notes: [],
     images: [],
   }
@@ -183,6 +191,11 @@ export function downloadMomentArchive(blob: Blob, momentName: string) {
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function momentContentForArchive(moment: Moment): LegacyCanvasContent {
+  if (moment.document) return legacyContentFromDocument(moment.document, moment.camera)
+  return moment.legacy ?? { panels: [], canvas: null }
 }
 
 function validateExportContent(notes: Note[], assets: Array<MomentImage & { blob: Blob }>) {
@@ -490,7 +503,9 @@ function isPanels(value: unknown): value is Panel[] {
   if (!Array.isArray(value)) return false
   const ids = new Set<string>()
   return value.every((panel) => {
-    if (!isRecord(panel) || !isSafeId(panel.id) || ids.has(panel.id) || !isTimestamp(panel.createdAt) || !isTimestamp(panel.updatedAt)) return false
+    if (!isRecord(panel) || !isSafeId(panel.id) || ids.has(panel.id)) return false
+    if (panel.createdAt !== undefined && !isTimestamp(panel.createdAt)) return false
+    if (panel.updatedAt !== undefined && !isTimestamp(panel.updatedAt)) return false
     if (panel.visible !== undefined && typeof panel.visible !== 'boolean') return false
     ids.add(panel.id)
     if (panel.type === 'spotify') return isRecord(panel.config) && isPlaylistReference(panel.config.playlist)

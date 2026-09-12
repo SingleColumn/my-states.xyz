@@ -39,14 +39,22 @@ describe('legacy moment migration', () => {
     const moment = await storage.getMoment(first.activeMomentId)
     const notes = await storage.getNotes(first.activeMomentId)
 
+    // Storage upgrades the old state into a schema-3 moment whose panels are
+    // still in the pre-snapshot shape; the canvas turns them into a document
+    // the first time the moment is opened.
     expect(moment).toMatchObject({
       name: 'Imported workspace',
-      panels: expect.arrayContaining([
-        expect.objectContaining({ type: 'notes', config: { activeNoteId: 'legacy_note' } }),
-        expect.objectContaining({ type: 'slideshow', config: expect.objectContaining({ folderName: 'references', intervalMs: 2500, shuffle: true }) }),
-        expect.objectContaining({ type: 'spotify', config: { playlist: expect.objectContaining({ id: 'legacy_playlist' }) } }),
-      ]),
-      canvas: { camera: { x: 12, y: 34, z: 1.5 } },
+      schemaVersion: 3,
+      document: null,
+      camera: { x: 12, y: 34, z: 1.5 },
+      legacy: {
+        panels: expect.arrayContaining([
+          expect.objectContaining({ type: 'notes', config: { activeNoteId: 'legacy_note' } }),
+          expect.objectContaining({ type: 'slideshow', config: expect.objectContaining({ folderName: 'references', intervalMs: 2500, shuffle: true }) }),
+          expect.objectContaining({ type: 'spotify', config: { playlist: expect.objectContaining({ id: 'legacy_playlist' }) } }),
+        ]),
+        canvas: { camera: { x: 12, y: 34, z: 1.5 } },
+      },
     })
     expect(notes).toEqual([expect.objectContaining({ id: 'legacy_note', sessionId: first.activeMomentId, content: 'Legacy note body' })])
     expect(window.localStorage.getItem('mic:canvas')).not.toBeNull()

@@ -1,8 +1,12 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useValue, type Editor, type TLStoreSnapshot } from 'tldraw'
 import type {
+  CanvasCamera,
   ImageItem,
   Note,
   Panel,
+  PanelConfigs,
+  PanelType,
   Moment,
   MomentSummary,
   SlideshowSettings,
@@ -30,6 +34,7 @@ import {
   savePanelDirectoryHandle,
   saveNote,
   saveMoment,
+  saveMomentDocument,
   saveSpotifyTokens,
   setActiveMomentId,
   momentLimits,
@@ -38,7 +43,16 @@ import {
 import { downloadMomentArchive, exportMomentArchive, importMomentArchive } from './momentArchive'
 import { createId } from './utils'
 import { createImageItemsFromBundledCollection } from './imageCollections'
-import { setPanelVisibility } from './panelLayout'
+import { getPanelDefinition } from './panelRegistry'
+import {
+  createPanelShape,
+  getPanel as getPanelFromEditor,
+  listPanels,
+  setPanelFocusView as writePanelFocusView,
+  setPanelVisible as writePanelVisible,
+  updatePanelConfig as writePanelConfig,
+  type PanelWriteOptions,
+} from './panelStore'
 import {
   releaseImageItems,
   settingsForBundledCollection,
@@ -76,6 +90,8 @@ interface NotesState {
 
 interface SlideshowState {
   settingsFor(panelId: string): SlideshowSettings
+  /** The picture showing now. Playback position, not configuration: it lives with the timer and is written to the panel only when playback rests. */
+  currentIndexFor(panelId: string): number
   imagesFor(panelId: string): ImageItem[]
   isPlayingFor(panelId: string): boolean
   statusFor(panelId: string): string
@@ -128,16 +144,35 @@ interface MomentsState {
   remove(momentId: string): Promise<void>
   exportActive(): Promise<void>
   importFile(file: File): Promise<void>
-  updateCanvas(canvas: Moment['canvas']): void
-  addPanels(panels: Moment['panels']): void
-  removePanel(panelId: string): void
-  updatePanel(panelId: string, update: (panel: Panel) => Panel): void
-  setPanelVisibility(panelId: string, visible: boolean): void
+  /** The canvas has changed; this is the whole of what a moment persists about it. */
+  updateDocument(document: TLStoreSnapshot, camera: CanvasCamera): void
   registerCanvasFlush(flush: () => void | Promise<void>): () => void
 }
 
-interface AppStateValue {
+/**
+ * The panels on the canvas, read from and written to tldraw's store. The
+ * store is the record of truth; this is the app's view of it and the one
+ * place panel configuration is written from outside the canvas.
+ */
+export interface PanelsState {
+  /** Every panel in stacking order, hidden ones included. Empty until the canvas is ready. */
+  all: Panel[]
+  /** True once the editor is attached and the active moment has been restored into it. */
+  isReady: boolean
+  get(panelId: string): Panel | undefined
+  updateConfig<Type extends PanelType>(panelId: string, patch: Partial<PanelConfigs[Type]>, options?: PanelWriteOptions): void
+  setVisible(panelId: string, visible: boolean): void
+  setFocusView(panelId: string, focusView: boolean): void
+  /** Adds a panel of a kind at its default place. Null when the kind is a singleton that already exists, or the canvas is not ready. */
+  add(type: PanelType): Panel | null
+  /** Wired by the canvas: the editor to read and write through, and the moment it has restored. */
+  attachEditor(editor: Editor | null): void
+  markRestored(momentId: string | null): void
+}
+
+export interface AppStateValue {
   moments: MomentsState
+  panels: PanelsState
   notes: NotesState
   slideshow: SlideshowState
   spotify: SpotifyState
@@ -147,9 +182,10 @@ const AppStateContext = createContext<AppStateValue | null>(null)
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const momentCore = useMomentState()
-  const notes = useNotesState(momentCore.activeMoment, momentCore.patchActiveMoment)
-  const slideshow = useSlideshowState(momentCore.activeMoment, momentCore.patchActiveMoment)
-  const spotify = useSpotifyState(momentCore.activeMoment, momentCore.patchActiveMoment)
+  const panels = usePanelsState(momentCore.activeMoment?.id ?? null)
+  const notes = useNotesState(momentCore.activeMoment, panels)
+  const slideshow = useSlideshowState(momentCore.activeMoment, panels)
+  const spotify = useSpotifyState(momentCore.activeMoment, panels)
 
   const moments = useMemo<MomentsState>(
     () => ({
@@ -186,21 +222,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const imported = await importMomentArchive(file)
         await momentCore.open(imported.id)
       },
-      updateCanvas: momentCore.updateCanvas,
-      addPanels: (panels) => momentCore.patchActiveMoment((current) => ({ ...current, panels: addAllowedPanels(current.panels, panels) })),
-      removePanel: (panelId) => momentCore.patchActiveMoment((current) => ({
-        ...current,
-        panels: current.panels.filter((panel) => panel.id !== panelId),
-        canvas: current.canvas ? { ...current.canvas, panels: current.canvas.panels.filter((layout) => layout.panelId !== panelId) } : null,
-      })),
-      updatePanel: (panelId, update) => momentCore.patchActiveMoment((current) => ({ ...current, panels: current.panels.map((panel) => panel.id === panelId ? update(panel) : panel) })),
-      setPanelVisibility: (panelId, visible) => momentCore.patchActiveMoment((current) => ({ ...current, panels: setPanelVisibility(current.panels, panelId, visible) })),
+      updateDocument: momentCore.updateDocument,
       registerCanvasFlush: momentCore.registerCanvasFlush,
     }),
     [notes, momentCore],
   )
 
-  const value = useMemo(() => ({ moments, notes, slideshow, spotify }), [moments, notes, slideshow, spotify])
+  const value = useMemo(() => ({ moments, panels, notes, slideshow, spotify }), [moments, panels, notes, slideshow, spotify])
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
 }
@@ -211,15 +239,32 @@ export function useAppState() {
   return value
 }
 
-export function addAllowedPanels(existing: Panel[], additions: Panel[]) {
-  let spotifyExists = existing.some((panel) => panel.type === 'spotify')
-  const allowed = additions.filter((panel) => {
-    if (panel.type !== 'spotify') return true
-    if (spotifyExists) return false
-    spotifyExists = true
-    return true
-  })
-  return [...existing, ...allowed]
+function usePanelsState(activeMomentId: string | null): PanelsState {
+  const [editor, setEditor] = useState<Editor | null>(null)
+  const [restoredMomentId, setRestoredMomentId] = useState<string | null>(null)
+  const isReady = editor !== null && restoredMomentId !== null && restoredMomentId === activeMomentId
+
+  // Re-runs whenever a panel shape changes in the store. A drag changes a
+  // shape's x/y but keeps its props object, and the view is cached on the
+  // props, so a drag hands out the same Panel objects as before.
+  const all = useValue('panels', () => (editor && isReady ? listPanels(editor) : []), [editor, isReady])
+
+  return useMemo<PanelsState>(() => ({
+    all,
+    isReady,
+    get: (panelId) => (editor ? getPanelFromEditor(editor, panelId) : undefined),
+    updateConfig: (panelId, patch, options) => { if (editor) writePanelConfig(editor, panelId, patch, options) },
+    setVisible: (panelId, visible) => { if (editor) writePanelVisible(editor, panelId, visible) },
+    setFocusView: (panelId, focusView) => { if (editor) writePanelFocusView(editor, panelId, focusView) },
+    add: (type) => {
+      if (!editor || !isReady) return null
+      if (getPanelDefinition(type).singleton && listPanels(editor).some((panel) => panel.type === type)) return null
+      const shape = createPanelShape(editor, type)
+      return getPanelFromEditor(editor, shape.props.panelId) ?? null
+    },
+    attachEditor: setEditor,
+    markRestored: setRestoredMomentId,
+  }), [all, editor, isReady])
 }
 
 function useMomentState() {
@@ -340,9 +385,19 @@ function useMomentState() {
     await loadMoment(replacement.id)
   }, [loadMoment])
 
-  const updateCanvas = useCallback((canvas: Moment['canvas']) => {
-    patchActiveMoment((current) => ({ ...current, canvas }))
-  }, [patchActiveMoment])
+  // The document changes on every drag and every edit, so it is kept on the
+  // ref and in the database and not in React state: nothing renders from it,
+  // and a state update here would re-render every panel on each change.
+  const updateDocument = useCallback((document: TLStoreSnapshot, camera: CanvasCamera) => {
+    const current = activeMomentRef.current
+    if (!current) return
+    const { legacy: _legacy, ...rest } = current
+    activeMomentRef.current = { ...rest, document, camera }
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      const saved = await saveMomentDocument(current.id, document, camera)
+      if (saved && activeMomentRef.current?.id === saved.id) activeMomentRef.current = { ...activeMomentRef.current, updatedAt: saved.updatedAt }
+    }).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the moment.'))
+  }, [])
 
   return {
     isReady,
@@ -353,15 +408,17 @@ function useMomentState() {
     open,
     rename,
     remove,
-    updateCanvas,
+    updateDocument,
     patchActiveMoment,
     registerCanvasFlush,
     flush,
   }
 }
 
-function useNotesState(moment: Moment | null, patchMoment: (patch: (current: Moment) => Moment) => void): NotesState {
+function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
   const [notes, setNotes] = useState<Note[]>([])
+  const panelsRef = useRef(panels)
+  panelsRef.current = panels
 
   const persistPanelNote = useCallback(async (panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
@@ -386,10 +443,13 @@ function useNotesState(moment: Moment | null, patchMoment: (patch: (current: Mom
     }))
   }, [persistPanelNote])
 
+  // The loading boundary is the moment, once the canvas has restored it:
+  // which note each Notes panel shows is read from the panels then.
+  const loadKey = panels.isReady ? moment?.id ?? '' : ''
   useEffect(() => {
     let cancelled = false
-    const momentId = moment?.id ?? ''
-    const notePanels = moment?.panels.filter((panel): panel is Extract<Panel, { type: 'notes' }> => panel.type === 'notes') ?? []
+    const momentId = loadKey
+    const notePanels = panelsRef.current.all.filter((panel): panel is Panel<'notes'> => panel.type === 'notes')
 
     async function load() {
       await flush()
@@ -416,7 +476,26 @@ function useNotesState(moment: Moment | null, patchMoment: (patch: (current: Mom
       cancelled = true
       void flush()
     }
-  }, [flush, moment?.id]) // Moment changes are the loading boundary.
+  }, [flush, loadKey])
+
+  // The note a panel edits follows the panel's configuration: a Notes panel
+  // that arrives after the load (undo of a delete, a copy, a command) or
+  // whose active note changes under it (undo of a selection) picks up the
+  // note the shape names. Unsaved typing is never displaced.
+  const noteSignature = panels.all
+    .filter((panel): panel is Panel<'notes'> => panel.type === 'notes')
+    .map((panel) => `${panel.id}=${panel.config.activeNoteId ?? ''}`)
+    .join('|')
+  useEffect(() => {
+    if (!loadKey) return
+    for (const panel of panelsRef.current.all) {
+      if (panel.type !== 'notes') continue
+      const state = getNotesPanelRuntimeState(panel.id)
+      const wanted = panel.config.activeNoteId
+      if ((state.activeNote?.id ?? null) === wanted || state.dirty) continue
+      state.activeNote = notes.find((note) => note.id === wanted) ?? null
+    }
+  }, [loadKey, noteSignature, notes])
 
   const scheduleSave = useCallback((panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
@@ -443,16 +522,16 @@ function useNotesState(moment: Moment | null, patchMoment: (patch: (current: Mom
     const state = getNotesPanelRuntimeState(panelId)
     state.activeNote = note
     setNotes((current) => [note, ...current])
-    patchNotesPanel(note.id, patchMoment, panelId)
-  }, [patchMoment, moment])
+    panels.updateConfig<'notes'>(panelId, { activeNoteId: note.id })
+  }, [panels, moment])
 
   const selectNote = useCallback((id: string, panelId: string) => {
     const next = notes.find((note) => note.id === id)
     if (!next) return
     void flush(panelId)
     getNotesPanelRuntimeState(panelId).activeNote = next
-    patchNotesPanel(next.id, patchMoment, panelId)
-  }, [flush, notes, patchMoment])
+    panels.updateConfig<'notes'>(panelId, { activeNoteId: next.id })
+  }, [flush, notes, panels])
 
   const deleteNote = useCallback(async (id: string, panelId: string) => {
     await flush(panelId)
@@ -463,9 +542,9 @@ function useNotesState(moment: Moment | null, patchMoment: (patch: (current: Mom
     if (state.activeNote?.id === id) {
       const next = nextNotes[0] ?? null
       state.activeNote = next
-      patchNotesPanel(next?.id ?? null, patchMoment, panelId)
+      panels.updateConfig<'notes'>(panelId, { activeNoteId: next?.id ?? null })
     }
-  }, [flush, notes, patchMoment])
+  }, [flush, notes, panels])
 
   const setActiveNoteContent = useCallback((content: string, panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
@@ -490,14 +569,41 @@ function useNotesState(moment: Moment | null, patchMoment: (patch: (current: Mom
   return { notes, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
-function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current: Moment) => Moment) => void): SlideshowState {
+function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
   const [, rerender] = useState(0)
   const touch = useCallback(() => rerender((value) => value + 1), [])
-  const panels = moment?.panels.filter((panel): panel is Extract<Panel, { type: 'slideshow' }> => panel.type === 'slideshow') ?? []
+  const panelsRef = useRef(panels)
+  panelsRef.current = panels
+  const settingsOf = useCallback((panelId: string): SlideshowSettings => {
+    const panel = panelsRef.current.get(panelId)
+    return panel?.type === 'slideshow' ? panel.config : defaultSlideshowSettings
+  }, [])
+  const writeSettings = useCallback((panelId: string, patch: Partial<SlideshowSettings>, options?: PanelWriteOptions) => {
+    panelsRef.current.updateConfig<'slideshow'>(panelId, patch, options)
+  }, [])
+  // The picture showing now is playback position, like whether the show is
+  // running, and lives with the timer. It is written back to the panel only
+  // when playback rests, so a running show never touches the store.
+  const setCurrentIndex = useCallback((panelId: string, index: number, persist: boolean) => {
+    getSlideshowPanelRuntimeState(panelId).currentIndex = index
+    if (persist) writeSettings(panelId, { currentIndex: index }, { history: 'ignore' })
+    touch()
+  }, [touch, writeSettings])
 
+  // The loading boundary is the moment, once the canvas has restored it.
+  const loadKey = panels.isReady ? moment?.id ?? '' : ''
+  // Which Images panels exist and where each takes its pictures from. A
+  // panel that arrives later (undo of a delete, a copy, a command) or whose
+  // source changes under it loads its pictures the same way one present at
+  // the start does.
+  const sourceSignature = panels.all
+    .filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+    .map((panel) => `${panel.id}=${imageSourceKey(panel.config.imageSource)}`)
+    .join('|')
   useEffect(() => {
     let cancelled = false
-    const activeIds = new Set(panels.map((panel) => panel.id))
+    const slideshowPanels = loadKey ? panelsRef.current.all.filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow') : []
+    const activeIds = new Set(slideshowPanels.map((panel) => panel.id))
     for (const [panelId, state] of slideshowPanelRuntimeStates) {
       if (!activeIds.has(panelId)) {
         if (state.timerId !== null) window.clearTimeout(state.timerId)
@@ -505,11 +611,14 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
         slideshowPanelRuntimeStates.delete(panelId)
       }
     }
-    for (const panel of panels) {
+    const toLoad = slideshowPanels.filter((panel) => getSlideshowPanelRuntimeState(panel.id).sourceKey !== imageSourceKey(panel.config.imageSource))
+    for (const panel of toLoad) {
       const state = getSlideshowPanelRuntimeState(panel.id)
       if (state.timerId !== null) window.clearTimeout(state.timerId)
       state.timerId = null
       state.isPlaying = false
+      state.sourceKey = imageSourceKey(panel.config.imageSource)
+      state.currentIndex = panel.config.currentIndex
       state.status = statusForImageSource(panel.config.imageSource, 0)
       state.error = null
       releaseImageItems(state.images)
@@ -517,7 +626,7 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
     }
     touch()
 
-    async function loadPanel(panel: Extract<Panel, { type: 'slideshow' }>) {
+    async function loadPanel(panel: Panel<'slideshow'>) {
       const state = getSlideshowPanelRuntimeState(panel.id)
       try {
         const source = panel.config.imageSource
@@ -546,9 +655,7 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
         }
         state.images = nextImages
         state.status = statusForImageSource(source, nextImages.length)
-        if (panel.config.currentIndex >= nextImages.length && panel.config.currentIndex !== 0) {
-          patchSlideshow({ ...panel.config, currentIndex: 0 }, patchMoment, panel.id)
-        }
+        if (state.currentIndex >= nextImages.length && state.currentIndex !== 0) setCurrentIndex(panel.id, 0, true)
         touch()
       } catch (caught) {
         if (!cancelled) {
@@ -559,39 +666,31 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
         }
       }
     }
-    if (!moment) return () => { cancelled = true }
-    for (const panel of panels) void loadPanel(panel)
+    if (!loadKey) return () => { cancelled = true }
+    for (const panel of toLoad) void loadPanel(panel)
     return () => { cancelled = true }
-  }, [moment?.id])
-
-  const momentRef = useRef(moment)
-  const patchMomentRef = useRef(patchMoment)
-  momentRef.current = moment
-  patchMomentRef.current = patchMoment
+  }, [loadKey, sourceSignature, setCurrentIndex, touch])
 
   const schedulePanelAdvance = useCallback((panelId: string) => {
     const state = getSlideshowPanelRuntimeState(panelId)
     if (!state.isPlaying || state.timerId !== null) return
 
-    const panel = momentRef.current?.panels.find((candidate): candidate is Extract<Panel, { type: 'slideshow' }> => candidate.id === panelId && candidate.type === 'slideshow')
-    if (!panel) {
+    const panel = panelsRef.current.get(panelId)
+    if (panel?.type !== 'slideshow') {
       state.isPlaying = false
       return
     }
 
     state.timerId = window.setTimeout(() => {
       state.timerId = null
-      const currentPanel = momentRef.current?.panels.find((candidate): candidate is Extract<Panel, { type: 'slideshow' }> => candidate.id === panelId && candidate.type === 'slideshow')
-      if (!currentPanel || !state.isPlaying) return
+      const currentPanel = panelsRef.current.get(panelId)
+      if (currentPanel?.type !== 'slideshow' || !state.isPlaying) return
       if (state.images.length) {
-        patchSlideshow({
-          ...currentPanel.config,
-          currentIndex: getNextImageIndex(currentPanel.config.currentIndex, state.images.length, currentPanel.config.shuffle),
-        }, patchMomentRef.current, panelId)
+        setCurrentIndex(panelId, getNextImageIndex(state.currentIndex, state.images.length, currentPanel.config.shuffle), false)
       }
       schedulePanelAdvance(panelId)
     }, panel.config.intervalMs)
-  }, [])
+  }, [setCurrentIndex])
 
   const replaceImages = useCallback(async (files: FileList | File[], folderName: string, panelId: string) => {
     if (!moment) return
@@ -609,10 +708,12 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
     state.images = nextImages
     state.status = nextImages.length ? `${folderName} · ${nextImages.length} images` : 'No supported images were selected.'
     state.error = null
-    const current = getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings)
-    patchSlideshow(settingsForMomentAssets(current, folderName), patchMoment, panelId)
+    state.currentIndex = 0
+    const nextSettings = settingsForMomentAssets(settingsOf(panelId), folderName)
+    state.sourceKey = imageSourceKey(nextSettings.imageSource)
+    writeSettings(panelId, nextSettings)
     touch()
-  }, [patchMoment, moment, touch])
+  }, [moment, settingsOf, touch, writeSettings])
 
   const loadImagesFromHandle = useCallback(async (handle: FileSystemDirectoryHandle, panelId: string) => {
     const files: File[] = []
@@ -658,9 +759,10 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
       releaseImageItems(state.images)
       state.images = nextImages
       state.isPlaying = nextImages.length > 0
-      const current = getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings)
-      const nextSettings = settingsForBundledCollection(current, collectionId)
-      patchSlideshow(nextSettings, patchMoment, panelId)
+      const nextSettings = settingsForBundledCollection(settingsOf(panelId), collectionId)
+      state.currentIndex = nextSettings.currentIndex
+      state.sourceKey = imageSourceKey(nextSettings.imageSource)
+      writeSettings(panelId, nextSettings)
       state.status = statusForImageSource(nextSettings.imageSource, nextImages.length)
       state.error = null
       if (state.isPlaying) schedulePanelAdvance(panelId)
@@ -669,7 +771,7 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
       state.error = caught instanceof Error ? caught.message : 'Could not load the sample collection.'
       touch()
     }
-  }, [patchMoment, schedulePanelAdvance, moment, touch])
+  }, [schedulePanelAdvance, moment, settingsOf, touch, writeSettings])
 
   const restoreFolder = useCallback(async (panelId: string) => {
     if (!moment) return
@@ -691,10 +793,11 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
   const resetFolder = useCallback(async (panelId: string) => {
     if (!moment) return
     const state = getSlideshowPanelRuntimeState(panelId)
-    const current = getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings)
+    const current = settingsOf(panelId)
     if (state.timerId !== null) window.clearTimeout(state.timerId)
     state.timerId = null
     state.isPlaying = false
+    state.currentIndex = 0
     if (current.imageSource.type === 'session-assets') {
       await replaceMomentAssets(moment.id, [], panelId)
       await clearPanelDirectoryHandle(moment.id, panelId)
@@ -704,9 +807,11 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
     state.images = []
     state.status = 'Choose your images or try a sample collection.'
     state.error = null
-    patchSlideshow(settingsForClearedImages(current), patchMoment, panelId)
+    const cleared = settingsForClearedImages(current)
+    state.sourceKey = imageSourceKey(cleared.imageSource)
+    writeSettings(panelId, cleared)
     touch()
-  }, [patchMoment, moment, touch])
+  }, [moment, settingsOf, touch, writeSettings])
 
   const stop = useCallback((panelId?: string) => {
     if (!panelId) return
@@ -714,39 +819,37 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
     if (state.timerId !== null) window.clearTimeout(state.timerId)
     state.timerId = null
     state.isPlaying = false
-    const current = getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings)
-    patchSlideshow({ ...current, currentIndex: 0 }, patchMoment, panelId)
-    touch()
-  }, [patchMoment, moment, touch])
+    setCurrentIndex(panelId, 0, true)
+  }, [setCurrentIndex])
 
   const next = useCallback((panelId?: string) => {
     if (!panelId) return
     const state = getSlideshowPanelRuntimeState(panelId)
-    const current = getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings)
-    patchSlideshow({ ...current, currentIndex: getNextImageIndex(current.currentIndex, state.images.length, current.shuffle) }, patchMoment, panelId)
-  }, [patchMoment, moment])
+    setCurrentIndex(panelId, getNextImageIndex(state.currentIndex, state.images.length, settingsOf(panelId).shuffle), true)
+  }, [setCurrentIndex, settingsOf])
 
   const previous = useCallback((panelId?: string) => {
     if (!panelId) return
     const state = getSlideshowPanelRuntimeState(panelId)
-    const current = getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings)
-    patchSlideshow({ ...current, currentIndex: state.images.length ? (current.currentIndex - 1 + state.images.length) % state.images.length : 0 }, patchMoment, panelId)
-  }, [patchMoment, moment])
+    setCurrentIndex(panelId, state.images.length ? (state.currentIndex - 1 + state.images.length) % state.images.length : 0, true)
+  }, [setCurrentIndex])
 
   const updateSettings = useCallback((partial: Partial<SlideshowSettings>, panelId?: string) => {
     if (!panelId) return
-    const current = getSlideshowSettingsForPanel(momentRef.current, panelId, defaultSlideshowSettings)
     const state = getSlideshowPanelRuntimeState(panelId)
     if (partial.intervalMs !== undefined && state.timerId !== null) {
       window.clearTimeout(state.timerId)
       state.timerId = null
     }
-    patchSlideshow({ ...current, ...partial }, patchMomentRef.current, panelId)
+    const { currentIndex, ...configuration } = partial
+    if (currentIndex !== undefined) setCurrentIndex(panelId, currentIndex, true)
+    if (Object.keys(configuration).length) writeSettings(panelId, configuration)
     if (partial.intervalMs !== undefined && state.isPlaying) schedulePanelAdvance(panelId)
-  }, [schedulePanelAdvance])
+  }, [schedulePanelAdvance, setCurrentIndex, writeSettings])
 
   return {
-    settingsFor: (panelId) => getSlideshowSettingsForPanel(moment, panelId, defaultSlideshowSettings),
+    settingsFor: (panelId) => settingsOf(panelId),
+    currentIndexFor: (panelId) => getSlideshowPanelRuntimeState(panelId).currentIndex,
     imagesFor: (panelId) => getSlideshowPanelRuntimeState(panelId).images,
     isPlayingFor: (panelId) => getSlideshowPanelRuntimeState(panelId).isPlaying,
     statusFor: (panelId) => getSlideshowPanelRuntimeState(panelId).status,
@@ -761,9 +864,13 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
       const state = getSlideshowPanelRuntimeState(panelId)
       state.isPlaying = value
       if (value) schedulePanelAdvance(panelId)
-      else if (state.timerId !== null) {
-        window.clearTimeout(state.timerId)
-        state.timerId = null
+      else {
+        if (state.timerId !== null) {
+          window.clearTimeout(state.timerId)
+          state.timerId = null
+        }
+        // Playback has come to rest: this is where the picture showing is kept.
+        setCurrentIndex(panelId, state.currentIndex, true)
       }
       touch()
     },
@@ -771,7 +878,7 @@ function useSlideshowState(moment: Moment | null, patchMoment: (patch: (current:
   }
 }
 
-function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: Moment) => Moment) => void): SpotifyState {
+function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifyState {
   const [tokens, setTokens] = useState<SpotifyTokens | null>(loadSpotifyTokens)
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
@@ -877,18 +984,21 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
     }
   }, [endExpiredSession, tokens?.accessToken])
 
-  const setMomentPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string) => {
-    patchMoment((current) => {
-      const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'spotify')
-        ?? current.panels.find((candidate) => candidate.type === 'spotify')
-      return panel ? { ...current, panels: current.panels.map((candidate) => candidate.id === panel.id ? { ...candidate, config: { playlist: next }, updatedAt: Date.now() } : candidate) as Panel[] } : current
-    })
-  }, [patchMoment])
+  const panelsRef = useRef(panels)
+  panelsRef.current = panels
+  const spotifyPanel = panels.all.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
+  // The user chose the playlist: history. The app filling in artwork it
+  // looked up: not history, or Undo would take the picture away again.
+  const setMomentPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string, options?: PanelWriteOptions) => {
+    const current = panelsRef.current
+    const panel = (panelId ? current.get(panelId) : undefined) ?? current.all.find((candidate) => candidate.type === 'spotify')
+    if (panel?.type === 'spotify') current.updateConfig<'spotify'>(panel.id, { playlist: next }, options)
+  }, [])
 
   // A playlist saved before the panel showed artwork - or restored from an
   // exported moment - has a name but no image. Look the artwork up once so the
   // panel can still show which playlist is loaded.
-  const savedPlaylist = (moment?.panels.find((panel) => panel.type === 'spotify') as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
+  const savedPlaylist = spotifyPanel?.config.playlist
   const playlistMissingArtwork = savedPlaylist?.id && !savedPlaylist.image ? savedPlaylist.id : null
   const artworkLookupsRef = useRef(new Set<string>())
 
@@ -901,7 +1011,7 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
         const fresh = await ensureFreshTokens()
         const summary = mapPlaylist(await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${playlistMissingArtwork}`, fresh.accessToken))
         if (cancelled || !summary.image) return
-        setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image })
+        setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, undefined, { history: 'ignore' })
       } catch {
         // Artwork is decoration: a failed lookup must not interrupt playback.
       }
@@ -983,7 +1093,7 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
   }, [deviceId, ensureFreshTokens, requestSpotify, setMomentPlaylist])
 
   const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary, panelId?: string) => {
-    const panelPlaylist = (moment?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
+    const panelPlaylist = (panelId ? panels.get(panelId) : undefined)?.type === 'spotify' ? (panels.get(panelId!) as Panel<'spotify'>).config.playlist : undefined
     const selected = summary ? { id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image } : panelPlaylist ?? defaultSpotifyPlaylistReference
     if (!selected.uri) throw new Error('Choose a playlist first.')
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
@@ -993,7 +1103,7 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
     setMomentPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, requestSpotify, moment, setMomentPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, panels, setMomentPlaylist])
 
   const playTrack = useCallback(async (summary: SpotifyTrackSummary, _panelId?: string) => {
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
@@ -1005,7 +1115,7 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
   }, [deviceId, ensureFreshTokens, requestSpotify])
 
   const togglePlay = useCallback(async (panelId?: string) => {
-    const panelPlaylist = (moment?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined)?.config.playlist
+    const panelPlaylist = (panelId ? panels.get(panelId) : undefined)?.type === 'spotify' ? (panels.get(panelId!) as Panel<'spotify'>).config.playlist : undefined
     const selectedPlaylist = panelPlaylist ?? defaultSpotifyPlaylistReference
     const action = getSpotifyPlaybackAction(Boolean(track), selectedPlaylist.uri)
     if (action === 'load-saved-playlist') {
@@ -1019,7 +1129,7 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
     const player = playerRef.current
     if (!player) throw new Error('Spotify browser device is not ready yet.')
     await player.togglePlay()
-  }, [playPlaylist, moment, track])
+  }, [playPlaylist, panels, track])
 
   return {
     tokens, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
@@ -1031,14 +1141,6 @@ function useSpotifyState(moment: Moment | null, patchMoment: (patch: (current: M
   }
 }
 
-function patchSlideshow(settings: SlideshowSettings, patchMoment: (patch: (current: Moment) => Moment) => void, panelId?: string) {
-  patchMoment((current) => {
-    if (!panelId) return current
-    const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'slideshow')
-    return panel ? { ...current, panels: current.panels.map((candidate) => candidate.id === panel.id ? { ...candidate, config: settings, updatedAt: Date.now() } : candidate) as Panel[] } : current
-  })
-}
-
 interface NotesPanelRuntimeState {
   activeNote: Note | null
   dirty: boolean
@@ -1048,6 +1150,9 @@ interface NotesPanelRuntimeState {
 interface SlideshowPanelRuntimeState {
   images: ImageItem[]
   isPlaying: boolean
+  currentIndex: number
+  /** The image source the loaded pictures came from, so a changed source reloads and an unchanged one does not. */
+  sourceKey: string | null
   timerId: number | null
   status: string
   error: string | null
@@ -1063,12 +1168,18 @@ function getNotesPanelRuntimeState(panelId: string): NotesPanelRuntimeState {
   return created
 }
 
+function imageSourceKey(source: SlideshowSettings['imageSource']) {
+  return source.type === 'bundled' ? `bundled:${source.collectionId}` : source.type
+}
+
 function getSlideshowPanelRuntimeState(panelId: string): SlideshowPanelRuntimeState {
   const existing = slideshowPanelRuntimeStates.get(panelId)
   if (existing) return existing
   const created: SlideshowPanelRuntimeState = {
     images: [],
     isPlaying: false,
+    currentIndex: 0,
+    sourceKey: null,
     timerId: null,
     status: 'Choose your images or try a sample collection.',
     error: null,
@@ -1095,17 +1206,6 @@ export const panelRuntime = {
     },
   },
   restorePanel: (panelId: string) => getNotesPanelRuntimeState(panelId),
-}
-
-function getSlideshowSettingsForPanel(moment: Moment | null, panelId: string | undefined, fallback: SlideshowSettings) {
-  return (moment?.panels.find((panel) => panel.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined)?.config ?? fallback
-}
-
-function patchNotesPanel(activeNoteId: string | null, patchMoment: (patch: (current: Moment) => Moment) => void, panelId: string) {
-  patchMoment((current) => {
-    const panel = current.panels.find((candidate) => candidate.id === panelId && candidate.type === 'notes')
-    return panel ? { ...current, panels: current.panels.map((candidate) => candidate.id === panel.id ? { ...candidate, config: { activeNoteId }, updatedAt: Date.now() } : candidate) as Panel[] } : current
-  })
 }
 
 function spotifyUrlFromUri(uri?: string) {

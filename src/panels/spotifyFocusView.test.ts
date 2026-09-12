@@ -33,18 +33,15 @@ vi.mock('../AppState', () => ({
       seek: async () => {},
       setVolume: async () => {},
     },
-    moments: {
-      activeMoment: {
-        id: 'moment_focus',
-        panels: [{
-          id: 'panel_music',
-          type: 'spotify',
-          focusView: panel.focusView,
-          createdAt: 1,
-          updatedAt: 1,
-          config: { playlist: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Deep Focus', url: 'https://open.spotify.com/playlist/p1', image: 'https://example.test/deep-focus.jpg' } },
-        }],
-      },
+    moments: { activeMoment: { id: 'moment_focus' } },
+    panels: {
+      get: () => ({
+        id: 'panel_music',
+        type: 'spotify',
+        visible: true,
+        focusView: panel.focusView,
+        config: { playlist: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Deep Focus', url: 'https://open.spotify.com/playlist/p1', image: 'https://example.test/deep-focus.jpg' } },
+      }),
     },
   }),
 }))

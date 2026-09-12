@@ -1,4 +1,22 @@
-export type PanelType = 'spotify' | 'slideshow' | 'notes'
+import type { TLStoreSnapshot } from 'tldraw'
+
+/**
+ * The configuration each kind of panel carries. This map is the one place a
+ * panel type is declared for the type system; the registry in
+ * panelRegistry.ts and the component table in PanelShape.tsx are both keyed
+ * by it, so adding a key here is what makes the compiler ask for the rest.
+ */
+export interface PanelConfigs {
+  spotify: { playlist: SpotifyPlaylistReference }
+  slideshow: SlideshowSettings
+  notes: { activeNoteId: string | null }
+}
+
+export type PanelType = keyof PanelConfigs
+export type PanelConfig<T extends PanelType = PanelType> = PanelConfigs[T]
+
+/** A panel's type and configuration together, discriminated on `type`. */
+export type PanelContent<T extends PanelType = PanelType> = { [K in PanelType]: { type: K; config: PanelConfigs[K] } }[T]
 
 export interface PanelLayout {
   panelId: string
@@ -20,20 +38,23 @@ export interface CanvasState {
 }
 
 export interface PanelBase {
+  /** Stable application identity; notes, image assets and folder handles are keyed by it. */
   id: string
-  type: PanelType
   /** Absent means visible for moments written before panel visibility existed. */
   visible?: boolean
   /** Absent means the full panel. True keeps the Music panel's playback controls only. */
   focusView?: boolean
-  createdAt: number
-  updatedAt: number
+  /** Only present on panels read from an archive or a pre-snapshot moment. */
+  createdAt?: number
+  updatedAt?: number
 }
 
-export type Panel =
-  | (PanelBase & { type: 'spotify'; config: { playlist: SpotifyPlaylistReference } })
-  | (PanelBase & { type: 'slideshow'; config: SlideshowSettings })
-  | (PanelBase & { type: 'notes'; config: { activeNoteId: string | null } })
+/**
+ * A panel as the app reads it. The tldraw shape is the record of truth: this
+ * is a view of the shape's props, produced by panelStore.ts, and a panel is
+ * changed by writing the shape, never by writing one of these.
+ */
+export type Panel<T extends PanelType = PanelType> = PanelBase & PanelContent<T>
 
 export interface SlideshowSettings {
   folderName: string | null
@@ -117,14 +138,35 @@ export interface SpotifyPlaylistReference {
   image?: string | null
 }
 
+export interface CanvasCamera {
+  x: number
+  y: number
+  z: number
+}
+
+/**
+ * Panels and layout in the shape they had before the canvas document was the
+ * unit of persistence. Kept on a moment only until it is first opened, when
+ * the canvas builds the document from it; also the shape every archive uses.
+ */
+export interface LegacyCanvasContent {
+  panels: Panel[]
+  canvas: CanvasState | null
+}
+
 export interface Moment {
   id: string
   name: string
-  schemaVersion: 2
+  schemaVersion: 3
   createdAt: number
   updatedAt: number
-  panels: Panel[]
-  canvas: CanvasState | null
+  camera: CanvasCamera | null
+  /**
+   * tldraw's document: every panel shape with its geometry, order and
+   * configuration. Null until the canvas has upgraded `legacy`.
+   */
+  document: TLStoreSnapshot | null
+  legacy?: LegacyCanvasContent
 }
 
 export interface MomentSummary {

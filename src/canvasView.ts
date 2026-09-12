@@ -1,6 +1,5 @@
 import type { Editor } from 'tldraw'
-
-const PANEL_SHAPE_TYPE = 'music-panel'
+import { listPanelShapes } from './panelStore'
 
 export interface ViewportInsets {
   top: number
@@ -112,9 +111,9 @@ export function fitEditorToBounds(editor: Editor, bounds: ViewRect | null, inset
 }
 
 function getPanelBoundsWithIds(editor: Editor) {
-  return editor
-    .getCurrentPageShapes()
-    .filter((shape) => shape.type === PANEL_SHAPE_TYPE)
+  // A hidden panel keeps its shape but takes no room on screen.
+  return listPanelShapes(editor)
+    .filter((shape) => shape.props.visible)
     .map((shape) => ({ id: shape.id, bounds: editor.getShapePageBounds(shape) }))
     .filter((item): item is { id: typeof item.id; bounds: NonNullable<typeof item.bounds> } => Boolean(item.bounds))
 }

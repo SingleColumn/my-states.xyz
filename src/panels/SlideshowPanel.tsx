@@ -25,10 +25,12 @@ const focusViewStack: string[] = []
  * -- is declared with `panelContentProps`, and nothing else is.
  */
 export function SlideshowPanel({ panelId }: { panelId: string }) {
-  const { slideshow, moments } = useAppState()
+  const { slideshow, panels } = useAppState()
   const commands = usePanelCommands()
-  const panel = moments.activeMoment?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined
+  const found = panels.get(panelId)
+  const panel = found?.type === 'slideshow' ? (found as Panel<'slideshow'>) : undefined
   const panelSettings = panel?.config ?? slideshow.settingsFor(panelId)
+  const currentIndex = slideshow.currentIndexFor(panelId)
   // Focus view leaves the picture alone on the panel: every control is dropped,
   // including the header, so Escape is the only way back out.
   const focusView = panel?.focusView === true
@@ -37,7 +39,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const panelStatus = slideshow.statusFor(panelId)
   const panelError = slideshow.errorFor(panelId)
   const firstImage = panelImages[0]
-  const currentImage = panelImages[panelSettings.currentIndex]
+  const currentImage = panelImages[currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
   const [isSamplePickerOpen, setIsSamplePickerOpen] = useState(false)
@@ -158,7 +160,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             {panelImages.length ? (
               <div className="slideshow-image-picker-list">
                 {panelImages.map((image, index) => (
-                  <button className={`slideshow-image-thumbnail ${index === panelSettings.currentIndex ? 'is-current' : ''}`} type="button" key={image.id} aria-label={`Show ${image.name}`} aria-pressed={index === panelSettings.currentIndex} title={image.name} onClick={() => slideshow.updateSettings({ currentIndex: index }, panelId)}>
+                  <button className={`slideshow-image-thumbnail ${index === currentIndex ? 'is-current' : ''}`} type="button" key={image.id} aria-label={`Show ${image.name}`} aria-pressed={index === currentIndex} title={image.name} onClick={() => slideshow.updateSettings({ currentIndex: index }, panelId)}>
                     <img src={image.url} alt="" draggable={false} />
                   </button>
                 ))}
@@ -254,7 +256,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         <footer className="card-footer" {...panelContentProps}>
             <span className="card-footer-meta">{currentImage?.name ?? panelStatus}</span>
           <div className="card-footer-status">
-            {panelError ? <span className="error-text">{panelError}</span> : <span>{panelImages.length ? `${panelSettings.currentIndex + 1} / ${panelImages.length}` : '0 / 0'}</span>}
+            {panelError ? <span className="error-text">{panelError}</span> : <span>{panelImages.length ? `${currentIndex + 1} / ${panelImages.length}` : '0 / 0'}</span>}
           </div>
         </footer>
         </>

@@ -21,9 +21,10 @@ import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
-  const { spotify, moments } = useAppState()
+  const { spotify, moments, panels } = useAppState()
   const commands = usePanelCommands()
-  const panel = moments.activeMoment?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined
+  const found = panels.get(panelId)
+  const panel = found?.type === 'spotify' ? (found as Panel<'spotify'>) : undefined
   const panelPlaylist = panel?.config.playlist ?? defaultSpotifyPlaylistReference
   // Focus view keeps what someone glances at while they write or look at
   // images: the playlist, the track, and the playback controls.
