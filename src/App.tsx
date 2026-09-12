@@ -447,15 +447,18 @@ function AppContent() {
     setChromeHeight((current) => Math.abs(current - rect.height) < 0.5 ? current : rect.height)
   }, [])
 
+  // The report reads the moment as last written, not the one in React state,
+  // because the document is kept out of state.
   const openArchitectureReport = useCallback(() => {
     const editor = editorRef.current
-    const moment = moments.activeMoment
+    const moment = moments.getActiveMomentRecord()
     if (!editor || !moment) return
     setArchitectureReport(buildPanelArchitectureReport(moment, editor))
-  }, [moments.activeMoment])
+  }, [moments])
 
-  const displayedArchitectureReport = architectureReport && moments.activeMoment && editorRef.current
-    ? buildPanelArchitectureReport(moments.activeMoment, editorRef.current)
+  const latestMoment = moments.getActiveMomentRecord()
+  const displayedArchitectureReport = architectureReport && latestMoment && editorRef.current
+    ? buildPanelArchitectureReport(latestMoment, editorRef.current)
     : architectureReport
 
   const openHelpAbout = useCallback(() => {

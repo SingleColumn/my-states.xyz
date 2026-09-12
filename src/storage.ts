@@ -221,7 +221,25 @@ function makeMoment(name: string, legacy: LegacyCanvasContent = { panels: create
   }
 }
 
-export async function initializeMoments() {
+let initialization: Promise<{ moments: Moment[]; activeMomentId: string }> | null = null
+
+/**
+ * Runs once per page. The work below is check-then-create, and React's
+ * development double-invoke of effects (or two callers in one page) would
+ * otherwise both find no moments and both create "My first moment". One
+ * promise is shared; a failure clears it so a reload can retry.
+ */
+export function initializeMoments() {
+  if (!initialization) {
+    initialization = runInitialization().catch((error) => {
+      initialization = null
+      throw error
+    })
+  }
+  return initialization
+}
+
+async function runInitialization() {
   const db = await dbPromise
   const migration = await db.get('preferences', MIGRATION_KEY)
 

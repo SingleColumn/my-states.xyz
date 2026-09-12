@@ -146,6 +146,8 @@ interface MomentsState {
   importFile(file: File): Promise<void>
   /** The canvas has changed; this is the whole of what a moment persists about it. */
   updateDocument(document: TLStoreSnapshot, camera: CanvasCamera): void
+  /** The active moment as last written, document included; activeMoment in state omits the document. */
+  getActiveMomentRecord(): Moment | null
   registerCanvasFlush(flush: () => void | Promise<void>): () => void
 }
 
@@ -223,6 +225,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await momentCore.open(imported.id)
       },
       updateDocument: momentCore.updateDocument,
+      getActiveMomentRecord: momentCore.getActiveMomentRecord,
       registerCanvasFlush: momentCore.registerCanvasFlush,
     }),
     [notes, momentCore],
@@ -409,6 +412,7 @@ function useMomentState() {
     rename,
     remove,
     updateDocument,
+    getActiveMomentRecord: () => activeMomentRef.current,
     patchActiveMoment,
     registerCanvasFlush,
     flush,
