@@ -15,7 +15,7 @@ export function PanelArchitectureReportView({ report, onClose }: { report: Panel
         <header className="architecture-report-header">
           <div>
             <h2 id="architecture-report-title">Panel architecture report</h2>
-            <p>{report.session.name} · {report.summary.panelCount} panels · {report.summary.shapeCount} shapes</p>
+            <p>{report.moment.name} · {report.summary.panelCount} panels · {report.summary.shapeCount} shapes</p>
           </div>
           <div className="architecture-report-actions">
             <button type="button" onClick={() => void copyJson()}>{copied ? 'Copied' : 'Copy JSON'}</button>

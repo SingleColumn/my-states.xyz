@@ -6,11 +6,11 @@ import { HELP_ABOUT_LABEL } from './AppChrome'
 import { HELP_ABOUT_GITHUB_URL, HELP_ABOUT_LICENSE_URL, HELP_ABOUT_MAIN_SECTION, HELP_ABOUT_TLDRAW_URL } from './HelpAbout'
 import { appVersion } from './appMetadata'
 
-const documentSections = ['About', 'Getting started', 'Panels', 'Sessions', 'Third-party licences']
+const documentSections = ['About', 'Getting started', 'Panels', 'Moments', 'Third-party licences']
 
 describe('Help & About feature contract', () => {
   it('keeps the document sections in the required order', () => {
-    expect(documentSections).toEqual(['About', 'Getting started', 'Panels', 'Sessions', 'Third-party licences'])
+    expect(documentSections).toEqual(['About', 'Getting started', 'Panels', 'Moments', 'Third-party licences'])
     expect(['Music', 'Images', 'Notes']).toEqual(['Music', 'Images', 'Notes'])
   })
 

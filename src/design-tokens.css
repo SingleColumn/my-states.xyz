@@ -85,7 +85,7 @@
   --font-weight-display: 680;
   --font-weight-emphasis: 650;
   --tracking-label: 0.04em;
-  --size-session-error-max-width: 260px;
+  --size-moment-error-max-width: 260px;
   --size-tldraw-icon: 16px;
   --space-control-padding-x: 12px;
   --space-app-chrome-compact-gap: 10px;
@@ -118,7 +118,7 @@
   --space-menu-item-gap: var(--space-detail-3);
   --space-menu-item-padding-x: var(--space-detail-4);
   --size-menu-item-height: 34px;
-  --size-session-menu-min-width: 190px;
+  --size-moment-menu-min-width: 190px;
   --size-canvas-menu-min-width: 220px;
   --space-card-eyebrow-bottom: 4px;
   --space-card-footer-padding-y: 12px;
@@ -271,7 +271,7 @@
   --size-grid: 48px;
   --size-top-toolbar-height: 54px;
   --size-top-toolbar-control: 36px;
-  --size-session-selector-width: 260px;
+  --size-moment-selector-width: 260px;
   --size-tldraw-control-button: var(--size-top-toolbar-control);
   --size-tldraw-page-selector-width: 112px;
   --z-app-badge: 5;

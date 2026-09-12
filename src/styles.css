@@ -50,7 +50,7 @@ button {
 
 .app-chrome {
   display: grid;
-  grid-template-areas: "sessions canvas spacer tldraw";
+  grid-template-areas: "moments canvas spacer tldraw";
   grid-template-columns: auto auto minmax(8px, 1fr) auto;
   align-items: center;
   column-gap: var(--space-app-chrome-group-gap);
@@ -67,9 +67,9 @@ button {
   pointer-events: auto;
 }
 
-.session-toolbar {
+.moment-toolbar {
   position: relative;
-  grid-area: sessions;
+  grid-area: moments;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -77,27 +77,27 @@ button {
   min-width: 0;
 }
 
-.session-toolbar select {
-  width: min(var(--size-session-selector-width), 22vw);
+.moment-toolbar select {
+  width: min(var(--size-moment-selector-width), 22vw);
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
   padding: 0 var(--space-detail-3);
 }
 
-.session-toolbar .card-icon-button {
+.moment-toolbar .card-icon-button {
   width: var(--size-top-toolbar-control);
   height: var(--size-top-toolbar-control);
   min-width: var(--size-top-toolbar-control);
 }
 
-.session-action-transfer,
-.session-action-delete {
+.moment-action-transfer,
+.moment-action-delete {
   position: relative;
   margin-left: 6px;
 }
 
-.session-action-transfer::before,
-.session-action-delete::before {
+.moment-action-transfer::before,
+.moment-action-delete::before {
   position: absolute;
   top: var(--space-divider-inset);
   bottom: var(--space-divider-inset);
@@ -107,23 +107,23 @@ button {
   content: "";
 }
 
-.session-action-delete:hover:not(:disabled),
-.session-actions-menu .is-destructive:hover:not(:disabled) {
+.moment-action-delete:hover:not(:disabled),
+.moment-actions-menu .is-destructive:hover:not(:disabled) {
   color: var(--color-danger);
 }
 
-.session-toolbar .session-actions-menu-trigger {
+.moment-toolbar .moment-actions-menu-trigger {
   display: none;
 }
 
-.session-actions-menu {
+.moment-actions-menu {
   position: absolute;
   top: calc(100% + var(--space-popover-offset));
   right: 0;
   z-index: 30;
   display: grid;
   width: max-content;
-  min-width: var(--size-session-menu-min-width);
+  min-width: var(--size-moment-menu-min-width);
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
@@ -132,7 +132,7 @@ button {
   backdrop-filter: var(--blur-app-badge);
 }
 
-.session-actions-menu button {
+.moment-actions-menu button {
   display: flex;
   align-items: center;
   gap: var(--space-menu-item-gap);
@@ -145,21 +145,21 @@ button {
   text-align: left;
 }
 
-.session-actions-menu button:hover:not(:disabled) {
+.moment-actions-menu button:hover:not(:disabled) {
   background: var(--card-button-bg-hover);
 }
 
-.session-actions-menu button:disabled {
+.moment-actions-menu button:disabled {
   cursor: not-allowed;
   opacity: var(--opacity-disabled);
 }
 
-.session-toolbar-error {
+.moment-toolbar-error {
   position: absolute;
   top: calc(100% + var(--space-detail-2));
   left: 50%;
   transform: translateX(-50%);
-  max-width: var(--size-session-error-max-width);
+  max-width: var(--size-moment-error-max-width);
   padding: var(--space-menu-padding) var(--space-menu-item-padding-x);
   border-radius: var(--button-radius);
   background: var(--background-toast);
@@ -1984,7 +1984,7 @@ input[type="range"] {
     padding-inline: 12px;
   }
 
-  .session-toolbar select {
+  .moment-toolbar select {
     width: clamp(180px, 20vw, 220px);
   }
 
@@ -2003,15 +2003,15 @@ input[type="range"] {
 }
 
 @media (max-width: 1199px) {
-  .session-action-secondary {
+  .moment-action-secondary {
     display: none !important;
   }
 
-  .session-toolbar .session-actions-menu-trigger {
+  .moment-toolbar .moment-actions-menu-trigger {
     display: inline-flex;
   }
 
-  .session-toolbar select {
+  .moment-toolbar select {
     width: clamp(160px, 22vw, 200px);
   }
 
@@ -2036,7 +2036,7 @@ input[type="range"] {
     min-width: 96px;
   }
 
-  .session-toolbar-error {
+  .moment-toolbar-error {
     max-width: calc(100vw - 32px);
   }
 }
@@ -2044,14 +2044,14 @@ input[type="range"] {
 @media (max-width: 799px) {
   .app-chrome {
     grid-template-areas:
-      "sessions sessions sessions"
+      "moments moments moments"
       "canvas spacer tldraw";
     grid-template-columns: auto minmax(8px, 1fr) auto;
     row-gap: var(--space-top-toolbar-gap);
     column-gap: var(--space-app-chrome-compact-gap);
   }
 
-  .session-toolbar {
+  .moment-toolbar {
     justify-content: flex-end;
   }
 
@@ -2060,7 +2060,7 @@ input[type="range"] {
     border-left: 0;
   }
 
-  .session-toolbar select {
+  .moment-toolbar select {
     width: clamp(130px, 30vw, 190px);
   }
 }
@@ -2068,13 +2068,13 @@ input[type="range"] {
 @media (max-width: 520px) {
   .app-chrome {
     grid-template-areas:
-      "sessions sessions"
+      "moments moments"
       "canvas spacer"
       "tldraw tldraw";
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .session-toolbar select {
+  .moment-toolbar select {
     width: clamp(105px, 28vw, 145px);
   }
 
@@ -2086,7 +2086,7 @@ input[type="range"] {
 }
 
 @media (max-width: 380px) {
-  .session-toolbar select {
+  .moment-toolbar select {
     width: 100px;
   }
 }

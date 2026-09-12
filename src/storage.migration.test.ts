@@ -24,7 +24,7 @@ beforeAll(async () => {
   })
   await db.put('notes', {
     id: 'legacy_note',
-    title: 'Before sessions',
+    title: 'Before moments',
     content: 'Legacy note body',
     createdAt: 10,
     updatedAt: 20,
@@ -32,14 +32,14 @@ beforeAll(async () => {
   db.close()
 })
 
-describe('legacy session migration', () => {
+describe('legacy moment migration', () => {
   it('migrates legacy state, verifies its read-back, and is idempotent', async () => {
     const storage = await import('./storage')
-    const first = await storage.initializeSessions()
-    const session = await storage.getSession(first.activeSessionId)
-    const notes = await storage.getNotes(first.activeSessionId)
+    const first = await storage.initializeMoments()
+    const moment = await storage.getMoment(first.activeMomentId)
+    const notes = await storage.getNotes(first.activeMomentId)
 
-    expect(session).toMatchObject({
+    expect(moment).toMatchObject({
       name: 'Imported workspace',
       panels: expect.arrayContaining([
         expect.objectContaining({ type: 'notes', config: { activeNoteId: 'legacy_note' } }),
@@ -48,11 +48,11 @@ describe('legacy session migration', () => {
       ]),
       canvas: { camera: { x: 12, y: 34, z: 1.5 } },
     })
-    expect(notes).toEqual([expect.objectContaining({ id: 'legacy_note', sessionId: first.activeSessionId, content: 'Legacy note body' })])
+    expect(notes).toEqual([expect.objectContaining({ id: 'legacy_note', sessionId: first.activeMomentId, content: 'Legacy note body' })])
     expect(window.localStorage.getItem('mic:canvas')).not.toBeNull()
 
-    const second = await storage.initializeSessions()
-    expect(second.activeSessionId).toBe(first.activeSessionId)
-    expect(await storage.getSessions()).toHaveLength(1)
+    const second = await storage.initializeMoments()
+    expect(second.activeMomentId).toBe(first.activeMomentId)
+    expect(await storage.getMoments()).toHaveLength(1)
   })
 })

@@ -1,13 +1,13 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
-import { createSession, getSession, saveSession } from './storage'
+import { createMoment, getMoment, saveMoment } from './storage'
 
 describe('persistent panel identity', () => {
   it('assigns stable IDs and preserves them across reloads', async () => {
-    const created = await createSession('Stable IDs')
+    const created = await createMoment('Stable IDs')
     const ids = created.panels.map((panel) => panel.id)
-    await saveSession(created)
-    const reloaded = await getSession(created.id)
+    await saveMoment(created)
+    const reloaded = await getMoment(created.id)
     expect(reloaded?.panels.map((panel) => panel.id)).toEqual(ids)
     expect(new Set(ids).size).toBe(ids.length)
   })

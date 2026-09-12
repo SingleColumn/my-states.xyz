@@ -20,9 +20,9 @@ import type { Panel } from '../types'
 import { PanelHeader, stopPanelHeaderEvent, usePanelCommands } from '../PanelHeader'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
-  const { spotify, sessions } = useAppState()
+  const { spotify, moments } = useAppState()
   const commands = usePanelCommands()
-  const panel = sessions.activeSession?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined
+  const panel = moments.activeMoment?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined
   const panelPlaylist = panel?.config.playlist ?? defaultSpotifyPlaylistReference
   // Focus view keeps what someone glances at while they write or look at
   // images: the playlist, the track, and the playback controls.
@@ -50,7 +50,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
 
   useEffect(() => {
     setPlaylistUrl(panelPlaylist.url ?? '')
-  }, [sessions.activeSession?.id, panelPlaylist.url])
+  }, [moments.activeMoment?.id, panelPlaylist.url])
 
   function resetFields() {
     setQuery('')

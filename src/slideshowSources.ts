@@ -1,7 +1,7 @@
 import type { ImageItem, SlideshowSettings } from './types'
 import { DEFAULT_SLIDESHOW_ZOOM } from './storage'
 
-export function settingsForSessionAssets(settings: SlideshowSettings, folderName: string): SlideshowSettings {
+export function settingsForMomentAssets(settings: SlideshowSettings, folderName: string): SlideshowSettings {
   return { ...settings, folderName, imageSource: { type: 'session-assets' }, currentIndex: 0 }
 }
 
@@ -19,7 +19,7 @@ export function statusForImageSource(source: SlideshowSettings['imageSource'], i
       ? `${source.collectionId} · ${imageCount} images`
       : `No images are available yet in "${source.collectionId}".`
   }
-  return imageCount ? `${imageCount} images loaded from this session.` : 'No supported images are available.'
+  return imageCount ? `${imageCount} images loaded from this moment.` : 'No supported images are available.'
 }
 
 export function releaseImageItems(images: ImageItem[]) {

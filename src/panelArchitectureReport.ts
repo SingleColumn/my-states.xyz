@@ -1,5 +1,5 @@
 import type { TLShape } from 'tldraw'
-import type { Panel, Session } from './types'
+import type { Panel, Moment } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 
 export type ArchitectureCheckStatus = 'PASS' | 'WARNING' | 'ERROR'
@@ -12,7 +12,7 @@ export interface PanelArchitectureCheck {
 }
 
 export interface PanelArchitectureReport {
-  session: {
+  moment: {
     id: string
     name: string
     schemaVersion: number
@@ -47,7 +47,7 @@ export interface PanelArchitectureReport {
       index: string | null
     }
     persisted: {
-      sessionPanelId: string | null
+      momentPanelId: string | null
       canvasLayout: { x: number; y: number; w: number; h: number } | null
     }
   }>
@@ -64,7 +64,7 @@ const rendererKeys: Record<Panel['type'], string> = {
   notes: 'NotesPanel',
 }
 
-export function buildPanelArchitectureReport(session: Session, editor: PanelArchitectureEditor): PanelArchitectureReport {
+export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchitectureEditor): PanelArchitectureReport {
   const shapes = editor.getCurrentPageShapes().filter(isPanelShape)
   const shapeByPanelId = new Map<string, TLShape[]>()
   for (const shape of shapes) {
@@ -73,9 +73,9 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
     shapeByPanelId.set(shape.props.panelId, list)
   }
 
-  const panelById = new Map(session.panels.map((panel) => [panel.id, panel]))
-  const layouts = new Map((session.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
-  const panels = session.panels.map((panel) => {
+  const panelById = new Map(moment.panels.map((panel) => [panel.id, panel]))
+  const layouts = new Map((moment.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
+  const panels = moment.panels.map((panel) => {
     const matchingShapes = shapeByPanelId.get(panel.id) ?? []
     const shape = matchingShapes[0]
     const layout = layouts.get(panel.id)
@@ -97,7 +97,7 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
         index: shape?.index ?? null,
       },
       persisted: {
-        sessionPanelId: panelById.has(panel.id) ? panel.id : null,
+        momentPanelId: panelById.has(panel.id) ? panel.id : null,
         canvasLayout: layout ? { x: layout.x, y: layout.y, w: layout.w, h: layout.h } : null,
       },
     }
@@ -108,7 +108,7 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
     checks.push({ id, label, status, details })
   }
 
-  const panelIds = session.panels.map((panel) => panel.id)
+  const panelIds = moment.panels.map((panel) => panel.id)
   const uniquePanelIds = new Set(panelIds)
   addCheck(
     'stable-panel-ids',
@@ -117,7 +117,7 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
     `${panelIds.length} panel objects, ${uniquePanelIds.size} unique IDs`,
   )
 
-  const panelsWithoutExactlyOneShape = session.panels.filter((panel) => (shapeByPanelId.get(panel.id)?.length ?? 0) !== 1)
+  const panelsWithoutExactlyOneShape = moment.panels.filter((panel) => (shapeByPanelId.get(panel.id)?.length ?? 0) !== 1)
   addCheck(
     'panel-shape-cardinality',
     'Every panel maps to exactly one tldraw shape',
@@ -133,7 +133,7 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
     orphanShapes.length ? `${orphanShapes.length} orphan shape(s)` : 'No orphan shapes',
   )
 
-  const invalidRenderers = session.panels.filter((panel) => !rendererKeys[panel.type])
+  const invalidRenderers = moment.panels.filter((panel) => !rendererKeys[panel.type])
   addCheck(
     'renderer-mapping',
     'Every panel type resolves to a renderer',
@@ -142,15 +142,15 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
   )
 
   const geometryProperties = new Set(['x', 'y', 'w', 'h', 'width', 'height', 'position', 'size'])
-  const modelGeometry = session.panels.flatMap((panel) => Object.keys(panel).filter((key) => geometryProperties.has(key)))
+  const modelGeometry = moment.panels.flatMap((panel) => Object.keys(panel).filter((key) => geometryProperties.has(key)))
   addCheck(
     'geometry-ownership',
     'Panel model does not own competing canvas geometry',
     modelGeometry.length ? 'ERROR' : 'PASS',
-    modelGeometry.length ? `Geometry fields found on panel model: ${modelGeometry.join(', ')}` : 'Geometry is owned by tldraw shapes; session canvas stores the persistence snapshot',
+    modelGeometry.length ? `Geometry fields found on panel model: ${modelGeometry.join(', ')}` : 'Geometry is owned by tldraw shapes; moment canvas stores the persistence snapshot',
   )
 
-  const layoutIds = session.canvas?.panels?.map((layout) => layout.panelId) ?? []
+  const layoutIds = moment.canvas?.panels?.map((layout) => layout.panelId) ?? []
   const duplicateLayoutIds = layoutIds.filter((id, index) => layoutIds.indexOf(id) !== index)
   const orphanLayouts = layoutIds.filter((id) => !panelById.has(id))
   addCheck(
@@ -160,10 +160,10 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
     duplicateLayoutIds.length || orphanLayouts.length ? `Duplicate layouts: ${duplicateLayoutIds.length}; orphan layouts: ${orphanLayouts.length}` : 'Canvas layouts use panelId references',
   )
 
-  const spotifyCount = session.panels.filter((panel) => panel.type === 'spotify').length
+  const spotifyCount = moment.panels.filter((panel) => panel.type === 'spotify').length
   addCheck(
     'spotify-singleton',
-    'The session contains at most one Spotify panel',
+    'The moment contains at most one Spotify panel',
     spotifyCount > 1 ? 'ERROR' : 'PASS',
     `${spotifyCount} Spotify panel(s)`,
   )
@@ -178,24 +178,24 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
 
   addCheck(
     'schema-version',
-    'Persisted panel data uses the current session schema',
-    session.schemaVersion === 2 ? 'PASS' : 'WARNING',
-    `Session schemaVersion is ${session.schemaVersion}`,
+    'Persisted panel data uses the current moment schema',
+    moment.schemaVersion === 2 ? 'PASS' : 'WARNING',
+    `Moment schemaVersion is ${moment.schemaVersion}`,
   )
 
   addCheck(
     'runtime-persistence-correlation',
     'Runtime panel objects and persisted panel objects correlate by panelId',
-    panels.every((panel) => panel.persisted.sessionPanelId === panel.panelId) ? 'PASS' : 'ERROR',
+    panels.every((panel) => panel.persisted.momentPanelId === panel.panelId) ? 'PASS' : 'ERROR',
     'Panel identity is correlated by panelId',
   )
 
   const errors = checks.filter((check) => check.status === 'ERROR').length
   const warnings = checks.filter((check) => check.status === 'WARNING').length
   return {
-    session: { id: session.id, name: session.name, schemaVersion: session.schemaVersion },
+    moment: { id: moment.id, name: moment.name, schemaVersion: moment.schemaVersion },
     summary: {
-      panelCount: session.panels.length,
+      panelCount: moment.panels.length,
       shapeCount: shapes.length,
       errors,
       warnings,
@@ -203,8 +203,8 @@ export function buildPanelArchitectureReport(session: Session, editor: PanelArch
     },
     ownership: {
       tldraw: ['position', 'dimensions', 'transforms', 'selection', 'canvas interaction', 'shape ordering/index'],
-      panelModel: ['stable panelId', 'panel type', 'persistent semantic/configuration state', 'content references', 'session membership'],
-      persistence: ['session panel records', 'canvas geometry snapshots keyed by panelId', 'panel-associated assets and notes'],
+      panelModel: ['stable panelId', 'panel type', 'persistent semantic/configuration state', 'content references', 'moment membership'],
+      persistence: ['moment panel records', 'canvas geometry snapshots keyed by panelId', 'panel-associated assets and notes'],
       react: ['component-internal UI state', 'content-specific transient runtime state keyed by panelId where applicable'],
     },
     panels,

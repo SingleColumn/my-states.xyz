@@ -27,9 +27,9 @@ vi.mock('../AppState', () => ({
       next: () => {},
       previous: () => {},
     },
-    sessions: {
-      activeSession: {
-        id: 'session_focus',
+    moments: {
+      activeMoment: {
+        id: 'moment_focus',
         panels: [{
           id: 'panel_images',
           type: 'slideshow',

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TLShape } from 'tldraw'
 import { buildPanelArchitectureReport } from './panelArchitectureReport'
 import { duplicatePanel } from './panelDuplication'
-import type { Panel, Session } from './types'
+import type { Panel, Moment } from './types'
 
 function makePanel(type: Panel['type'], id = `panel-${type}`): Panel {
   const base = { id, type, createdAt: 1, updatedAt: 1 }
@@ -40,10 +40,10 @@ function makeShape(panelId: string, id = `shape:${panelId}`, x = 10): TLShape {
   } as unknown as TLShape
 }
 
-function makeSession(panels: Panel[], layouts = panels.map((panel, index) => ({ panelId: panel.id, x: index * 500, y: 0, w: 460, h: 720 }))): Session {
+function makeMoment(panels: Panel[], layouts = panels.map((panel, index) => ({ panelId: panel.id, x: index * 500, y: 0, w: 460, h: 720 }))): Moment {
   return {
-    id: 'session-1',
-    name: 'Test session',
+    id: 'moment-1',
+    name: 'Test moment',
     schemaVersion: 2,
     createdAt: 1,
     updatedAt: 1,
@@ -59,7 +59,7 @@ function editorWith(...shapes: TLShape[]) {
 describe('panel architecture report', () => {
   it('reports a healthy single-panel state', () => {
     const panel = makePanel('notes')
-    const report = buildPanelArchitectureReport(makeSession([panel]), editorWith(makeShape(panel.id)))
+    const report = buildPanelArchitectureReport(makeMoment([panel]), editorWith(makeShape(panel.id)))
 
     expect(report.summary.status).toBe('PASS')
     expect(report.summary.errors).toBe(0)
@@ -68,7 +68,7 @@ describe('panel architecture report', () => {
 
   it('reports multiple panel types and explicit ownership', () => {
     const panels = [makePanel('spotify'), makePanel('slideshow'), makePanel('notes')]
-    const report = buildPanelArchitectureReport(makeSession(panels), editorWith(...panels.map((panel) => makeShape(panel.id))))
+    const report = buildPanelArchitectureReport(makeMoment(panels), editorWith(...panels.map((panel) => makeShape(panel.id))))
 
     expect(report.summary.status).toBe('PASS')
     expect(report.ownership.tldraw).toContain('position')
@@ -78,7 +78,7 @@ describe('panel architecture report', () => {
 
   it('reports missing and orphaned relationships', () => {
     const panel = makePanel('notes')
-    const report = buildPanelArchitectureReport(makeSession([panel]), editorWith(makeShape('missing-panel')))
+    const report = buildPanelArchitectureReport(makeMoment([panel]), editorWith(makeShape('missing-panel')))
 
     expect(report.summary.status).toBe('ERROR')
     expect(report.checks.find((check) => check.id === 'panel-shape-cardinality')?.status).toBe('ERROR')
@@ -88,7 +88,7 @@ describe('panel architecture report', () => {
   it('reports duplicate shape references and stale legacy shape identity', () => {
     const panel = makePanel('slideshow')
     const duplicateShape = { ...makeShape(panel.id, 'shape:two'), props: { ...makeShape(panel.id).props, panelType: 'slideshow' } } as unknown as TLShape
-    const report = buildPanelArchitectureReport(makeSession([panel]), editorWith(makeShape(panel.id, 'shape:one'), duplicateShape))
+    const report = buildPanelArchitectureReport(makeMoment([panel]), editorWith(makeShape(panel.id, 'shape:one'), duplicateShape))
 
     expect(report.checks.find((check) => check.id === 'panel-shape-cardinality')?.status).toBe('ERROR')
     expect(report.checks.find((check) => check.id === 'legacy-runtime-representation')?.status).toBe('ERROR')
@@ -99,7 +99,7 @@ describe('panel architecture report', () => {
     const duplicate = duplicatePanel(source)
     expect(duplicate).not.toBeNull()
     const report = buildPanelArchitectureReport(
-      makeSession([source, duplicate!]),
+      makeMoment([source, duplicate!]),
       editorWith(makeShape(source.id, 'shape:source'), makeShape(duplicate!.id, 'shape:duplicate', 510)),
     )
 
@@ -111,14 +111,14 @@ describe('panel architecture report', () => {
   it('reports deletion when a shape remains for a deleted panel', () => {
     const remaining = makePanel('notes', 'panel-remaining')
     const deletedShape = makeShape('panel-deleted', 'shape:deleted')
-    const report = buildPanelArchitectureReport(makeSession([remaining]), editorWith(makeShape(remaining.id), deletedShape))
+    const report = buildPanelArchitectureReport(makeMoment([remaining]), editorWith(makeShape(remaining.id), deletedShape))
 
     expect(report.checks.find((check) => check.id === 'orphan-shapes')?.status).toBe('ERROR')
   })
 
   it('keeps legacy schema compatibility visible without treating it as an identity failure', () => {
     const panel = makePanel('notes')
-    const legacy = { ...makeSession([panel]), schemaVersion: 1 as Session['schemaVersion'] }
+    const legacy = { ...makeMoment([panel]), schemaVersion: 1 as Moment['schemaVersion'] }
     const report = buildPanelArchitectureReport(legacy, editorWith(makeShape(panel.id)))
 
     expect(report.checks.find((check) => check.id === 'schema-version')?.status).toBe('WARNING')

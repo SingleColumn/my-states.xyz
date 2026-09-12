@@ -31,7 +31,7 @@ import type { Panel } from '../types'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
-  const { notes, sessions } = useAppState()
+  const { notes, moments } = useAppState()
   const commands = usePanelCommands()
   // Full screen is treated as the writing state: the panel sheds its form
   // chrome and becomes a page. The default panel size is deliberately left
@@ -42,7 +42,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // starts folded away behind the Aa toggle in both the default panel and
   // writing mode -- one preference, remembered across both.
   const [isToolbarVisible, setIsToolbarVisible] = useState(() => readToolbarVisible())
-  const activeNoteId = (sessions.activeSession?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
+  const activeNoteId = (moments.activeMoment?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
   async function handleDocumentSelection(documentId: string) {

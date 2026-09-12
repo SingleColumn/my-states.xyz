@@ -33,9 +33,9 @@ vi.mock('../AppState', () => ({
       seek: async () => {},
       setVolume: async () => {},
     },
-    sessions: {
-      activeSession: {
-        id: 'session_focus',
+    moments: {
+      activeMoment: {
+        id: 'moment_focus',
         panels: [{
           id: 'panel_music',
           type: 'spotify',

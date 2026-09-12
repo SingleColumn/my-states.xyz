@@ -18,9 +18,9 @@ const focusHintDurationMs = 3500
 const focusViewStack: string[] = []
 
 export function SlideshowPanel({ panelId }: { panelId: string }) {
-  const { slideshow, sessions } = useAppState()
+  const { slideshow, moments } = useAppState()
   const commands = usePanelCommands()
-  const panel = sessions.activeSession?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined
+  const panel = moments.activeMoment?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined
   const panelSettings = panel?.config ?? slideshow.settingsFor(panelId)
   // Focus view leaves the picture alone on the panel: every control is dropped,
   // including the header, so Escape is the only way back out.

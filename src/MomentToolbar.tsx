@@ -2,8 +2,8 @@ import { Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Trash2 } from 'l
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
 
-export function SessionToolbar() {
-  const { sessions } = useAppState()
+export function MomentToolbar() {
+  const { moments } = useAppState()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -40,7 +40,7 @@ export function SessionToolbar() {
     try {
       await action()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Session action failed.')
+      setError(caught instanceof Error ? caught.message : 'The action could not be completed.')
     } finally {
       setBusy(false)
     }
@@ -52,21 +52,21 @@ export function SessionToolbar() {
     event.stopPropagation()
   }
 
-  function createSession() {
-    const name = window.prompt('Name the new session', 'Untitled session')
-    if (name !== null) void run(() => sessions.create(name))
+  function createMoment() {
+    const name = window.prompt('Name the new moment', 'Untitled moment')
+    if (name !== null) void run(() => moments.create(name))
   }
 
-  function renameSession() {
-    const name = window.prompt('Rename session', sessions.activeSession?.name ?? '')
-    if (name !== null) void run(() => sessions.rename(name))
+  function renameMoment() {
+    const name = window.prompt('Rename moment', moments.activeMoment?.name ?? '')
+    if (name !== null) void run(() => moments.rename(name))
   }
 
-  function deleteSession() {
-    const current = sessions.activeSession
+  function deleteMoment() {
+    const current = moments.activeMoment
     if (!current) return
     if (window.confirm(`Delete "${current.name}"? This permanently removes this app's local copies of its images and notes. Original files and exported archives are unaffected.`)) {
-      void run(() => sessions.remove(current.id))
+      void run(() => moments.remove(current.id))
     }
   }
 
@@ -76,60 +76,60 @@ export function SessionToolbar() {
   }
 
   return (
-    <section ref={rootRef} className="session-toolbar panel-interactive" aria-label="Session controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+    <section ref={rootRef} className="moment-toolbar panel-interactive" aria-label="Moment controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
       <select
         className="app-dropdown"
-        aria-label="Open session"
-        value={sessions.activeSession?.id ?? ''}
+        aria-label="Open moment"
+        value={moments.activeMoment?.id ?? ''}
         disabled={busy}
-        onChange={(event) => void run(() => sessions.open(event.target.value))}
+        onChange={(event) => void run(() => moments.open(event.target.value))}
       >
-        {sessions.sessions.map((session) => (
-          <option key={session.id} value={session.id}>{session.name}</option>
+        {moments.moments.map((moment) => (
+          <option key={moment.id} value={moment.id}>{moment.name}</option>
         ))}
       </select>
       <button
         className="card-icon-button"
         type="button"
-        title="New session"
-        aria-label="New session"
+        title="New moment"
+        aria-label="New moment"
         disabled={busy}
-        onClick={createSession}
+        onClick={createMoment}
       >
         <FilePlus2 size={17} />
       </button>
       <button
-        className="card-icon-button session-action-secondary"
+        className="card-icon-button moment-action-secondary"
         type="button"
-        title="Rename session"
-        aria-label="Rename session"
-        disabled={busy || !sessions.activeSession}
-        onClick={renameSession}
+        title="Rename moment"
+        aria-label="Rename moment"
+        disabled={busy || !moments.activeMoment}
+        onClick={renameMoment}
       >
         <Pencil size={16} />
       </button>
-      <button className="card-icon-button session-action-secondary session-action-transfer" type="button" title="Export session" aria-label="Export session" disabled={busy || !sessions.activeSession} onClick={() => void run(sessions.exportActive)}>
+      <button className="card-icon-button moment-action-secondary moment-action-transfer" type="button" title="Export moment" aria-label="Export moment" disabled={busy || !moments.activeMoment} onClick={() => void run(moments.exportActive)}>
         <Download size={17} />
       </button>
-      <button className="card-icon-button session-action-secondary" type="button" title="Import session" aria-label="Import session" disabled={busy} onClick={() => inputRef.current?.click()}>
+      <button className="card-icon-button moment-action-secondary" type="button" title="Import moment" aria-label="Import moment" disabled={busy} onClick={() => inputRef.current?.click()}>
         <FolderUp size={17} />
       </button>
       <button
-        className="card-icon-button session-action-secondary session-action-delete"
+        className="card-icon-button moment-action-secondary moment-action-delete"
         type="button"
-        title="Delete session"
-        aria-label="Delete session"
-        disabled={busy || !sessions.activeSession}
-        onClick={deleteSession}
+        title="Delete moment"
+        aria-label="Delete moment"
+        disabled={busy || !moments.activeMoment}
+        onClick={deleteMoment}
       >
         <Trash2 size={17} />
       </button>
       <button
         ref={menuTriggerRef}
-        className="card-icon-button session-actions-menu-trigger"
+        className="card-icon-button moment-actions-menu-trigger"
         type="button"
-        title="More session actions"
-        aria-label="More session actions"
+        title="More moment actions"
+        aria-label="More moment actions"
         aria-haspopup="menu"
         aria-expanded={isMenuOpen}
         disabled={busy}
@@ -138,18 +138,18 @@ export function SessionToolbar() {
         <MoreHorizontal size={17} aria-hidden="true" />
       </button>
       {isMenuOpen ? (
-        <div ref={menuRef} className="session-actions-menu" role="menu" aria-label="Session actions">
-          <button type="button" role="menuitem" disabled={!sessions.activeSession} onClick={() => runMenuAction(renameSession)}>
-            <Pencil size={16} aria-hidden="true" /><span>Rename session</span>
+        <div ref={menuRef} className="moment-actions-menu" role="menu" aria-label="Moment actions">
+          <button type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(renameMoment)}>
+            <Pencil size={16} aria-hidden="true" /><span>Rename moment</span>
           </button>
-          <button type="button" role="menuitem" disabled={!sessions.activeSession} onClick={() => runMenuAction(() => void run(sessions.exportActive))}>
-            <Download size={17} aria-hidden="true" /><span>Export session</span>
+          <button type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(() => void run(moments.exportActive))}>
+            <Download size={17} aria-hidden="true" /><span>Export moment</span>
           </button>
           <button type="button" role="menuitem" onClick={() => runMenuAction(() => inputRef.current?.click())}>
-            <FolderUp size={17} aria-hidden="true" /><span>Import session</span>
+            <FolderUp size={17} aria-hidden="true" /><span>Import moment</span>
           </button>
-          <button className="is-destructive" type="button" role="menuitem" disabled={!sessions.activeSession} onClick={() => runMenuAction(deleteSession)}>
-            <Trash2 size={17} aria-hidden="true" /><span>Delete session</span>
+          <button className="is-destructive" type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(deleteMoment)}>
+            <Trash2 size={17} aria-hidden="true" /><span>Delete moment</span>
           </button>
         </div>
       ) : null}
@@ -160,11 +160,11 @@ export function SessionToolbar() {
         accept=".zip,.mix-session.zip,application/zip"
         onChange={(event) => {
           const file = event.target.files?.[0]
-          if (file) void run(() => sessions.importFile(file))
+          if (file) void run(() => moments.importFile(file))
           event.currentTarget.value = ''
         }}
       />
-      {error ? <span className="session-toolbar-error">{error}</span> : null}
+      {error ? <span className="moment-toolbar-error">{error}</span> : null}
     </section>
   )
 }

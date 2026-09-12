@@ -114,7 +114,7 @@ function HidePanelMenuItem() {
  * of panels.
  *
  * Dropped from tldraw's default menu:
- * - "Move to page", because a session is a single page with nowhere to move to.
+ * - "Move to page", because a moment is a single page with nowhere to move to.
  * - The whole "Edit" submenu. For a panel it only ever offered Flatten (which
  *   rasterises a shape, so it does nothing to live HTML), Lock/unlock, and
  *   Group/Ungroup on a multi-selection -- and grouping would reparent panels,

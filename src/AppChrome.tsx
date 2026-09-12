@@ -3,7 +3,7 @@ import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, Tld
 import { Hand } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
 import { isPanelReportEnabled } from './panelReportFeature'
-import { SessionToolbar } from './SessionToolbar'
+import { MomentToolbar } from './MomentToolbar'
 import type { PanelType } from './types'
 
 export interface AppChromeRect {
@@ -109,7 +109,7 @@ export function AppChrome({
 
   return (
     <div ref={rootRef} className="app-chrome" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-      <SessionToolbar />
+      <MomentToolbar />
 
       <section className="app-chrome-canvas" aria-label="Canvas view controls">
         <button

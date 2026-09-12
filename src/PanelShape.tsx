@@ -181,8 +181,8 @@ function findScrollableAncestor(start: Node, boundary: Element): HTMLElement | n
 }
 
 function PanelContent({ panelId }: { panelId: string }) {
-  const { sessions } = useAppState()
-  const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+  const { moments } = useAppState()
+  const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === panelId)
   if (!panel) return <div className="panel">This panel is no longer available.</div>
   if (panel.type === 'spotify') return <SpotifyPanel panelId={panel.id} />
   if (panel.type === 'notes') return <NotesPanel panelId={panel.id} />

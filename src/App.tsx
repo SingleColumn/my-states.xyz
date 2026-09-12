@@ -27,7 +27,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const { spotify, sessions } = useAppState()
+  const { spotify, moments } = useAppState()
   const [callbackStatus, setCallbackStatus] = useState<string | null>(null)
   const callbackHandledRef = useRef(false)
   const [isPanMode, setIsPanMode] = useState(false)
@@ -46,9 +46,9 @@ function AppContent() {
   const restoringCanvasRef = useRef(false)
   const programmaticCanvasMutationRef = useRef(false)
   const persistCanvasRef = useRef<ReturnType<typeof debounce> | null>(null)
-  const updateCanvasRef = useRef(sessions.updateCanvas)
-  const sessionPanelsRef = useRef<Panel[]>(sessions.activeSession?.panels ?? [])
-  const sessionCanvasRef = useRef<CanvasState | null>(sessions.activeSession?.canvas ?? null)
+  const updateCanvasRef = useRef(moments.updateCanvas)
+  const momentPanelsRef = useRef<Panel[]>(moments.activeMoment?.panels ?? [])
+  const momentCanvasRef = useRef<CanvasState | null>(moments.activeMoment?.canvas ?? null)
   const previousPanelGeometryRef = useRef(new Map<string, PanelLayout>())
   const preFocusPanelGeometryRef = useRef(new Map<string, PanelLayout>())
   // Deleting a panel removes two things that live in different stores: the
@@ -57,17 +57,17 @@ function AppContent() {
   // shape whose panel was gone and rendered "This panel is no longer
   // available". The removed record is kept here so the shape's return can put
   // it back. Entries are only reachable while the history that created them
-  // is, so loading a session clears both together.
+  // is, so loading a moment clears both together.
   const deletedPanelsRef = useRef(new Map<string, Panel>())
 
   useEffect(() => {
-    updateCanvasRef.current = sessions.updateCanvas
-  }, [sessions.updateCanvas])
+    updateCanvasRef.current = moments.updateCanvas
+  }, [moments.updateCanvas])
 
   useEffect(() => {
-    sessionPanelsRef.current = sessions.activeSession?.panels ?? []
-    sessionCanvasRef.current = sessions.activeSession?.canvas ?? null
-  }, [sessions.activeSession?.canvas, sessions.activeSession?.panels])
+    momentPanelsRef.current = moments.activeMoment?.panels ?? []
+    momentCanvasRef.current = moments.activeMoment?.canvas ?? null
+  }, [moments.activeMoment?.canvas, moments.activeMoment?.panels])
 
   useEffect(() => {
     if (window.location.pathname !== '/callback' || callbackHandledRef.current) return
@@ -108,18 +108,18 @@ function AppContent() {
   const restoreCanvas = useCallback((editor: Editor, canvas: CanvasState | null) => {
     restoringCanvasRef.current = true
     try {
-      // Loading a session is not something the user did on the canvas, so it
+      // Loading a moment is not something the user did on the canvas, so it
       // must not become an undo step. Left in history, Undo after opening a
-      // session reversed the load: it deleted the freshly created shapes --
-      // and, through the after-delete side effect, the new session's panel
-      // records with them -- and brought back the previous session's shapes,
-      // now pointing at panels that live in another session. Any history
+      // moment reversed the load: it deleted the freshly created shapes --
+      // and, through the after-delete side effect, the new moment's panel
+      // records with them -- and brought back the previous moment's shapes,
+      // now pointing at panels that live in another moment. Any history
       // that survives the switch refers to shapes that no longer exist, so it
       // is cleared outright rather than merely bypassed.
       editor.run(() => {
         const existingPanels = editor.getCurrentPageShapes().filter(isPanelShape)
         if (existingPanels.length) editor.deleteShapes(existingPanels.map((shape) => shape.id))
-        const layouts = getRenderablePanelLayouts(sessionPanelsRef.current, canvas)
+        const layouts = getRenderablePanelLayouts(momentPanelsRef.current, canvas)
           .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
         editor.createShapes(
           layouts.map((layout) => ({
@@ -149,15 +149,15 @@ function AppContent() {
     // build reads differently machine to machine. This app is written in
     // English, so keep its wording fixed.
     editor.user.updateUserPreferences({ locale: 'en' })
-    restoreCanvas(editor, sessions.activeSession?.canvas ?? null)
+    restoreCanvas(editor, moments.activeMoment?.canvas ?? null)
 
     const persist = debounce(() => {
       if (!restoringCanvasRef.current && !programmaticCanvasMutationRef.current) {
-        updateCanvasRef.current(persistCanvas(editor, sessionPanelsRef.current, sessionCanvasRef.current))
+        updateCanvasRef.current(persistCanvas(editor, momentPanelsRef.current, momentCanvasRef.current))
       }
     }, 300)
     persistCanvasRef.current = persist
-    const unregisterCanvasFlush = sessions.registerCanvasFlush(() => {
+    const unregisterCanvasFlush = moments.registerCanvasFlush(() => {
       persist.flush()
     })
     // Re-key duplicated panel shapes inside tldraw's creation transaction. A
@@ -168,13 +168,13 @@ function AppContent() {
       if (record.type !== PANEL_SHAPE_TYPE) return record
 
       const shape = record as PanelShape
-      const panel = sessionPanelsRef.current.find((candidate) => candidate.id === shape.props.panelId)
+      const panel = momentPanelsRef.current.find((candidate) => candidate.id === shape.props.panelId)
       if (!panel) return record
 
       const duplicate = duplicatePanel(panel)
       if (!duplicate) return record
 
-      sessions.addPanels([duplicate])
+      moments.addPanels([duplicate])
       return {
         ...record,
         props: {
@@ -186,14 +186,14 @@ function AppContent() {
     const removePanelAfterDeleteHandler = editor.sideEffects.registerAfterDeleteHandler('shape', (record) => {
       if (restoringCanvasRef.current || programmaticCanvasMutationRef.current || !isPanelShape(record)) return
       const panelId = record.props.panelId
-      const panel = sessionPanelsRef.current.find((candidate) => candidate.id === panelId)
+      const panel = momentPanelsRef.current.find((candidate) => candidate.id === panelId)
       if (panel) deletedPanelsRef.current.set(panelId, panel)
-      // Drop it from the ref here rather than waiting for the session state to
+      // Drop it from the ref here rather than waiting for the moment state to
       // round-trip through React. The create handlers read this ref to decide
       // whether a shape's panel is missing, and an undo can re-create the
       // shape before that re-render has happened.
-      sessionPanelsRef.current = sessionPanelsRef.current.filter((candidate) => candidate.id !== panelId)
-      sessions.removePanel(panelId)
+      momentPanelsRef.current = momentPanelsRef.current.filter((candidate) => candidate.id !== panelId)
+      moments.removePanel(panelId)
     })
     // The other half of the delete above: a panel shape that comes back
     // without its record came back through undo, so give the record back too.
@@ -202,12 +202,12 @@ function AppContent() {
     const restorePanelAfterCreateHandler = editor.sideEffects.registerAfterCreateHandler('shape', (record) => {
       if (restoringCanvasRef.current || programmaticCanvasMutationRef.current || !isPanelShape(record)) return
       const panelId = record.props.panelId
-      if (sessionPanelsRef.current.some((candidate) => candidate.id === panelId)) return
+      if (momentPanelsRef.current.some((candidate) => candidate.id === panelId)) return
       const deleted = deletedPanelsRef.current.get(panelId)
       if (!deleted) return
       deletedPanelsRef.current.delete(panelId)
-      sessionPanelsRef.current = [...sessionPanelsRef.current, deleted]
-      sessions.addPanels([deleted])
+      momentPanelsRef.current = [...momentPanelsRef.current, deleted]
+      moments.addPanels([deleted])
     })
     const removeStoreListener = editor.store.listen(() => {
       if (!restoringCanvasRef.current && !programmaticCanvasMutationRef.current) persist()
@@ -235,7 +235,7 @@ function AppContent() {
         .filter((shape): shape is PanelShape => shape !== undefined && isPanelShape(shape))
         .map((shape) => shape.props.panelId)
       editor.deleteShapes(selectedShapeIds)
-      for (const panelId of selectedPanelIds) sessions.removePanel(panelId)
+      for (const panelId of selectedPanelIds) moments.removePanel(panelId)
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -253,7 +253,7 @@ function AppContent() {
       setIsCanvasReady(false)
       setSelectedPanelId(null)
     }
-  }, [restoreCanvas, sessions.activeSession?.id, sessions.registerCanvasFlush])
+  }, [restoreCanvas, moments.activeMoment?.id, moments.registerCanvasFlush])
 
   const runProgrammaticCanvasMutation = useCallback((mutation: (editor: Editor) => void) => {
     const editor = editorRef.current
@@ -263,7 +263,7 @@ function AppContent() {
     programmaticCanvasMutationRef.current = true
     try {
       mutation(editor)
-      updateCanvasRef.current(persistCanvas(editor, sessionPanelsRef.current, sessionCanvasRef.current))
+      updateCanvasRef.current(persistCanvas(editor, momentPanelsRef.current, momentCanvasRef.current))
       return true
     } finally {
       programmaticCanvasMutationRef.current = false
@@ -274,21 +274,21 @@ function AppContent() {
     const editor = editorRef.current
     const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
     if (!editor || !shape || !isPanelShape(shape)) return
-    sessionCanvasRef.current = {
+    momentCanvasRef.current = {
       camera: editor.getCamera(),
       panels: [
-        ...(sessionCanvasRef.current?.panels ?? []).filter((layout) => layout.panelId !== panelId),
+        ...(momentCanvasRef.current?.panels ?? []).filter((layout) => layout.panelId !== panelId),
         panelShapeToLayout(shape),
       ],
     }
-    sessionPanelsRef.current = sessionPanelsRef.current.map((panel) => panel.id === panelId ? { ...panel, visible: false } : panel)
-    sessions.setPanelVisibility(panelId, false)
+    momentPanelsRef.current = momentPanelsRef.current.map((panel) => panel.id === panelId ? { ...panel, visible: false } : panel)
+    moments.setPanelVisibility(panelId, false)
     runProgrammaticCanvasMutation((editor) => {
       editor.deleteShapes([shape.id])
       editor.selectNone()
       setSelectedPanelId(null)
     })
-  }, [runProgrammaticCanvasMutation, sessions])
+  }, [runProgrammaticCanvasMutation, moments])
 
   const hideSelectedPanel = useCallback(() => {
     const selected = editorRef.current?.getSelectedShapes() ?? []
@@ -325,13 +325,13 @@ function AppContent() {
   const togglePanelFocusView = useCallback((panelId: string) => {
     const editor = editorRef.current
     const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
-    const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+    const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === panelId)
     if (!editor || !shape || !isPanelShape(shape) || !panel) return
     const focused = isPanelInFocusView(panel)
     const beforeFocus = preFocusPanelGeometryRef.current.get(panelId)
-    // The focus view is part of the panel, not of this canvas session, so it is
+    // The focus view is part of the panel, not of this canvas moment, so it is
     // saved with the panel and survives a reload alongside its smaller geometry.
-    sessions.updatePanel(panelId, (current) => ({ ...current, focusView: !focused, updatedAt: Date.now() }))
+    moments.updatePanel(panelId, (current) => ({ ...current, focusView: !focused, updatedAt: Date.now() }))
     // A panel whose focus view has no size of its own keeps the one it has, so
     // there is no geometry to swap: the Images panel hands the room its controls
     // used to take to the picture rather than shrinking away from it.
@@ -352,37 +352,37 @@ function AppContent() {
       currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
       currentEditor.bringToFront([shape.id])
     })
-  }, [runProgrammaticCanvasMutation, sessions])
+  }, [runProgrammaticCanvasMutation, moments])
 
   const restorePanelDefaultSizeForId = useCallback((panelId: string) => {
     const editor = editorRef.current
     const shape = editor?.getCurrentPageShapes().find((candidate) => isPanelShape(candidate) && candidate.props.panelId === panelId)
-    const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+    const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === panelId)
     if (!editor || !shape || !isPanelShape(shape) || !panel) return
     previousPanelGeometryRef.current.delete(panelId)
     preFocusPanelGeometryRef.current.delete(panelId)
     setFullScreenPanelId(null)
     // The default size is the whole panel, so it also leaves the focus view.
-    if (isPanelInFocusView(panel)) sessions.updatePanel(panelId, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
+    if (isPanelInFocusView(panel)) moments.updatePanel(panelId, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
     runProgrammaticCanvasMutation((currentEditor) => {
       const layout = restorePanelDefaultLayout(panelShapeToLayout(shape), panel.type)
       currentEditor.updateShapes([{ id: shape.id, type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h, panelId } }] as never)
     })
-  }, [runProgrammaticCanvasMutation, sessions])
+  }, [runProgrammaticCanvasMutation, moments])
 
   const addPanel = useCallback((panelType: PanelType) => {
     const editor = editorRef.current
-    const session = sessions.activeSession
-    if (!editor || !session) return
-    if (panelType === 'spotify' && session.panels.some((panel) => panel.type === 'spotify')) {
+    const moment = moments.activeMoment
+    if (!editor || !moment) return
+    if (panelType === 'spotify' && moment.panels.some((panel) => panel.type === 'spotify')) {
       setCallbackStatus('Only one Music panel is allowed on the canvas. Restore the existing panel from the panel view menu if it is hidden.')
       return
     }
 
     const panel = createPanel(panelType)
     const canonical = getCanonicalPanelLayout(panelType)
-    sessionPanelsRef.current = [...sessionPanelsRef.current, panel]
-    sessions.addPanels([panel])
+    momentPanelsRef.current = [...momentPanelsRef.current, panel]
+    moments.addPanels([panel])
     const changed = runProgrammaticCanvasMutation((currentEditor) => {
       currentEditor.createShapes([{
         type: PANEL_SHAPE_TYPE,
@@ -393,7 +393,7 @@ function AppContent() {
     })
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
     else setCallbackStatus(null)
-  }, [runProgrammaticCanvasMutation, sessions])
+  }, [runProgrammaticCanvasMutation, moments])
 
   const hideSelectedPanelRef = useRef(hideSelectedPanel)
 
@@ -402,19 +402,19 @@ function AppContent() {
   }, [hideSelectedPanel])
 
   const restorePanel = useCallback((panelId: string) => {
-    const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === panelId)
+    const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === panelId)
     if (!panel) return
-    const layout = sessions.activeSession?.canvas?.panels.find((candidate) => candidate.panelId === panelId) ?? (() => {
+    const layout = moments.activeMoment?.canvas?.panels.find((candidate) => candidate.panelId === panelId) ?? (() => {
       const canonical = getCanonicalPanelLayout(panel.type)
       return { panelId, x: canonical.x, y: canonical.y, w: canonical.w, h: canonical.h, rotation: 0 }
     })()
-    sessionPanelsRef.current = sessionPanelsRef.current.map((candidate) => candidate.id === panelId ? { ...candidate, visible: true } : candidate)
-    sessions.setPanelVisibility(panelId, true)
+    momentPanelsRef.current = momentPanelsRef.current.map((candidate) => candidate.id === panelId ? { ...candidate, visible: true } : candidate)
+    moments.setPanelVisibility(panelId, true)
     runProgrammaticCanvasMutation((editor) => {
       if (editor.getCurrentPageShapes().some((shape) => isPanelShape(shape) && shape.props.panelId === panelId)) return
       editor.createShapes([{ type: PANEL_SHAPE_TYPE, x: layout.x, y: layout.y, rotation: layout.rotation ?? 0, props: { w: layout.w, h: layout.h, panelId } }] as never)
     })
-  }, [runProgrammaticCanvasMutation, sessions.activeSession])
+  }, [runProgrammaticCanvasMutation, moments.activeMoment])
 
   const fitAllPanels = useCallback(() => {
     const editor = editorRef.current
@@ -451,13 +451,13 @@ function AppContent() {
     const changed = runProgrammaticCanvasMutation((editor) => {
       const shape = editor.getShape(selected[0].id)
       if (!shape || !isPanelShape(shape)) return
-      const panel = sessions.activeSession?.panels.find((candidate) => candidate.id === shape.props.panelId)
+      const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === shape.props.panelId)
       if (!panel) return
       previousPanelGeometryRef.current.delete(panel.id)
       preFocusPanelGeometryRef.current.delete(panel.id)
       // Same rule as the panel header's restore button: a default-sized panel
       // shows its whole contents rather than the focus view.
-      if (isPanelInFocusView(panel)) sessions.updatePanel(panel.id, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
+      if (isPanelInFocusView(panel)) moments.updatePanel(panel.id, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
       const reset = restorePanelDefaultSize(panelShapeToLayout(shape), panel.type)
       editor.updateShapes([{
         id: shape.id,
@@ -468,7 +468,7 @@ function AppContent() {
       }] as never)
     })
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
-  }, [runProgrammaticCanvasMutation, sessions])
+  }, [runProgrammaticCanvasMutation, moments])
 
   const resetPanelLayout = useCallback(() => {
     const confirmed = window.confirm('Reset panel layout? This puts every panel back to its original position and size, and brings back any hidden panels. Your Spotify, images, and notes are kept.')
@@ -476,7 +476,7 @@ function AppContent() {
 
     setCallbackStatus(null)
     const changed = runProgrammaticCanvasMutation((editor) => {
-      const canonicalLayouts = (sessions.activeSession?.panels ?? []).map((panel, order) => {
+      const canonicalLayouts = (moments.activeMoment?.panels ?? []).map((panel, order) => {
         const layout = getCanonicalPanelLayout(panel.type)
         return { panelId: panel.id, x: layout.x, y: layout.y, w: layout.w, h: layout.h, rotation: 0, order }
       })
@@ -516,19 +516,19 @@ function AppContent() {
       // The reset above puts a shape back on the canvas for every panel, hidden
       // ones included, so the stored visibility has to catch up. Otherwise a
       // panel is visible again while the menu still offers to restore it.
-      for (const panel of sessionPanelsRef.current) {
-        if (!isPanelVisible(panel)) sessions.setPanelVisibility(panel.id, true)
+      for (const panel of momentPanelsRef.current) {
+        if (!isPanelVisible(panel)) moments.setPanelVisibility(panel.id, true)
         // Every panel is back at its original size, so none of them is in the
         // reduced focus view any more.
-        if (isPanelInFocusView(panel)) sessions.updatePanel(panel.id, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
+        if (isPanelInFocusView(panel)) moments.updatePanel(panel.id, (current) => ({ ...current, focusView: false, updatedAt: Date.now() }))
       }
       previousPanelGeometryRef.current.clear()
       preFocusPanelGeometryRef.current.clear()
-      sessionPanelsRef.current = showAllPanels(sessionPanelsRef.current)
-      if (editor) sessions.updateCanvas({ camera: editor.getCamera(), panels: resetAllPanelLayouts(sessions.activeSession?.panels ?? []) })
+      momentPanelsRef.current = showAllPanels(momentPanelsRef.current)
+      if (editor) moments.updateCanvas({ camera: editor.getCamera(), panels: resetAllPanelLayouts(moments.activeMoment?.panels ?? []) })
     }
     if (!changed) setCallbackStatus('The canvas is not ready yet.')
-  }, [runProgrammaticCanvasMutation, sessions])
+  }, [runProgrammaticCanvasMutation, moments])
 
   const togglePanMode = useCallback(() => {
     const editor = editorRef.current
@@ -546,13 +546,13 @@ function AppContent() {
 
   const openArchitectureReport = useCallback(() => {
     const editor = editorRef.current
-    const session = sessions.activeSession
-    if (!editor || !session) return
-    setArchitectureReport(buildPanelArchitectureReport(session, editor))
-  }, [sessions.activeSession])
+    const moment = moments.activeMoment
+    if (!editor || !moment) return
+    setArchitectureReport(buildPanelArchitectureReport(moment, editor))
+  }, [moments.activeMoment])
 
-  const displayedArchitectureReport = architectureReport && sessions.activeSession && editorRef.current
-    ? buildPanelArchitectureReport(sessions.activeSession, editorRef.current)
+  const displayedArchitectureReport = architectureReport && moments.activeMoment && editorRef.current
+    ? buildPanelArchitectureReport(moments.activeMoment, editorRef.current)
     : architectureReport
 
   const openHelpAbout = useCallback(() => {
@@ -563,8 +563,8 @@ function AppContent() {
   const closeHelpAbout = useCallback(() => setIsHelpAboutOpen(false), [])
 
   useEffect(() => {
-    if (editorRef.current && sessions.activeSession) restoreCanvas(editorRef.current, sessions.activeSession.canvas)
-  }, [restoreCanvas, sessions.activeSession?.id])
+    if (editorRef.current && moments.activeMoment) restoreCanvas(editorRef.current, moments.activeMoment.canvas)
+  }, [restoreCanvas, moments.activeMoment?.id])
 
   // tldraw remounts components.MenuPanel whenever its reference changes, which would wipe
   // AppChrome's internal state (e.g. the About-button pulse) on almost every interaction.
@@ -579,7 +579,7 @@ function AppContent() {
     onResetSelectedPanel: resetSelectedPanel,
     onResetPanelLayout: resetPanelLayout,
     canHideSelectedPanel: selectedPanelId !== null,
-    hiddenPanels: (sessions.activeSession?.panels ?? []).filter((panel) => !isPanelVisible(panel)).map((panel) => ({ id: panel.id, type: panel.type })),
+    hiddenPanels: (moments.activeMoment?.panels ?? []).filter((panel) => !isPanelVisible(panel)).map((panel) => ({ id: panel.id, type: panel.type })),
     onHideSelectedPanel: hideSelectedPanel,
     onRestorePanel: restorePanel,
     onAddPanel: addPanel,
@@ -588,7 +588,7 @@ function AppContent() {
     onMeasure: handleChromeMeasure,
   }
 
-  // One session is one page, so tldraw's "Move to page" has nowhere to move a
+  // One moment is one page, so tldraw's "Move to page" has nowhere to move a
   // panel to. Declaring the limit hides that submenu instead of leaving a
   // dead end in the menu.
   const editorOptions = useMemo(() => ({ maxPages: 1 }), [])
@@ -609,7 +609,7 @@ function AppContent() {
             const selectedShape = selected.length === 1 ? selected[0] : undefined
             const selectedPanel = selectedShape && isPanelShape(selectedShape) ? selectedShape : undefined
             const selectedMusicPanel = selectedPanel !== undefined
-              && sessionPanelsRef.current.find((panel) => panel.id === selectedPanel.props.panelId)?.type === 'spotify'
+              && momentPanelsRef.current.find((panel) => panel.id === selectedPanel.props.panelId)?.type === 'spotify'
             if (selectedMusicPanel) {
               setCallbackStatus('Music panel cannot be duplicated. Only one Music panel is allowed on the canvas.')
               return
@@ -644,8 +644,8 @@ function AppContent() {
     [],
   )
 
-  if (!sessions.isReady) {
-    return <main className="app-root app-loading">Loading sessions...</main>
+  if (!moments.isReady) {
+    return <main className="app-root app-loading">Loading moments...</main>
   }
 
   return (
@@ -661,13 +661,13 @@ function AppContent() {
       </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
-      {sessions.error ? <div className="callback-toast">{sessions.error}</div> : null}
+      {moments.error ? <div className="callback-toast">{moments.error}</div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>
   )
 }
 
-function persistCanvas(editor: Editor, sessionPanels: readonly Panel[], existingCanvas: CanvasState | null) {
+function persistCanvas(editor: Editor, momentPanels: readonly Panel[], existingCanvas: CanvasState | null) {
   const visiblePanels = editor
     .getCurrentPageShapes()
     .filter(isPanelShape)
@@ -680,7 +680,7 @@ function persistCanvas(editor: Editor, sessionPanels: readonly Panel[], existing
       rotation: shape.rotation,
       order,
     }))
-  return { camera: editor.getCamera(), panels: mergeVisiblePanelLayouts(sessionPanels, existingCanvas, visiblePanels) }
+  return { camera: editor.getCamera(), panels: mergeVisiblePanelLayouts(momentPanels, existingCanvas, visiblePanels) }
 }
 
 function isPanelShape(shape: TLShape): shape is PanelShape {

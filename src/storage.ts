@@ -6,9 +6,9 @@ import type {
   Panel,
   PanelLayout,
   PanelType,
-  Session,
-  SessionImage,
-  SessionSummary,
+  Moment,
+  MomentImage,
+  MomentSummary,
   SlideshowSettings,
   SpotifyPlaylistReference,
   SpotifyPlaylistState,
@@ -17,10 +17,13 @@ import type {
 import { createId } from './utils'
 
 const DB_VERSION = 2
-const SESSION_SCHEMA_VERSION = 2
+const MOMENT_SCHEMA_VERSION = 2
+// Moments were called sessions when these keys, the store and index names below, and the
+// createId('session') prefix were first persisted. They keep the old spelling so existing
+// browser data keeps loading; only the vocabulary in code and UI changed.
 const MIGRATION_KEY = 'session-migration-v1'
 const MIGRATION_PENDING_KEY = 'session-migration-v1-pending'
-const ACTIVE_SESSION_KEY = 'active-session-id'
+const ACTIVE_MOMENT_KEY = 'active-session-id'
 
 const legacyKeys = {
   canvas: 'mic:canvas',
@@ -30,7 +33,7 @@ const legacyKeys = {
   lastNoteId: 'mic:last-note-id',
 }
 
-export const sessionLimits = {
+export const momentLimits = {
   maxImageCount: 200,
   maxImageBytes: 25 * 1024 * 1024,
   maxTotalImageBytes: 250 * 1024 * 1024,
@@ -64,7 +67,7 @@ export const defaultSpotifyPlaylistReference: SpotifyPlaylistReference = {
   url: null,
 }
 
-interface SessionAssetRecord extends SessionImage {
+interface MomentAssetRecord extends MomentImage {
   blob: Blob
 }
 
@@ -98,7 +101,7 @@ export function createDefaultPanels(now = Date.now()): Panel[] {
   return [createPanel('spotify', now), createPanel('slideshow', now), createPanel('notes', now)]
 }
 
-export interface ImportedSessionContent {
+export interface ImportedMomentContent {
   name: string
   panels?: Panel[]
   canvas: CanvasState | null
@@ -106,7 +109,7 @@ export interface ImportedSessionContent {
   spotify: SpotifyPlaylistReference
   activeNoteSourceId: string | null
   notes: Array<Pick<Note, 'id' | 'title' | 'content' | 'createdAt' | 'updatedAt'>>
-  assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>
+  assets: Array<Omit<MomentImage, 'sessionId'> & { blob: Blob }>
 }
 
 interface MusicImagesCanvasDb extends DBSchema {
@@ -138,14 +141,14 @@ interface MusicImagesCanvasDb extends DBSchema {
   }
   sessions: {
     key: string
-    value: Session
+    value: Moment
     indexes: {
       'by-updated': number
     }
   }
   assets: {
     key: string
-    value: SessionAssetRecord
+    value: MomentAssetRecord
     indexes: {
       'by-session': string
     }
@@ -185,8 +188,8 @@ const dbPromise = openDB<MusicImagesCanvasDb>('music-images-canvas', DB_VERSION,
         notes.createIndex('by-session-updated', ['sessionId', 'updatedAt'])
       }
 
-      const sessions = db.createObjectStore('sessions', { keyPath: 'id' })
-      sessions.createIndex('by-updated', 'updatedAt')
+      const moments = db.createObjectStore('sessions', { keyPath: 'id' })
+      moments.createIndex('by-updated', 'updatedAt')
 
       const assets = db.createObjectStore('assets', { keyPath: 'id' })
       assets.createIndex('by-session', 'sessionId')
@@ -218,12 +221,12 @@ function legacyPlaylistReference(): SpotifyPlaylistReference {
   }
 }
 
-function makeSession(name: string, initial?: Partial<Session>): Session {
+function makeMoment(name: string, initial?: Partial<Moment>): Moment {
   const now = Date.now()
   return {
     id: createId('session'),
-    name: normalizeSessionName(name),
-    schemaVersion: SESSION_SCHEMA_VERSION,
+    name: normalizeMomentName(name),
+    schemaVersion: MOMENT_SCHEMA_VERSION,
     createdAt: now,
     updatedAt: now,
     panels: createDefaultPanels(now),
@@ -232,7 +235,7 @@ function makeSession(name: string, initial?: Partial<Session>): Session {
   }
 }
 
-export async function initializeSessions() {
+export async function initializeMoments() {
   const db = await dbPromise
   const migration = await db.get('preferences', MIGRATION_KEY)
 
@@ -241,12 +244,12 @@ export async function initializeSessions() {
     let verification = pending ? parseMigrationVerification(pending.value) : null
 
     if (pending && !verification) {
-      throw new Error('The previous session migration cannot be verified. Your original browser data has not been removed.')
+      throw new Error('Your earlier data could not be upgraded into a moment. Your original browser data has not been removed.')
     }
 
     if (!verification) {
-      const existingSessions = await db.count('sessions')
-      if (!existingSessions) verification = await migrateLegacyState(db)
+      const existingMoments = await db.count('sessions')
+      if (!existingMoments) verification = await migrateLegacyState(db)
     }
 
     if (verification) await verifyMigratedLegacyState(db, verification)
@@ -257,22 +260,22 @@ export async function initializeSessions() {
     await tx.done
   }
 
-  let sessions = await getSessions()
-  if (!sessions.length) {
-    const session = await createSession('My first session')
-    sessions = [session]
+  let moments = await getMoments()
+  if (!moments.length) {
+    const moment = await createMoment('My first moment')
+    moments = [moment]
   }
 
-  const activePreference = await db.get('preferences', ACTIVE_SESSION_KEY)
-  const activeSessionId = sessions.some((session) => session.id === activePreference?.value)
-    ? activePreference?.value ?? sessions[0].id
-    : sessions[0].id
+  const activePreference = await db.get('preferences', ACTIVE_MOMENT_KEY)
+  const activeMomentId = moments.some((moment) => moment.id === activePreference?.value)
+    ? activePreference?.value ?? moments[0].id
+    : moments[0].id
 
-  if (activePreference?.value !== activeSessionId) {
-    await db.put('preferences', { key: ACTIVE_SESSION_KEY, value: activeSessionId })
+  if (activePreference?.value !== activeMomentId) {
+    await db.put('preferences', { key: ACTIVE_MOMENT_KEY, value: activeMomentId })
   }
 
-  return { sessions, activeSessionId }
+  return { moments, activeMomentId }
 }
 
 async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<MigrationVerificationRecord> {
@@ -291,11 +294,11 @@ async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<Migrat
   spotifyPanel.config.playlist = legacySpotify
   slideshowPanel.config = legacySlideshow
   notesPanel.config.activeNoteId = activeNoteId
-  const session = makeSession(hasLegacyState ? 'Imported workspace' : 'My first session', { canvas: migrateCanvas(legacyCanvas, panels), panels })
+  const moment = makeMoment(hasLegacyState ? 'Imported workspace' : 'My first moment', { canvas: migrateCanvas(legacyCanvas, panels), panels })
   const verification: MigrationVerificationRecord = {
-    sessionId: session.id,
-    name: session.name,
-    canvas: session.canvas,
+    sessionId: moment.id,
+    name: moment.name,
+    canvas: moment.canvas,
     slideshow: slideshowPanel.config,
     spotify: spotifyPanel.config.playlist,
     activeNoteId,
@@ -304,28 +307,28 @@ async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<Migrat
   }
 
   const tx = db.transaction(['sessions', 'notes', 'preferences', 'sessionDirectoryHandles'], 'readwrite')
-  await tx.objectStore('sessions').put(session)
+  await tx.objectStore('sessions').put(moment)
 
   for (const note of legacyNotes) {
-    await tx.objectStore('notes').put({ ...note, sessionId: session.id })
+    await tx.objectStore('notes').put({ ...note, sessionId: moment.id })
   }
 
   if (legacyFolder) {
     await tx.objectStore('sessionDirectoryHandles').put({
-      sessionId: session.id,
+      sessionId: moment.id,
       name: legacyFolder.name,
       handle: legacyFolder.handle,
     })
   }
 
-  await tx.objectStore('preferences').put({ key: ACTIVE_SESSION_KEY, value: session.id })
+  await tx.objectStore('preferences').put({ key: ACTIVE_MOMENT_KEY, value: moment.id })
   await tx.objectStore('preferences').put({ key: MIGRATION_PENDING_KEY, value: JSON.stringify(verification) })
   await tx.done
   return verification
 }
 
 async function verifyMigratedLegacyState(db: Awaited<typeof dbPromise>, expected: MigrationVerificationRecord) {
-  const [session, notes, directory] = await Promise.all([
+  const [moment, notes, directory] = await Promise.all([
     db.get('sessions', expected.sessionId),
     db.getAllFromIndex('notes', 'by-session-updated', IDBKeyRange.bound([expected.sessionId, 0], [expected.sessionId, Number.MAX_SAFE_INTEGER])),
     db.get('sessionDirectoryHandles', expected.sessionId),
@@ -333,18 +336,18 @@ async function verifyMigratedLegacyState(db: Awaited<typeof dbPromise>, expected
 
   const hasExpectedNotes = notes.length === expected.noteIds.length
     && notes.every((note) => note.sessionId === expected.sessionId && expected.noteIds.includes(note.id))
-  const sessionMatches = session
-    && session.name === expected.name
-    && session.panels.find((panel) => panel.type === 'notes')?.config.activeNoteId === expected.activeNoteId
-    && JSON.stringify(session.canvas) === JSON.stringify(expected.canvas)
-    && JSON.stringify(session.panels.find((panel) => panel.type === 'slideshow')?.config) === JSON.stringify(expected.slideshow)
-    && JSON.stringify(session.panels.find((panel) => panel.type === 'spotify')?.config.playlist) === JSON.stringify(expected.spotify)
+  const momentMatches = moment
+    && moment.name === expected.name
+    && moment.panels.find((panel) => panel.type === 'notes')?.config.activeNoteId === expected.activeNoteId
+    && JSON.stringify(moment.canvas) === JSON.stringify(expected.canvas)
+    && JSON.stringify(moment.panels.find((panel) => panel.type === 'slideshow')?.config) === JSON.stringify(expected.slideshow)
+    && JSON.stringify(moment.panels.find((panel) => panel.type === 'spotify')?.config.playlist) === JSON.stringify(expected.spotify)
   const directoryMatches = expected.directoryName === null
     ? !directory
     : directory?.name === expected.directoryName
 
-  if (!sessionMatches || !hasExpectedNotes || !directoryMatches) {
-    throw new Error('The previous session migration could not be verified. Your original browser data has not been removed; reload to retry.')
+  if (!momentMatches || !hasExpectedNotes || !directoryMatches) {
+    throw new Error('Your earlier data could not be upgraded into a moment. Your original browser data has not been removed; reload to retry.')
   }
 }
 
@@ -366,96 +369,96 @@ function parseMigrationVerification(value: string): MigrationVerificationRecord 
   }
 }
 
-export async function getSessions(): Promise<Session[]> {
+export async function getMoments(): Promise<Moment[]> {
   const db = await dbPromise
-  const sessions = await db.getAllFromIndex('sessions', 'by-updated')
-  const normalized = await Promise.all(sessions.map(async (session) => normalizeAndPersistSession(session, await db.countFromIndex('assets', 'by-session', session.id))))
+  const moments = await db.getAllFromIndex('sessions', 'by-updated')
+  const normalized = await Promise.all(moments.map(async (moment) => normalizeAndPersistMoment(moment, await db.countFromIndex('assets', 'by-session', moment.id))))
   return normalized.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
-export async function getSession(sessionId: string) {
+export async function getMoment(momentId: string) {
   const db = await dbPromise
-  const session = await db.get('sessions', sessionId)
-  if (!session) return undefined
-  const assetCount = await db.countFromIndex('assets', 'by-session', sessionId)
-  return normalizeAndPersistSession(session, assetCount)
+  const moment = await db.get('sessions', momentId)
+  if (!moment) return undefined
+  const assetCount = await db.countFromIndex('assets', 'by-session', momentId)
+  return normalizeAndPersistMoment(moment, assetCount)
 }
 
-export async function createSession(name: string) {
+export async function createMoment(name: string) {
   const db = await dbPromise
-  const session = makeSession(name)
-  await db.put('sessions', session)
-  return session
+  const moment = makeMoment(name)
+  await db.put('sessions', moment)
+  return moment
 }
 
-export async function saveSession(session: Session) {
+export async function saveMoment(moment: Moment) {
   const db = await dbPromise
-  const next = enforceSpotifySingleton({ ...session, name: normalizeSessionName(session.name), updatedAt: Date.now() })
+  const next = enforceSpotifySingleton({ ...moment, name: normalizeMomentName(moment.name), updatedAt: Date.now() })
   await db.put('sessions', next)
   return next
 }
 
-export async function setActiveSessionId(sessionId: string) {
+export async function setActiveMomentId(momentId: string) {
   const db = await dbPromise
-  await db.put('preferences', { key: ACTIVE_SESSION_KEY, value: sessionId })
+  await db.put('preferences', { key: ACTIVE_MOMENT_KEY, value: momentId })
 }
 
-export async function deleteSession(sessionId: string) {
+export async function deleteMoment(momentId: string) {
   const db = await dbPromise
   const tx = db.transaction(['sessions', 'notes', 'assets', 'sessionDirectoryHandles', 'preferences'], 'readwrite')
-  const noteIds = await tx.objectStore('notes').index('by-session-updated').getAllKeys(IDBKeyRange.bound([sessionId, 0], [sessionId, Number.MAX_SAFE_INTEGER]))
-  const assetIds = await tx.objectStore('assets').index('by-session').getAllKeys(sessionId)
+  const noteIds = await tx.objectStore('notes').index('by-session-updated').getAllKeys(IDBKeyRange.bound([momentId, 0], [momentId, Number.MAX_SAFE_INTEGER]))
+  const assetIds = await tx.objectStore('assets').index('by-session').getAllKeys(momentId)
 
   await Promise.all([
     ...noteIds.map((id) => tx.objectStore('notes').delete(id)),
     ...assetIds.map((id) => tx.objectStore('assets').delete(id)),
-    tx.objectStore('sessions').delete(sessionId),
-    tx.objectStore('sessionDirectoryHandles').delete(sessionId),
+    tx.objectStore('sessions').delete(momentId),
+    tx.objectStore('sessionDirectoryHandles').delete(momentId),
   ])
 
-  const active = await tx.objectStore('preferences').get(ACTIVE_SESSION_KEY)
-  if (active?.value === sessionId) {
-    await tx.objectStore('preferences').delete(ACTIVE_SESSION_KEY)
+  const active = await tx.objectStore('preferences').get(ACTIVE_MOMENT_KEY)
+  if (active?.value === momentId) {
+    await tx.objectStore('preferences').delete(ACTIVE_MOMENT_KEY)
   }
   await tx.done
 }
 
-export async function importSessionContent(content: ImportedSessionContent) {
+export async function importMomentContent(content: ImportedMomentContent) {
   validateAssets(content.assets)
   const sourceNoteIds = new Set<string>()
   for (const note of content.notes) {
-    if (!note.id || sourceNoteIds.has(note.id)) throw new Error('The session bundle contains duplicate note IDs.')
+    if (!note.id || sourceNoteIds.has(note.id)) throw new Error('The moment bundle contains duplicate note IDs.')
     sourceNoteIds.add(note.id)
   }
 
   const sourcePanels = enforceSpotifySingletonPanels(content.panels ?? createDefaultPanels())
   const panelIdMap = new Map(sourcePanels.map((panel) => [panel.id, createId('panel')]))
   const importedPanels = sourcePanels.map((panel) => ({ ...panel, id: panelIdMap.get(panel.id)! }))
-  const session = makeSession(content.name, {
+  const moment = makeMoment(content.name, {
     panels: importedPanels,
     canvas: migrateCanvas(content.canvas, importedPanels, panelIdMap),
   })
   const hasMultipleSlideshowPanels = (content.panels?.filter((panel) => panel.type === 'slideshow').length ?? 0) > 1
   if (!hasMultipleSlideshowPanels) {
-    const slideshowPanel = session.panels.find((panel) => panel.type === 'slideshow')
+    const slideshowPanel = moment.panels.find((panel) => panel.type === 'slideshow')
     if (slideshowPanel) slideshowPanel.config = normalizeSlideshowSettings(content.slideshow, content.assets.length > 0)
-    const spotifyPanel = session.panels.find((panel) => panel.type === 'spotify')
+    const spotifyPanel = moment.panels.find((panel) => panel.type === 'spotify')
     if (spotifyPanel) spotifyPanel.config.playlist = content.spotify
   }
   const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
   if (!content.panels || (content.panels.filter((panel) => panel.type === 'notes').length ?? 0) <= 1) {
-    const notesPanel = session.panels.find((panel) => panel.type === 'notes')
+    const notesPanel = moment.panels.find((panel) => panel.type === 'notes')
     if (notesPanel) notesPanel.config.activeNoteId = content.activeNoteSourceId ? noteIdMap.get(content.activeNoteSourceId) ?? null : null
   }
 
   const tx = (await dbPromise).transaction(['sessions', 'notes', 'assets'], 'readwrite')
-  await tx.objectStore('sessions').put(session)
+  await tx.objectStore('sessions').put(moment)
 
   for (const note of content.notes) {
     await tx.objectStore('notes').put({
       ...note,
       id: noteIdMap.get(note.id) ?? createId('note'),
-      sessionId: session.id,
+      sessionId: moment.id,
     })
   }
 
@@ -463,22 +466,22 @@ export async function importSessionContent(content: ImportedSessionContent) {
     await tx.objectStore('assets').put({
       ...asset,
       id: createId('image'),
-      sessionId: session.id,
+      sessionId: moment.id,
       ...(asset.panelId && panelIdMap.has(asset.panelId) ? { panelId: panelIdMap.get(asset.panelId)! } : {}),
     })
   }
 
   await tx.done
-  return session
+  return moment
 }
 
-export async function getSessionSummaries(): Promise<SessionSummary[]> {
-  return (await getSessions()).map(({ id, name, updatedAt }) => ({ id, name, updatedAt }))
+export async function getMomentSummaries(): Promise<MomentSummary[]> {
+  return (await getMoments()).map(({ id, name, updatedAt }) => ({ id, name, updatedAt }))
 }
 
-export async function getNotes(sessionId: string) {
+export async function getNotes(momentId: string) {
   const db = await dbPromise
-  const notes = await db.getAllFromIndex('notes', 'by-session-updated', IDBKeyRange.bound([sessionId, 0], [sessionId, Number.MAX_SAFE_INTEGER]))
+  const notes = await db.getAllFromIndex('notes', 'by-session-updated', IDBKeyRange.bound([momentId, 0], [momentId, Number.MAX_SAFE_INTEGER]))
   return notes.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -492,48 +495,48 @@ export async function deleteNote(id: string) {
   await db.delete('notes', id)
 }
 
-export async function getSessionAssets(sessionId: string, panelId?: string) {
+export async function getMomentAssets(momentId: string, panelId?: string) {
   const db = await dbPromise
-  const assets = await db.getAllFromIndex('assets', 'by-session', sessionId)
+  const assets = await db.getAllFromIndex('assets', 'by-session', momentId)
   return panelId ? assets.filter((asset) => !asset.panelId || asset.panelId === panelId) : assets
 }
 
-export async function saveSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>, panelId?: string) {
+export async function saveMomentAssets(momentId: string, assets: Array<Omit<MomentImage, 'sessionId'> & { blob: Blob }>, panelId?: string) {
   validateAssets(assets)
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
   for (const asset of assets) {
-    await tx.store.put({ ...asset, sessionId, ...(panelId ? { panelId } : {}) })
+    await tx.store.put({ ...asset, sessionId: momentId, ...(panelId ? { panelId } : {}) })
   }
   await tx.done
 }
 
-export async function replaceSessionAssets(sessionId: string, assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>, panelId?: string) {
+export async function replaceMomentAssets(momentId: string, assets: Array<Omit<MomentImage, 'sessionId'> & { blob: Blob }>, panelId?: string) {
   validateAssets(assets)
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
-  const existing = await tx.store.index('by-session').getAll(sessionId)
+  const existing = await tx.store.index('by-session').getAll(momentId)
   const existingIds = existing.filter((asset) => !panelId || !asset.panelId || asset.panelId === panelId).map((asset) => asset.id)
   await Promise.all(existingIds.map((id) => tx.store.delete(id)))
   for (const asset of assets) {
-    await tx.store.put({ ...asset, sessionId, ...(panelId ? { panelId } : {}) })
+    await tx.store.put({ ...asset, sessionId: momentId, ...(panelId ? { panelId } : {}) })
   }
   await tx.done
 }
 
-export async function saveDirectoryHandle(sessionId: string, handle: FileSystemDirectoryHandle) {
+export async function saveDirectoryHandle(momentId: string, handle: FileSystemDirectoryHandle) {
   const db = await dbPromise
-  await db.put('sessionDirectoryHandles', { sessionId, name: handle.name, handle })
+  await db.put('sessionDirectoryHandles', { sessionId: momentId, name: handle.name, handle })
 }
 
-export async function getDirectoryHandle(sessionId: string) {
+export async function getDirectoryHandle(momentId: string) {
   const db = await dbPromise
-  return db.get('sessionDirectoryHandles', sessionId)
+  return db.get('sessionDirectoryHandles', momentId)
 }
 
-export async function clearDirectoryHandle(sessionId: string) {
+export async function clearDirectoryHandle(momentId: string) {
   const db = await dbPromise
-  await db.delete('sessionDirectoryHandles', sessionId)
+  await db.delete('sessionDirectoryHandles', momentId)
 }
 
 export function loadSpotifyTokens() {
@@ -548,27 +551,27 @@ export function saveSpotifyTokens(tokens: SpotifyTokens | null) {
   window.localStorage.setItem(legacyKeys.spotifyTokens, JSON.stringify(tokens))
 }
 
-function validateAssets(assets: Array<Omit<SessionImage, 'sessionId'> & { blob: Blob }>) {
-  if (assets.length > sessionLimits.maxImageCount) {
-    throw new Error(`A session can contain at most ${sessionLimits.maxImageCount} images.`)
+function validateAssets(assets: Array<Omit<MomentImage, 'sessionId'> & { blob: Blob }>) {
+  if (assets.length > momentLimits.maxImageCount) {
+    throw new Error(`A moment can contain at most ${momentLimits.maxImageCount} images.`)
   }
 
   let total = 0
   for (const asset of assets) {
-    if (asset.blob.size > sessionLimits.maxImageBytes) {
-      throw new Error(`${asset.filename} exceeds the ${formatBytes(sessionLimits.maxImageBytes)} per-image limit.`)
+    if (asset.blob.size > momentLimits.maxImageBytes) {
+      throw new Error(`${asset.filename} exceeds the ${formatBytes(momentLimits.maxImageBytes)} per-image limit.`)
     }
     total += asset.blob.size
   }
 
-  if (total > sessionLimits.maxTotalImageBytes) {
-    throw new Error(`Images exceed the ${formatBytes(sessionLimits.maxTotalImageBytes)} per-session limit.`)
+  if (total > momentLimits.maxTotalImageBytes) {
+    throw new Error(`Images exceed the ${formatBytes(momentLimits.maxTotalImageBytes)} per-moment limit.`)
   }
 }
 
 export function normalizeSlideshowSettings(
   slideshow: SlideshowSettings | (Omit<SlideshowSettings, 'imageSource'> & { imageSource?: unknown }),
-  hasSessionAssets: boolean,
+  hasMomentAssets: boolean,
 ): SlideshowSettings {
   const candidate = slideshow.imageSource
   let imageSource: SlideshowSettings['imageSource']
@@ -580,18 +583,18 @@ export function normalizeSlideshowSettings(
       imageSource = { type: 'bundled', collectionId: sourceRecord.collectionId }
     } else imageSource = { type: 'none' }
   } else {
-    imageSource = hasSessionAssets ? { type: 'session-assets' } : { type: 'none' }
+    imageSource = hasMomentAssets ? { type: 'session-assets' } : { type: 'none' }
   }
   return { ...defaultSlideshowSettings, ...slideshow, imageSource }
 }
 
-async function normalizeAndPersistSession(raw: Session, assetCount: number): Promise<Session> {
-  const legacy = raw as Session & {
+async function normalizeAndPersistMoment(raw: Moment, assetCount: number): Promise<Moment> {
+  const legacy = raw as Moment & {
     activeNoteId?: string | null
     slideshow?: SlideshowSettings
     spotify?: SpotifyPlaylistReference
   }
-  if (raw.schemaVersion >= SESSION_SCHEMA_VERSION && Array.isArray(raw.panels)) {
+  if (raw.schemaVersion >= MOMENT_SCHEMA_VERSION && Array.isArray(raw.panels)) {
     const normalized = enforceSpotifySingleton(raw)
     const slideshow = normalized.panels.find((panel) => panel.type === 'slideshow')
     if (slideshow) slideshow.config = normalizeSlideshowSettings(slideshow.config, assetCount > 0)
@@ -606,10 +609,10 @@ async function normalizeAndPersistSession(raw: Session, assetCount: number): Pro
   spotify.config.playlist = legacy.spotify ?? defaultSpotifyPlaylistReference
   slideshow.config = normalizeSlideshowSettings(legacy.slideshow ?? defaultSlideshowSettings, assetCount > 0)
   notes.config.activeNoteId = legacy.activeNoteId ?? null
-  const migrated: Session = {
+  const migrated: Moment = {
     id: raw.id,
     name: raw.name,
-    schemaVersion: SESSION_SCHEMA_VERSION,
+    schemaVersion: MOMENT_SCHEMA_VERSION,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     panels,
@@ -620,14 +623,14 @@ async function normalizeAndPersistSession(raw: Session, assetCount: number): Pro
   return migrated
 }
 
-function enforceSpotifySingleton(session: Session): Session {
-  const panels = enforceSpotifySingletonPanels(session.panels)
-  if (panels.length === session.panels.length) return session
+function enforceSpotifySingleton(moment: Moment): Moment {
+  const panels = enforceSpotifySingletonPanels(moment.panels)
+  if (panels.length === moment.panels.length) return moment
   const retainedIds = new Set(panels.map((panel) => panel.id))
   return {
-    ...session,
+    ...moment,
     panels,
-    canvas: session.canvas ? { ...session.canvas, panels: session.canvas.panels.filter((layout) => retainedIds.has(layout.panelId)) } : null,
+    canvas: moment.canvas ? { ...moment.canvas, panels: moment.canvas.panels.filter((layout) => retainedIds.has(layout.panelId)) } : null,
   }
 }
 
@@ -641,21 +644,21 @@ function enforceSpotifySingletonPanels(panels: Panel[]): Panel[] {
   })
 }
 
-const panelDirectoryKey = (sessionId: string, panelId: string) => `${sessionId}:${panelId}`
+const panelDirectoryKey = (momentId: string, panelId: string) => `${momentId}:${panelId}`
 
-export async function savePanelDirectoryHandle(sessionId: string, panelId: string, handle: FileSystemDirectoryHandle) {
+export async function savePanelDirectoryHandle(momentId: string, panelId: string, handle: FileSystemDirectoryHandle) {
   const db = await dbPromise
-  await db.put('directoryHandles', { id: panelDirectoryKey(sessionId, panelId), sessionId, panelId, name: handle.name, handle })
+  await db.put('directoryHandles', { id: panelDirectoryKey(momentId, panelId), sessionId: momentId, panelId, name: handle.name, handle })
 }
 
-export async function getPanelDirectoryHandle(sessionId: string, panelId: string) {
+export async function getPanelDirectoryHandle(momentId: string, panelId: string) {
   const db = await dbPromise
-  return db.get('directoryHandles', panelDirectoryKey(sessionId, panelId))
+  return db.get('directoryHandles', panelDirectoryKey(momentId, panelId))
 }
 
-export async function clearPanelDirectoryHandle(sessionId: string, panelId: string) {
+export async function clearPanelDirectoryHandle(momentId: string, panelId: string) {
   const db = await dbPromise
-  await db.delete('directoryHandles', panelDirectoryKey(sessionId, panelId))
+  await db.delete('directoryHandles', panelDirectoryKey(momentId, panelId))
 }
 
 function migrateCanvas(canvas: CanvasState | null, panels: Panel[], panelIdMap = new Map<string, string>()): CanvasState | null {
@@ -679,8 +682,8 @@ function migrateCanvas(canvas: CanvasState | null, panels: Panel[], panelIdMap =
   }
 }
 
-function normalizeSessionName(name: string) {
-  return name.trim().slice(0, 80) || 'Untitled session'
+function normalizeMomentName(name: string) {
+  return name.trim().slice(0, 80) || 'Untitled moment'
 }
 
 function formatBytes(bytes: number) {

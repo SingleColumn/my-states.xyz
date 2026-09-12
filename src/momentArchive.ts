@@ -1,16 +1,16 @@
 import { strFromU8, strToU8, Unzip, UnzipInflate, zipSync } from 'fflate'
 import {
   getNotes,
-  getSession,
-  getSessionAssets,
-  importSessionContent,
-  sessionLimits,
+  getMoment,
+  getMomentAssets,
+  importMomentContent,
+  momentLimits,
 } from './storage'
 import type {
   CanvasState,
   Note,
   Panel,
-  SessionImage,
+  MomentImage,
   SlideshowSettings,
   SpotifyPlaylistReference,
 } from './types'
@@ -29,8 +29,9 @@ const supportedImageTypes = new Set([
   'image/svg+xml',
 ])
 
-interface SessionManifest {
+interface MomentManifest {
   formatVersion: 1
+  /** Named when moments were still sessions; kept so archives exported before the rename still import. */
   session: {
     name: string
     createdAt: number
@@ -61,30 +62,30 @@ interface SessionManifest {
   }>
 }
 
-export async function exportSessionArchive(sessionId: string) {
-  const [session, notes, assets] = await Promise.all([getSession(sessionId), getNotes(sessionId), getSessionAssets(sessionId)])
-  if (!session) throw new Error('The selected session no longer exists.')
+export async function exportMomentArchive(momentId: string) {
+  const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
+  if (!moment) throw new Error('The selected moment no longer exists.')
   // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
-  const slideshow = session.panels.find((panel) => panel.type === 'slideshow')
-  const spotify = session.panels.find((panel) => panel.type === 'spotify')
-  const notesPanel = session.panels.find((panel) => panel.type === 'notes')
+  const slideshow = moment.panels.find((panel) => panel.type === 'slideshow')
+  const spotify = moment.panels.find((panel) => panel.type === 'spotify')
+  const notesPanel = moment.panels.find((panel) => panel.type === 'notes')
   const slideshowSettings = slideshow?.config
-  const exportedAssets = session.panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
+  const exportedAssets = moment.panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   validateExportContent(notes, exportedAssets)
 
   const files: Record<string, Uint8Array> = {}
-  const manifest: SessionManifest = {
+  const manifest: MomentManifest = {
     formatVersion: FORMAT_VERSION,
     session: {
-      name: session.name,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
+      name: moment.name,
+      createdAt: moment.createdAt,
+      updatedAt: moment.updatedAt,
       activeNoteId: notesPanel?.config.activeNoteId ?? null,
     },
-    canvas: session.canvas,
+    canvas: moment.canvas,
     slideshow: slideshowSettings!,
     spotify: spotify?.config.playlist ?? { id: null, uri: null, name: null, url: null },
-    panels: session.panels,
+    panels: moment.panels,
     notes: [],
     images: [],
   }
@@ -121,21 +122,21 @@ export async function exportSessionArchive(sessionId: string) {
 
   files['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2))
   const archive = zipSync(files, { level: 6 })
-  if (archive.byteLength > sessionLimits.maxArchiveBytes) {
-    throw new Error('The compressed session archive exceeds the 260 MB limit.')
+  if (archive.byteLength > momentLimits.maxArchiveBytes) {
+    throw new Error('The compressed moment archive exceeds the 260 MB limit.')
   }
 
   return new Blob([archive], { type: 'application/zip' })
 }
 
-export async function importSessionArchive(file: File) {
-  if (file.size > sessionLimits.maxArchiveBytes) {
+export async function importMomentArchive(file: File) {
+  if (file.size > momentLimits.maxArchiveBytes) {
     throw new Error('The selected archive exceeds the 260 MB limit.')
   }
 
   const files = extractArchive(new Uint8Array(await file.arrayBuffer()))
   const manifestBytes = files.get('manifest.json')
-  if (!manifestBytes) throw new Error('The session archive is missing manifest.json.')
+  if (!manifestBytes) throw new Error('The moment archive is missing manifest.json.')
 
   const manifest = parseManifest(manifestBytes)
   validateManifest(manifest, files)
@@ -160,7 +161,7 @@ export async function importSessionArchive(file: File) {
     blob: new Blob([toArrayBuffer(files.get(image.path)!)], { type: image.mimeType }),
   }))
 
-  return importSessionContent({
+  return importMomentContent({
     name: manifest.session.name,
     canvas: manifest.canvas,
     slideshow: manifest.slideshow,
@@ -172,11 +173,11 @@ export async function importSessionArchive(file: File) {
   })
 }
 
-export function downloadSessionArchive(blob: Blob, sessionName: string) {
+export function downloadMomentArchive(blob: Blob, momentName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${safeFileStem(sessionName)}.mix-session.zip`
+  link.download = `${safeFileStem(momentName)}.mix-session.zip`
   link.rel = 'noopener'
   document.body.appendChild(link)
   link.click()
@@ -184,9 +185,9 @@ export function downloadSessionArchive(blob: Blob, sessionName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-function validateExportContent(notes: Note[], assets: Array<SessionImage & { blob: Blob }>) {
-  if (notes.length > maxNoteCount) throw new Error(`A session can contain at most ${maxNoteCount} notes.`)
-  if (assets.length > sessionLimits.maxImageCount) throw new Error(`A session can contain at most ${sessionLimits.maxImageCount} images.`)
+function validateExportContent(notes: Note[], assets: Array<MomentImage & { blob: Blob }>) {
+  if (notes.length > maxNoteCount) throw new Error(`A moment can contain at most ${maxNoteCount} notes.`)
+  if (assets.length > momentLimits.maxImageCount) throw new Error(`A moment can contain at most ${momentLimits.maxImageCount} images.`)
 
   let noteBytes = 0
   let imageBytes = 0
@@ -195,15 +196,15 @@ function validateExportContent(notes: Note[], assets: Array<SessionImage & { blo
     if (bytes > maxNoteBytes) throw new Error(`The note "${note.title}" exceeds the 1 MB limit.`)
     noteBytes += bytes
   }
-  if (noteBytes > maxTotalNoteBytes) throw new Error('Notes exceed the 10 MB session limit.')
+  if (noteBytes > maxTotalNoteBytes) throw new Error('Notes exceed the 10 MB moment limit.')
 
   for (const asset of assets) {
     if (!supportedImageTypes.has(asset.mimeType)) throw new Error(`${asset.filename} has an unsupported image type.`)
     if (asset.blob.size !== asset.size) throw new Error(`${asset.filename} no longer matches its stored file size.`)
-    if (asset.size > sessionLimits.maxImageBytes) throw new Error(`${asset.filename} exceeds the 25 MB per-image limit.`)
+    if (asset.size > momentLimits.maxImageBytes) throw new Error(`${asset.filename} exceeds the 25 MB per-image limit.`)
     imageBytes += asset.size
   }
-  if (imageBytes > sessionLimits.maxTotalImageBytes) throw new Error('Images exceed the 250 MB session limit.')
+  if (imageBytes > momentLimits.maxTotalImageBytes) throw new Error('Images exceed the 250 MB moment limit.')
 }
 
 function extractArchive(source: Uint8Array) {
@@ -211,8 +212,8 @@ function extractArchive(source: Uint8Array) {
   let totalBytes = 0
   let fileCount = 0
   let failure: Error | null = null
-  const maxTotalBytes = sessionLimits.maxTotalImageBytes + maxTotalNoteBytes + 1024 * 1024
-  const maxFileCount = sessionLimits.maxImageCount + maxNoteCount + 1
+  const maxTotalBytes = momentLimits.maxTotalImageBytes + maxTotalNoteBytes + 1024 * 1024
+  const maxFileCount = momentLimits.maxImageCount + maxNoteCount + 1
 
   const unzip = new Unzip((entry) => {
     if (failure) return
@@ -221,7 +222,7 @@ function extractArchive(source: Uint8Array) {
       if (files.has(entry.name) || ++fileCount > maxFileCount) {
         throw new Error('The archive contains duplicate or too many files.')
       }
-      if (entry.originalSize !== undefined && entry.originalSize > sessionLimits.maxTotalImageBytes) {
+      if (entry.originalSize !== undefined && entry.originalSize > momentLimits.maxTotalImageBytes) {
         throw new Error('The archive contains an oversized file.')
       }
 
@@ -229,13 +230,13 @@ function extractArchive(source: Uint8Array) {
       entry.ondata = (error, chunk, final) => {
         if (failure) return
         if (error) {
-          failure = new Error('The session archive could not be read.')
+          failure = new Error('The moment archive could not be read.')
           entry.terminate()
           return
         }
         totalBytes += chunk.byteLength
         if (totalBytes > maxTotalBytes) {
-          failure = new Error('The archive expands beyond the permitted session size.')
+          failure = new Error('The archive expands beyond the permitted moment size.')
           entry.terminate()
           return
         }
@@ -253,33 +254,33 @@ function extractArchive(source: Uint8Array) {
   try {
     unzip.push(source, true)
   } catch (caught) {
-    throw new Error(caught instanceof Error ? `The session archive is invalid: ${caught.message}` : 'The session archive is invalid.')
+    throw new Error(caught instanceof Error ? `The moment archive is invalid: ${caught.message}` : 'The moment archive is invalid.')
   }
 
   if (failure) throw failure
   return files
 }
 
-function parseManifest(bytes: Uint8Array): SessionManifest {
+function parseManifest(bytes: Uint8Array): MomentManifest {
   try {
-    return JSON.parse(strFromU8(bytes)) as SessionManifest
+    return JSON.parse(strFromU8(bytes)) as MomentManifest
   } catch {
     throw new Error('manifest.json is not valid JSON.')
   }
 }
 
-function validateManifest(manifest: SessionManifest, files: Map<string, Uint8Array>) {
+function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Array>) {
   if (!isRecord(manifest) || manifest.formatVersion !== FORMAT_VERSION) {
-    throw new Error('This session archive uses an unsupported format version.')
+    throw new Error('This moment archive uses an unsupported format version.')
   }
-  if (!isSessionMetadata(manifest.session) || !isSlideshowSettings(manifest.slideshow) || !isPlaylistReference(manifest.spotify) || (manifest.panels !== undefined && !isPanels(manifest.panels))) {
-    throw new Error('The session manifest has invalid metadata.')
+  if (!isMomentMetadata(manifest.session) || !isSlideshowSettings(manifest.slideshow) || !isPlaylistReference(manifest.spotify) || (manifest.panels !== undefined && !isPanels(manifest.panels))) {
+    throw new Error('The moment manifest has invalid metadata.')
   }
   if (!isCanvasState(manifest.canvas) || !Array.isArray(manifest.notes) || !Array.isArray(manifest.images)) {
-    throw new Error('The session manifest has invalid workspace data.')
+    throw new Error('The moment manifest has invalid workspace data.')
   }
-  if (manifest.notes.length > maxNoteCount || manifest.images.length > sessionLimits.maxImageCount) {
-    throw new Error('The session archive exceeds the permitted number of notes or images.')
+  if (manifest.notes.length > maxNoteCount || manifest.images.length > momentLimits.maxImageCount) {
+    throw new Error('The moment archive exceeds the permitted number of notes or images.')
   }
 
   const referencedPaths = new Set<string>(['manifest.json'])
@@ -311,7 +312,7 @@ function validateManifest(manifest: SessionManifest, files: Map<string, Uint8Arr
       throw new Error('The manifest references a missing or duplicate image file.')
     }
     const bytes = files.get(image.path)!.byteLength
-    if (image.size !== bytes || bytes > sessionLimits.maxImageBytes) {
+    if (image.size !== bytes || bytes > momentLimits.maxImageBytes) {
       throw new Error('An image does not match its declared size or exceeds the per-image limit.')
     }
     imageBytes += bytes
@@ -319,8 +320,8 @@ function validateManifest(manifest: SessionManifest, files: Map<string, Uint8Arr
     referencedPaths.add(image.path)
   }
 
-  if (noteBytes > maxTotalNoteBytes || imageBytes > sessionLimits.maxTotalImageBytes) {
-    throw new Error('The archive exceeds the permitted session size.')
+  if (noteBytes > maxTotalNoteBytes || imageBytes > momentLimits.maxTotalImageBytes) {
+    throw new Error('The archive exceeds the permitted moment size.')
   }
   if (manifest.session.activeNoteId !== null && !noteIds.has(manifest.session.activeNoteId)) {
     throw new Error('The active note is not included in the archive.')
@@ -337,7 +338,7 @@ function validateArchivePath(path: string) {
   }
 }
 
-function extensionForAsset(asset: SessionImage) {
+function extensionForAsset(asset: MomentImage) {
   return extensionForMimeType(asset.mimeType)
 }
 
@@ -360,7 +361,7 @@ function safeFileStem(name: string) {
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
     .replace(/\s+/g, ' ')
     .slice(0, 80)
-  return sanitized || 'untitled-session'
+  return sanitized || 'untitled-moment'
 }
 
 function createNoteArchivePath(title: string, usedPaths: Set<string>) {
@@ -427,7 +428,7 @@ function isNullableDimension(value: unknown) {
   return value === null || (typeof value === 'number' && Number.isFinite(value) && value > 0)
 }
 
-function isSessionMetadata(value: unknown): value is SessionManifest['session'] {
+function isMomentMetadata(value: unknown): value is MomentManifest['session'] {
   return (
     isRecord(value) &&
     typeof value.name === 'string' &&

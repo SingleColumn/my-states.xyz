@@ -22,7 +22,7 @@ export interface CanvasState {
 export interface PanelBase {
   id: string
   type: PanelType
-  /** Absent means visible for sessions written before panel visibility existed. */
+  /** Absent means visible for moments written before panel visibility existed. */
   visible?: boolean
   /** Absent means the full panel. True keeps the Music panel's playback controls only. */
   focusView?: boolean
@@ -58,8 +58,9 @@ export interface ImageMetadata {
   height: number | null
 }
 
-export interface SessionImage extends ImageMetadata {
+export interface MomentImage extends ImageMetadata {
   id: string
+  /** The owning moment. Moments were called sessions when this field was persisted; it keeps that name so stored records and indexes stay valid. */
   sessionId: string
   panelId?: string
   filename: string
@@ -112,11 +113,11 @@ export interface SpotifyPlaylistReference {
   uri: string | null
   name: string | null
   url: string | null
-  /** Optional: sessions saved before the panel showed playlist artwork have none. */
+  /** Optional: moments saved before the panel showed playlist artwork have none. */
   image?: string | null
 }
 
-export interface Session {
+export interface Moment {
   id: string
   name: string
   schemaVersion: 2
@@ -126,7 +127,7 @@ export interface Session {
   canvas: CanvasState | null
 }
 
-export interface SessionSummary {
+export interface MomentSummary {
   id: string
   name: string
   updatedAt: number
