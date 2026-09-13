@@ -38,31 +38,15 @@ export type PanelShapeProps = { [K in keyof typeof panelShapeProps]: T.TypeOf<(t
 
 export type PanelShape = TLBaseShape<typeof PANEL_SHAPE_TYPE, PanelShapeProps>
 
-export const panelShapeMigrationVersions = createShapePropsMigrationIds(PANEL_SHAPE_TYPE, {
-  AddPanelContent: 1,
-})
+export const panelShapeMigrationVersions = createShapePropsMigrationIds(PANEL_SHAPE_TYPE, {})
 
 /**
  * Persisted shapes carry the version they were written with, and tldraw runs
- * these when it loads an older one. No moment was ever persisted with the
- * first shape of the props (those shapes were rebuilt on every load), so the
- * first migration only has to produce something valid; later ones will do
- * real work.
+ * these when it loads an older one. The sequence is empty: the props above
+ * are the first shape ever persisted by the `my-states` database. A change
+ * to them is a migration here, and the point at which the decision to
+ * discard earlier saved work has to be revisited.
  */
 export const panelShapeMigrations = createShapePropsMigrationSequence({
-  sequence: [
-    {
-      id: panelShapeMigrationVersions.AddPanelContent,
-      up(props) {
-        props.panel = { type: 'slideshow', config: panelRegistry.slideshow.createConfig() }
-        props.visible = true
-        props.focusView = false
-      },
-      down(props) {
-        delete props.panel
-        delete props.visible
-        delete props.focusView
-      },
-    },
-  ],
+  sequence: [],
 })

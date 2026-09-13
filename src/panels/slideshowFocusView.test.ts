@@ -7,7 +7,7 @@ import { SlideshowPanel } from './SlideshowPanel'
 
 const panel = vi.hoisted(() => ({ focusView: false }))
 
-const image = { id: 'image_1', sessionId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
+const image = { id: 'image_1', momentId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
 
 vi.mock('../AppState', () => ({
   useAppState: () => ({

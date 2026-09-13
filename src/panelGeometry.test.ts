@@ -37,8 +37,7 @@ describe('panel geometry commands', () => {
     expect(getPanelFocusViewSize('slideshow')).toBeNull()
   })
 
-  it('treats a panel saved before focus view existed as showing its whole contents', () => {
-    expect(isPanelInFocusView({})).toBe(false)
+  it('reads focus view from the panel', () => {
     expect(isPanelInFocusView({ focusView: false })).toBe(false)
     expect(isPanelInFocusView({ focusView: true })).toBe(true)
   })

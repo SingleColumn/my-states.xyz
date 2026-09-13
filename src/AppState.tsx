@@ -15,14 +15,12 @@ import type {
   SpotifyTrackState,
 } from './types'
 import {
-  clearDirectoryHandle,
   clearPanelDirectoryHandle,
   createMoment as createStoredMoment,
   defaultSlideshowSettings,
   defaultSpotifyPlaylistReference,
   deleteNote as deleteStoredNote,
   deleteMoment as deleteStoredMoment,
-  getDirectoryHandle,
   getPanelDirectoryHandle,
   getNotes,
   getMoment,
@@ -30,7 +28,6 @@ import {
   getMomentSummaries,
   initializeMoments,
   replaceMomentAssets,
-  saveDirectoryHandle,
   savePanelDirectoryHandle,
   saveNote,
   renameMoment,
@@ -232,6 +229,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await notes.flush()
         await momentCore.flush()
         const imported = await importMomentArchive(file)
+        // The picker lists summaries; without this the imported moment is
+        // open but absent from the list until the next create or delete.
+        await momentCore.refreshSummaries()
         await momentCore.open(imported.id)
       }),
       updateDocument: momentCore.updateDocument,
@@ -435,6 +435,7 @@ function useMomentState() {
     open,
     rename,
     remove,
+    refreshSummaries,
     updateDocument,
     getActiveMomentRecord: () => activeMomentRef.current,
     registerCanvasFlush,
@@ -552,7 +553,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const now = Date.now()
     const note: Note = {
       id: createId('note'),
-      sessionId: moment.id,
+      momentId: moment.id,
       title: 'Untitled note',
       content: '',
       createdAt: now,
@@ -817,7 +818,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
 
   const restoreFolder = useCallback(async (panelId: string) => {
     if (!moment) return
-    const stored = await getPanelDirectoryHandle(moment.id, panelId) ?? await getDirectoryHandle(moment.id)
+    const stored = await getPanelDirectoryHandle(moment.id, panelId)
     if (!stored) return
     try {
       if (!(await ensureReadPermission(stored.handle))) {
@@ -843,7 +844,6 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     if (current.imageSource.type === 'session-assets') {
       await replaceMomentAssets(moment.id, [], panelId)
       await clearPanelDirectoryHandle(moment.id, panelId)
-      await clearDirectoryHandle(moment.id)
     }
     releaseImageItems(state.images)
     state.images = []
@@ -1317,7 +1317,7 @@ async function createMomentAsset(file: File, momentId: string, panelId?: string)
   URL.revokeObjectURL(url)
   return {
     id: createId('image'),
-    sessionId: momentId,
+    momentId,
     ...(panelId ? { panelId } : {}),
     filename: file.name,
     name: file.webkitRelativePath || file.name,

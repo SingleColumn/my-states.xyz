@@ -3,45 +3,42 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { describe, expect, it, vi } from 'vitest'
 import { exportMomentArchive, importMomentArchive } from './momentArchive'
 import {
+  createDefaultPanels,
   createMoment,
   defaultSlideshowSettings,
   getNotes,
   getMoment,
   getMomentAssets,
-  saveNote,
-  saveMoment,
+  importMomentContent,
   saveMomentAssets,
   saveSpotifyTokens,
   momentLimits,
 } from './storage'
-import type { Moment, Panel } from './types'
+import type { CanvasState, Moment, Panel } from './types'
 
-// Archives carry a moment's panels in the pre-snapshot shape; a moment that
-// has not been opened on a canvas carries the same shape under `legacy`.
-const panelsOf = (moment: Moment | undefined) => moment?.legacy?.panels ?? []
-const withPanels = (moment: Moment, panels: Panel[], canvas: NonNullable<Moment['legacy']>['canvas'] = moment.legacy?.canvas ?? null): Moment => ({ ...moment, legacy: { panels, canvas } })
+// Archives carry a moment as a draft; a moment that has not been opened on a
+// canvas carries the same draft.
+const panelsOf = (moment: Moment | undefined) => moment?.draft?.panels ?? []
+
+/** A stored moment with these panels, the way an import produces one. */
+function storeMoment(name: string, panels: Panel[], canvas: CanvasState | null = null, notes: Parameters<typeof importMomentContent>[0]['notes'] = []) {
+  return importMomentContent({ name, panels, canvas, notes, assets: [] })
+}
+
+const slideshowIn = (panels: Panel[]) => panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')!
 
 async function createCompleteArchive() {
-  const moment = await createMoment('Archive source')
   const now = Date.now()
-  const note = {
-    id: 'note_source',
-    sessionId: moment.id,
-    title: 'Lyrics',
-    content: '# A portable note\n\nSaved without credentials.',
-    createdAt: now,
-    updatedAt: now,
-  }
-  await saveNote(note)
+  const note = { id: 'note_source', title: 'Lyrics', content: '# A portable note\n\nSaved without credentials.', createdAt: now, updatedAt: now }
+  const panels = createDefaultPanels().map((panel): Panel => panel.type === 'notes' ? { ...panel, config: { activeNoteId: note.id } } : panel.type === 'slideshow' ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' }, intervalMs: 3500, shuffle: true } } : panel.type === 'spotify' ? { ...panel, config: { playlist: { id: 'playlist_123', uri: 'spotify:playlist:playlist_123', name: 'Focus', url: 'https://open.spotify.com/playlist/playlist_123' } } } : panel)
+  const moment = await storeMoment('Archive source', panels, {
+    camera: { x: 120, y: -80, z: 1.25 },
+    panels: [{ panelId: panels.find((panel) => panel.type === 'notes')!.id, x: 1, y: 2, w: 300, h: 400, rotation: 0.25, order: 2 }],
+  }, [note])
   await saveMomentAssets(moment.id, [
     makeAsset('image_one', 'cover.png', new Uint8Array([137, 80, 78, 71])),
     makeAsset('image_two', 'scene.webp', new Uint8Array([82, 73, 70, 70])),
   ])
-  const panels = panelsOf(moment).map((panel): Panel => panel.type === 'notes' ? { ...panel, config: { activeNoteId: note.id } } : panel.type === 'slideshow' ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' }, intervalMs: 3500, shuffle: true } } : panel.type === 'spotify' ? { ...panel, config: { playlist: { id: 'playlist_123', uri: 'spotify:playlist:playlist_123', name: 'Focus', url: 'https://open.spotify.com/playlist/playlist_123' } } } : panel)
-  await saveMoment(withPanels(moment, panels, {
-    camera: { x: 120, y: -80, z: 1.25 },
-    panels: [{ panelId: panels.find((panel) => panel.type === 'notes')!.id, x: 1, y: 2, w: 300, h: 400, rotation: 0.25, order: 2 }],
-  }))
   return exportMomentArchive(moment.id)
 }
 
@@ -69,19 +66,19 @@ async function archiveEntries(blob: Blob) {
 
 function manifest(entries: Record<string, Uint8Array>) {
   return JSON.parse(strFromU8(entries['manifest.json'])) as {
+    formatVersion: number
     images: Array<{ path: string; mimeType: string }>
     notes: Array<{ path: string }>
-    spotify: unknown
-    slideshow: typeof defaultSlideshowSettings
+    panels: Panel[]
   }
 }
 
 describe('portable moment archives', () => {
   it('exports and imports multiple slideshow panels independently', async () => {
-    const source = await createMoment('Duplicate archive panels')
-    const slideshow = panelsOf(source).find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')!
+    const panels = createDefaultPanels()
+    const slideshow = slideshowIn(panels)
     const duplicate: Panel = { ...slideshow, id: 'slideshow_duplicate', config: { ...slideshow.config, currentIndex: 3, shuffle: true } }
-    await saveMoment(withPanels(source, [...panelsOf(source), duplicate]))
+    const source = await storeMoment('Duplicate archive panels', [...panels, duplicate])
     const imported = await importMomentArchive(asFile(await exportMomentArchive(source.id)))
     const slideshowPanels = panelsOf(await getMoment(imported.id)).filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     expect(slideshowPanels).toHaveLength(2)
@@ -96,6 +93,7 @@ describe('portable moment archives', () => {
     const entries = await archiveEntries(archive)
     const exportedManifest = manifest(entries)
 
+    expect(exportedManifest.formatVersion).toBe(2)
     expect(JSON.stringify(exportedManifest)).not.toContain('access-secret')
     expect(JSON.stringify(exportedManifest)).not.toContain('refresh-secret')
     expect(Object.values(entries).map((entry) => strFromU8(entry)).join('')).not.toContain('access-secret')
@@ -107,12 +105,14 @@ describe('portable moment archives', () => {
       getMomentAssets(imported.id),
     ])
 
-    expect(stored?.legacy?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
-    expect(stored?.legacy?.canvas?.panels[0]).toMatchObject({ rotation: 0.25, order: 2 })
-    expect(panelsOf(stored).find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')?.config).toMatchObject({ intervalMs: 3500, shuffle: true })
-    expect(panelsOf(stored).find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')?.config.playlist).toEqual(exportedManifest.spotify)
+    expect(stored?.draft?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
+    expect(stored?.draft?.canvas?.panels[0]).toMatchObject({ rotation: 0.25, order: 2 })
+    expect(slideshowIn(panelsOf(stored)).config).toMatchObject({ intervalMs: 3500, shuffle: true })
+    expect(panelsOf(stored).find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')?.config.playlist).toEqual(exportedManifest.panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')!.config.playlist)
     expect(notes).toHaveLength(1)
     expect(notes[0]).toMatchObject({ title: 'Lyrics', content: '# A portable note\n\nSaved without credentials.' })
+    // The Notes panel follows its note to the note's reissued id.
+    expect(panelsOf(stored).find((panel): panel is Panel<'notes'> => panel.type === 'notes')?.config.activeNoteId).toBe(notes[0].id)
     expect(assets.map((asset) => asset.filename).sort()).toEqual(['cover.png', 'scene.webp'])
     expect(await assets[0].blob.arrayBuffer()).toBeInstanceOf(ArrayBuffer)
   })
@@ -129,19 +129,18 @@ describe('portable moment archives', () => {
   })
 
   it('exports and imports a bundled collection reference without copying image blobs', async () => {
-    const source = await createMoment('Sample archive')
+    const source = await storeMoment('Sample archive', createDefaultPanels().map((panel): Panel => panel.type === 'slideshow' ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'eightbitstrana', imageSource: { type: 'bundled', collectionId: 'eightbitstrana' } } } : panel))
     await saveMomentAssets(source.id, [makeAsset('inactive_local', 'inactive.png', new Uint8Array([1, 2, 3]))])
-    await saveMoment(withPanels(source, panelsOf(source).map((panel): Panel => panel.type === 'slideshow' ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'eightbitstrana', imageSource: { type: 'bundled', collectionId: 'eightbitstrana' } } } : panel)))
 
     const archive = await exportMomentArchive(source.id)
     const entries = await archiveEntries(archive)
     const exportedManifest = manifest(entries)
-    expect(exportedManifest.slideshow.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
+    expect(slideshowIn(exportedManifest.panels).config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
     expect(exportedManifest.images).toEqual([])
     expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toEqual([])
 
     const imported = await importMomentArchive(asFile(archive))
-    expect(panelsOf(await getMoment(imported.id)).find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
+    expect(slideshowIn(panelsOf(await getMoment(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
     expect(await getMomentAssets(imported.id)).toEqual([])
   })
 
@@ -149,12 +148,12 @@ describe('portable moment archives', () => {
     const source = await createMoment('Unavailable sample')
     const entries = await archiveEntries(await exportMomentArchive(source.id))
     const sourceManifest = manifest(entries)
-    sourceManifest.slideshow.imageSource = { type: 'bundled', collectionId: 'removed-sample' }
-    sourceManifest.slideshow.folderName = 'removed-sample'
+    slideshowIn(sourceManifest.panels).config.imageSource = { type: 'bundled', collectionId: 'removed-sample' }
+    slideshowIn(sourceManifest.panels).config.folderName = 'removed-sample'
     entries['manifest.json'] = strToU8(JSON.stringify(sourceManifest))
 
     const imported = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect(panelsOf(await getMoment(imported.id)).find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
+    expect(slideshowIn(panelsOf(await getMoment(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
     expect(await getMomentAssets(imported.id)).toEqual([])
   })
 
@@ -178,5 +177,16 @@ describe('portable moment archives', () => {
 
     const oversized = { size: momentLimits.maxArchiveBytes + 1, arrayBuffer: vi.fn() } as unknown as File
     await expect(importMomentArchive(oversized)).rejects.toThrow('exceeds the 260 MB limit')
+  })
+
+  it('refuses a file from the earlier format with a message that says which version wrote it', async () => {
+    const entries = await archiveEntries(await exportMomentArchive((await createMoment('Current format')).id))
+    const older = { ...manifest(entries), formatVersion: 1 }
+    entries['manifest.json'] = strToU8(JSON.stringify(older))
+    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('exported by an earlier version of my-states')
+
+    const unknown = { ...manifest(entries), formatVersion: 99 }
+    entries['manifest.json'] = strToU8(JSON.stringify(unknown))
+    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('unsupported format version')
   })
 })

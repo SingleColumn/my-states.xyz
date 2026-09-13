@@ -1,12 +1,12 @@
 import { T, createTLStore, type Editor, type TLStore } from 'tldraw'
-import { shapesForLegacyContent } from './panelStore'
+import { shapesForDraft } from './panelStore'
 import type { Moment } from './types'
 
 /** Preflight in a detached store, never in editor.run. Loading untrusted
  * snapshots there validates/migrates with the exact installed schema without
  * crashing or changing the mounted editor on a validation failure. */
 export function prepareCanvasRestore(store: TLStore, moment: Moment) {
-  const camera = moment.camera ?? moment.legacy?.canvas?.camera
+  const camera = moment.camera ?? moment.draft?.canvas?.camera
   if (camera) {
     T.number.validate(camera.x)
     T.number.validate(camera.y)
@@ -16,7 +16,7 @@ export function prepareCanvasRestore(store: TLStore, moment: Moment) {
     createTLStore({ schema: store.schema, snapshot: moment.document })
     return null
   }
-  return shapesForLegacyContent(moment.legacy ?? { panels: [], canvas: null })
+  return shapesForDraft(moment.draft ?? { panels: [], canvas: null })
 }
 
 /** Input remains paused by the operation gate. tldraw's readonly mode also

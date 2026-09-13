@@ -2,12 +2,12 @@ import { createTLSchema, createTLStore, type Editor, type TLShapeId } from 'tldr
 import { describe, expect, it } from 'vitest'
 import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
 import { panelShapeMigrations, panelShapeProps } from './panelShapeSchema'
-import { createPanelProps, shapesForLegacyContent } from './panelStore'
+import { createPanelProps, shapesForDraft } from './panelStore'
 import type { Moment, Panel } from './types'
 
 const schema = createTLSchema({ shapes: { 'music-panel': { props: panelShapeProps, migrations: panelShapeMigrations } }, bindings: {} })
 Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
-const moment: Moment = { id: 'test', name: 'Test', schemaVersion: 3, createdAt: 1, updatedAt: 2, camera: { x: 0, y: 0, z: 1 }, document: null }
+const moment: Moment = { id: 'test', name: 'Test', schemaVersion: 1, createdAt: 1, updatedAt: 2, camera: { x: 0, y: 0, z: 1 }, document: null }
 
 describe('canvas restore preflight', () => {
   it('allows synchronous restore writes but reinstates the readonly input pause even on failure', () => {
@@ -38,13 +38,13 @@ describe('canvas restore preflight', () => {
     expect(store.getStoreSnapshot()).toEqual(snapshot)
   })
 
-  it('rejects bad camera and legacy geometry without touching an editor transaction', () => {
+  it('rejects bad camera and draft geometry without touching an editor transaction', () => {
     const store = createTLStore({ schema })
     expect(() => prepareCanvasRestore(store, { ...moment, camera: { x: 0, y: 0, z: NaN } })).toThrow()
-    const panel: Panel<'notes'> = { id: 'notes', type: 'notes', config: { activeNoteId: null } }
-    expect(() => shapesForLegacyContent({
+    const panel: Panel<'notes'> = { id: 'notes', type: 'notes', config: { activeNoteId: null }, visible: true, focusView: false }
+    expect(() => shapesForDraft({
       panels: [panel], canvas: { camera: { x: 0, y: 0, z: 1 }, panels: [{ panelId: 'notes', x: NaN, y: 0, w: 400, h: 500 }] },
     })).toThrow()
-    expect(() => shapesForLegacyContent({ panels: [panel, panel], canvas: null })).toThrow(/duplicate/)
+    expect(() => shapesForDraft({ panels: [panel, panel], canvas: null })).toThrow(/duplicate/)
   })
 })

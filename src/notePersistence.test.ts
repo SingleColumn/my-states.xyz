@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { persistNoteSnapshot } from './notePersistence'
 import { SaveQueue } from './saveQueue'
 
-const note = { id: 'note', sessionId: 'moment', title: 'Title', content: 'Old', createdAt: 1, updatedAt: 2 }
+const note = { id: 'note', momentId: 'moment', title: 'Title', content: 'Old', createdAt: 1, updatedAt: 2 }
 
 describe('note save acknowledgement', () => {
   it('keeps a failed draft dirty and retries the same content', async () => {

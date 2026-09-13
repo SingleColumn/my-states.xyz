@@ -3,6 +3,7 @@ import type { Moment, Panel, PanelContent } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeProps, type PanelShape } from './panelShapeSchema'
 import { getPanelDefinition, isPanelType } from './panelRegistry'
+import { MOMENT_SCHEMA_VERSION } from './momentSchema'
 
 export type ArchitectureCheckStatus = 'PASS' | 'WARNING' | 'ERROR'
 
@@ -144,16 +145,16 @@ export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchit
   addCheck(
     'schema-version',
     'The moment uses the current schema',
-    moment.schemaVersion === 3 ? 'PASS' : 'WARNING',
+    moment.schemaVersion === MOMENT_SCHEMA_VERSION ? 'PASS' : 'WARNING',
     `Moment schemaVersion is ${moment.schemaVersion}`,
   )
 
   addCheck(
     'document-persisted',
     'The moment persists the tldraw document and no separate panel records',
-    moment.document && !moment.legacy ? 'PASS' : moment.document ? 'WARNING' : 'ERROR',
+    moment.document && !moment.draft ? 'PASS' : moment.document ? 'WARNING' : 'ERROR',
     moment.document
-      ? moment.legacy ? 'Document is present but pre-snapshot content has not been cleared' : 'Document is the only record of the canvas'
+      ? moment.draft ? 'Document is present but the draft has not been cleared' : 'Document is the only record of the canvas'
       : 'No document has been saved for this moment yet',
   )
 

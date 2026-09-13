@@ -29,7 +29,7 @@ describe('slideshow image source transitions', () => {
 
   it('revokes object URLs but never static sample URLs', () => {
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
-    const base = { id: 'image', sessionId: null, filename: 'image.jpg', name: 'image.jpg', mimeType: 'image/jpeg', size: 0, lastModified: 0, width: null, height: null }
+    const base = { id: 'image', momentId: null, filename: 'image.jpg', name: 'image.jpg', mimeType: 'image/jpeg', size: 0, lastModified: 0, width: null, height: null }
     releaseImageItems([
       { ...base, url: 'blob:local', urlKind: 'object-url' },
       { ...base, id: 'sample', url: '/sample-images/teemu-jpeg/image.jpg', urlKind: 'static' },

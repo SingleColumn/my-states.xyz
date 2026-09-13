@@ -34,7 +34,7 @@ function makeMoment(shapes: TLShape[], overrides: Partial<Moment> = {}): Moment 
   return {
     id: 'moment-1',
     name: 'Test moment',
-    schemaVersion: 3,
+    schemaVersion: 1,
     createdAt: 1,
     updatedAt: 1,
     camera: { x: 0, y: 0, z: 1 },
@@ -101,12 +101,12 @@ describe('panel architecture report', () => {
     expect(check(buildPanelArchitectureReport(makeMoment([locked]), editorWith(locked)), 'hidden-panels-locked')).toBe('PASS')
   })
 
-  it('reports a moment that has not been upgraded to a document, and one that kept its old content', () => {
+  it('reports a moment whose document has not been built yet, and one that kept its draft', () => {
     const shape = makeShape('notes', 'panel-a')
-    const notUpgraded = makeMoment([shape], { document: null, legacy: { panels: [], canvas: null } })
-    expect(check(buildPanelArchitectureReport(notUpgraded, editorWith(shape)), 'document-persisted')).toBe('ERROR')
+    const notBuilt = makeMoment([shape], { document: null, draft: { panels: [], canvas: null } })
+    expect(check(buildPanelArchitectureReport(notBuilt, editorWith(shape)), 'document-persisted')).toBe('ERROR')
 
-    const stale = makeMoment([shape], { legacy: { panels: [], canvas: null } })
+    const stale = makeMoment([shape], { draft: { panels: [], canvas: null } })
     expect(check(buildPanelArchitectureReport(stale, editorWith(shape)), 'document-persisted')).toBe('WARNING')
   })
 

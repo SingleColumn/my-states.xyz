@@ -1,7 +1,7 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { duplicatePanel } from './panelDuplication'
-import { createMoment, getMoment, importMomentContent, saveMoment } from './storage'
+import { createDefaultPanels, createMoment, getMoment, importMomentContent } from './storage'
 import type { Moment, Panel } from './types'
 
 type PanelRuntimeState = Record<string, unknown>
@@ -20,22 +20,26 @@ async function runtimeContract() {
   return (appState as unknown as { panelRuntime?: RuntimeContract }).panelRuntime
 }
 
-const panelsOf = (moment: Moment | undefined) => moment?.legacy?.panels ?? []
+const panelsOf = (moment: Moment | undefined) => moment?.draft?.panels ?? []
 
-function twoPanelsOfType<T extends 'slideshow' | 'notes'>(moment: Moment, type: T) {
-  const source = panelsOf(moment).find((panel) => panel.type === type)
+/** A stored moment holding two panels of one kind, as an import produces it. */
+async function twoPanelsOfType<T extends 'slideshow' | 'notes'>(name: string, type: T) {
+  const panels = createDefaultPanels()
+  const source = panels.find((panel) => panel.type === type)
   if (!source) throw new Error(`Missing ${type} panel`)
   const duplicate = duplicatePanel(source)
   if (!duplicate) throw new Error(`Could not duplicate ${type} panel`)
-  return { source, duplicate, moment: { ...moment, legacy: { panels: [...panelsOf(moment), duplicate], canvas: null } } as Moment }
+  const moment = await importMomentContent({ name, panels: [...panels, duplicate], canvas: null, notes: [], assets: [] })
+  // Import reissues identities; read the stored pair back by kind.
+  const [storedSource, storedDuplicate] = panelsOf(moment).filter((panel) => panel.type === type)
+  return { source: storedSource, duplicate: storedDuplicate, moment }
 }
 
 describe('runtime panel independence acceptance contract', () => {
   it('Notes panels must have panelId-keyed editor state and persistence', async () => {
-    const setup = twoPanelsOfType(await createMoment('Notes runtime acceptance'), 'notes')
+    const setup = await twoPanelsOfType('Notes runtime acceptance', 'notes')
     expect(setup.duplicate.id).not.toBe(setup.source.id)
     expect(setup.duplicate.config).toEqual(setup.source.config)
-    await saveMoment(setup.moment)
     const reloaded = await getMoment(setup.moment.id)
     expect(panelsOf(reloaded).map((panel) => panel.id)).toEqual(expect.arrayContaining([setup.source.id, setup.duplicate.id]))
 
@@ -51,10 +55,9 @@ describe('runtime panel independence acceptance contract', () => {
   })
 
   it('slideshow panels must have panelId-keyed images, settings, and playback state', async () => {
-    const setup = twoPanelsOfType(await createMoment('Slideshow runtime acceptance'), 'slideshow')
+    const setup = await twoPanelsOfType('Slideshow runtime acceptance', 'slideshow')
     expect(setup.duplicate.id).not.toBe(setup.source.id)
     expect(setup.duplicate.config).toEqual(setup.source.config)
-    await saveMoment(setup.moment)
     const reloaded = await getMoment(setup.moment.id)
     expect(panelsOf(reloaded).filter((panel) => panel.type === 'slideshow')).toHaveLength(2)
 
@@ -74,27 +77,19 @@ describe('runtime panel independence acceptance contract', () => {
     const source = panelsOf(moment).find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')!
     expect(duplicatePanel(source)).toBeNull()
 
-    const attempted: Moment = { ...moment, legacy: { panels: [...panelsOf(moment), { ...source, id: 'spotify-second' }], canvas: null } }
-    await saveMoment(attempted)
-    const reloaded = await getMoment(moment.id)
-    expect(panelsOf(reloaded).filter((panel) => panel.type === 'spotify')).toHaveLength(1)
-    expect(panelsOf(reloaded).find((panel) => panel.type === 'spotify')?.id).toBe(source.id)
-
     const imported = await importMomentContent({
       name: 'Multiple Spotify import',
-      panels: attempted.legacy!.panels,
+      panels: [...panelsOf(moment), { ...source, id: 'spotify-second' }],
       canvas: null,
-      slideshow: panelsOf(attempted).find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')!.config,
-      spotify: source.config.playlist,
-      activeNoteSourceId: null,
       notes: [],
       assets: [],
     })
     expect(panelsOf(imported).filter((panel) => panel.type === 'spotify')).toHaveLength(1)
+    expect(panelsOf(await getMoment(imported.id)).filter((panel) => panel.type === 'spotify')).toHaveLength(1)
   })
 
   it('initialization must restore every panel by ID, not select the first panel of a type', async () => {
-    const setup = twoPanelsOfType(await createMoment('Initialization runtime acceptance'), 'notes')
+    const setup = await twoPanelsOfType('Initialization runtime acceptance', 'notes')
     const runtime = await runtimeContract()
     expect(runtime?.restorePanel, 'Initialization must restore each persistent panel by panelId').toEqual(expect.any(Function))
     runtime?.restorePanel(setup.source.id)
@@ -102,7 +97,7 @@ describe('runtime panel independence acceptance contract', () => {
   })
 
   it('duplicated panels must expose independent runtime access by panelId', async () => {
-    const setup = twoPanelsOfType(await createMoment('Duplication runtime acceptance'), 'slideshow')
+    const setup = await twoPanelsOfType('Duplication runtime acceptance', 'slideshow')
     expect(setup.source.id).not.toBe(setup.duplicate.id)
     expect(setup.duplicate.config).toEqual(setup.source.config)
 

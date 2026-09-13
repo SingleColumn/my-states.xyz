@@ -1,11 +1,11 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { T, type TLStoreSnapshot } from 'tldraw'
-import { createPanelProps, legacyContentFromDocument, panelFromShape, shapesForLegacyContent } from './panelStore'
-import { panelContentValidator, panelShapeMigrations, panelShapeProps } from './panelShapeSchema'
+import { createPanelProps, draftFromDocument, panelFromShape, shapesForDraft } from './panelStore'
+import { panelContentValidator, panelShapeProps } from './panelShapeSchema'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
 import { createPanel } from './storage'
-import type { LegacyCanvasContent, Panel } from './types'
+import type { MomentDraft, Panel } from './types'
 
 const propsValidator = T.object(panelShapeProps)
 
@@ -25,21 +25,10 @@ describe('panel shape schema', () => {
     expect(() => panelContentValidator.validate({ type: 'video', config: {} })).toThrow()
     expect(() => propsValidator.validate({ ...createPanelProps('notes'), visible: 'yes' })).toThrow()
   })
-
-  it('migrates a shape written with only size and panelId', () => {
-    const migration = panelShapeMigrations.sequence[0]
-    if (!('up' in migration) || typeof migration.down !== 'function') throw new Error('expected a props migration with a down step')
-    expect(migration.id).toBe('com.tldraw.shape.music-panel/1')
-    const legacy: Record<string, unknown> = { w: 460, h: 720, panelId: 'panel-1' }
-    migration.up(legacy)
-    expect(() => propsValidator.validate(legacy)).not.toThrow()
-    migration.down(legacy)
-    expect(legacy).toEqual({ w: 460, h: 720, panelId: 'panel-1' })
-  })
 })
 
-describe('pre-snapshot content and the document', () => {
-  const legacy: LegacyCanvasContent = {
+describe('the draft and the document', () => {
+  const draft: MomentDraft = {
     panels: [
       { ...createPanel('spotify'), id: 'panel-music', focusView: true },
       { ...createPanel('slideshow'), id: 'panel-images', visible: false },
@@ -55,7 +44,7 @@ describe('pre-snapshot content and the document', () => {
   }
 
   it('gives every panel a shape, in the saved order, with its saved place or its default one', () => {
-    const shapes = shapesForLegacyContent(legacy)
+    const shapes = shapesForDraft(draft)
     expect(shapes.map((shape) => shape.props?.panelId)).toEqual(['panel-notes', 'panel-music', 'panel-images'])
     expect(shapes[0]).toMatchObject({ x: 300, y: 10, rotation: 0.1, isLocked: false, props: { w: 500, h: 600, visible: true, focusView: false, panel: { type: 'notes', config: { activeNoteId: 'note-1' } } } })
     expect(shapes[1]).toMatchObject({ x: -700, props: { w: 400, focusView: true, panel: { type: 'spotify' } } })
@@ -65,7 +54,7 @@ describe('pre-snapshot content and the document', () => {
   })
 
   it('reads the same content back out of a document, in stacking order', () => {
-    const shapes = shapesForLegacyContent(legacy).map((shape, index) => ({
+    const shapes = shapesForDraft(draft).map((shape, index) => ({
       ...shape,
       typeName: 'shape',
       parentId: 'page:page',
@@ -74,7 +63,7 @@ describe('pre-snapshot content and the document', () => {
       meta: {},
     }))
     const document = { store: Object.fromEntries(shapes.map((shape) => [shape.id, shape])), schema: { schemaVersion: 2, sequences: {} } } as unknown as TLStoreSnapshot
-    const out = legacyContentFromDocument(document, { x: 1, y: 2, z: 0.5 })
+    const out = draftFromDocument(document, { x: 1, y: 2, z: 0.5 })
 
     expect(out.panels.map((panel) => panel.id)).toEqual(['panel-music', 'panel-images', 'panel-notes'])
     expect(out.canvas?.camera).toEqual({ x: 1, y: 2, z: 0.5 })
@@ -86,7 +75,7 @@ describe('pre-snapshot content and the document', () => {
   })
 
   it('hands out the same panel view while a shape keeps its props', () => {
-    const [shape] = shapesForLegacyContent(legacy)
+    const [shape] = shapesForDraft(draft)
     const record = { ...shape, typeName: 'shape', parentId: 'page:page', index: 'a1', opacity: 1, meta: {} } as never
     expect(panelFromShape(record)).toBe(panelFromShape({ ...(record as object), x: 999 } as never))
   })

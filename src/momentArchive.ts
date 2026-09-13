@@ -1,16 +1,15 @@
 import { strFromU8, strToU8, Unzip, UnzipInflate, zipSync } from 'fflate'
 import {
-  defaultSlideshowSettings,
   getNotes,
   getMoment,
   getMomentAssets,
   importMomentContent,
   momentLimits,
 } from './storage'
-import { legacyContentFromDocument } from './panelStore'
+import { draftFromDocument } from './panelStore'
 import type {
   CanvasState,
-  LegacyCanvasContent,
+  MomentDraft,
   Moment,
   Note,
   Panel,
@@ -19,7 +18,14 @@ import type {
   SpotifyPlaylistReference,
 } from './types'
 
-const FORMAT_VERSION = 1
+/**
+ * Version 2 is the first format written for the `my-states` database, on
+ * 2026-09-13. Version 1 files, written by earlier builds, are refused with a
+ * message that says so; that generation of saved work was discarded along
+ * with the browser data it came from. From version 2 on,
+ * a file this app exports is meant to stay openable by later versions.
+ */
+const FORMAT_VERSION = 2
 const maxNoteCount = 500
 const maxNoteBytes = 1024 * 1024
 const maxTotalNoteBytes = 10 * 1024 * 1024
@@ -34,18 +40,15 @@ const supportedImageTypes = new Set([
 ])
 
 interface MomentManifest {
-  formatVersion: 1
-  /** Named when moments were still sessions; kept so archives exported before the rename still import. */
-  session: {
+  formatVersion: typeof FORMAT_VERSION
+  moment: {
     name: string
     createdAt: number
     updatedAt: number
-    activeNoteId: string | null
   }
+  /** The moment's draft: panels and their layout, in the app's own terms. */
+  panels: Panel[]
   canvas: CanvasState | null
-  slideshow: SlideshowSettings
-  spotify: SpotifyPlaylistReference
-  panels?: Panel[]
   notes: Array<{
     id: string
     title: string
@@ -69,31 +72,24 @@ interface MomentManifest {
 export async function exportMomentArchive(momentId: string) {
   const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
   if (!moment) throw new Error('The selected moment no longer exists.')
-  // The archive keeps the pre-snapshot shape of a moment, so a file written by
-  // any version of the app opens in any other: the tldraw document is the
-  // app's persistence format, not its interchange format.
-  const { panels, canvas } = momentContentForArchive(moment)
+  // The archive carries a moment as a draft, in the app's own terms: the
+  // tldraw document is the app's persistence format, not its interchange
+  // format, so a change to tldraw's is not a change to the file.
+  const { panels, canvas } = draftForArchive(moment)
   // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
-  const slideshow = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
-  const spotify = panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
-  const notesPanel = panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')
-  const slideshowSettings = slideshow?.config ?? defaultSlideshowSettings
   const exportedAssets = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   validateExportContent(notes, exportedAssets)
 
   const files: Record<string, Uint8Array> = {}
   const manifest: MomentManifest = {
     formatVersion: FORMAT_VERSION,
-    session: {
+    moment: {
       name: moment.name,
       createdAt: moment.createdAt,
       updatedAt: moment.updatedAt,
-      activeNoteId: notesPanel?.config.activeNoteId ?? null,
     },
+    panels,
     canvas,
-    slideshow: slideshowSettings,
-    spotify: spotify?.config.playlist ?? { id: null, uri: null, name: null, url: null },
-    panels: panels.map((panel) => ({ ...panel, createdAt: moment.createdAt, updatedAt: moment.updatedAt })),
     notes: [],
     images: [],
   }
@@ -170,12 +166,9 @@ export async function importMomentArchive(file: File) {
   }))
 
   return importMomentContent({
-    name: manifest.session.name,
-    canvas: manifest.canvas,
-    slideshow: manifest.slideshow,
-    spotify: manifest.spotify,
+    name: manifest.moment.name,
     panels: manifest.panels,
-    activeNoteSourceId: manifest.session.activeNoteId,
+    canvas: manifest.canvas,
     notes,
     assets,
   })
@@ -185,7 +178,7 @@ export function downloadMomentArchive(blob: Blob, momentName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${safeFileStem(momentName)}.mix-session.zip`
+  link.download = `${safeFileStem(momentName)}.moment.zip`
   link.rel = 'noopener'
   document.body.appendChild(link)
   link.click()
@@ -193,9 +186,9 @@ export function downloadMomentArchive(blob: Blob, momentName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-function momentContentForArchive(moment: Moment): LegacyCanvasContent {
-  if (moment.document) return legacyContentFromDocument(moment.document, moment.camera)
-  return moment.legacy ?? { panels: [], canvas: null }
+function draftForArchive(moment: Moment): MomentDraft {
+  if (moment.document) return draftFromDocument(moment.document, moment.camera)
+  return moment.draft ?? { panels: [], canvas: null }
 }
 
 function validateExportContent(notes: Note[], assets: Array<MomentImage & { blob: Blob }>) {
@@ -283,10 +276,15 @@ function parseManifest(bytes: Uint8Array): MomentManifest {
 }
 
 function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Array>) {
-  if (!isRecord(manifest) || manifest.formatVersion !== FORMAT_VERSION) {
+  if (!isRecord(manifest)) throw new Error('This moment archive uses an unsupported format version.')
+  const formatVersion: unknown = manifest.formatVersion
+  if (formatVersion === 1) {
+    throw new Error('This file was exported by an earlier version of my-states and cannot be opened by this one.')
+  }
+  if (formatVersion !== FORMAT_VERSION) {
     throw new Error('This moment archive uses an unsupported format version.')
   }
-  if (!isMomentMetadata(manifest.session) || !isSlideshowSettings(manifest.slideshow) || !isPlaylistReference(manifest.spotify) || (manifest.panels !== undefined && !isPanels(manifest.panels))) {
+  if (!isMomentMetadata(manifest.moment) || !isPanels(manifest.panels)) {
     throw new Error('The moment manifest has invalid metadata.')
   }
   if (!isCanvasState(manifest.canvas) || !Array.isArray(manifest.notes) || !Array.isArray(manifest.images)) {
@@ -336,8 +334,10 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
   if (noteBytes > maxTotalNoteBytes || imageBytes > momentLimits.maxTotalImageBytes) {
     throw new Error('The archive exceeds the permitted moment size.')
   }
-  if (manifest.session.activeNoteId !== null && !noteIds.has(manifest.session.activeNoteId)) {
-    throw new Error('The active note is not included in the archive.')
+  for (const panel of manifest.panels) {
+    if (panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)) {
+      throw new Error('A Notes panel refers to a note that is not included in the archive.')
+    }
   }
   if (files.size !== referencedPaths.size) throw new Error('The archive contains unexpected files.')
 }
@@ -441,15 +441,14 @@ function isNullableDimension(value: unknown) {
   return value === null || (typeof value === 'number' && Number.isFinite(value) && value > 0)
 }
 
-function isMomentMetadata(value: unknown): value is MomentManifest['session'] {
+function isMomentMetadata(value: unknown): value is MomentManifest['moment'] {
   return (
     isRecord(value) &&
     typeof value.name === 'string' &&
     value.name.trim().length > 0 &&
     value.name.length <= 80 &&
     isTimestamp(value.createdAt) &&
-    isTimestamp(value.updatedAt) &&
-    (value.activeNoteId === null || isSafeId(value.activeNoteId))
+    isTimestamp(value.updatedAt)
   )
 }
 
@@ -492,7 +491,7 @@ function isCanvasState(value: unknown): value is CanvasState | null {
   return value.panels.every(
     (panel) =>
       isRecord(panel) &&
-      (isSafeId(panel.panelId) || ['spotify', 'slideshow', 'notes'].includes(panel.panelType as string)) &&
+      isSafeId(panel.panelId) &&
       ['x', 'y', 'w', 'h'].every((key) => typeof panel[key] === 'number' && Number.isFinite(panel[key] as number)) &&
       (panel.rotation === undefined || (typeof panel.rotation === 'number' && Number.isFinite(panel.rotation))) &&
       (panel.order === undefined || (typeof panel.order === 'number' && Number.isFinite(panel.order))),
@@ -504,9 +503,8 @@ function isPanels(value: unknown): value is Panel[] {
   const ids = new Set<string>()
   return value.every((panel) => {
     if (!isRecord(panel) || !isSafeId(panel.id) || ids.has(panel.id)) return false
-    if (panel.createdAt !== undefined && !isTimestamp(panel.createdAt)) return false
-    if (panel.updatedAt !== undefined && !isTimestamp(panel.updatedAt)) return false
     if (panel.visible !== undefined && typeof panel.visible !== 'boolean') return false
+    if (panel.focusView !== undefined && typeof panel.focusView !== 'boolean') return false
     ids.add(panel.id)
     if (panel.type === 'spotify') return isRecord(panel.config) && isPlaylistReference(panel.config.playlist)
     if (panel.type === 'slideshow') return isRecord(panel.config) && isSlideshowSettings(panel.config)

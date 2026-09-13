@@ -17,11 +17,11 @@ export function getPanelFocusViewSize(panelType: PanelType) {
 }
 
 export function isPanelInFocusView(panel: Pick<Panel, 'focusView'>) {
-  return panel.focusView === true
+  return panel.focusView
 }
 
 export function isPanelVisible(panel: Pick<Panel, 'visible'>) {
-  return panel.visible !== false
+  return panel.visible
 }
 
 export function resetPanelLayoutSize(layout: PanelLayout, panelType: PanelType): PanelLayout {

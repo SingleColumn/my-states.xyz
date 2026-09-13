@@ -1,14 +1,13 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
-import { createMoment, getMoment, saveMoment } from './storage'
+import { createMoment, getMoment } from './storage'
 
 describe('persistent panel identity', () => {
   it('assigns stable IDs and preserves them across reloads', async () => {
     const created = await createMoment('Stable IDs')
-    const ids = created.legacy!.panels.map((panel) => panel.id)
-    await saveMoment(created)
+    const ids = created.draft!.panels.map((panel) => panel.id)
     const reloaded = await getMoment(created.id)
-    expect(reloaded?.legacy?.panels.map((panel) => panel.id)).toEqual(ids)
+    expect(reloaded?.draft?.panels.map((panel) => panel.id)).toEqual(ids)
     expect(new Set(ids).size).toBe(ids.length)
   })
 

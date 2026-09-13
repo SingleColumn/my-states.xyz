@@ -9,7 +9,7 @@ import { PanelShape, PanelShapeUtil } from './PanelShape'
 import { getCanonicalPanelLayout, getPanelFocusViewSize, isPanelInFocusView } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { getPanelDefinition } from './panelRegistry'
-import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, shapesForLegacyContent, withPanelEdit, writePanelShape } from './panelStore'
+import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, shapesForDraft, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
 import { applyTheme, builtInTheme } from './theme'
@@ -105,10 +105,9 @@ function AppContent() {
   /**
    * Puts a moment on the canvas. A moment that has been opened before carries
    * tldraw's document and is loaded as it is, ids and all. One that has not
-   * (a new moment, an import, or one saved before the document was the unit
-   * of persistence) carries its panels in the older shape; they become
+   * (a new moment or an import) carries a draft of its panels; they become
    * shapes here, once, and the document that results is saved back so the
-   * older shape is never read again.
+   * draft is never read again.
    *
    * Loading is not something the user did on the canvas, so none of it goes
    * into the undo history, and whatever history there was is cleared: it
@@ -116,11 +115,11 @@ function AppContent() {
    */
   const restoreCanvas = useCallback((editor: Editor, moment: Moment) => {
     if (canvasMomentIdRef.current === moment.id) return
-    // Construct and validate legacy shapes before the editor transaction.
+    // Construct and validate the draft's shapes before the editor transaction.
     // On failure the old canvas and stored source remain intact.
-    let legacyShapes: ReturnType<typeof shapesForLegacyContent> | null = null
+    let draftShapes: ReturnType<typeof shapesForDraft> | null = null
     try {
-      legacyShapes = prepareCanvasRestore(editor.store, moment)
+      draftShapes = prepareCanvasRestore(editor.store, moment)
     } catch (error) {
       setCallbackStatus(error instanceof Error ? error.message : 'Could not open this moment. Its original data has been kept.')
       return
@@ -132,13 +131,13 @@ function AppContent() {
           loadSnapshot(editor.store, moment.document)
         } else {
           // Clear the whole outgoing document, including native shapes and
-          // other pages, before constructing a legacy moment's panels.
+          // other pages, before constructing the draft's panels.
           loadSnapshot(editor.store, createTLStore({ schema: editor.store.schema }).getStoreSnapshot())
-          editor.createShapes(legacyShapes!)
+          editor.createShapes(draftShapes!)
         }
         editor.selectNone()
         setSelectedPanelId(null)
-        const camera = moment.camera ?? moment.legacy?.canvas?.camera ?? null
+        const camera = moment.camera ?? moment.draft?.canvas?.camera ?? null
         if (camera) editor.setCamera(camera)
         else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
       }, { history: 'ignore', ignoreShapeLock: true }))
@@ -527,7 +526,7 @@ function AppContent() {
     onResetSelectedPanel: resetSelectedPanel,
     onResetPanelLayout: resetPanelLayout,
     canHideSelectedPanel: selectedPanelId !== null,
-    hiddenPanels: panels.all.filter((panel) => panel.visible === false).map((panel) => ({ id: panel.id, type: panel.type })),
+    hiddenPanels: panels.all.filter((panel) => !panel.visible).map((panel) => ({ id: panel.id, type: panel.type })),
     onHideSelectedPanel: hideSelectedPanel,
     onRestorePanel: restorePanel,
     onAddPanel: addPanel,

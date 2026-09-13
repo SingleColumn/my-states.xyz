@@ -1,7 +1,7 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { duplicatePanel } from './panelDuplication'
-import { createPanel, createMoment, getMoment, saveMoment } from './storage'
+import { createPanel, createDefaultPanels, getMoment, importMomentContent } from './storage'
 
 describe('panel duplication', () => {
   it('creates a fresh panel for each kind in the registry', () => {
@@ -31,13 +31,16 @@ describe('panel duplication', () => {
   })
 
   it('keeps a copy in a moment that has not yet been opened on a canvas', async () => {
-    const moment = await createMoment('Duplicate panels')
-    const source = moment.legacy!.panels.find((panel) => panel.type === 'notes')!
+    const panels = createDefaultPanels()
+    const source = panels.find((panel) => panel.type === 'notes')!
     const duplicate = duplicatePanel(source)
     if (!duplicate) throw new Error('Notes panel unexpectedly rejected for duplication')
-    await saveMoment({ ...moment, legacy: { panels: [...moment.legacy!.panels, duplicate], canvas: null } })
+    const moment = await importMomentContent({ name: 'Duplicate panels', panels: [...panels, duplicate], canvas: null, notes: [], assets: [] })
     const reloaded = await getMoment(moment.id)
-    expect(reloaded?.legacy?.panels.filter((panel) => panel.type === 'notes')).toHaveLength(2)
-    expect(reloaded?.legacy?.panels.find((panel) => panel.id === duplicate.id)).toEqual(duplicate)
+    const notesPanels = reloaded?.draft?.panels.filter((panel) => panel.type === 'notes') ?? []
+    expect(notesPanels).toHaveLength(2)
+    // Import reissues identities; the copy keeps its own configuration.
+    expect(new Set(notesPanels.map((panel) => panel.id)).size).toBe(2)
+    expect(notesPanels.map((panel) => panel.config)).toEqual([duplicate.config, duplicate.config])
   })
 })

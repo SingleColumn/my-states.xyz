@@ -40,13 +40,9 @@ export interface CanvasState {
 export interface PanelBase {
   /** Stable application identity; notes, image assets and folder handles are keyed by it. */
   id: string
-  /** Absent means visible for moments written before panel visibility existed. */
-  visible?: boolean
-  /** Absent means the full panel. True keeps the Music panel's playback controls only. */
-  focusView?: boolean
-  /** Only present on panels read from an archive or a pre-snapshot moment. */
-  createdAt?: number
-  updatedAt?: number
+  visible: boolean
+  /** True keeps the Music panel's playback controls only. */
+  focusView: boolean
 }
 
 /**
@@ -81,8 +77,7 @@ export interface ImageMetadata {
 
 export interface MomentImage extends ImageMetadata {
   id: string
-  /** The owning moment. Moments were called sessions when this field was persisted; it keeps that name so stored records and indexes stay valid. */
-  sessionId: string
+  momentId: string
   panelId?: string
   filename: string
   mimeType: string
@@ -97,7 +92,7 @@ export interface ImageAttribution {
 
 export interface ImageItem extends ImageMetadata {
   id: string
-  sessionId: string | null
+  momentId: string | null
   filename: string
   mimeType: string
   url: string
@@ -108,7 +103,7 @@ export interface ImageItem extends ImageMetadata {
 
 export interface Note {
   id: string
-  sessionId: string
+  momentId: string
   title: string
   content: string
   createdAt: number
@@ -121,20 +116,12 @@ export interface SpotifyTokens {
   expiresAt: number
 }
 
-export interface SpotifyPlaylistState {
-  id: string | null
-  uri: string | null
-  name: string | null
-  url: string | null
-  lastSearch: string
-}
-
 export interface SpotifyPlaylistReference {
   id: string | null
   uri: string | null
   name: string | null
   url: string | null
-  /** Optional: moments saved before the panel showed playlist artwork have none. */
+  /** Filled in by the artwork lookup after the playlist is chosen. */
   image?: string | null
 }
 
@@ -145,11 +132,13 @@ export interface CanvasCamera {
 }
 
 /**
- * Panels and layout in the shape they had before the canvas document was the
- * unit of persistence. Kept on a moment only until it is first opened, when
- * the canvas builds the document from it; also the shape every archive uses.
+ * A moment's canvas in the app's own terms: its panels and where they sit.
+ * Every new or imported moment starts as a draft; the canvas turns it into
+ * a tldraw document the first time it opens the moment, and the draft is
+ * dropped. The exported archive carries a draft too, so the file format
+ * stays in the app's vocabulary rather than tldraw's.
  */
-export interface LegacyCanvasContent {
+export interface MomentDraft {
   panels: Panel[]
   canvas: CanvasState | null
 }
@@ -157,16 +146,16 @@ export interface LegacyCanvasContent {
 export interface Moment {
   id: string
   name: string
-  schemaVersion: 3
+  schemaVersion: 1
   createdAt: number
   updatedAt: number
   camera: CanvasCamera | null
   /**
    * tldraw's document: every panel shape with its geometry, order and
-   * configuration. Null until the canvas has upgraded `legacy`.
+   * configuration. Null until the canvas has built it from `draft`.
    */
   document: TLStoreSnapshot | null
-  legacy?: LegacyCanvasContent
+  draft?: MomentDraft
 }
 
 export interface MomentSummary {

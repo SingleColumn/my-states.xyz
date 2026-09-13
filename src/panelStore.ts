@@ -1,5 +1,5 @@
 import { T, createShapeId, type Editor, type TLShape, type TLShapePartial, type TLStoreSnapshot } from 'tldraw'
-import type { CanvasCamera, LegacyCanvasContent, Panel, PanelConfigs, PanelLayout, PanelType } from './types'
+import type { CanvasCamera, MomentDraft, Panel, PanelConfigs, PanelLayout, PanelType } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeProps, type PanelShape, type PanelShapeProps } from './panelShapeSchema'
 import { getPanelDefinition } from './panelRegistry'
@@ -192,21 +192,21 @@ export function createPanelShape<Type extends PanelType>(
 }
 
 /**
- * The shapes a pre-snapshot moment's panels become. Every panel gets a shape,
- * hidden ones too (locked, so the canvas leaves them alone); a panel with no
- * saved layout takes its type's default place.
+ * The shapes a draft's panels become. Every panel gets a shape, hidden ones
+ * too (locked, so the canvas leaves them alone); a panel with no saved
+ * layout takes its type's default place.
  */
-export function shapesForLegacyContent(legacy: LegacyCanvasContent): TLShapePartial<PanelShape>[] {
-  const ids = new Set(legacy.panels.map((panel) => panel.id))
-  if (ids.size !== legacy.panels.length || ids.has('')) throw new Error('This moment contains missing or duplicate panel identities. Its original data has been kept.')
-  const layouts = new Map((legacy.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
+export function shapesForDraft(draft: MomentDraft): TLShapePartial<PanelShape>[] {
+  const ids = new Set(draft.panels.map((panel) => panel.id))
+  if (ids.size !== draft.panels.length || ids.has('')) throw new Error('This moment contains missing or duplicate panel identities. Its original data has been kept.')
+  const layouts = new Map((draft.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
   // A panel with no saved layout goes after every panel that has one.
   const orderOf = (panel: Panel) => layouts.get(panel.id)?.order ?? Number.MAX_SAFE_INTEGER
-  const ordered = [...legacy.panels].sort((left, right) => orderOf(left) - orderOf(right))
+  const ordered = [...draft.panels].sort((left, right) => orderOf(left) - orderOf(right))
   return ordered.map((panel) => {
     const definition = getPanelDefinition(panel.type)
     const layout = layouts.get(panel.id)
-    const visible = panel.visible !== false
+    const visible = panel.visible
     const shape = {
       id: createShapeId(),
       type: PANEL_SHAPE_TYPE as typeof PANEL_SHAPE_TYPE,
@@ -220,7 +220,7 @@ export function shapesForLegacyContent(legacy: LegacyCanvasContent): TLShapePart
         panelId: panel.id,
         panel: { type: panel.type, config: panel.config } as PanelShapeProps['panel'],
         visible,
-        focusView: panel.focusView === true,
+        focusView: panel.focusView,
       },
     }
     // Validate before entering editor.run: an exception inside a tldraw
@@ -234,10 +234,10 @@ export function shapesForLegacyContent(legacy: LegacyCanvasContent): TLShapePart
 }
 
 /**
- * The pre-snapshot shape of a document, for the archive format and for
- * anything that wants panels without an editor. Order is stacking order.
+ * A document as a draft, for the archive format and for anything that wants
+ * panels without an editor. Order is stacking order.
  */
-export function legacyContentFromDocument(document: TLStoreSnapshot, camera: CanvasCamera | null): LegacyCanvasContent {
+export function draftFromDocument(document: TLStoreSnapshot, camera: CanvasCamera | null): MomentDraft {
   const shapes = Object.values(document.store)
     .filter((record): record is PanelShape => record.typeName === 'shape' && (record as TLShape).type === PANEL_SHAPE_TYPE)
     .sort((left, right) => (left.index < right.index ? -1 : left.index > right.index ? 1 : 0))
