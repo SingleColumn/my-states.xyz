@@ -197,6 +197,8 @@ export function createPanelShape<Type extends PanelType>(
  * saved layout takes its type's default place.
  */
 export function shapesForLegacyContent(legacy: LegacyCanvasContent): TLShapePartial<PanelShape>[] {
+  const ids = new Set(legacy.panels.map((panel) => panel.id))
+  if (ids.size !== legacy.panels.length || ids.has('')) throw new Error('This moment contains missing or duplicate panel identities. Its original data has been kept.')
   const layouts = new Map((legacy.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
   // A panel with no saved layout goes after every panel that has one.
   const orderOf = (panel: Panel) => layouts.get(panel.id)?.order ?? Number.MAX_SAFE_INTEGER
@@ -205,9 +207,9 @@ export function shapesForLegacyContent(legacy: LegacyCanvasContent): TLShapePart
     const definition = getPanelDefinition(panel.type)
     const layout = layouts.get(panel.id)
     const visible = panel.visible !== false
-    return {
+    const shape = {
       id: createShapeId(),
-      type: PANEL_SHAPE_TYPE,
+      type: PANEL_SHAPE_TYPE as typeof PANEL_SHAPE_TYPE,
       x: layout?.x ?? definition.defaultLayout.x,
       y: layout?.y ?? definition.defaultLayout.y,
       rotation: layout?.rotation ?? 0,
@@ -221,6 +223,13 @@ export function shapesForLegacyContent(legacy: LegacyCanvasContent): TLShapePart
         focusView: panel.focusView === true,
       },
     }
+    // Validate before entering editor.run: an exception inside a tldraw
+    // transaction marks the editor as crashed, even if the caller catches it.
+    T.object(panelShapeProps).validate(shape.props)
+    T.number.validate(shape.x)
+    T.number.validate(shape.y)
+    T.number.validate(shape.rotation)
+    return shape
   })
 }
 

@@ -16,11 +16,16 @@ import type {
   SpotifyTokens,
 } from './types'
 import { createId } from './utils'
-import { PANEL_TYPES, defaultSlideshowSettings, defaultSpotifyPlaylistReference, getPanelDefinition, isPanelType } from './panelRegistry'
+import { PANEL_TYPES, defaultSlideshowSettings, defaultSpotifyPlaylistReference, getPanelDefinition } from './panelRegistry'
+import { normalizeLegacyPanel, normalizePlaylist, normalizeSlideshowSettings } from './panelMigration'
+export { normalizeSlideshowSettings } from './panelMigration'
 
 export { DEFAULT_SLIDESHOW_ZOOM, defaultSlideshowSettings, defaultSpotifyPlaylistReference } from './panelRegistry'
 
-const DB_VERSION = 2
+// Old builds open version 2 and destructively reinterpret schema-3 moments.
+// The exclusive version upgrade waits for those connections to close; a
+// later old build fails to open instead of silently overwriting user data.
+const DB_VERSION = 3
 const MOMENT_SCHEMA_VERSION = 3
 // Moments were called sessions when these keys, the store and index names below, and the
 // createId('session') prefix were first persisted. They keep the old spelling so existing
@@ -93,6 +98,10 @@ export interface ImportedMomentContent {
 }
 
 interface MusicImagesCanvasDb extends DBSchema {
+  momentMigrationBackups: {
+    key: string
+    value: StoredMoment
+  }
   notes: {
     key: string
     value: Note
@@ -147,8 +156,22 @@ interface MusicImagesCanvasDb extends DBSchema {
   }
 }
 
+let storageStatus: string | null = null
+const storageStatusListeners = new Set<(status: string | null) => void>()
+export const getStorageStatus = () => storageStatus
+export function subscribeStorageStatus(listener: (status: string | null) => void) {
+  storageStatusListeners.add(listener)
+  listener(storageStatus)
+  return () => { storageStatusListeners.delete(listener) }
+}
+function reportStorageStatus(status: string | null) {
+  storageStatus = status
+  storageStatusListeners.forEach((listener) => listener(status))
+}
+
 const dbPromise = openDB<MusicImagesCanvasDb>('music-images-canvas', DB_VERSION, {
   upgrade(db, oldVersion, _newVersion, transaction) {
+    void transaction.done.catch(() => {})
     if (!db.objectStoreNames.contains('notes')) {
       const notes = db.createObjectStore('notes', { keyPath: 'id' })
       notes.createIndex('by-updated', 'updatedAt')
@@ -177,7 +200,38 @@ const dbPromise = openDB<MusicImagesCanvasDb>('music-images-canvas', DB_VERSION,
       db.createObjectStore('preferences', { keyPath: 'key' })
       db.createObjectStore('sessionDirectoryHandles', { keyPath: 'sessionId' })
     }
+    if (oldVersion < 3) {
+      db.createObjectStore('momentMigrationBackups', { keyPath: 'id' })
+      // Cursor requests keep the upgrade transaction alive. If any copy
+      // fails, IndexedDB aborts the entire upgrade (including its version).
+      const request = transaction.objectStore('sessions').openCursor()
+      void (async () => {
+        let cursor = await request
+        while (cursor) {
+          await transaction.objectStore('momentMigrationBackups').put(cursor.value)
+          cursor = await cursor.continue()
+        }
+      })().catch(() => {
+        // A failed request may already have aborted the transaction.
+        try { transaction.abort() } catch { /* already aborted */ }
+      })
+    }
   },
+  blocked() {
+    reportStorageStatus('Save your work in other my-states tabs, then close those tabs to finish this update. Your stored moments have not been changed.')
+  },
+  blocking() {
+    // Do not close automatically: this page may have unsaved edits.
+    reportStorageStatus('Another my-states version is waiting. Save or export your work here, then close this tab.')
+  },
+  terminated() {
+    reportStorageStatus('The connection to your saved work was interrupted. Keep this tab open and export your work if possible.')
+  },
+})
+void dbPromise.then(() => reportStorageStatus(null), (error: unknown) => {
+  reportStorageStatus(error instanceof DOMException && error.name === 'VersionError'
+    ? 'Your saved work needs a newer version of my-states. Open the latest version; do not clear your browser data.'
+    : 'Could not open your saved work. Your browser data has not been removed.')
 })
 
 function readLegacyJson<T>(key: string, fallback: T): T {
@@ -217,11 +271,11 @@ function makeMoment(name: string, legacy: LegacyCanvasContent = { panels: create
     updatedAt: now,
     camera: legacy.canvas?.camera ?? null,
     document: null,
-    legacy,
+    legacy: { ...legacy, panels: legacy.panels.map((panel) => normalizeLegacyPanel(panel, false)) },
   }
 }
 
-let initialization: Promise<{ moments: Moment[]; activeMomentId: string }> | null = null
+let initialization: Promise<{ moments: MomentSummary[]; activeMomentId: string }> | null = null
 
 /**
  * Runs once per page. The work below is check-then-create, and React's
@@ -264,7 +318,7 @@ async function runInitialization() {
     await tx.done
   }
 
-  let moments = await getMoments()
+  let moments = await getMomentSummaries()
   if (!moments.length) {
     const moment = await createMoment('My first moment')
     moments = [moment]
@@ -284,10 +338,10 @@ async function runInitialization() {
 
 async function migrateLegacyState(db: Awaited<typeof dbPromise>): Promise<MigrationVerificationRecord> {
   const legacyCanvas = readLegacyJson<CanvasState | null>(legacyKeys.canvas, null)
-  const legacySlideshow = { ...defaultSlideshowSettings, ...readLegacyJson(legacyKeys.slideshow, defaultSlideshowSettings) }
+  const legacySlideshow = normalizeSlideshowSettings(readLegacyJson(legacyKeys.slideshow, defaultSlideshowSettings), false)
   const legacyLastNoteId = window.localStorage.getItem(legacyKeys.lastNoteId)
   const legacyNotes = await db.getAll('notes')
-  const legacySpotify = legacyPlaylistReference()
+  const legacySpotify = normalizePlaylist(legacyPlaylistReference())
   const legacyFolder = await db.get('directoryHandles', 'slideshow')
   const hasLegacyState = Boolean(legacyCanvas || legacyNotes.length || legacySlideshow.folderName || legacySpotify.id)
   const activeNoteId = legacyNotes.some((note) => note.id === legacyLastNoteId) ? legacyLastNoteId : legacyNotes[0]?.id ?? null
@@ -377,7 +431,7 @@ function parseMigrationVerification(value: string): MigrationVerificationRecord 
 export async function getMoments(): Promise<Moment[]> {
   const db = await dbPromise
   const moments = await db.getAllFromIndex('sessions', 'by-updated')
-  const normalized = await Promise.all(moments.map(async (moment) => normalizeAndPersistMoment(moment, await db.countFromIndex('assets', 'by-session', moment.id))))
+  const normalized = await Promise.all(moments.map(async (moment) => normalizeStoredMoment(moment, await db.countFromIndex('assets', 'by-session', moment.id))))
   return normalized.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -386,7 +440,12 @@ export async function getMoment(momentId: string) {
   const moment = await db.get('sessions', momentId)
   if (!moment) return undefined
   const assetCount = await db.countFromIndex('assets', 'by-session', momentId)
-  return normalizeAndPersistMoment(moment, assetCount)
+  return normalizeStoredMoment(moment, assetCount)
+}
+
+/** Read-only recovery access. Never repair or overwrite a backup on read. */
+export async function getMomentMigrationBackup(momentId: string) {
+  return (await dbPromise).get('momentMigrationBackups', momentId)
 }
 
 export async function createMoment(name: string) {
@@ -406,11 +465,37 @@ export async function saveMoment(moment: Moment) {
 /** The canvas has produced the document for a moment; the pre-snapshot content has done its job. */
 export async function saveMomentDocument(momentId: string, document: NonNullable<Moment['document']>, camera: Moment['camera']) {
   const db = await dbPromise
-  const current = await db.get('sessions', momentId)
-  if (!current) return undefined
-  const { legacy: _legacy, ...rest } = current as Moment
-  const next: Moment = { ...rest, schemaVersion: MOMENT_SCHEMA_VERSION, document, camera, updatedAt: Date.now() }
-  await db.put('sessions', next)
+  const tx = db.transaction(['sessions', 'momentMigrationBackups'], 'readwrite')
+  // Observe tx.done even if an individual request rejects first.
+  const done = tx.done
+  void done.catch(() => {})
+  const current = await tx.objectStore('sessions').get(momentId)
+  if (!current) throw new Error('This moment no longer exists. Your changes have not been saved.')
+  if (current.schemaVersion > MOMENT_SCHEMA_VERSION) throw new Error('This moment needs a newer version of my-states.')
+  if ((current.schemaVersion < 3 || (current as Moment).legacy) && !await tx.objectStore('momentMigrationBackups').get(momentId)) {
+    await tx.objectStore('momentMigrationBackups').put(current)
+  }
+  const next: Moment = {
+    id: current.id, name: current.name, createdAt: current.createdAt,
+    schemaVersion: MOMENT_SCHEMA_VERSION, document, camera, updatedAt: Date.now(),
+  }
+  await tx.objectStore('sessions').put(next)
+  await done
+  return next
+}
+
+/** Rename only metadata, in the same transaction as its read. A slow rename
+ * must never replace a newer canvas with an older whole-moment object. */
+export async function renameMoment(momentId: string, name: string) {
+  const db = await dbPromise
+  const tx = db.transaction('sessions', 'readwrite')
+  const done = tx.done
+  void done.catch(() => {})
+  const current = await tx.store.get(momentId)
+  if (!current) throw new Error('This moment no longer exists.')
+  const next = { ...current, name: normalizeMomentName(name), updatedAt: Date.now() }
+  await tx.store.put(next)
+  await done
   return next
 }
 
@@ -447,7 +532,7 @@ export async function importMomentContent(content: ImportedMomentContent) {
     sourceNoteIds.add(note.id)
   }
 
-  const sourcePanels = enforceSpotifySingletonPanels((content.panels ?? createDefaultPanels()).filter((panel) => isPanelType(panel.type)))
+  const sourcePanels = enforceSpotifySingletonPanels((content.panels ?? createDefaultPanels()).map((panel) => normalizeLegacyPanel(panel, content.assets.length > 0)))
   const panelIdMap = new Map(sourcePanels.map((panel) => [panel.id, createId('panel')]))
   const importedPanels = sourcePanels.map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...panel }) => ({ ...panel, id: panelIdMap.get(panel.id)! }) as Panel)
   const moment = makeMoment(content.name, {
@@ -460,13 +545,20 @@ export async function importMomentContent(content: ImportedMomentContent) {
     const slideshowPanel = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     if (slideshowPanel) slideshowPanel.config = normalizeSlideshowSettings(content.slideshow, content.assets.length > 0)
     const spotifyPanel = panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
-    if (spotifyPanel) spotifyPanel.config.playlist = content.spotify
+    if (spotifyPanel) spotifyPanel.config.playlist = normalizePlaylist(content.spotify)
   }
   const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
   if (!content.panels || (content.panels.filter((panel) => panel.type === 'notes').length ?? 0) <= 1) {
     const notesPanel = panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')
     if (notesPanel) notesPanel.config.activeNoteId = content.activeNoteSourceId ? noteIdMap.get(content.activeNoteSourceId) ?? null : null
+  } else {
+    for (const panel of panels) {
+      if (panel.type === 'notes') panel.config.activeNoteId = panel.config.activeNoteId ? noteIdMap.get(panel.config.activeNoteId) ?? null : null
+    }
   }
+  // Overrides above are also input, not trusted merely because they came
+  // from a successfully unpacked archive.
+  moment.legacy!.panels = panels.map((panel) => normalizeLegacyPanel(panel, content.assets.length > 0))
 
   const tx = (await dbPromise).transaction(['sessions', 'notes', 'assets'], 'readwrite')
   await tx.objectStore('sessions').put(moment)
@@ -493,7 +585,12 @@ export async function importMomentContent(content: ImportedMomentContent) {
 }
 
 export async function getMomentSummaries(): Promise<MomentSummary[]> {
-  return (await getMoments()).map(({ id, name, updatedAt }) => ({ id, name, updatedAt }))
+  // Listing is metadata-only. One damaged or newer unopened document must
+  // not prevent a user from finding the other moments, or trigger migration.
+  const db = await dbPromise
+  return (await db.getAllFromIndex('sessions', 'by-updated'))
+    .map(({ id, name, updatedAt }) => ({ id, name, updatedAt }))
+    .sort((left, right) => right.updatedAt - left.updatedAt)
 }
 
 export async function getNotes(momentId: string) {
@@ -586,25 +683,6 @@ function validateAssets(assets: Array<Omit<MomentImage, 'sessionId'> & { blob: B
   }
 }
 
-export function normalizeSlideshowSettings(
-  slideshow: SlideshowSettings | (Omit<SlideshowSettings, 'imageSource'> & { imageSource?: unknown }),
-  hasMomentAssets: boolean,
-): SlideshowSettings {
-  const candidate = slideshow.imageSource
-  let imageSource: SlideshowSettings['imageSource']
-  if (candidate && typeof candidate === 'object' && 'type' in candidate) {
-    const sourceRecord = candidate as Record<string, unknown>
-    const type = sourceRecord.type
-    if (type === 'session-assets') imageSource = { type: 'session-assets' }
-    else if (type === 'bundled' && typeof sourceRecord.collectionId === 'string') {
-      imageSource = { type: 'bundled', collectionId: sourceRecord.collectionId }
-    } else imageSource = { type: 'none' }
-  } else {
-    imageSource = hasMomentAssets ? { type: 'session-assets' } : { type: 'none' }
-  }
-  return { ...defaultSlideshowSettings, ...slideshow, imageSource }
-}
-
 /** What a moment looked like in each earlier schema, as far as this code still reads it. */
 export type StoredMoment = Moment | (Omit<Moment, 'schemaVersion' | 'camera' | 'document' | 'legacy'> & {
   schemaVersion: 1 | 2
@@ -619,37 +697,33 @@ export type StoredMoment = Moment | (Omit<Moment, 'schemaVersion' | 'camera' | '
  * Brings a stored moment up to the current schema. Schema 3 holds a tldraw
  * document; a schema 2 moment carried its panels and layout directly, and a
  * schema 1 moment carried one of each panel's settings at its top level.
- * Both become schema 3 moments with legacy content, which the canvas turns
- * into a document on first open.
+ * Both become in-memory schema 3 moments with legacy content. Reading never
+ * rewrites the original. Only a successful document save replaces it.
  */
-async function normalizeAndPersistMoment(raw: StoredMoment, assetCount: number): Promise<Moment> {
-  const db = await dbPromise
-  if (raw.schemaVersion >= MOMENT_SCHEMA_VERSION) {
+function normalizeStoredMoment(raw: StoredMoment, assetCount: number): Moment {
+  if (raw.schemaVersion > MOMENT_SCHEMA_VERSION) throw new Error('This moment needs a newer version of my-states. Its stored data has not been changed.')
+  if (![1, 2, 3].includes(raw.schemaVersion)) throw new Error('This moment has an unsupported format. Its stored data has not been changed.')
+  if (raw.schemaVersion === MOMENT_SCHEMA_VERSION) {
     const current = raw as Moment
     if (!current.legacy) return current
-    const normalized = enforceSpotifySingleton(current)
-    const slideshow = normalized.legacy?.panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
-    if (slideshow) slideshow.config = normalizeSlideshowSettings(slideshow.config, assetCount > 0)
-    if (normalized !== current) await db.put('sessions', normalized)
-    return normalized
+    return enforceSpotifySingleton({ ...current, legacy: { ...current.legacy, panels: current.legacy.panels.map((panel) => normalizeLegacyPanel(panel, assetCount > 0)) } })
   }
 
   const earlier = raw as Exclude<StoredMoment, Moment>
+  if (earlier.schemaVersion === 2 && !Array.isArray(earlier.panels)) throw new Error('This moment is missing its saved panels. Its original data has been kept.')
   let legacy: LegacyCanvasContent
   if (earlier.schemaVersion === 2 && Array.isArray(earlier.panels)) {
-    const panels = enforceSpotifySingletonPanels(earlier.panels.filter((panel) => isPanelType(panel.type)))
-    const slideshow = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
-    if (slideshow) slideshow.config = normalizeSlideshowSettings(slideshow.config, assetCount > 0)
+    const panels = enforceSpotifySingletonPanels(earlier.panels.map((panel) => normalizeLegacyPanel(panel, assetCount > 0)))
     legacy = { panels, canvas: migrateCanvas(earlier.canvas ?? null, panels) }
   } else {
     const panels = createDefaultPanels()
     const spotify = panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')!
     const slideshow = panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')!
     const notes = panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
-    spotify.config.playlist = earlier.spotify ?? defaultSpotifyPlaylistReference
+    spotify.config.playlist = normalizePlaylist(earlier.spotify)
     slideshow.config = normalizeSlideshowSettings(earlier.slideshow ?? defaultSlideshowSettings, assetCount > 0)
     notes.config.activeNoteId = earlier.activeNoteId ?? null
-    legacy = { panels, canvas: migrateCanvas(earlier.canvas ?? null, panels) }
+    legacy = { panels: panels.map((panel) => normalizeLegacyPanel(panel, assetCount > 0)), canvas: migrateCanvas(earlier.canvas ?? null, panels) }
   }
   const migrated: Moment = {
     id: raw.id,
@@ -661,7 +735,6 @@ async function normalizeAndPersistMoment(raw: StoredMoment, assetCount: number):
     document: null,
     legacy,
   }
-  await db.put('sessions', migrated)
   return migrated
 }
 

@@ -60,7 +60,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     <select
       className="app-dropdown note-select"
       value={activeNote?.id ?? ''}
-      onChange={(event) => void handleDocumentSelection(event.target.value)}
+      onChange={(event) => void handleDocumentSelection(event.target.value).catch(() => {})}
       aria-label="Choose a note"
     >
       <option value={newDocumentSelectValue}>
@@ -113,7 +113,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             type="button"
             title="New note"
             onClick={() => {
-              void notes.createNote(panelId)
+              void notes.createNote(panelId).catch(() => {})
             }}
           >
             <FilePlus2 size={18} />
@@ -137,7 +137,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             onClick={() => {
               if (!activeNote) return
               const confirmed = window.confirm(`Delete "${getDisplayNoteTitle(activeNote)}"?`)
-              if (confirmed) void notes.deleteNote(activeNote.id, panelId)
+              if (confirmed) void notes.deleteNote(activeNote.id, panelId).catch(() => {})
             }}
           >
             <Trash2 size={18} />
@@ -206,7 +206,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               className="card-icon-button is-primary is-wide empty-note-button"
               type="button"
               onClick={() => {
-                void notes.createNote(panelId)
+                void notes.createNote(panelId).catch(() => {})
               }}
             >
               <FilePlus2 size={18} />

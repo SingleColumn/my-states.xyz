@@ -113,6 +113,7 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
 
     async dispatch(command) {
       const state = getState()
+      if (state.moments.isOperationPending()) throw new Error('Please wait for the current moment operation to finish.')
       switch (command.kind) {
         case 'panel.update': {
           requirePanel(command.panelId)

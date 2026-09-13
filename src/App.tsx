@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Editor, Tldraw, TLShape, getSnapshot, loadSnapshot, type TLUiOverrides } from 'tldraw'
+import { Editor, Tldraw, TLShape, createTLStore, getSnapshot, loadSnapshot, type TLUiOverrides } from 'tldraw'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { AppChromeMenuPanel, AppChromePropsProvider, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
@@ -14,6 +14,8 @@ import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
 import { applyTheme, builtInTheme } from './theme'
 import { debounce } from './utils'
+import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
+import { registerHiddenCanvasPersistence } from './canvasPersistence'
 import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
@@ -47,8 +49,10 @@ function AppContent() {
   const [fullScreenPanelId, setFullScreenPanelId] = useState<string | null>(null)
   const helpAboutReturnFocusRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<Editor | null>(null)
+  const appRootRef = useRef<HTMLElement | null>(null)
   const chromeRectRef = useRef<AppChromeRect | null>(null)
   const restoringCanvasRef = useRef(false)
+  const canvasMomentIdRef = useRef<string | null>(null)
   const persistCanvasRef = useRef<ReturnType<typeof debounce> | null>(null)
   const momentsRef = useRef(moments)
   const panelsRef = useRef(panels)
@@ -111,24 +115,36 @@ function AppContent() {
    * could only refer to shapes of another moment.
    */
   const restoreCanvas = useCallback((editor: Editor, moment: Moment) => {
+    if (canvasMomentIdRef.current === moment.id) return
+    // Construct and validate legacy shapes before the editor transaction.
+    // On failure the old canvas and stored source remain intact.
+    let legacyShapes: ReturnType<typeof shapesForLegacyContent> | null = null
+    try {
+      legacyShapes = prepareCanvasRestore(editor.store, moment)
+    } catch (error) {
+      setCallbackStatus(error instanceof Error ? error.message : 'Could not open this moment. Its original data has been kept.')
+      return
+    }
     restoringCanvasRef.current = true
     try {
-      editor.run(() => {
+      withRestoreWriteAccess(editor, () => editor.run(() => {
         if (moment.document) {
           loadSnapshot(editor.store, moment.document)
         } else {
-          const existing = listPanelShapes(editor)
-          if (existing.length) editor.deleteShapes(existing.map((shape) => shape.id))
-          editor.createShapes(shapesForLegacyContent(moment.legacy ?? { panels: [], canvas: null }))
+          // Clear the whole outgoing document, including native shapes and
+          // other pages, before constructing a legacy moment's panels.
+          loadSnapshot(editor.store, createTLStore({ schema: editor.store.schema }).getStoreSnapshot())
+          editor.createShapes(legacyShapes!)
         }
         editor.selectNone()
         setSelectedPanelId(null)
         const camera = moment.camera ?? moment.legacy?.canvas?.camera ?? null
         if (camera) editor.setCamera(camera)
         else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
-      }, { history: 'ignore', ignoreShapeLock: true })
+      }, { history: 'ignore', ignoreShapeLock: true }))
       editor.clearHistory()
-      if (!moment.document) momentsRef.current.updateDocument(getSnapshot(editor.store).document, editor.getCamera())
+      canvasMomentIdRef.current = moment.id
+      if (!moment.document) momentsRef.current.updateDocument(moment.id, getSnapshot(editor.store).document, editor.getCamera())
     } finally {
       restoringCanvasRef.current = false
     }
@@ -158,8 +174,9 @@ function AppContent() {
     // document snapshot is what the moment keeps. Loads are the one exception
     // and are fenced off by the ref.
     const saveNow = () => {
-      if (restoringCanvasRef.current) return
-      momentsRef.current.updateDocument(getSnapshot(editor.store).document, editor.getCamera())
+      const momentId = canvasMomentIdRef.current
+      if (restoringCanvasRef.current || !momentId) return
+      momentsRef.current.updateDocument(momentId, getSnapshot(editor.store).document, editor.getCamera())
     }
     const persist = debounce(saveNow, 300)
     persistCanvasRef.current = persist
@@ -172,17 +189,37 @@ function AppContent() {
       persist.cancel()
       saveNow()
     })
-    const saveWhenLeaving = () => {
-      if (document.visibilityState === 'hidden') {
-        persist.cancel()
-        saveNow()
-      }
+    const unregisterCanvasPause = moments.registerCanvasPause((paused) => {
+      editor.updateInstanceState({ isReadonly: paused })
+      if (appRootRef.current) appRootRef.current.inert = paused
+    })
+    const unregisterCanvasRestore = moments.registerCanvasRestore((moment) => {
+      prepareCanvasRestore(editor.store, moment)
+      return () => restoreCanvas(editor, moment)
+    })
+    const blockInputWhileSaving = (event: Event) => {
+      if (!momentsRef.current.isOperationPending()) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
     }
-    document.addEventListener('visibilitychange', saveWhenLeaving)
+    // Portalled menus/editors can sit outside the inert canvas root.
+    const inputEvents = ['pointerdown', 'keydown', 'beforeinput']
+    inputEvents.forEach((name) => window.addEventListener(name, blockInputWhileSaving, true))
+    const saveWhenLeaving = () => {
+      // pagehide is unconditional; visibilityState need not be hidden yet.
+      // This flush includes notes and immediately captures the canvas.
+      void momentsRef.current.flush().catch(() => {})
+    }
+    const saveWhenHidden = () => { if (document.visibilityState === 'hidden') saveWhenLeaving() }
+    document.addEventListener('visibilitychange', saveWhenHidden)
     window.addEventListener('pagehide', saveWhenLeaving)
     const removeStoreListener = editor.store.listen(() => {
       if (!restoringCanvasRef.current) persist()
     }, { source: 'all', scope: 'all' })
+    const removeHiddenPersistence = registerHiddenCanvasPersistence(editor.store,
+      () => document.visibilityState === 'hidden' && !restoringCanvasRef.current,
+      () => { persist.cancel(); saveNow() },
+    )
 
     // A copy of a panel shape arrives with the original's panelId (tldraw's
     // duplicate and alt-drag both copy props verbatim). The copy gets its own
@@ -232,16 +269,21 @@ function AppContent() {
     window.myStates = createCanvasApi(editor, () => appStateRef.current)
     return () => {
       unregisterCanvasFlush()
+      unregisterCanvasPause()
+      unregisterCanvasRestore()
+      inputEvents.forEach((name) => window.removeEventListener(name, blockInputWhileSaving, true))
       persist.cancel()
       removeCopyHandler()
       persistCanvasRef.current = null
       removeStoreListener()
+      removeHiddenPersistence()
       removeSelectionListener()
-      document.removeEventListener('visibilitychange', saveWhenLeaving)
+      document.removeEventListener('visibilitychange', saveWhenHidden)
       window.removeEventListener('pagehide', saveWhenLeaving)
       window.removeEventListener('keydown', handleKeyDown)
       delete window.myStates
       editorRef.current = null
+      canvasMomentIdRef.current = null
       panelsRef.current.attachEditor(null)
       panelsRef.current.markRestored(null)
       setIsCanvasReady(false)
@@ -548,12 +590,13 @@ function AppContent() {
     [],
   )
 
-  if (!moments.isReady) {
-    return <main className="app-root app-loading">Loading moments...</main>
+  if (!moments.isReady || !moments.activeMoment) {
+    return <main className="app-root app-loading" role="status">{moments.error ?? 'Loading moments...'}</main>
   }
 
   return (
     <main
+      ref={appRootRef}
       className="app-root"
       data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
       style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
@@ -565,7 +608,7 @@ function AppContent() {
       </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
-      {moments.error ? <div className="callback-toast">{moments.error}</div> : null}
+      {moments.error ? <div className="callback-toast" role="alert">{moments.error} <button type="button" onClick={() => { void moments.flush().catch(() => {}) }}>Retry save</button></div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>
   )

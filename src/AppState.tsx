@@ -33,8 +33,9 @@ import {
   saveDirectoryHandle,
   savePanelDirectoryHandle,
   saveNote,
-  saveMoment,
+  renameMoment,
   saveMomentDocument,
+  subscribeStorageStatus,
   saveSpotifyTokens,
   setActiveMomentId,
   momentLimits,
@@ -42,6 +43,10 @@ import {
 } from './storage'
 import { downloadMomentArchive, exportMomentArchive, importMomentArchive } from './momentArchive'
 import { createId } from './utils'
+import { SaveQueue } from './saveQueue'
+import { persistNoteSnapshot } from './notePersistence'
+import { MomentOperation } from './momentOperation'
+import { withRestoreWriteAccess } from './canvasRestore'
 import { createImageItemsFromBundledCollection } from './imageCollections'
 import { getPanelDefinition } from './panelRegistry'
 import {
@@ -80,6 +85,7 @@ const supportedImagePattern = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i
 
 interface NotesState {
   notes: Note[]
+  error: string | null
   setActiveNoteContent(content: string, panelId: string): void
   setActiveNoteTitle(title: string, panelId: string): void
   createNote(panelId: string): Promise<void>
@@ -145,10 +151,14 @@ interface MomentsState {
   exportActive(): Promise<void>
   importFile(file: File): Promise<void>
   /** The canvas has changed; this is the whole of what a moment persists about it. */
-  updateDocument(document: TLStoreSnapshot, camera: CanvasCamera): void
-  /** The active moment as last written, document included; activeMoment in state omits the document. */
+  updateDocument(momentId: string, document: TLStoreSnapshot, camera: CanvasCamera): void
+  /** Last successfully read/written moment, including its document. React's activeMoment is not updated on every document save. */
   getActiveMomentRecord(): Moment | null
   registerCanvasFlush(flush: () => void | Promise<void>): () => void
+  registerCanvasPause(pause: (paused: boolean) => void): () => void
+  registerCanvasRestore(prepare: (moment: Moment) => (() => void)): () => void
+  isOperationPending(): boolean
+  flush(): Promise<void>
 }
 
 /**
@@ -185,7 +195,7 @@ const AppStateContext = createContext<AppStateValue | null>(null)
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const momentCore = useMomentState()
   const panels = usePanelsState(momentCore.activeMoment?.id ?? null)
-  const notes = useNotesState(momentCore.activeMoment, panels)
+  const notes = useNotesState(momentCore.activeMoment, panels, momentCore.operation)
   const slideshow = useSlideshowState(momentCore.activeMoment, panels)
   const spotify = useSpotifyState(momentCore.activeMoment, panels)
 
@@ -194,39 +204,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       isReady: momentCore.isReady,
       moments: momentCore.moments,
       activeMoment: momentCore.activeMoment,
-      error: momentCore.error,
-      create: async (name) => {
+      error: momentCore.error ?? notes.error,
+      create: (name) => momentCore.operation.run(async () => {
         await notes.flush()
         await momentCore.flush()
         await momentCore.create(name)
-      },
-      open: async (momentId) => {
+      }),
+      open: (momentId) => momentCore.operation.run(async () => {
         await notes.flush()
         await momentCore.flush()
         await momentCore.open(momentId)
-      },
-      rename: momentCore.rename,
-      remove: async (momentId) => {
+      }),
+      rename: (name) => momentCore.operation.run(() => momentCore.rename(name)),
+      remove: (momentId) => momentCore.operation.run(async () => {
         await notes.flush()
         await momentCore.flush()
         await momentCore.remove(momentId)
-      },
-      exportActive: async () => {
+      }),
+      exportActive: () => momentCore.operation.run(async () => {
         await notes.flush()
         if (!momentCore.activeMoment) throw new Error('No moment is open.')
         await momentCore.flush()
         const blob = await exportMomentArchive(momentCore.activeMoment.id)
         downloadMomentArchive(blob, momentCore.activeMoment.name)
-      },
-      importFile: async (file) => {
+      }),
+      importFile: (file) => momentCore.operation.run(async () => {
         await notes.flush()
         await momentCore.flush()
         const imported = await importMomentArchive(file)
         await momentCore.open(imported.id)
-      },
+      }),
       updateDocument: momentCore.updateDocument,
       getActiveMomentRecord: momentCore.getActiveMomentRecord,
       registerCanvasFlush: momentCore.registerCanvasFlush,
+      registerCanvasPause: (pause) => momentCore.operation.registerPause(pause),
+      registerCanvasRestore: momentCore.registerCanvasRestore,
+      isOperationPending: () => momentCore.operation.isBusy,
+      flush: async () => {
+        // Start both now: a lifecycle event must not wait for notes before
+        // taking the canvas snapshot (the page may be leaving).
+        await Promise.all([notes.flush(), momentCore.flush()])
+      },
     }),
     [notes, momentCore],
   )
@@ -256,7 +274,9 @@ function usePanelsState(activeMomentId: string | null): PanelsState {
     all,
     isReady,
     get: (panelId) => (editor ? getPanelFromEditor(editor, panelId) : undefined),
-    updateConfig: (panelId, patch, options) => { if (editor) writePanelConfig(editor, panelId, patch, options) },
+    // Readonly pauses tldraw's user tools, not a trusted app operation that
+    // is completing while input is held (for example selecting a note).
+    updateConfig: (panelId, patch, options) => { if (editor) withRestoreWriteAccess(editor, () => { writePanelConfig(editor, panelId, patch, options) }) },
     setVisible: (panelId, visible) => { if (editor) writePanelVisible(editor, panelId, visible) },
     setFocusView: (panelId, focusView) => { if (editor) writePanelFocusView(editor, panelId, focusView) },
     add: (type) => {
@@ -276,12 +296,16 @@ function useMomentState() {
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const activeMomentRef = useRef<Moment | null>(null)
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the moment. Keep this tab open and try again.')))
+  const [operation] = useState(() => new MomentOperation())
   const canvasFlushRef = useRef<(() => void | Promise<void>) | null>(null)
+  const canvasRestoreRef = useRef<((moment: Moment) => (() => void)) | null>(null)
 
   const refreshSummaries = useCallback(async () => {
     setMoments(await getMomentSummaries())
   }, [])
+
+  useEffect(() => subscribeStorageStatus((status) => { if (status) setError(status) }), [])
 
   useEffect(() => {
     let cancelled = false
@@ -306,30 +330,6 @@ function useMomentState() {
     }
   }, [])
 
-  const persist = useCallback(async (moment: Moment) => {
-    saveQueueRef.current = saveQueueRef.current.then(async () => {
-      const saved = await saveMoment(moment)
-      if (activeMomentRef.current?.id === saved.id) {
-        activeMomentRef.current = saved
-        setActiveMoment(saved)
-      }
-    })
-    await saveQueueRef.current
-    await refreshSummaries()
-  }, [refreshSummaries])
-
-  const patchActiveMoment = useCallback(
-    (patch: (current: Moment) => Moment) => {
-      const current = activeMomentRef.current
-      if (!current) return
-      const next = patch(current)
-      activeMomentRef.current = next
-      setActiveMoment(next)
-      void persist(next).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the moment.'))
-    },
-    [persist],
-  )
-
   const registerCanvasFlush = useCallback((flush: () => void | Promise<void>) => {
     canvasFlushRef.current = flush
     return () => {
@@ -337,19 +337,34 @@ function useMomentState() {
     }
   }, [])
 
-  const flush = useCallback(async () => {
-    await canvasFlushRef.current?.()
-    await saveQueueRef.current
+  const registerCanvasRestore = useCallback((prepare: (moment: Moment) => (() => void)) => {
+    canvasRestoreRef.current = prepare
+    return () => { if (canvasRestoreRef.current === prepare) canvasRestoreRef.current = null }
   }, [])
 
-  const loadMoment = useCallback(async (momentId: string) => {
+  const flush = useCallback(async () => {
+    // Invoke synchronously so visibility/pagehide captures changes even if
+    // tldraw has not delivered its animation-frame listener yet.
+    const canvasFlush = canvasFlushRef.current?.()
+    await canvasFlush
+    await saveQueue.flush()
+  }, [saveQueue])
+
+  const loadMoment = useCallback(async (momentId: string, flushCurrent = true) => {
     const moment = await getMoment(momentId)
     if (!moment) throw new Error('The requested moment no longer exists.')
+    const restore = canvasRestoreRef.current?.(moment)
+    // Input is paused by the enclosing moment operation. Take one final
+    // snapshot before committing the active preference and ref handoff.
+    if (flushCurrent) await flush()
     await setActiveMomentId(momentId)
     activeMomentRef.current = moment
+    // Finish the editor handoff while the operation still owns the input
+    // pause, not in a later React effect after input has been released.
+    restore?.()
     setActiveMoment(moment)
     setError(null)
-  }, [])
+  }, [flush])
 
   const open = useCallback(async (momentId: string) => {
     await flush()
@@ -365,45 +380,54 @@ function useMomentState() {
   const rename = useCallback(async (name: string) => {
     const current = activeMomentRef.current
     if (!current) return
-    const next = await saveMoment({ ...current, name })
-    activeMomentRef.current = next
-    setActiveMoment(next)
+    saveQueue.enqueue(`name:${current.id}`, async () => {
+      const saved = await renameMoment(current.id, name)
+      if (activeMomentRef.current?.id === saved.id) {
+        activeMomentRef.current = { ...activeMomentRef.current, name: saved.name, updatedAt: saved.updatedAt }
+        setActiveMoment((active) => active?.id === saved.id ? { ...active, name: saved.name, updatedAt: saved.updatedAt } : active)
+      }
+    })
+    await saveQueue.flush()
     await refreshSummaries()
-  }, [refreshSummaries])
+  }, [refreshSummaries, saveQueue])
 
   const remove = useCallback(async (momentId: string) => {
     const removingActive = activeMomentRef.current?.id === momentId
     await deleteStoredMoment(momentId)
+    if (removingActive) activeMomentRef.current = null
     const remaining = await getMomentSummaries()
     setMoments(remaining)
     if (!removingActive) return
 
     if (remaining[0]) {
-      await loadMoment(remaining[0].id)
+      await loadMoment(remaining[0].id, false)
       return
     }
 
     const replacement = await createStoredMoment('My first moment')
     setMoments(await getMomentSummaries())
-    await loadMoment(replacement.id)
+    await loadMoment(replacement.id, false)
   }, [loadMoment])
 
   // The document changes on every drag and every edit, so it is kept on the
   // ref and in the database and not in React state: nothing renders from it,
   // and a state update here would re-render every panel on each change.
-  const updateDocument = useCallback((document: TLStoreSnapshot, camera: CanvasCamera) => {
-    const current = activeMomentRef.current
-    if (!current) return
-    const { legacy: _legacy, ...rest } = current
-    activeMomentRef.current = { ...rest, document, camera }
-    saveQueueRef.current = saveQueueRef.current.then(async () => {
-      const saved = await saveMomentDocument(current.id, document, camera)
-      if (saved && activeMomentRef.current?.id === saved.id) activeMomentRef.current = { ...activeMomentRef.current, updatedAt: saved.updatedAt }
-    }).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the moment.'))
-  }, [])
+  const updateDocument = useCallback((momentId: string, document: TLStoreSnapshot, camera: CanvasCamera) => {
+    // A delayed listener from the outgoing canvas must not save into the
+    // destination, or resurrect a moment the user has just removed.
+    if (activeMomentRef.current?.id !== momentId) return
+    saveQueue.enqueue(`document:${momentId}`, async () => {
+      const saved = await saveMomentDocument(momentId, document, camera)
+      // This ref describes committed storage, not an optimistic snapshot.
+      // The queue retains unsaved snapshots independently for retry.
+      if (activeMomentRef.current?.id === saved.id) activeMomentRef.current = saved
+      setError(null)
+    })
+  }, [saveQueue])
 
   return {
     isReady,
+    operation,
     moments,
     activeMoment,
     error,
@@ -413,25 +437,36 @@ function useMomentState() {
     remove,
     updateDocument,
     getActiveMomentRecord: () => activeMomentRef.current,
-    patchActiveMoment,
     registerCanvasFlush,
+    registerCanvasRestore,
     flush,
   }
 }
 
-function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
+function useNotesState(moment: Moment | null, panels: PanelsState, operation: MomentOperation): NotesState {
   const [notes, setNotes] = useState<Note[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save your note. Keep this tab open and try again.')))
   const panelsRef = useRef(panels)
   panelsRef.current = panels
+  const runNoteOperation = useCallback((work: () => Promise<void>) => operation.run(work).catch((caught) => {
+    setError(caught instanceof Error ? caught.message : 'Could not finish the note operation. Your unsaved draft has been kept.')
+    throw caught
+  }), [operation])
 
   const persistPanelNote = useCallback(async (panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
     const note = state.activeNote
-    if (!note || !state.dirty) return
-    state.dirty = false
-    await saveNote(note)
-    setNotes((current) => [note, ...current.filter((candidate) => candidate.id !== note.id)].sort((a, b) => b.updatedAt - a.updatedAt))
-  }, [])
+    if (note && state.dirty) {
+      // Each panel's draft needs its own acknowledgement, even when two
+      // panels refer to the same note. Coalescing by note id loses one ack.
+      saveQueue.enqueue(`${panelId}:${note.id}`, async () => {
+        await persistNoteSnapshot(state, note, saveNote)
+        setError(null)
+      })
+    }
+    await saveQueue.flush()
+  }, [saveQueue])
 
   const flush = useCallback(async (panelId?: string) => {
     const panelIds = panelId
@@ -474,11 +509,11 @@ function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
         getNotesPanelRuntimeState(panel.id).activeNote = selected
       }
     }
-    void load()
+    void load().catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not load your notes.'))
 
     return () => {
       cancelled = true
-      void flush()
+      void flush().catch(() => {})
     }
   }, [flush, loadKey])
 
@@ -507,12 +542,13 @@ function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
     if (state.saveTimer !== null) window.clearTimeout(state.saveTimer)
     state.saveTimer = window.setTimeout(() => {
       state.saveTimer = null
-      void persistPanelNote(panelId)
+      void persistPanelNote(panelId).catch(() => {})
     }, 500)
   }, [persistPanelNote])
 
-  const createNote = useCallback(async (panelId: string) => {
+  const createNote = useCallback((panelId: string) => runNoteOperation(async () => {
     if (!moment) return
+    await flush(panelId)
     const now = Date.now()
     const note: Note = {
       id: createId('note'),
@@ -527,17 +563,19 @@ function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
     state.activeNote = note
     setNotes((current) => [note, ...current])
     panels.updateConfig<'notes'>(panelId, { activeNoteId: note.id })
-  }, [panels, moment])
+  }), [panels, moment, flush, runNoteOperation])
 
   const selectNote = useCallback((id: string, panelId: string) => {
     const next = notes.find((note) => note.id === id)
     if (!next) return
-    void flush(panelId)
-    getNotesPanelRuntimeState(panelId).activeNote = next
-    panels.updateConfig<'notes'>(panelId, { activeNoteId: next.id })
-  }, [flush, notes, panels])
+    void runNoteOperation(async () => {
+      await flush(panelId)
+      getNotesPanelRuntimeState(panelId).activeNote = next
+      panels.updateConfig<'notes'>(panelId, { activeNoteId: next.id })
+    }).catch(() => {})
+  }, [flush, notes, panels, runNoteOperation])
 
-  const deleteNote = useCallback(async (id: string, panelId: string) => {
+  const deleteNote = useCallback((id: string, panelId: string) => runNoteOperation(async () => {
     await flush(panelId)
     await deleteStoredNote(id)
     const nextNotes = notes.filter((note) => note.id !== id)
@@ -548,7 +586,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
       state.activeNote = next
       panels.updateConfig<'notes'>(panelId, { activeNoteId: next?.id ?? null })
     }
-  }, [flush, notes, panels])
+  }), [flush, notes, panels, runNoteOperation])
 
   const setActiveNoteContent = useCallback((content: string, panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
@@ -570,7 +608,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState): NotesState {
     scheduleSave(panelId)
   }, [scheduleSave])
 
-  return { notes, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
+  return { notes, error, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
