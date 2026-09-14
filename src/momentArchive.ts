@@ -75,7 +75,15 @@ export async function exportMomentArchive(momentId: string) {
   // The archive carries a moment as a draft, in the app's own terms: the
   // tldraw document is the app's persistence format, not its interchange
   // format, so a change to tldraw's is not a change to the file.
-  const { panels, canvas } = draftForArchive(moment)
+  const { panels: draftPanels, canvas } = draftForArchive(moment)
+  const noteIds = new Set(notes.map((note) => note.id))
+  // A Notes panel can be left pointing at a note that no longer exists (a
+  // second panel showing a note deleted through a different one). Import
+  // rejects that reference outright, so a moment carrying it must not be
+  // allowed to produce a backup it cannot itself restore.
+  const panels = draftPanels.map((panel) => panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)
+    ? { ...panel, config: { activeNoteId: null } }
+    : panel)
   // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
   const exportedAssets = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   validateExportContent(notes, exportedAssets)

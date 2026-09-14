@@ -169,7 +169,7 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
           return
         case 'note.select':
           requirePanel(command.panelId)
-          state.notes.selectNote(command.noteId, command.panelId)
+          await state.notes.selectNote(command.noteId, command.panelId)
           return
         case 'note.setTitle':
           requirePanel(command.panelId)

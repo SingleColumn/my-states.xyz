@@ -1,4 +1,5 @@
 import './test/setup'
+import { openDB } from 'idb'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { describe, expect, it, vi } from 'vitest'
 import { exportMomentArchive, importMomentArchive } from './momentArchive'
@@ -13,6 +14,7 @@ import {
   saveMomentAssets,
   saveSpotifyTokens,
   momentLimits,
+  MOMENT_SCHEMA_VERSION,
 } from './storage'
 import type { CanvasState, Moment, Panel } from './types'
 
@@ -177,6 +179,42 @@ describe('portable moment archives', () => {
 
     const oversized = { size: momentLimits.maxArchiveBytes + 1, arrayBuffer: vi.fn() } as unknown as File
     await expect(importMomentArchive(oversized)).rejects.toThrow('exceeds the 260 MB limit')
+  })
+
+  it('sanitizes a Notes panel pointing at a note the moment no longer has, rather than exporting a backup that cannot be restored', async () => {
+    // Two Notes panels can end up pointing at the same note; deleting it
+    // through one panel does not clear the other's reference (a separate,
+    // pre-existing bug). Simulate that state directly, since import's own
+    // remap would otherwise heal it before this code ever saw it.
+    const defaultPanels = createDefaultPanels()
+    const notesPanel = defaultPanels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
+    const danglingPanels: Panel[] = [
+      ...defaultPanels.filter((panel) => panel.type !== 'notes'),
+      { ...notesPanel, config: { activeNoteId: 'ghost-note' } },
+      { ...notesPanel, id: 'notes-panel-two', config: { activeNoteId: 'ghost-note' } },
+    ]
+    const moment: Moment = {
+      id: 'dangling-reference',
+      name: 'Dangling reference',
+      schemaVersion: MOMENT_SCHEMA_VERSION,
+      createdAt: 1,
+      updatedAt: 2,
+      camera: null,
+      document: null,
+      draft: { panels: danglingPanels, canvas: null },
+    }
+    const db = await openDB('my-states')
+    await db.put('moments', moment)
+    db.close()
+
+    const entries = await archiveEntries(await exportMomentArchive(moment.id))
+    const exportedManifest = manifest(entries)
+    const notesPanels = exportedManifest.panels.filter((panel): panel is Panel<'notes'> => panel.type === 'notes')
+    expect(notesPanels).toHaveLength(2)
+    expect(notesPanels.every((panel) => panel.config.activeNoteId === null)).toBe(true)
+
+    const imported = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
+    expect(panelsOf(await getMoment(imported.id)).filter((panel) => panel.type === 'notes')).toHaveLength(2)
   })
 
   it('refuses a file from the earlier format with a message that says which version wrote it', async () => {

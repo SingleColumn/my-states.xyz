@@ -86,7 +86,7 @@ interface NotesState {
   setActiveNoteContent(content: string, panelId: string): void
   setActiveNoteTitle(title: string, panelId: string): void
   createNote(panelId: string): Promise<void>
-  selectNote(id: string, panelId: string): void
+  selectNote(id: string, panelId: string): Promise<void>
   deleteNote(id: string, panelId: string): Promise<void>
   flush(): Promise<void>
 }
@@ -312,12 +312,31 @@ function useMomentState() {
     async function load() {
       try {
         const initial = await initializeMoments()
-        const moment = await getMoment(initial.activeMomentId)
-        if (cancelled || !moment) return
-        activeMomentRef.current = moment
-        setActiveMoment(moment)
-        setMoments((await getMomentSummaries()).map((item) => item))
-        setError(null)
+        const summaries = await getMomentSummaries()
+        if (cancelled) return
+        let moment = await getMoment(initial.activeMomentId).catch(() => undefined)
+        let openError: string | null = null
+        // Listing is metadata-only and does not hit this, but opening the
+        // remembered active moment can still fail (schema mismatch, for
+        // instance). Fall back to another moment rather than stranding the
+        // user on the loading screen with nothing to open; the unreadable
+        // record is left untouched and stays listed for a build that can
+        // read it.
+        if (!moment) {
+          openError = 'Your last-opened moment could not be read. Its stored data has not been changed.'
+          const fallback = summaries.find((item) => item.id !== initial.activeMomentId)
+          if (fallback) {
+            moment = await getMoment(fallback.id).catch(() => undefined)
+            if (moment) await setActiveMomentId(fallback.id)
+          }
+        }
+        if (cancelled) return
+        setMoments(summaries)
+        if (moment) {
+          activeMomentRef.current = moment
+          setActiveMoment(moment)
+        }
+        setError(openError)
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load your moments.')
       } finally {
@@ -568,12 +587,16 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
 
   const selectNote = useCallback((id: string, panelId: string) => {
     const next = notes.find((note) => note.id === id)
-    if (!next) return
-    void runNoteOperation(async () => {
+    if (!next) return Promise.resolve()
+    // Returns the operation's own promise rather than firing it and
+    // forgetting: a caller through the command surface (canvasApi.ts) needs
+    // its await to mean the selection has actually landed, and its
+    // rejection to actually reach the caller.
+    return runNoteOperation(async () => {
       await flush(panelId)
       getNotesPanelRuntimeState(panelId).activeNote = next
       panels.updateConfig<'notes'>(panelId, { activeNoteId: next.id })
-    }).catch(() => {})
+    })
   }, [flush, notes, panels, runNoteOperation])
 
   const deleteNote = useCallback((id: string, panelId: string) => runNoteOperation(async () => {
@@ -581,11 +604,21 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     await deleteStoredNote(id)
     const nextNotes = notes.filter((note) => note.id !== id)
     setNotes(nextNotes)
-    const state = getNotesPanelRuntimeState(panelId)
-    if (state.activeNote?.id === id) {
-      const next = nextNotes[0] ?? null
-      state.activeNote = next
-      panels.updateConfig<'notes'>(panelId, { activeNoteId: next?.id ?? null })
+    const fallback = nextNotes[0] ?? null
+    // Every Notes panel that showed the deleted note follows it, not only
+    // the one the delete came through: a second panel left pointing at a
+    // vanished note is a dangling reference an export cannot come back
+    // from on import (see the archive validation in momentArchive.ts).
+    for (const panel of panels.all) {
+      if (panel.type !== 'notes' || panel.config.activeNoteId !== id) continue
+      const state = getNotesPanelRuntimeState(panel.id)
+      if (state.saveTimer !== null) {
+        window.clearTimeout(state.saveTimer)
+        state.saveTimer = null
+      }
+      state.activeNote = fallback
+      state.dirty = false
+      panels.updateConfig<'notes'>(panel.id, { activeNoteId: fallback?.id ?? null })
     }
   }), [flush, notes, panels, runNoteOperation])
 

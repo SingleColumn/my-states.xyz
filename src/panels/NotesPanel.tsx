@@ -53,7 +53,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
       return
     }
 
-    notes.selectNote(documentId, panelId)
+    await notes.selectNote(documentId, panelId)
   }
 
   const noteSelect = (
