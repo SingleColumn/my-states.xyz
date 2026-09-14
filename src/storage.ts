@@ -196,7 +196,7 @@ let initialization: Promise<{ moments: MomentSummary[]; activeMomentId: string }
 /**
  * Runs once per page. The work below is check-then-create, and React's
  * development double-invoke of effects (or two callers in one page) would
- * otherwise both find no moments and both create "My first moment". One
+ * otherwise both find no moments and both create "A new moment". One
  * promise is shared; a failure clears it so a reload can retry.
  */
 export function initializeMoments() {
@@ -215,7 +215,7 @@ async function runInitialization() {
 
   let moments = await getMomentSummaries()
   if (!moments.length) {
-    const moment = await createMoment('My first moment')
+    const moment = await createMoment('A new moment')
     moments = [moment]
   }
 

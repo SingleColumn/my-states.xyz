@@ -33,7 +33,7 @@ describe('the fresh database', () => {
     expect([...db.objectStoreNames].sort()).toEqual(['assets', 'directoryHandles', 'moments', 'notes', 'preferences'])
     const moments = await db.getAll('moments')
     expect(moments).toHaveLength(1)
-    expect(moments[0]).toMatchObject({ name: 'My first moment', schemaVersion: storage.MOMENT_SCHEMA_VERSION })
+    expect(moments[0]).toMatchObject({ name: 'A new moment', schemaVersion: storage.MOMENT_SCHEMA_VERSION })
     expect(await db.get('moments', earlier.moment.id)).toBeUndefined()
     db.close()
   })

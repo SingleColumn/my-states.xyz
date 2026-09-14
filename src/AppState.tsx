@@ -341,7 +341,7 @@ function useMomentState() {
           // once): fall back exactly as if there were none, rather than
           // leaving nothing to open and no way to start one. Their records
           // are left untouched and stay listed.
-          moment = await createStoredMoment('My first moment')
+          moment = await createStoredMoment('A new moment')
           if (cancelled) return
           summaries = await getMomentSummaries()
           await setActiveMomentId(moment.id)
@@ -438,7 +438,7 @@ function useMomentState() {
       return
     }
 
-    const replacement = await createStoredMoment('My first moment')
+    const replacement = await createStoredMoment('A new moment')
     setMoments(await getMomentSummaries())
     await loadMoment(replacement.id, false)
   }, [loadMoment])
