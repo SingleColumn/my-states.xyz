@@ -546,6 +546,22 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       if (!momentId) return
       const storedNotes = await getNotes(momentId)
       if (cancelled) return
+      // A moment with no notes yet (freshly created, or its last note just
+      // removed) opens with a blank note already active, rather than
+      // making the writer click through an empty state to start one.
+      if (storedNotes.length === 0 && notePanels.length > 0) {
+        const now = Date.now()
+        const blank: Note = { id: createId('note'), momentId, title: 'Untitled note', content: '', createdAt: now, updatedAt: now }
+        await saveNote(blank)
+        if (cancelled) return
+        setNotes([blank])
+        notesLoadedForRef.current = momentId
+        for (const panel of notePanels) {
+          getNotesPanelRuntimeState(panel.id).activeNote = blank
+          panelsRef.current.updateConfig<'notes'>(panel.id, { activeNoteId: blank.id })
+        }
+        return
+      }
       setNotes(storedNotes)
       notesLoadedForRef.current = momentId
       for (const panel of notePanels) {

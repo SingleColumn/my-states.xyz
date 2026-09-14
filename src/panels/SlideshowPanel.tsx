@@ -9,8 +9,7 @@ import { ImageAttributionOverlay } from './imageAttribution'
 import { panelContentProps } from '../panelSurface'
 
 const minSlideshowInterval = 250
-const maxSlideshowInterval = 5000
-const maxSpeed = 20
+const maxSlideshowInterval = 12000
 const focusHintDurationMs = 3500
 
 /* Escape has to reach exactly one panel. Several panels can be in focus view at
@@ -43,7 +42,6 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
   const [isSamplePickerOpen, setIsSamplePickerOpen] = useState(false)
-  const speedValue = intervalToSpeed(panelSettings.intervalMs)
   const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
   const attribution = currentImage?.attribution ?? null
   const [isFocusHintVisible, setIsFocusHintVisible] = useState(false)
@@ -243,8 +241,8 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             <button className={`card-icon-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={18} /></button>
           </div>
           <div className="range-grid">
-            <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={1} max={maxSpeed} step={1} value={speedValue} onChange={(event) => slideshow.updateSettings({ intervalMs: speedToInterval(Number(event.target.value)) }, panelId)} /></label>
-            <label><span>Fade <output className="slideshow-control-value">{panelSettings.transitionMs} ms</output></span><input type="range" min={0} max={2000} step={50} value={panelSettings.transitionMs} onChange={(event) => slideshow.updateSettings({ transitionMs: Number(event.target.value) }, panelId)} /></label>
+            <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={minSlideshowInterval} max={maxSlideshowInterval} step={250} value={panelSettings.intervalMs} onChange={(event) => slideshow.updateSettings({ intervalMs: Number(event.target.value) }, panelId)} /></label>
+            <label><span>Fade <output className="slideshow-control-value">{panelSettings.transitionMs} ms</output></span><input type="range" min={0} max={4000} step={50} value={panelSettings.transitionMs} onChange={(event) => slideshow.updateSettings({ transitionMs: Number(event.target.value) }, panelId)} /></label>
           </div>
           <div className="zoom-row">
             <label><span>Zoom <output className="slideshow-control-value">{Math.round(panelSettings.zoom * 100)}%</output></span><input type="range" min={0.5} max={2.4} step={0.05} value={panelSettings.zoom} onChange={(event) => slideshow.updateSettings({ zoom: Number(event.target.value) }, panelId)} /></label>
@@ -321,15 +319,4 @@ function CrossfadeImage({
       />
     </>
   )
-}
-
-function speedToInterval(speed: number) {
-  const normalized = (Math.max(1, Math.min(maxSpeed, speed)) - 1) / (maxSpeed - 1)
-  return Math.round(maxSlideshowInterval - normalized * (maxSlideshowInterval - minSlideshowInterval))
-}
-
-function intervalToSpeed(intervalMs: number) {
-  const clamped = Math.max(minSlideshowInterval, Math.min(maxSlideshowInterval, intervalMs))
-  const normalized = (maxSlideshowInterval - clamped) / (maxSlideshowInterval - minSlideshowInterval)
-  return Math.round(normalized * (maxSpeed - 1) + 1)
 }

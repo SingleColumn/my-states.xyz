@@ -44,7 +44,7 @@ export const defaultSlideshowSettings: SlideshowSettings = {
   imageSource: { type: 'none' },
   currentIndex: 0,
   intervalMs: 5000,
-  transitionMs: 450,
+  transitionMs: 1000,
   shuffle: false,
   zoom: DEFAULT_SLIDESHOW_ZOOM,
 }

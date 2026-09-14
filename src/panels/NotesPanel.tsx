@@ -56,7 +56,11 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     await notes.selectNote(documentId, panelId)
   }
 
-  const noteSelect = (
+  // A single note - even the blank one a fresh moment opens with - is not a
+  // choice yet, so a dropdown offering nothing but itself and "Create new
+  // note" is a control for a choice that doesn't exist.
+  const hasNotes = notes.notes.length > 1
+  const noteSelect = hasNotes ? (
     <select
       className="app-dropdown note-select"
       value={activeNote?.id ?? ''}
@@ -77,14 +81,14 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         </option>
       ))}
     </select>
-  )
+  ) : null
 
   return (
     <section className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}`}>
       <PanelHeader
         panelId={panelId}
         panelType="notes"
-        title="Notes"
+        title="Writing"
         leadingActions={
           <button
             className={`card-icon-button${isToolbarVisible ? ' is-active' : ''}`}
@@ -102,7 +106,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </button>
         }
       >
-          {isWritingMode ? (
+          {isWritingMode && hasNotes ? (
             <label className="writing-note-picker">
               <span className="sr-only">Choose a note</span>
               {noteSelect}
@@ -147,10 +151,12 @@ export function NotesPanel({ panelId }: { panelId: string }) {
       <div className={`panel-body notes-body${isWritingMode ? ' notes-body-writing' : ''}`}>
         {isWritingMode ? null : (
           <div className="notes-document-controls" {...panelContentProps}>
-            <label className="note-control-field">
-              <span>Choose a note</span>
-              {noteSelect}
-            </label>
+            {hasNotes ? (
+              <label className="note-control-field">
+                <span>Choose a note</span>
+                {noteSelect}
+              </label>
+            ) : null}
 
             <label className="note-control-field">
               <span>Note title</span>

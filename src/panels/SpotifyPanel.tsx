@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ChevronsDownUp,
   ChevronsUpDown,
@@ -49,10 +49,35 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   }
 
   const error = localError ?? spotify.error
+  const runRef = useRef(run)
+  runRef.current = run
+  const spotifyRef = useRef(spotify)
+  spotifyRef.current = spotify
 
   useEffect(() => {
     setPlaylistUrl(panelPlaylist.url ?? '')
   }, [moments.activeMoment?.id, panelPlaylist.url])
+
+  // A keyboard's dedicated volume keys reach the page as keydown events
+  // (code "AudioVolume*"), separate from the OS volume they also adjust.
+  // Following them here keeps the on-screen slider, and Spotify's own
+  // playback volume, in step with whichever one someone actually used.
+  useEffect(() => {
+    if (!spotify.tokens) return
+    function handleVolumeKey(event: KeyboardEvent) {
+      if (event.code !== 'AudioVolumeUp' && event.code !== 'AudioVolumeDown' && event.code !== 'AudioVolumeMute') return
+      event.preventDefault()
+      setVolume((current) => {
+        const next = event.code === 'AudioVolumeMute'
+          ? (current === 0 ? 70 : 0)
+          : Math.max(0, Math.min(100, current + (event.code === 'AudioVolumeUp' ? 5 : -5)))
+        void runRef.current(() => spotifyRef.current.setVolume(next / 100))
+        return next
+      })
+    }
+    window.addEventListener('keydown', handleVolumeKey)
+    return () => window.removeEventListener('keydown', handleVolumeKey)
+  }, [spotify.tokens])
 
   function resetFields() {
     setQuery('')

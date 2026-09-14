@@ -87,7 +87,7 @@ A moment is everything on the canvas at once: the camera and panel layout, the M
 
 The controls at the top left of the canvas manage moments. Pick one from **Open moment**, create one with **New moment**, and use **Rename moment** or **Delete moment** on the current one; the **…** button beside them repeats these actions. Deleting a moment removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
 
-Use **Export moment** to download a portable `.moment.zip` archive, and **Import moment** to load one. An imported moment brings its canvas layout, settings, Markdown notes, and embedded local images. Spotify login tokens and live playback data are never included.
+Use **Export moment** to download a portable `.moment.zip` archive, and **Import moment** to load one (in .zip format). An imported moment brings its canvas layout, settings, Markdown notes, and embedded local images. Spotify login tokens and live playback data are never included.
 
 Moments live in your browser's storage, not on a server. The browser keeps the moments themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a moment when you need a backup.
 

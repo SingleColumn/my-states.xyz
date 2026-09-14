@@ -1641,6 +1641,17 @@ input[type="range"] {
   outline: none;
 }
 
+/* MDXEditor's placeholder ships as a single, ellipsis-truncated line, sized
+   for a short field rather than this panel's default width. It shares the
+   editor's own content class, so it is picked out here by the "placeholder"
+   half of its module class name -- the one part of that name unlikely to
+   change with an MDXEditor upgrade, unlike the build-specific hash next to it. */
+.notes-editor-content[class*="placeholder"] {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .notes-editor-content p,
 .notes-editor-content ul,
 .notes-editor-content ol,
