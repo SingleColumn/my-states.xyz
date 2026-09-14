@@ -27,6 +27,18 @@ describe('panel shape schema', () => {
     expect(() => propsValidator.validate({ ...createPanelProps('notes'), visible: 'yes' })).toThrow()
   })
 
+  it('rejects a slideshow index, interval or transition that nothing downstream would correct', () => {
+    // AppState.tsx only resets currentIndex once it has outgrown the image
+    // count, never a negative one; a sub-100ms interval would put the
+    // slideshow's own timer in a near-continuous loop. Bounds live here, at
+    // the one gate every source of configuration writes through, not only
+    // in the archive importer.
+    const slideshow = createPanelProps('slideshow')
+    expect(() => panelContentValidator.validate({ type: 'slideshow', config: { ...slideshow.panel.config, currentIndex: -1 } })).toThrow()
+    expect(() => panelContentValidator.validate({ type: 'slideshow', config: { ...slideshow.panel.config, intervalMs: 1 } })).toThrow()
+    expect(() => panelContentValidator.validate({ type: 'slideshow', config: { ...slideshow.panel.config, transitionMs: -1 } })).toThrow()
+  })
+
   it('flags a schema that no longer matches the editor, and passes on the one storage actually uses', () => {
     expect(documentSchemaMatchesEditor(documentSchema)).toBe(true)
     const driftedSchema = { serialize: () => ({ ...documentSchema.serialize() as object, extra: true }) }

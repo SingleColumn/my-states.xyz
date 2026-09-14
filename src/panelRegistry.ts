@@ -72,12 +72,23 @@ export const imageCollectionSourceValidator: T.Validator<ImageCollectionSource> 
   bundled: T.object({ type: T.literal('bundled'), collectionId: T.string }),
 })
 
+// The floor a slideshow's own timer already enforces (SlideshowPanel.tsx);
+// stated here too so a value this low is rejected before it ever reaches a
+// running timer, not just clamped once one is already ticking.
+const MIN_SLIDESHOW_INTERVAL_MS = 100
+
 export const slideshowSettingsValidator: T.Validator<SlideshowSettings> = T.object({
   folderName: T.nullable(T.string),
   imageSource: imageCollectionSourceValidator,
-  currentIndex: T.integer,
-  intervalMs: T.positiveNumber,
-  transitionMs: T.number,
+  // A negative index is never corrected elsewhere (AppState.tsx only
+  // resets an index the image count has outgrown, not a negative one), so
+  // it is rejected here, at the one gate every source of configuration -
+  // live edit, import, agent command - writes through.
+  currentIndex: T.positiveInteger,
+  intervalMs: T.positiveNumber.check((value) => {
+    if (value < MIN_SLIDESHOW_INTERVAL_MS) throw new T.ValidationError(`Expected at least ${MIN_SLIDESHOW_INTERVAL_MS}ms, got ${value}`)
+  }),
+  transitionMs: T.positiveNumber,
   shuffle: T.boolean,
   zoom: T.positiveNumber,
 })
