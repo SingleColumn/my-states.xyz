@@ -13,9 +13,10 @@ import type {
 import { createId } from './utils'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
 import { normalizeDraftPanel } from './panelInput'
+import { documentFromDraft } from './panelStore'
 import { MOMENT_SCHEMA_VERSION } from './momentSchema'
 export { MOMENT_SCHEMA_VERSION } from './momentSchema'
-export { normalizeSlideshowSettings } from './panelInput'
+export { normalizeSlideshowSettings } from './panelRegistry'
 
 export { DEFAULT_SLIDESHOW_ZOOM, defaultSlideshowSettings, defaultSpotifyPlaylistReference } from './panelRegistry'
 
@@ -171,22 +172,22 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 /**
- * A moment starts life as a draft. The canvas turns that into a tldraw
- * document the first time the moment is opened; storage does not build a
- * document itself yet (it could: the schema is available without an editor),
- * so a moment carries its draft until then.
+ * A moment has its document from creation: the draft (a new moment's
+ * defaults, or an imported archive) is normalised, then built into a real
+ * tldraw document directly, with no editor and no intermediate stored
+ * shape. The canvas loads it exactly as it would one of its own saves.
  */
 function makeMoment(name: string, draft: MomentDraft = { panels: createDefaultPanels(), canvas: null }): Moment {
   const now = Date.now()
+  const normalized = { ...draft, panels: draft.panels.map(normalizeDraftPanel) }
   return {
     id: createId('moment'),
     name: normalizeMomentName(name),
     schemaVersion: MOMENT_SCHEMA_VERSION,
     createdAt: now,
     updatedAt: now,
-    camera: draft.canvas?.camera ?? null,
-    document: null,
-    draft: { ...draft, panels: draft.panels.map(normalizeDraftPanel) },
+    camera: normalized.canvas?.camera ?? null,
+    document: documentFromDraft(normalized),
   }
 }
 
@@ -248,7 +249,7 @@ export async function createMoment(name: string) {
  * job. Read and replace in one transaction so a slow save cannot overwrite a
  * rename or a deletion that landed in between.
  */
-export async function saveMomentDocument(momentId: string, document: NonNullable<Moment['document']>, camera: Moment['camera']) {
+export async function saveMomentDocument(momentId: string, document: Moment['document'], camera: Moment['camera']) {
   const db = await dbPromise
   const tx = db.transaction('moments', 'readwrite')
   // Observe tx.done even if an individual request rejects first.
@@ -318,7 +319,7 @@ export async function importMomentContent(content: ImportedMomentContent) {
   // Archive content is input, not trusted because it unpacked: every panel
   // is projected onto known keys and validated, and every identity is
   // reissued so an import can never collide with what is already stored.
-  const sourcePanels = enforceSpotifySingletonPanels(content.panels.map(normalizeDraftPanel))
+  const sourcePanels = enforceSingletonPanels(content.panels.map(normalizeDraftPanel))
   const panelIdMap = new Map(sourcePanels.map((panel) => [panel.id, createId('panel')]))
   const noteIdMap = new Map(content.notes.map((note) => [note.id, createId('note')]))
   const panels = sourcePanels.map((panel): Panel => {
@@ -449,12 +450,13 @@ function checkMomentSchema(moment: Moment): Moment {
   return moment
 }
 
-function enforceSpotifySingletonPanels(panels: Panel[]): Panel[] {
-  let spotifySeen = false
+/** At most one panel of a singleton kind (the registry says which kinds are singleton); later ones are dropped. */
+function enforceSingletonPanels(panels: Panel[]): Panel[] {
+  const seen = new Set<PanelType>()
   return panels.filter((panel) => {
-    if (panel.type !== 'spotify') return true
-    if (spotifySeen) return false
-    spotifySeen = true
+    if (!getPanelDefinition(panel.type).singleton) return true
+    if (seen.has(panel.type)) return false
+    seen.add(panel.type)
     return true
   })
 }

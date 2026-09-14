@@ -1,13 +1,17 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { createMoment, getMoment } from './storage'
+import { draftFromDocument } from './panelStore'
+import type { Moment } from './types'
+
+const panelIdsOf = (moment: Moment) => draftFromDocument(moment.document, moment.camera).panels.map((panel) => panel.id)
 
 describe('persistent panel identity', () => {
   it('assigns stable IDs and preserves them across reloads', async () => {
     const created = await createMoment('Stable IDs')
-    const ids = created.draft!.panels.map((panel) => panel.id)
+    const ids = panelIdsOf(created)
     const reloaded = await getMoment(created.id)
-    expect(reloaded?.draft?.panels.map((panel) => panel.id)).toEqual(ids)
+    expect(reloaded && panelIdsOf(reloaded)).toEqual(ids)
     expect(new Set(ids).size).toBe(ids.length)
   })
 

@@ -149,22 +149,17 @@ export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchit
     `Moment schemaVersion is ${moment.schemaVersion}`,
   )
 
-  addCheck(
-    'document-persisted',
-    'The moment persists the tldraw document and no separate panel records',
-    moment.document && !moment.draft ? 'PASS' : moment.document ? 'WARNING' : 'ERROR',
-    moment.document
-      ? moment.draft ? 'Document is present but the draft has not been cleared' : 'Document is the only record of the canvas'
-      : 'No document has been saved for this moment yet',
-  )
-
-  const persistedShapeIds = new Set(moment.document ? Object.keys(moment.document.store).filter((id) => id.startsWith('shape:')) : [])
+  // A moment's document is never absent (see the Moment type and
+  // documentFromDraft in panelStore.ts), so there is no longer a
+  // transitional state to check for here — only whether the canvas has
+  // caught up with a debounced save, below.
+  const persistedShapeIds = new Set(Object.keys(moment.document.store).filter((id) => id.startsWith('shape:')))
   const unpersisted = shapes.filter((shape) => !persistedShapeIds.has(shape.id))
   addCheck(
     'document-correlation',
     'Every shape on the canvas is in the persisted document',
-    !moment.document ? 'WARNING' : unpersisted.length ? 'WARNING' : 'PASS',
-    !moment.document ? 'No document to compare against' : unpersisted.length ? `${unpersisted.length} shape(s) not yet saved (a save is debounced)` : 'Canvas and document agree',
+    unpersisted.length ? 'WARNING' : 'PASS',
+    unpersisted.length ? `${unpersisted.length} shape(s) not yet saved (a save is debounced)` : 'Canvas and document agree',
   )
 
   const errors = checks.filter((check) => check.status === 'ERROR').length

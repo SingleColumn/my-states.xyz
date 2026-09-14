@@ -7,7 +7,8 @@ import type { Moment, Panel } from './types'
 
 const schema = createTLSchema({ shapes: { 'music-panel': { props: panelShapeProps, migrations: panelShapeMigrations } }, bindings: {} })
 Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
-const moment: Moment = { id: 'test', name: 'Test', schemaVersion: 1, createdAt: 1, updatedAt: 2, camera: { x: 0, y: 0, z: 1 }, document: null }
+const emptyDocument = createTLStore({ schema }).getStoreSnapshot()
+const moment: Moment = { id: 'test', name: 'Test', schemaVersion: 2, createdAt: 1, updatedAt: 2, camera: { x: 0, y: 0, z: 1 }, document: emptyDocument }
 
 describe('canvas restore preflight', () => {
   it('allows synchronous restore writes but reinstates the readonly input pause even on failure', () => {

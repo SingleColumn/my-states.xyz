@@ -16,11 +16,12 @@ import {
   momentLimits,
   MOMENT_SCHEMA_VERSION,
 } from './storage'
+import { documentFromDraft, draftFromDocument } from './panelStore'
 import type { CanvasState, Moment, Panel } from './types'
 
-// Archives carry a moment as a draft; a moment that has not been opened on a
-// canvas carries the same draft.
-const panelsOf = (moment: Moment | undefined) => moment?.draft?.panels ?? []
+// Archives carry a moment as a draft: its own document, read back out.
+const draftOf = (moment: Moment | undefined) => moment && draftFromDocument(moment.document, moment.camera)
+const panelsOf = (moment: Moment | undefined) => draftOf(moment)?.panels ?? []
 
 /** A stored moment with these panels, the way an import produces one. */
 function storeMoment(name: string, panels: Panel[], canvas: CanvasState | null = null, notes: Parameters<typeof importMomentContent>[0]['notes'] = []) {
@@ -107,8 +108,12 @@ describe('portable moment archives', () => {
       getMomentAssets(imported.id),
     ])
 
-    expect(stored?.draft?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
-    expect(stored?.draft?.canvas?.panels[0]).toMatchObject({ rotation: 0.25, order: 2 })
+    expect(draftOf(stored)?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
+    // Rotation is preserved verbatim; order is always a derived, 0-based
+    // stacking position (panelStore.test.ts asserts the same), not the raw
+    // number a layout happened to carry in. The Notes panel is given the
+    // only explicit order (2) among three panels, which sorts it first.
+    expect(draftOf(stored)?.canvas?.panels[0]).toMatchObject({ rotation: 0.25, order: 0 })
     expect(slideshowIn(panelsOf(stored)).config).toMatchObject({ intervalMs: 3500, shuffle: true })
     expect(panelsOf(stored).find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')?.config.playlist).toEqual(exportedManifest.panels.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')!.config.playlist)
     expect(notes).toHaveLength(1)
@@ -184,7 +189,8 @@ describe('portable moment archives', () => {
   it('sanitizes a Notes panel pointing at a note the moment no longer has, rather than exporting a backup that cannot be restored', async () => {
     // Two Notes panels can end up pointing at the same note; deleting it
     // through one panel does not clear the other's reference (a separate,
-    // pre-existing bug). Simulate that state directly, since import's own
+    // pre-existing bug). Simulate that state directly, at the document
+    // level (the only level a moment is ever stored at), since import's own
     // remap would otherwise heal it before this code ever saw it.
     const defaultPanels = createDefaultPanels()
     const notesPanel = defaultPanels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
@@ -200,8 +206,7 @@ describe('portable moment archives', () => {
       createdAt: 1,
       updatedAt: 2,
       camera: null,
-      document: null,
-      draft: { panels: danglingPanels, canvas: null },
+      document: documentFromDraft({ panels: danglingPanels, canvas: null }),
     }
     const db = await openDB('my-states')
     await db.put('moments', moment)

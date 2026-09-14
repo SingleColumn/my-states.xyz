@@ -1,13 +1,14 @@
 import './test/setup'
 import { describe, expect, it } from 'vitest'
-import { T, type TLStoreSnapshot } from 'tldraw'
-import { createPanelProps, draftFromDocument, panelFromShape, shapesForDraft } from './panelStore'
-import { panelContentValidator, panelShapeProps } from './panelShapeSchema'
+import { createTLStore, loadSnapshot, T, type TLStoreSnapshot } from 'tldraw'
+import { createPanelProps, documentFromDraft, draftFromDocument, panelFromShape, shapesForDraft } from './panelStore'
+import { documentSchema, documentSchemaMatchesEditor, panelContentValidator, panelShapeProps } from './panelShapeSchema'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
 import { createPanel } from './storage'
 import type { MomentDraft, Panel } from './types'
 
 const propsValidator = T.object(panelShapeProps)
+Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
 
 describe('panel shape schema', () => {
   it('accepts every configuration the registry creates, unchanged', () => {
@@ -24,6 +25,12 @@ describe('panel shape schema', () => {
     expect(() => panelContentValidator.validate({ type: 'notes', config: { playlist: null } })).toThrow()
     expect(() => panelContentValidator.validate({ type: 'video', config: {} })).toThrow()
     expect(() => propsValidator.validate({ ...createPanelProps('notes'), visible: 'yes' })).toThrow()
+  })
+
+  it('flags a schema that no longer matches the editor, and passes on the one storage actually uses', () => {
+    expect(documentSchemaMatchesEditor(documentSchema)).toBe(true)
+    const driftedSchema = { serialize: () => ({ ...documentSchema.serialize() as object, extra: true }) }
+    expect(documentSchemaMatchesEditor(driftedSchema)).toBe(false)
   })
 })
 
@@ -51,6 +58,21 @@ describe('the draft and the document', () => {
     const images = shapes[2]
     expect(images).toMatchObject({ x: getPanelDefinition('slideshow').defaultLayout.x, isLocked: true, props: { visible: false } })
     expect(new Set(shapes.map((shape) => shape.id)).size).toBe(3)
+  })
+
+  it('builds a real, loadable tldraw document with no editor at all', () => {
+    const document = documentFromDraft(draft)
+    // The exact premise documentSchemaMatchesEditor guards at startup: a
+    // store built the way the mounted editor builds its own must load this
+    // without complaint.
+    const editorStore = createTLStore({ schema: documentSchema })
+    expect(() => loadSnapshot(editorStore, document)).not.toThrow()
+
+    // And it round-trips back to the same draft this was built from.
+    const out = draftFromDocument(document, draft.canvas!.camera)
+    expect(out.panels.map((panel) => panel.id)).toEqual(['panel-notes', 'panel-music', 'panel-images'])
+    expect(out.panels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')?.config.activeNoteId).toBe('note-1')
+    expect(out.canvas?.panels.find((layout) => layout.panelId === 'panel-notes')).toMatchObject({ x: 300, y: 10, rotation: 0.1 })
   })
 
   it('reads the same content back out of a document, in stacking order', () => {

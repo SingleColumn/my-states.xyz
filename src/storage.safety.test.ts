@@ -5,6 +5,9 @@ import type { Moment, Panel } from './types'
 // Importing opens the new database; it reads nothing from the earlier one,
 // so seeding that afterwards (below) is a faithful order of events.
 import * as storage from './storage'
+import { draftFromDocument } from './panelStore'
+
+const panelsOf = (moment: Moment) => draftFromDocument(moment.document, moment.camera).panels
 
 /** What the earlier build left behind: its own database, and workspace keys in localStorage. */
 const earlier = {
@@ -30,7 +33,7 @@ describe('the fresh database', () => {
     expect([...db.objectStoreNames].sort()).toEqual(['assets', 'directoryHandles', 'moments', 'notes', 'preferences'])
     const moments = await db.getAll('moments')
     expect(moments).toHaveLength(1)
-    expect(moments[0]).toMatchObject({ name: 'My first moment', schemaVersion: 1 })
+    expect(moments[0]).toMatchObject({ name: 'My first moment', schemaVersion: storage.MOMENT_SCHEMA_VERSION })
     expect(await db.get('moments', earlier.moment.id)).toBeUndefined()
     db.close()
   })
@@ -46,12 +49,12 @@ describe('the fresh database', () => {
     expect(storage.loadSpotifyTokens()).toMatchObject({ accessToken: 'keep' })
   })
 
-  it('creates every panel visible and out of focus view, and normalises a draft only on the way in', async () => {
+  it('creates every panel visible and out of focus view, from a normalised draft built straight into a document', async () => {
     const moment = await storage.createMoment('Defaults')
-    expect(moment.draft!.panels.map((panel) => [panel.visible, panel.focusView])).toEqual([[true, false], [true, false], [true, false]])
+    expect(panelsOf(moment).map((panel) => [panel.visible, panel.focusView])).toEqual([[true, false], [true, false], [true, false]])
     const partial = [{ id: 'a', type: 'notes', config: {} }] as unknown as Panel[]
     const imported = await storage.importMomentContent({ name: 'Partial', panels: partial, canvas: null, notes: [], assets: [] })
-    expect(imported.draft!.panels[0]).toMatchObject({ type: 'notes', config: { activeNoteId: null }, visible: true, focusView: false })
+    expect(panelsOf(imported)[0]).toMatchObject({ type: 'notes', config: { activeNoteId: null }, visible: true, focusView: false })
   })
 
   it('rejects malformed known fields instead of silently defaulting them', async () => {
@@ -61,7 +64,7 @@ describe('the fresh database', () => {
 })
 
 describe('save safety', () => {
-  const snapshot = { store: {}, schema: { schemaVersion: 2, sequences: {} } } as Moment['document'] & {}
+  const snapshot = { store: {}, schema: { schemaVersion: 2, sequences: {} } } as Moment['document']
 
   it('refuses to read or overwrite a moment written by a newer build', async () => {
     const db = await openDB('my-states')
@@ -74,12 +77,11 @@ describe('save safety', () => {
     db.close()
   })
 
-  it('replaces the draft with the document only once the transaction commits', async () => {
-    const moment = await storage.createMoment('First open')
+  it('replaces the document and camera on a save, transactionally', async () => {
+    const moment = await storage.createMoment('Resave')
     const saved = await storage.saveMomentDocument(moment.id, snapshot, { x: 1, y: 2, z: 1 })
-    expect(saved.draft).toBeUndefined()
+    expect(saved.document).toEqual(snapshot)
     expect(await storage.getMoment(moment.id)).toMatchObject({ document: snapshot, camera: { x: 1, y: 2, z: 1 } })
-    expect((await storage.getMoment(moment.id))!.draft).toBeUndefined()
   })
 
   it('serializes rename with document saves without replacing either field', async () => {
@@ -114,6 +116,6 @@ describe('save safety', () => {
       notes: [{ id: 'source-note', title: 'Keep me', content: 'Body', createdAt: 1, updatedAt: 2 }], assets: [],
     })
     const notes = await storage.getNotes(imported.id)
-    expect(imported.draft!.panels.filter((panel) => panel.type === 'notes').map((panel) => panel.config.activeNoteId)).toEqual([notes[0].id, notes[0].id])
+    expect(panelsOf(imported).filter((panel) => panel.type === 'notes').map((panel) => panel.config.activeNoteId)).toEqual([notes[0].id, notes[0].id])
   })
 })

@@ -1,15 +1,16 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Editor, Tldraw, TLShape, createTLStore, getSnapshot, loadSnapshot, type TLUiOverrides } from 'tldraw'
+import { createTLSchemaFromUtils, defaultBindingUtils, defaultShapeUtils, Editor, Tldraw, TLShape, getSnapshot, loadSnapshot, type TLUiOverrides } from 'tldraw'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { AppChromeMenuPanel, AppChromePropsProvider, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, useAppState } from './AppState'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { createCanvasApi } from './canvasApi'
 import { PanelShape, PanelShapeUtil } from './PanelShape'
+import { documentSchemaMatchesEditor } from './panelShapeSchema'
 import { getCanonicalPanelLayout, getPanelFocusViewSize, isPanelInFocusView } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { getPanelDefinition } from './panelRegistry'
-import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, shapesForDraft, withPanelEdit, writePanelShape } from './panelStore'
+import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
 import { applyTheme, builtInTheme } from './theme'
@@ -22,6 +23,18 @@ import { HelpAbout } from './HelpAbout'
 import type { Moment, PanelLayout, PanelType } from './types'
 
 const shapeUtils = [PanelShapeUtil]
+
+// Storage builds a moment's document with no editor at all (documentSchema
+// in panelShapeSchema.ts), on the verified premise that it is exactly the
+// schema this mounted editor derives from PanelShapeUtil's own statics. If
+// a future change to tldraw's defaults or to PanelShapeUtil ever makes that
+// stop being true, a document one side builds would silently stop loading
+// the way the other expects; checking once at startup turns that into an
+// immediate, loud failure instead.
+const editorSchema = createTLSchemaFromUtils({ shapeUtils: [...defaultShapeUtils, PanelShapeUtil], bindingUtils: [...defaultBindingUtils] })
+if (!documentSchemaMatchesEditor(editorSchema)) {
+  throw new Error('The document schema storage builds no longer matches the schema this canvas derives from PanelShapeUtil. A document built by one would not load correctly for the other.')
+}
 
 export default function App() {
   useEffect(() => applyTheme(builtInTheme), [])
@@ -103,11 +116,9 @@ function AppContent() {
   }, [spotify])
 
   /**
-   * Puts a moment on the canvas. A moment that has been opened before carries
-   * tldraw's document and is loaded as it is, ids and all. One that has not
-   * (a new moment or an import) carries a draft of its panels; they become
-   * shapes here, once, and the document that results is saved back so the
-   * draft is never read again.
+   * Puts a moment on the canvas. Every moment has its document from
+   * creation (storage builds it directly; see `documentFromDraft` in
+   * panelStore.ts), so this only ever loads it, ids and all.
    *
    * Loading is not something the user did on the canvas, so none of it goes
    * into the undo history, and whatever history there was is cleared: it
@@ -115,11 +126,10 @@ function AppContent() {
    */
   const restoreCanvas = useCallback((editor: Editor, moment: Moment) => {
     if (canvasMomentIdRef.current === moment.id) return
-    // Construct and validate the draft's shapes before the editor transaction.
-    // On failure the old canvas and stored source remain intact.
-    let draftShapes: ReturnType<typeof shapesForDraft> | null = null
+    // Preflight in a detached store before the editor transaction. On
+    // failure the old canvas and stored source remain intact.
     try {
-      draftShapes = prepareCanvasRestore(editor.store, moment)
+      prepareCanvasRestore(editor.store, moment)
     } catch (error) {
       setCallbackStatus(error instanceof Error ? error.message : 'Could not open this moment. Its original data has been kept.')
       return
@@ -127,23 +137,14 @@ function AppContent() {
     restoringCanvasRef.current = true
     try {
       withRestoreWriteAccess(editor, () => editor.run(() => {
-        if (moment.document) {
-          loadSnapshot(editor.store, moment.document)
-        } else {
-          // Clear the whole outgoing document, including native shapes and
-          // other pages, before constructing the draft's panels.
-          loadSnapshot(editor.store, createTLStore({ schema: editor.store.schema }).getStoreSnapshot())
-          editor.createShapes(draftShapes!)
-        }
+        loadSnapshot(editor.store, moment.document)
         editor.selectNone()
         setSelectedPanelId(null)
-        const camera = moment.camera ?? moment.draft?.canvas?.camera ?? null
-        if (camera) editor.setCamera(camera)
+        if (moment.camera) editor.setCamera(moment.camera)
         else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
       }, { history: 'ignore', ignoreShapeLock: true }))
       editor.clearHistory()
       canvasMomentIdRef.current = moment.id
-      if (!moment.document) momentsRef.current.updateDocument(moment.id, getSnapshot(editor.store).document, editor.getCamera())
     } finally {
       restoringCanvasRef.current = false
     }

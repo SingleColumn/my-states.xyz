@@ -312,7 +312,7 @@ function useMomentState() {
     async function load() {
       try {
         const initial = await initializeMoments()
-        const summaries = await getMomentSummaries()
+        let summaries = await getMomentSummaries()
         if (cancelled) return
         let moment = await getMoment(initial.activeMomentId).catch(() => undefined)
         let openError: string | null = null
@@ -324,18 +324,32 @@ function useMomentState() {
         // read it.
         if (!moment) {
           openError = 'Your last-opened moment could not be read. Its stored data has not been changed.'
-          const fallback = summaries.find((item) => item.id !== initial.activeMomentId)
-          if (fallback) {
-            moment = await getMoment(fallback.id).catch(() => undefined)
-            if (moment) await setActiveMomentId(fallback.id)
+          for (const candidate of summaries) {
+            if (candidate.id === initial.activeMomentId) continue
+            moment = await getMoment(candidate.id).catch(() => undefined)
+            if (cancelled) return
+            if (moment) {
+              await setActiveMomentId(candidate.id)
+              break
+            }
           }
+        }
+        if (!moment) {
+          // Every stored moment failed to open, not only the active one (for
+          // example, a schema version bump made all of them unreadable at
+          // once): fall back exactly as if there were none, rather than
+          // leaving nothing to open and no way to start one. Their records
+          // are left untouched and stay listed.
+          moment = await createStoredMoment('My first moment')
+          if (cancelled) return
+          summaries = await getMomentSummaries()
+          await setActiveMomentId(moment.id)
+          openError = summaries.length > 1 ? 'None of your saved moments could be opened by this version. A new one has been started; their stored data has not been changed.' : null
         }
         if (cancelled) return
         setMoments(summaries)
-        if (moment) {
-          activeMomentRef.current = moment
-          setActiveMoment(moment)
-        }
+        activeMomentRef.current = moment
+        setActiveMoment(moment)
         setError(openError)
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load your moments.')

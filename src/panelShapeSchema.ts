@@ -1,4 +1,4 @@
-import { T, createShapePropsMigrationIds, createShapePropsMigrationSequence, type TLBaseShape } from 'tldraw'
+import { T, createShapePropsMigrationIds, createShapePropsMigrationSequence, createTLSchema, defaultBindingSchemas, defaultShapeSchemas, type TLBaseShape } from 'tldraw'
 import type { PanelContent, PanelType } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelRegistry } from './panelRegistry'
@@ -50,3 +50,44 @@ export const panelShapeMigrationVersions = createShapePropsMigrationIds(PANEL_SH
 export const panelShapeMigrations = createShapePropsMigrationSequence({
   sequence: [],
 })
+
+/**
+ * The schema storage builds and reads documents with, with no editor and no
+ * React: tldraw's own default record types (page, asset, and so on) plus
+ * this one custom shape. Verified 2026-09-13 to serialise identically to
+ * the schema the mounted editor derives from `PanelShapeUtil`'s statics
+ * (`documentSchemaMatchesEditor`, below, checks this at every startup so
+ * drift between the two fails loudly instead of surfacing as a load bug).
+ */
+export const documentSchema = createTLSchema({
+  shapes: { ...defaultShapeSchemas, [PANEL_SHAPE_TYPE]: { props: panelShapeProps, migrations: panelShapeMigrations } },
+  bindings: defaultBindingSchemas,
+})
+
+/**
+ * A JSON string that depends only on content, not key insertion order:
+ * `createTLSchema` and `createTLSchemaFromUtils` build their shape/binding
+ * maps by different paths (a plain merge here, `mergeArraysAndReplaceDefaults`
+ * there) and can insert the same keys in a different order, which plain
+ * `JSON.stringify` would wrongly read as two different schemas.
+ */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort()
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+/**
+ * True when a schema built from the mounted editor's own shape/binding
+ * utility classes matches `documentSchema`. Call once at startup with the
+ * editor-side schema (built via `createTLSchemaFromUtils`, which needs
+ * `PanelShapeUtil` and so can't be built in this React-free module) and
+ * throw loudly on a mismatch: it means a document storage built would no
+ * longer load the way the canvas expects, or vice versa.
+ */
+export function documentSchemaMatchesEditor(editorSchema: { serialize(): unknown }): boolean {
+  return stableStringify(editorSchema.serialize()) === stableStringify(documentSchema.serialize())
+}
