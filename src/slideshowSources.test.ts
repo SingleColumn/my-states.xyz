@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defaultSlideshowSettings } from './storage'
 import {
+  folderPickerCancelThresholdMs,
+  isFolderPickerCancelledByUser,
   releaseImageItems,
   settingsForBundledCollection,
   settingsForClearedImages,
@@ -25,6 +27,16 @@ describe('slideshow image source transitions', () => {
     const selected = settingsForBundledCollection(defaultSlideshowSettings, 'jaumecopilotos-ai')
     expect(settingsForClearedImages({ ...selected, currentIndex: 2, zoom: 2 })).toMatchObject({ imageSource: { type: 'none' }, folderName: null, currentIndex: 0, zoom: 1.1 })
     expect(statusForImageSource(selected.imageSource, 0)).toBe('No images are available yet in "jaumecopilotos-ai".')
+  })
+
+  it('treats only an abort that arrives after a dialog could have shown as a user cancel', () => {
+    const abort = new DOMException('The user aborted a request.', 'AbortError')
+    expect(isFolderPickerCancelledByUser(abort, 1800)).toBe(true)
+    expect(isFolderPickerCancelledByUser(abort, folderPickerCancelThresholdMs)).toBe(true)
+    // Electron-style hosts reject within a few milliseconds without a dialog.
+    expect(isFolderPickerCancelledByUser(abort, 9)).toBe(false)
+    expect(isFolderPickerCancelledByUser(new DOMException('Denied', 'SecurityError'), 1800)).toBe(false)
+    expect(isFolderPickerCancelledByUser(new Error('boom'), 1800)).toBe(false)
   })
 
   it('revokes object URLs but never static sample URLs', () => {

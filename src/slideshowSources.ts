@@ -22,6 +22,17 @@ export function statusForImageSource(source: SlideshowSettings['imageSource'], i
   return imageCount ? `${imageCount} images loaded from this moment.` : 'No supported images are available.'
 }
 
+/* A person cancelling the folder dialog needs it to appear first, which takes
+   far longer than this. Some Chromium hosts (Electron apps, including the
+   Claude desktop preview pane) expose showDirectoryPicker but reject it within
+   a few milliseconds without ever showing a dialog. That abort has to fall
+   through to the file input, or choosing a folder silently does nothing. */
+export const folderPickerCancelThresholdMs = 200
+
+export function isFolderPickerCancelledByUser(error: unknown, elapsedMs: number) {
+  return error instanceof DOMException && error.name === 'AbortError' && elapsedMs >= folderPickerCancelThresholdMs
+}
+
 export function releaseImageItems(images: ImageItem[]) {
   for (const image of images) {
     if (image.urlKind === 'object-url') URL.revokeObjectURL(image.url)

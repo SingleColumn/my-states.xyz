@@ -56,6 +56,7 @@ import {
   type PanelWriteOptions,
 } from './panelStore'
 import {
+  isFolderPickerCancelledByUser,
   releaseImageItems,
   settingsForBundledCollection,
   settingsForClearedImages,
@@ -844,13 +845,19 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       touch()
       return false
     }
+    const openedAt = performance.now()
     try {
       const handle = await window.showDirectoryPicker()
       await savePanelDirectoryHandle(moment.id, panelId, handle)
       await loadImagesFromHandle(handle, panelId)
       return true
     } catch (caught) {
-      if (caught instanceof DOMException && caught.name === 'AbortError') return true
+      // A genuine cancel is the end of it. An abort that arrives before a
+      // dialog could have appeared means this browser never showed one, and
+      // the caller should offer the file input instead.
+      if (caught instanceof DOMException && caught.name === 'AbortError') {
+        return isFolderPickerCancelledByUser(caught, performance.now() - openedAt)
+      }
       const state = getSlideshowPanelRuntimeState(panelId)
       state.error = caught instanceof Error ? caught.message : 'Could not select the folder.'
       touch()
