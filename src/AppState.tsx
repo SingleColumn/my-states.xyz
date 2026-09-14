@@ -614,6 +614,14 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   }, [flush, notes, panels, runNoteOperation])
 
   const deleteNote = useCallback((id: string, panelId: string) => runNoteOperation(async () => {
+    // deleteStoredNote deletes by id alone, with no moment to scope it to.
+    // A stale or foreign id (retained across a moment switch, say) must
+    // never reach it: it would permanently delete a note out of whichever
+    // moment actually owns it, leaving that moment's own panels pointing
+    // at a note that no longer exists - the same failure this function's
+    // own redirect loop below exists to prevent, reached through a
+    // different door. Mirrors the same check selectNote already makes.
+    if (!notes.some((note) => note.id === id)) return
     await flush(panelId)
     await deleteStoredNote(id)
     const nextNotes = notes.filter((note) => note.id !== id)
