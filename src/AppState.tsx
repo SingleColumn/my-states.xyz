@@ -483,6 +483,14 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save your note. Keep this tab open and try again.')))
   const panelsRef = useRef(panels)
   panelsRef.current = panels
+  // Which moment `notes` actually holds loaded notes for. A moment switch
+  // updates panels synchronously (tldraw's own store) but notes only once
+  // this hook's async load effect below finishes, so between those two
+  // points panelId can already name the new moment while `notes` still
+  // holds the old one's. Set only at the moment load() actually replaces
+  // `notes` with real data for `momentId` - never for the moment a switch
+  // is merely heading towards.
+  const notesLoadedForRef = useRef('')
   const runNoteOperation = useCallback((work: () => Promise<void>) => operation.run(work).catch((caught) => {
     setError(caught instanceof Error ? caught.message : 'Could not finish the note operation. Your unsaved draft has been kept.')
     throw caught
@@ -538,6 +546,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       const storedNotes = await getNotes(momentId)
       if (cancelled) return
       setNotes(storedNotes)
+      notesLoadedForRef.current = momentId
       for (const panel of notePanels) {
         const selected = storedNotes.find((note) => note.id === panel.config.activeNoteId) ?? storedNotes[0] ?? null
         getNotesPanelRuntimeState(panel.id).activeNote = selected
@@ -600,6 +609,11 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   }), [panels, moment, flush, runNoteOperation])
 
   const selectNote = useCallback((id: string, panelId: string) => {
+    // notesLoadedForRef, not just membership: right after a moment switch,
+    // panelId can already belong to the new moment while `notes` still
+    // holds the old one's, and an old note's id would otherwise be found
+    // "valid" and get written onto the new moment's panel.
+    if (notesLoadedForRef.current !== loadKey) return Promise.resolve()
     const next = notes.find((note) => note.id === id)
     if (!next) return Promise.resolve()
     // Returns the operation's own promise rather than firing it and
@@ -611,9 +625,21 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       getNotesPanelRuntimeState(panelId).activeNote = next
       panels.updateConfig<'notes'>(panelId, { activeNoteId: next.id })
     })
-  }, [flush, notes, panels, runNoteOperation])
+  }, [flush, loadKey, notes, panels, runNoteOperation])
 
   const deleteNote = useCallback((id: string, panelId: string) => runNoteOperation(async () => {
+    // deleteStoredNote deletes by id alone, with no moment to scope it to.
+    // A stale or foreign id (retained across a moment switch, say) must
+    // never reach it: it would permanently delete a note out of whichever
+    // moment actually owns it, leaving that moment's own panels pointing
+    // at a note that no longer exists - the same failure this function's
+    // own redirect loop below exists to prevent, reached through a
+    // different door. Mirrors the same check selectNote already makes -
+    // gated on notesLoadedForRef too, not just membership in `notes`: a
+    // panelId can already belong to a moment just switched into while
+    // `notes` still holds the one just left, and a foreign note's id would
+    // otherwise be found "valid" in that stale array.
+    if (notesLoadedForRef.current !== loadKey || !notes.some((note) => note.id === id)) return
     await flush(panelId)
     await deleteStoredNote(id)
     const nextNotes = notes.filter((note) => note.id !== id)
@@ -634,7 +660,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       state.dirty = false
       panels.updateConfig<'notes'>(panel.id, { activeNoteId: fallback?.id ?? null })
     }
-  }), [flush, notes, panels, runNoteOperation])
+  }), [flush, loadKey, notes, panels, runNoteOperation])
 
   const setActiveNoteContent = useCallback((content: string, panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
