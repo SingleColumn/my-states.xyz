@@ -1,4 +1,22 @@
-export type PanelType = 'spotify' | 'slideshow' | 'notes'
+import type { TLStoreSnapshot } from 'tldraw'
+
+/**
+ * The configuration each kind of panel carries. This map is the one place a
+ * panel type is declared for the type system; the registry in
+ * panelRegistry.ts and the component table in PanelShape.tsx are both keyed
+ * by it, so adding a key here is what makes the compiler ask for the rest.
+ */
+export interface PanelConfigs {
+  spotify: { playlist: SpotifyPlaylistReference }
+  slideshow: SlideshowSettings
+  notes: { activeNoteId: string | null }
+}
+
+export type PanelType = keyof PanelConfigs
+export type PanelConfig<T extends PanelType = PanelType> = PanelConfigs[T]
+
+/** A panel's type and configuration together, discriminated on `type`. */
+export type PanelContent<T extends PanelType = PanelType> = { [K in PanelType]: { type: K; config: PanelConfigs[K] } }[T]
 
 export interface PanelLayout {
   panelId: string
@@ -20,20 +38,19 @@ export interface CanvasState {
 }
 
 export interface PanelBase {
+  /** Stable application identity; notes, image assets and folder handles are keyed by it. */
   id: string
-  type: PanelType
-  /** Absent means visible for moments written before panel visibility existed. */
-  visible?: boolean
-  /** Absent means the full panel. True keeps the Music panel's playback controls only. */
-  focusView?: boolean
-  createdAt: number
-  updatedAt: number
+  visible: boolean
+  /** True keeps the Music panel's playback controls only. */
+  focusView: boolean
 }
 
-export type Panel =
-  | (PanelBase & { type: 'spotify'; config: { playlist: SpotifyPlaylistReference } })
-  | (PanelBase & { type: 'slideshow'; config: SlideshowSettings })
-  | (PanelBase & { type: 'notes'; config: { activeNoteId: string | null } })
+/**
+ * A panel as the app reads it. The tldraw shape is the record of truth: this
+ * is a view of the shape's props, produced by panelStore.ts, and a panel is
+ * changed by writing the shape, never by writing one of these.
+ */
+export type Panel<T extends PanelType = PanelType> = PanelBase & PanelContent<T>
 
 export interface SlideshowSettings {
   folderName: string | null
@@ -60,8 +77,7 @@ export interface ImageMetadata {
 
 export interface MomentImage extends ImageMetadata {
   id: string
-  /** The owning moment. Moments were called sessions when this field was persisted; it keeps that name so stored records and indexes stay valid. */
-  sessionId: string
+  momentId: string
   panelId?: string
   filename: string
   mimeType: string
@@ -76,7 +92,7 @@ export interface ImageAttribution {
 
 export interface ImageItem extends ImageMetadata {
   id: string
-  sessionId: string | null
+  momentId: string | null
   filename: string
   mimeType: string
   url: string
@@ -87,7 +103,7 @@ export interface ImageItem extends ImageMetadata {
 
 export interface Note {
   id: string
-  sessionId: string
+  momentId: string
   title: string
   content: string
   createdAt: number
@@ -100,31 +116,46 @@ export interface SpotifyTokens {
   expiresAt: number
 }
 
-export interface SpotifyPlaylistState {
-  id: string | null
-  uri: string | null
-  name: string | null
-  url: string | null
-  lastSearch: string
-}
-
 export interface SpotifyPlaylistReference {
   id: string | null
   uri: string | null
   name: string | null
   url: string | null
-  /** Optional: moments saved before the panel showed playlist artwork have none. */
+  /** Filled in by the artwork lookup after the playlist is chosen. */
   image?: string | null
+}
+
+export interface CanvasCamera {
+  x: number
+  y: number
+  z: number
+}
+
+/**
+ * A moment's canvas in the app's own terms: its panels and where they sit.
+ * Every new or imported moment starts as a draft; the canvas turns it into
+ * a tldraw document the first time it opens the moment, and the draft is
+ * dropped. The exported archive carries a draft too, so the file format
+ * stays in the app's vocabulary rather than tldraw's.
+ */
+export interface MomentDraft {
+  panels: Panel[]
+  canvas: CanvasState | null
 }
 
 export interface Moment {
   id: string
   name: string
-  schemaVersion: 2
+  schemaVersion: 1
   createdAt: number
   updatedAt: number
-  panels: Panel[]
-  canvas: CanvasState | null
+  camera: CanvasCamera | null
+  /**
+   * tldraw's document: every panel shape with its geometry, order and
+   * configuration. Null until the canvas has built it from `draft`.
+   */
+  document: TLStoreSnapshot | null
+  draft?: MomentDraft
 }
 
 export interface MomentSummary {

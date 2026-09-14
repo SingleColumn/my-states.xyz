@@ -76,7 +76,7 @@ export function MomentToolbar() {
   }
 
   return (
-    <section ref={rootRef} className="moment-toolbar panel-interactive" aria-label="Moment controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+    <section ref={rootRef} className="moment-toolbar" aria-label="Moment controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
       <select
         className="app-dropdown"
         aria-label="Open moment"
@@ -157,7 +157,7 @@ export function MomentToolbar() {
         ref={inputRef}
         className="visually-hidden-file-input"
         type="file"
-        accept=".zip,.mix-session.zip,application/zip"
+        accept=".zip,.moment.zip,application/zip"
         onChange={(event) => {
           const file = event.target.files?.[0]
           if (file) void run(() => moments.importFile(file))

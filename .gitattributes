@@ -1,0 +1,4 @@
+# The sample-image manifest is regenerated with LF endings by scripts/generate-sample-images-manifest.mjs
+# on every dev and build run. Pin it so a Windows checkout (core.autocrlf=true) does not report the
+# rewritten but identical file as modified.
+public/sample-images/manifest.json text eol=lf

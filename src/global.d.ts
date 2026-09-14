@@ -34,6 +34,8 @@ declare global {
   }
 
   interface Window {
+    /** The canvas as data and its verbs as commands; see canvasApi.ts. Present while the canvas is mounted. */
+    myStates?: import('./canvasApi').CanvasApi
     showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
     Spotify?: typeof Spotify
     onSpotifyWebPlaybackSDKReady?: () => void

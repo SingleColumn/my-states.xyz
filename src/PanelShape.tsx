@@ -1,31 +1,35 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ComponentType } from 'react'
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
   RecordProps,
   Rectangle2d,
-  T,
-  TLBaseShape,
   useEditor,
 } from 'tldraw'
-import { useAppState } from './AppState'
 import type { PanelType } from './types'
-import { getCanonicalPanelLayout, getPanelMinimumSize } from './panelLayout'
+import { getPanelMinimumSize } from './panelLayout'
 import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
+import { panelShapeMigrations, panelShapeProps, type PanelShape } from './panelShapeSchema'
+import { createPanelProps, panelFromShape } from './panelStore'
+import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled } from './panelSurface'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
+export type { PanelShape } from './panelShapeSchema'
 
-export type PanelShape = TLBaseShape<
-  typeof PANEL_SHAPE_TYPE,
-  {
-    w: number
-    h: number
-    panelId: string
-  }
->
+/**
+ * The component that renders each kind of panel. This is the one place a
+ * panel type meets React; the rest of what a type is lives in
+ * panelRegistry.ts. Typed as a record over PanelType so that a type added to
+ * the registry without a renderer is a compile error here.
+ */
+const panelComponents: { readonly [K in PanelType]: ComponentType<{ panelId: string }> } = {
+  spotify: SpotifyPanel,
+  slideshow: SlideshowPanel,
+  notes: NotesPanel,
+}
 
 export function getPanelIdFromShape(shape: PanelShape) {
   return shape.props.panelId
@@ -33,20 +37,22 @@ export function getPanelIdFromShape(shape: PanelShape) {
 
 export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   static override type = PANEL_SHAPE_TYPE
-
-  static override props: RecordProps<PanelShape> = {
-    w: T.number,
-    h: T.number,
-    panelId: T.string,
-  }
+  static override props: RecordProps<PanelShape> = panelShapeProps
+  static override migrations = panelShapeMigrations
 
   override getDefaultProps(): PanelShape['props'] {
-    const layout = getCanonicalPanelLayout('slideshow')
-    return {
-      w: layout.w,
-      h: layout.h,
-      panelId: '',
-    }
+    return createPanelProps('slideshow')
+  }
+
+  // A hidden panel keeps its shape (and so its place and configuration) but
+  // draws nothing and, being locked, is not selectable, movable or deletable
+  // from the canvas. Showing it again is a single write to the shape.
+  override hideSelectionBoundsBg(shape: PanelShape) {
+    return !shape.props.visible
+  }
+
+  override hideSelectionBoundsFg(shape: PanelShape) {
+    return !shape.props.visible
   }
 
   // Deliberately NOT editable, and panel selection deliberately does not set
@@ -69,12 +75,15 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   override component(shape: PanelShape) {
     const editor = useEditor()
     const wheelScopeRef = useNativeWheelScrollScope()
+    if (!shape.props.visible) return null
 
     return (
       <HTMLContainer
         className="canvas-panel-shell"
-        onPointerDownCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
-        onTouchStartCapture={(event) => handlePanelPointerDownCapture(editor, shape.id, event)}
+        onPointerDownCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
+        onTouchStartCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
+        onPointerDown={claimPointerDownForContent}
+        onTouchStart={claimPointerDownForContent}
         onContextMenu={(event) => handlePanelContextMenu(editor, shape.id, event)}
         style={{
           width: shape.props.w,
@@ -82,13 +91,14 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
         }}
       >
         <div ref={wheelScopeRef} className="canvas-panel-wheel-scope">
-          <PanelContent panelId={shape.props.panelId} />
+          <PanelContent shape={shape} />
         </div>
       </HTMLContainer>
     )
   }
 
   override indicator(shape: PanelShape) {
+    if (!shape.props.visible) return null
     return <rect width={shape.props.w} height={shape.props.h} rx={22} ry={22} />
   }
 
@@ -102,7 +112,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
 
   override onResize(shape: PanelShape, info: Parameters<BaseBoxShapeUtil<PanelShape>['onResize']>[1]) {
     const resized = super.onResize(shape, info) as PanelShape
-    const minimum = getPanelMinimumSize('slideshow')
+    const minimum = getPanelMinimumSize(shape.props.panel.type)
     return {
       ...resized,
       props: {
@@ -180,23 +190,12 @@ function findScrollableAncestor(start: Node, boundary: Element): HTMLElement | n
   return null
 }
 
-function PanelContent({ panelId }: { panelId: string }) {
-  const { moments } = useAppState()
-  const panel = moments.activeMoment?.panels.find((candidate) => candidate.id === panelId)
-  if (!panel) return <div className="panel">This panel is no longer available.</div>
-  if (panel.type === 'spotify') return <SpotifyPanel panelId={panel.id} />
-  if (panel.type === 'notes') return <NotesPanel panelId={panel.id} />
-  return <SlideshowPanel panelId={panel.id} />
+function PanelContent({ shape }: { shape: PanelShape }) {
+  const panel = panelFromShape(shape)
+  const Component = panelComponents[panel.type]
+  return <Component panelId={panel.id} />
 }
 
-// The surfaces where a right-click means "act on this text", not "act on this
-// panel" - so the browser's own Cut/Copy/Paste should be offered instead of
-// tldraw's shape clipboard.
-const textEditingSelector = 'input, textarea, .cm-editor, [contenteditable="true"], [role="textbox"]'
-
-function isTextEditingTarget(target: EventTarget | null) {
-  return target instanceof Element && target.closest(textEditingSelector) !== null
-}
 
 /**
  * tldraw's canvas menu offers clipboard actions that operate on shapes, so its
@@ -210,42 +209,67 @@ function handlePanelContextMenu(
   shapeId: PanelShape['id'],
   event: React.MouseEvent<HTMLDivElement>,
 ) {
-  if (isTextEditingTarget(event.target)) {
+  if (isTextInputTarget(event.target)) {
     event.stopPropagation()
     return
   }
   editor.select(shapeId)
 }
 
-function handlePanelPointerDownCapture(
-  editor: ReturnType<typeof useEditor>,
-  shapeId: PanelShape['id'],
-  event: React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
-) {
+type PanelPressEvent = React.PointerEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+
+/**
+ * Capture phase: a press anywhere on the panel selects it, before the content
+ * underneath gets to react. Selection is all that happens here -- see
+ * claimPointerDownForContent for why the "this press is the content's" mark
+ * cannot be made in this phase.
+ */
+function selectPanelOnPointerDown(editor: ReturnType<typeof useEditor>, shapeId: PanelShape['id'], event: PanelPressEvent) {
   const isRightClick = 'button' in event && event.button === 2
 
   // Selecting the panel here would pull focus out of the caret, and tldraw
   // would open its own menu over the text. Leave both alone.
-  if (isRightClick && isTextEditingTarget(event.target)) {
-    ;(event as unknown as { isKilled?: boolean }).isKilled = true
-    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-    return
-  }
+  if (isRightClick && isTextInputTarget(event.target)) return
 
   if (!('button' in event) || event.button === 0 || isRightClick) {
     editor.select(shapeId)
   }
+}
 
-  if (isRightClick) return
+/**
+ * Bubble phase, on the shell: the rule from panelSurface.ts applied once. A
+ * press inside a declared content region is marked as handled so tldraw's
+ * canvas handler, which runs later in this same phase, ignores it; every
+ * other press falls through untouched and tldraw treats it as a press on the
+ * shape.
+ *
+ * This has to be a bubble-phase handler, and the reason is worth knowing.
+ * React dispatches its capture-phase and bubble-phase listeners from two
+ * separate native listeners on the root, and builds a fresh synthetic event
+ * for each, so a flag set on the synthetic event during capture is gone by
+ * the time tldraw's bubble-phase `onPointerDown` on `.tl-canvas` reads it.
+ * The version of this file on main marked the event in a capture handler and
+ * relied, without saying so, on per-widget bubble handlers to do the real
+ * work. Marking here shares the bubble-phase event with tldraw's handler.
+ *
+ * The event is marked rather than stopped so it still reaches the document,
+ * where Radix's outside-click detection and tldraw's own menu-closing logic
+ * listen.
+ */
+function claimPointerDownForContent(event: PanelPressEvent) {
+  const isRightClick = 'button' in event && event.button === 2
   const target = event.target
   if (!(target instanceof Element)) return
 
-  if (target.closest('button, input, select, textarea, label, .cm-editor, [contenteditable="true"], [role="textbox"], [role="option"], [role="combobox"], [data-radix-select-viewport], .mdxeditor-toolbar, .mdxeditor-popup-container, .panel-interactive')) {
-    ;(event as unknown as { isKilled?: boolean }).isKilled = true
-    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
+  // A right-click on text is the browser's: its menu has Cut/Copy/Paste for
+  // the selection, where tldraw's would paste onto the canvas.
+  if (isRightClick) {
+    if (isTextInputTarget(target)) markPointerEventHandled(event)
+    return
+  }
 
-    // Keep the event on the document so tldraw's context menu can observe an
-    // outside click and close before a later right-click opens a new menu.
-    // The killed flag still prevents canvas manipulation.
+  if (isInsidePanelContent(target)) {
+    markPointerEventHandled(event)
   }
 }
+

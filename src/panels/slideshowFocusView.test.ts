@@ -7,12 +7,13 @@ import { SlideshowPanel } from './SlideshowPanel'
 
 const panel = vi.hoisted(() => ({ focusView: false }))
 
-const image = { id: 'image_1', sessionId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
+const image = { id: 'image_1', momentId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
 
 vi.mock('../AppState', () => ({
   useAppState: () => ({
     slideshow: {
       settingsFor: () => ({ folderName: 'Trip', imageSource: { type: 'session-assets' }, currentIndex: 0, intervalMs: 2000, transitionMs: 400, shuffle: false, zoom: 1 }),
+      currentIndexFor: () => 0,
       imagesFor: () => [image],
       statusFor: () => 'Showing 1 of 1',
       errorFor: () => null,
@@ -27,18 +28,15 @@ vi.mock('../AppState', () => ({
       next: () => {},
       previous: () => {},
     },
-    moments: {
-      activeMoment: {
-        id: 'moment_focus',
-        panels: [{
-          id: 'panel_images',
-          type: 'slideshow',
-          focusView: panel.focusView,
-          createdAt: 1,
-          updatedAt: 1,
-          config: { folderName: 'Trip', imageSource: { type: 'session-assets' }, currentIndex: 0, intervalMs: 2000, transitionMs: 400, shuffle: false, zoom: 1 },
-        }],
-      },
+    moments: { activeMoment: { id: 'moment_focus' } },
+    panels: {
+      get: () => ({
+        id: 'panel_images',
+        type: 'slideshow',
+        visible: true,
+        focusView: panel.focusView,
+        config: { folderName: 'Trip', imageSource: { type: 'session-assets' }, currentIndex: 0, intervalMs: 2000, transitionMs: 400, shuffle: false, zoom: 1 },
+      }),
     },
   }),
 }))

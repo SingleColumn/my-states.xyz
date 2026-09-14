@@ -1,4 +1,4 @@
-import { type SyntheticEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ChevronsDownUp,
   ChevronsUpDown,
@@ -17,12 +17,14 @@ import { useAppState } from '../AppState'
 import { defaultSpotifyPlaylistReference } from '../storage'
 import { formatDuration } from '../utils'
 import type { Panel } from '../types'
-import { PanelHeader, stopPanelHeaderEvent, usePanelCommands } from '../PanelHeader'
+import { PanelHeader, usePanelCommands } from '../PanelHeader'
+import { panelContentProps } from '../panelSurface'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
-  const { spotify, moments } = useAppState()
+  const { spotify, moments, panels } = useAppState()
   const commands = usePanelCommands()
-  const panel = moments.activeMoment?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'spotify' }> | undefined
+  const found = panels.get(panelId)
+  const panel = found?.type === 'spotify' ? (found as Panel<'spotify'>) : undefined
   const panelPlaylist = panel?.config.playlist ?? defaultSpotifyPlaylistReference
   // Focus view keeps what someone glances at while they write or look at
   // images: the playlist, the track, and the playback controls.
@@ -70,12 +72,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               className="card-icon-button"
               type="button"
               title="Log out"
-              onPointerDown={stopCanvasEvent}
-              onMouseDown={stopCanvasEvent}
-              onClick={(event) => {
-                stopCanvasEvent(event)
-                spotify.logout()
-              }}
+              onClick={() => spotify.logout()}
             >
               <LogOut size={18} />
             </button>
@@ -87,18 +84,13 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           title={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
           aria-label={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
           aria-pressed={focusView}
-          onPointerDown={stopPanelHeaderEvent}
-          onMouseDown={stopPanelHeaderEvent}
-          onClick={(event) => {
-            stopPanelHeaderEvent(event)
-            commands.togglePanelFocusView(panelId)
-          }}
+          onClick={() => commands.togglePanelFocusView(panelId)}
         >
           {focusView ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}
         </button>
       </PanelHeader>
 
-      <div className="panel-body panel-interactive" {...canvasEventBlockerProps}>
+      <div className="panel-body" {...panelContentProps}>
         {!spotify.tokens ? (
           <div className="card-content spotify-login">
             <div>
@@ -142,9 +134,6 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                     rel="noreferrer"
                     aria-label="Open current item in Spotify"
                     title="Open current item in Spotify"
-                    onPointerDown={stopCanvasEvent}
-                    onMouseDown={stopCanvasEvent}
-                    onClick={stopCanvasEvent}
                   >
                     <ExternalLink aria-hidden="true" />
                   </a>
@@ -268,7 +257,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         )}
       </div>
 
-      <footer className="card-footer panel-interactive" {...canvasEventBlockerProps}>
+      <footer className="card-footer" {...panelContentProps}>
         <span className="card-footer-meta">{panelPlaylist.name ?? 'No playlist loaded'}</span>
         <div className="card-footer-status">
           {/* The panel is titled "Music", so the service is credited here instead —
@@ -285,19 +274,4 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       </footer>
     </section>
   )
-}
-
-function stopCanvasEvent(event: SyntheticEvent) {
-  if ('button' in event && event.button === 2) return
-  ;(event as unknown as { isKilled?: boolean }).isKilled = true
-  ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-}
-
-const canvasEventBlockerProps = {
-  onClick: stopCanvasEvent,
-  onMouseDown: stopCanvasEvent,
-  onPointerDown: stopCanvasEvent,
-  onPointerMove: stopCanvasEvent,
-  onPointerUp: stopCanvasEvent,
-  onWheel: stopCanvasEvent,
 }

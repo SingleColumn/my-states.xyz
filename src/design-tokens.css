@@ -1,75 +1,10 @@
 :root {
-  color-scheme: dark;
   font-family: var(--font-family-ui);
   background: var(--color-canvas);
   color: var(--color-text);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-
-  --color-canvas: #101114;
-  --color-text: #f5f3ee;
-  /* tldraw redefines --color-text on .tl-container for its own light theme,
-     which shadows the value above everywhere inside the canvas. Panel styles
-     must use this un-shadowed alias instead. */
-  --color-panel-text: #f5f3ee;
-  --color-text-muted: rgba(245, 243, 238, 0.64);
-  --color-text-soft: rgba(245, 243, 238, 0.8);
-  --color-danger: #ffb4a9;
-  --color-panel-border: rgba(255, 255, 255, 0.16);
-  --color-control: rgba(255, 255, 255, 0.1);
-  --color-control-border: rgba(255, 255, 255, 0.14);
-  --color-control-border-hover: rgba(255, 255, 255, 0.25);
-  --color-input-bg: rgba(0, 0, 0, 0.24);
-  --color-dropdown-bg: #000;
-  --color-dropdown-text: var(--card-button-icon-color);
-  --color-note-control-bg: rgba(7, 13, 14, 0.94);
-  /* The formatting bar is sticky over the text (MDXEditor pins it at top: 0),
-     so it needs a surface of its own - a transparent bar lets the note scroll
-     visibly through the buttons. */
-  --background-notes-toolbar: rgba(9, 17, 17, 0.97);
-  --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
-  --color-focus-ring: rgba(255, 255, 255, 0.46);
-  /* The slideshow accent lifted toward light. Glows read as emitted light, and
-     #7f77dd itself is too dark to radiate against the near-black chrome, while
-     lifting much further than this washes out to white and loses the palette. */
-  --color-attention-glow: #a49cf0;
-  --color-panel-divider: rgba(255, 255, 255, 0.1);
-  --color-panel-frame: rgba(255, 255, 255, 0.11);
-  --color-card-bg: rgba(0, 0, 0, 0.18);
-  --color-card-bg-hover: rgba(255, 255, 255, 0.11);
-  --color-empty-control: rgba(255, 255, 255, 0.09);
-  --color-empty-control-hover: rgba(255, 255, 255, 0.15);
-  --color-album-empty: rgba(255, 255, 255, 0.08);
-  --color-album-empty-highlight: rgba(255, 255, 255, 0.16);
-  --color-app-badge-border: rgba(255, 255, 255, 0.12);
-  --color-app-badge-text: #f6f2ea;
-  --color-toast-border: rgba(255, 255, 255, 0.15);
-  --color-toast-text: #f8f4ef;
-  --color-input-text: #fffaf2;
-  --color-note-title: #fff8ee;
-  --color-editor-border: rgba(255, 255, 255, 0.12);
-  --color-editor-bg: rgba(12, 23, 22, 0.78);
-
-  --background-app:
-    radial-gradient(circle at 25% 20%, rgba(55, 79, 92, 0.26), transparent 32%),
-    radial-gradient(circle at 80% 12%, rgba(117, 85, 62, 0.2), transparent 27%),
-    linear-gradient(135deg, #101114 0%, #181715 54%, #12151a 100%);
-  --background-canvas-grid:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  --background-album-empty:
-    linear-gradient(135deg, var(--color-album-empty-highlight), transparent),
-    var(--color-album-empty);
-  --background-app-badge: rgba(12, 13, 15, 0.68);
-  --background-toast: rgba(14, 15, 18, 0.92);
-
-  --shadow-panel: 0 26px 70px rgba(0, 0, 0, 0.34);
-  --shadow-app-badge: 0 14px 34px rgba(0, 0, 0, 0.28);
-  --shadow-album-art: 0 14px 32px rgba(0, 0, 0, 0.35);
-
-  --blur-app-badge: blur(18px);
-  --blur-panel: blur(20px);
 
   /* Static rungs, used when panel-relative scaling is unavailable. The .panel
      block redefines these to scale with the panel; the roles below alias them
@@ -318,7 +253,6 @@
   --card-radius: 20px;
   --content-radius: 12px;
   --button-radius: 8px;
-  --card-border: 0.5px solid rgba(255, 255, 255, 0.09);
   --card-padding: 20px;
 
   --card-eyebrow-size: 11px;
@@ -326,21 +260,12 @@
   --card-eyebrow-weight: 700;
   --card-title-size: 20px;
   --card-title-weight: 500;
-  --card-title-color: rgba(255, 255, 255, 0.94);
   --card-header-button-size: 32px;
 
   --card-footer-meta-size: 11px;
-  --card-footer-meta-color: rgba(255, 255, 255, 0.32);
   --card-footer-button-size: 26px;
   --size-card-footer-min-height: calc(26px + (var(--space-card-footer-padding-y) * 2));
 
-  --card-button-bg: rgba(255, 255, 255, 0.04);
-  --card-button-border: rgba(255, 255, 255, 0.1);
-  --card-button-icon-color: rgba(255, 255, 255, 0.58);
-  --card-button-bg-hover: rgba(255, 255, 255, 0.08);
-  --card-button-active-bg: rgba(255, 255, 255, 0.12);
-  --card-button-active-border: rgba(255, 255, 255, 0.18);
-  --card-button-active-icon: rgba(255, 255, 255, 0.75);
 }
 
 /*
@@ -452,7 +377,7 @@
   --image-panel-control-bottom: clamp(12px, min(2.8cqi, 2.2cqb), 110px);
   --image-panel-control-gap: clamp(10px, min(2.4cqi, 1.9cqb), 96px);
 
-  --card-eyebrow-color: color-mix(in srgb, var(--accent) 50%, rgba(255, 255, 255, 0.5));
+  --card-eyebrow-color: color-mix(in srgb, var(--accent) 50%, var(--color-text-soft));
   --card-content-bg: color-mix(in srgb, var(--accent) 7%, transparent);
   --card-primary-bg: color-mix(in srgb, var(--accent) 20%, transparent);
   --card-primary-border: color-mix(in srgb, var(--accent) 45%, transparent);
@@ -460,20 +385,9 @@
   --card-bg-gradient: linear-gradient(160deg, color-mix(in srgb, var(--accent) 28%, transparent), var(--bg) 62%), var(--bg);
 }
 
-/* Per-card identity — the only tokens each card should need to define. */
-.panel-slideshow-surface {
-  --accent: #7f77dd;
-  --bg: #16121f;
-}
-
-.panel-spotify-surface {
-  --accent: #1db954;
-  --bg: #0e1712;
-}
-
+/* Per-card structure. The accent and background each card carries are theme
+   tokens and live in theme.css; only the structural tokens stay here. */
 .panel-notes-surface {
-  --accent: #8fb7a2;
-  --bg: #101918;
   --font-size-notes-panel-title: var(--type-xl);
   --font-size-notes-control-label: var(--type-sm);
   --font-size-notes-control: var(--type-md);

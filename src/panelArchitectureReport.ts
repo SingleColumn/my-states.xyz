@@ -1,6 +1,9 @@
 import type { TLShape } from 'tldraw'
-import type { Panel, Moment } from './types'
+import type { Moment, Panel, PanelContent } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
+import { panelShapeProps, type PanelShape } from './panelShapeSchema'
+import { getPanelDefinition, isPanelType } from './panelRegistry'
+import { MOMENT_SCHEMA_VERSION } from './momentSchema'
 
 export type ArchitectureCheckStatus = 'PASS' | 'WARNING' | 'ERROR'
 
@@ -24,170 +27,144 @@ export interface PanelArchitectureReport {
     warnings: number
     status: ArchitectureCheckStatus
   }
+  /**
+   * Who owns what. This is a description of the running system and is
+   * checked against it below; if the two drift, the report says so.
+   */
   ownership: {
     tldraw: string[]
-    panelModel: string[]
-    persistence: string[]
+    momentRecord: string[]
+    ownStores: string[]
     react: string[]
   }
   panels: Array<{
     panelId: string
     panelType: Panel['type']
     rendererKey: string | null
-    panelModel: {
+    shape: {
+      shapeId: string
+      position: { x: number; y: number }
+      size: { w: number; h: number }
       propertyNames: string[]
       configPropertyNames: string[]
-      contentReferences: Record<string, string | null>
+      index: string
+      visible: boolean
+      focusView: boolean
+      locked: boolean
     }
-    shape: {
-      shapeId: string | null
-      position: { x: number; y: number } | null
-      size: { w: number; h: number } | null
-      propertyNames: string[]
-      index: string | null
-    }
-    persisted: {
-      momentPanelId: string | null
-      canvasLayout: { x: number; y: number; w: number; h: number } | null
-    }
+    contentReferences: Record<string, string | null>
   }>
   checks: PanelArchitectureCheck[]
 }
 
 export interface PanelArchitectureEditor {
-  getCurrentPageShapes(): readonly TLShape[]
+  getCurrentPageShapesSorted(): readonly TLShape[]
 }
 
-const rendererKeys: Record<Panel['type'], string> = {
-  spotify: 'SpotifyPanel',
-  slideshow: 'SlideshowPanel',
-  notes: 'NotesPanel',
-}
-
+/**
+ * Reads the canvas and the moment record and says whether they hold to the
+ * architecture: every panel is one tldraw shape carrying its own
+ * configuration, the configuration validates against the schema, the moment
+ * persists the document and nothing else about panels, and the rules the
+ * registry declares (one of a singleton kind) hold.
+ */
 export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchitectureEditor): PanelArchitectureReport {
-  const shapes = editor.getCurrentPageShapes().filter(isPanelShape)
-  const shapeByPanelId = new Map<string, TLShape[]>()
-  for (const shape of shapes) {
-    const list = shapeByPanelId.get(shape.props.panelId) ?? []
-    list.push(shape)
-    shapeByPanelId.set(shape.props.panelId, list)
-  }
-
-  const panelById = new Map(moment.panels.map((panel) => [panel.id, panel]))
-  const layouts = new Map((moment.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
-  const panels = moment.panels.map((panel) => {
-    const matchingShapes = shapeByPanelId.get(panel.id) ?? []
-    const shape = matchingShapes[0]
-    const layout = layouts.get(panel.id)
-    const shapeProps = shape?.props as { w?: number; h?: number } | undefined
-    return {
-      panelId: panel.id,
-      panelType: panel.type,
-      rendererKey: rendererKeys[panel.type] ?? null,
-      panelModel: {
-        propertyNames: Object.keys(panel).sort(),
-        configPropertyNames: Object.keys(panel.config).sort(),
-        contentReferences: getContentReferences(panel),
-      },
-      shape: {
-        shapeId: shape?.id ?? null,
-        position: shape ? { x: shape.x, y: shape.y } : null,
-        size: shape && typeof shapeProps?.w === 'number' && typeof shapeProps.h === 'number' ? { w: shapeProps.w, h: shapeProps.h } : null,
-        propertyNames: shape ? Object.keys(shape.props).sort() : [],
-        index: shape?.index ?? null,
-      },
-      persisted: {
-        momentPanelId: panelById.has(panel.id) ? panel.id : null,
-        canvasLayout: layout ? { x: layout.x, y: layout.y, w: layout.w, h: layout.h } : null,
-      },
-    }
-  })
-
+  const shapes = editor.getCurrentPageShapesSorted().filter(isPanelShapeRecord)
   const checks: PanelArchitectureCheck[] = []
   const addCheck = (id: string, label: string, status: ArchitectureCheckStatus, details: string) => {
     checks.push({ id, label, status, details })
   }
 
-  const panelIds = moment.panels.map((panel) => panel.id)
+  const panels = shapes.map((shape) => ({
+    panelId: shape.props.panelId,
+    panelType: shape.props.panel.type,
+    rendererKey: isPanelType(shape.props.panel.type) ? getPanelDefinition(shape.props.panel.type).label : null,
+    shape: {
+      shapeId: shape.id,
+      position: { x: shape.x, y: shape.y },
+      size: { w: shape.props.w, h: shape.props.h },
+      propertyNames: Object.keys(shape.props).sort(),
+      configPropertyNames: Object.keys(shape.props.panel.config).sort(),
+      index: shape.index,
+      visible: shape.props.visible,
+      focusView: shape.props.focusView,
+      locked: shape.isLocked,
+    },
+    contentReferences: getContentReferences(shape.props.panel),
+  }))
+
+  const panelIds = shapes.map((shape) => shape.props.panelId)
   const uniquePanelIds = new Set(panelIds)
   addCheck(
     'stable-panel-ids',
-    'Every panel has a unique stable panel ID',
+    'Every panel shape carries a unique panelId',
     panelIds.every(Boolean) && uniquePanelIds.size === panelIds.length ? 'PASS' : 'ERROR',
-    `${panelIds.length} panel objects, ${uniquePanelIds.size} unique IDs`,
+    `${panelIds.length} panel shapes, ${uniquePanelIds.size} unique ids`,
   )
 
-  const panelsWithoutExactlyOneShape = moment.panels.filter((panel) => (shapeByPanelId.get(panel.id)?.length ?? 0) !== 1)
+  const invalid = shapes.flatMap((shape) => {
+    try {
+      panelShapeProps.panel.validate(shape.props.panel)
+      return []
+    } catch (caught) {
+      return [`${shape.props.panelId}: ${caught instanceof Error ? caught.message : String(caught)}`]
+    }
+  })
   addCheck(
-    'panel-shape-cardinality',
-    'Every panel maps to exactly one tldraw shape',
-    panelsWithoutExactlyOneShape.length ? 'ERROR' : 'PASS',
-    panelsWithoutExactlyOneShape.length ? panelsWithoutExactlyOneShape.map((panel) => panel.id).join(', ') : 'All panels have one shape',
+    'config-validates',
+    'Every panel configuration validates against the shape schema',
+    invalid.length ? 'ERROR' : 'PASS',
+    invalid.length ? invalid.join('; ') : 'All configurations validate',
   )
 
-  const orphanShapes = shapes.filter((shape) => !panelById.has(shape.props.panelId))
-  addCheck(
-    'orphan-shapes',
-    'Every tldraw panel shape maps to one panel object',
-    orphanShapes.length ? 'ERROR' : 'PASS',
-    orphanShapes.length ? `${orphanShapes.length} orphan shape(s)` : 'No orphan shapes',
-  )
-
-  const invalidRenderers = moment.panels.filter((panel) => !rendererKeys[panel.type])
+  const unknownTypes = shapes.filter((shape) => !isPanelType(shape.props.panel.type))
   addCheck(
     'renderer-mapping',
-    'Every panel type resolves to a renderer',
-    invalidRenderers.length ? 'ERROR' : 'PASS',
-    invalidRenderers.length ? invalidRenderers.map((panel) => panel.type).join(', ') : 'All panel types have registered renderer keys',
+    'Every panel type is in the registry',
+    unknownTypes.length ? 'ERROR' : 'PASS',
+    unknownTypes.length ? unknownTypes.map((shape) => shape.props.panel.type).join(', ') : 'All panel types are registered',
   )
 
-  const geometryProperties = new Set(['x', 'y', 'w', 'h', 'width', 'height', 'position', 'size'])
-  const modelGeometry = moment.panels.flatMap((panel) => Object.keys(panel).filter((key) => geometryProperties.has(key)))
+  const counts = countByType(shapes)
+  const singletonBreaches = Object.keys(counts).filter((type) => isPanelType(type) && getPanelDefinition(type).singleton && counts[type] > 1)
   addCheck(
-    'geometry-ownership',
-    'Panel model does not own competing canvas geometry',
-    modelGeometry.length ? 'ERROR' : 'PASS',
-    modelGeometry.length ? `Geometry fields found on panel model: ${modelGeometry.join(', ')}` : 'Geometry is owned by tldraw shapes; moment canvas stores the persistence snapshot',
+    'singletons',
+    'A singleton panel kind appears at most once',
+    singletonBreaches.length ? 'ERROR' : 'PASS',
+    singletonBreaches.length ? singletonBreaches.map((type) => `${type}: ${counts[type]}`).join(', ') : 'No singleton kind is duplicated',
   )
 
-  const layoutIds = moment.canvas?.panels?.map((layout) => layout.panelId) ?? []
-  const duplicateLayoutIds = layoutIds.filter((id, index) => layoutIds.indexOf(id) !== index)
-  const orphanLayouts = layoutIds.filter((id) => !panelById.has(id))
+  const hiddenUnlocked = shapes.filter((shape) => !shape.props.visible && !shape.isLocked)
   addCheck(
-    'canvas-persistence-correlation',
-    'Persisted canvas layouts correlate unambiguously with panel objects',
-    duplicateLayoutIds.length || orphanLayouts.length ? 'ERROR' : 'PASS',
-    duplicateLayoutIds.length || orphanLayouts.length ? `Duplicate layouts: ${duplicateLayoutIds.length}; orphan layouts: ${orphanLayouts.length}` : 'Canvas layouts use panelId references',
-  )
-
-  const spotifyCount = moment.panels.filter((panel) => panel.type === 'spotify').length
-  addCheck(
-    'spotify-singleton',
-    'The moment contains at most one Spotify panel',
-    spotifyCount > 1 ? 'ERROR' : 'PASS',
-    `${spotifyCount} Spotify panel(s)`,
-  )
-
-  const deprecatedRepresentations = shapes.filter((shape) => 'panelType' in shape.props).length
-  addCheck(
-    'legacy-runtime-representation',
-    'Deprecated panelType shape identity is not active',
-    deprecatedRepresentations ? 'ERROR' : 'PASS',
-    deprecatedRepresentations ? `${deprecatedRepresentations} shape(s) still use panelType` : 'All shapes use panelId',
+    'hidden-panels-locked',
+    'A hidden panel is locked so the canvas cannot act on it',
+    hiddenUnlocked.length ? 'ERROR' : 'PASS',
+    hiddenUnlocked.length ? hiddenUnlocked.map((shape) => shape.props.panelId).join(', ') : `${shapes.filter((shape) => !shape.props.visible).length} hidden, all locked`,
   )
 
   addCheck(
     'schema-version',
-    'Persisted panel data uses the current moment schema',
-    moment.schemaVersion === 2 ? 'PASS' : 'WARNING',
+    'The moment uses the current schema',
+    moment.schemaVersion === MOMENT_SCHEMA_VERSION ? 'PASS' : 'WARNING',
     `Moment schemaVersion is ${moment.schemaVersion}`,
   )
 
   addCheck(
-    'runtime-persistence-correlation',
-    'Runtime panel objects and persisted panel objects correlate by panelId',
-    panels.every((panel) => panel.persisted.momentPanelId === panel.panelId) ? 'PASS' : 'ERROR',
-    'Panel identity is correlated by panelId',
+    'document-persisted',
+    'The moment persists the tldraw document and no separate panel records',
+    moment.document && !moment.draft ? 'PASS' : moment.document ? 'WARNING' : 'ERROR',
+    moment.document
+      ? moment.draft ? 'Document is present but the draft has not been cleared' : 'Document is the only record of the canvas'
+      : 'No document has been saved for this moment yet',
+  )
+
+  const persistedShapeIds = new Set(moment.document ? Object.keys(moment.document.store).filter((id) => id.startsWith('shape:')) : [])
+  const unpersisted = shapes.filter((shape) => !persistedShapeIds.has(shape.id))
+  addCheck(
+    'document-correlation',
+    'Every shape on the canvas is in the persisted document',
+    !moment.document ? 'WARNING' : unpersisted.length ? 'WARNING' : 'PASS',
+    !moment.document ? 'No document to compare against' : unpersisted.length ? `${unpersisted.length} shape(s) not yet saved (a save is debounced)` : 'Canvas and document agree',
   )
 
   const errors = checks.filter((check) => check.status === 'ERROR').length
@@ -195,33 +172,47 @@ export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchit
   return {
     moment: { id: moment.id, name: moment.name, schemaVersion: moment.schemaVersion },
     summary: {
-      panelCount: moment.panels.length,
+      panelCount: panels.length,
       shapeCount: shapes.length,
       errors,
       warnings,
       status: errors ? 'ERROR' : warnings ? 'WARNING' : 'PASS',
     },
     ownership: {
-      tldraw: ['position', 'dimensions', 'transforms', 'selection', 'canvas interaction', 'shape ordering/index'],
-      panelModel: ['stable panelId', 'panel type', 'persistent semantic/configuration state', 'content references', 'moment membership'],
-      persistence: ['moment panel records', 'canvas geometry snapshots keyed by panelId', 'panel-associated assets and notes'],
-      react: ['component-internal UI state', 'content-specific transient runtime state keyed by panelId where applicable'],
+      tldraw: [
+        'shape identity, position, size, rotation and stacking order',
+        'panel type, configuration, visibility and focus view (as shape props, validated by the schema)',
+        'selection and undo history',
+        'pointer interaction outside a declared content region',
+      ],
+      momentRecord: ['name and timestamps', 'the tldraw document snapshot', 'the camera'],
+      ownStores: ['notes (by moment)', 'image assets and folder handles (by moment and panelId)', 'Spotify tokens (browser-local, never in a moment)'],
+      react: ['component-internal UI state', 'playback state and loaded images, keyed by panelId in AppState runtime maps', 'pointer interaction inside a declared content region'],
     },
     panels,
     checks,
   }
 }
 
-function isPanelShape(shape: TLShape): shape is TLShape & { props: { panelId: string; w: number; h: number } } {
+function isPanelShapeRecord(shape: TLShape): shape is PanelShape {
+  const props = shape.props as Partial<PanelShape['props']> | undefined
   return shape.type === PANEL_SHAPE_TYPE
-    && typeof shape.props === 'object'
-    && shape.props !== null
-    && typeof (shape.props as { panelId?: unknown }).panelId === 'string'
-    && typeof (shape.props as { w?: unknown }).w === 'number'
-    && typeof (shape.props as { h?: unknown }).h === 'number'
+    && typeof props === 'object'
+    && props !== null
+    && typeof props.panelId === 'string'
+    && typeof props.w === 'number'
+    && typeof props.h === 'number'
+    && typeof props.panel === 'object'
+    && props.panel !== null
 }
 
-function getContentReferences(panel: Panel): Record<string, string | null> {
+function countByType(shapes: PanelShape[]) {
+  const counts: Record<string, number> = {}
+  for (const shape of shapes) counts[shape.props.panel.type] = (counts[shape.props.panel.type] ?? 0) + 1
+  return counts
+}
+
+function getContentReferences(panel: PanelContent): Record<string, string | null> {
   if (panel.type === 'notes') return { activeNoteId: panel.config.activeNoteId }
   if (panel.type === 'spotify') return { playlistId: panel.config.playlist.id, playlistUri: panel.config.playlist.uri }
   if (panel.config.imageSource.type === 'bundled') return { imageCollectionId: panel.config.imageSource.collectionId }

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type SyntheticEvent } from 'react'
+import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   BlockTypeSelect,
   BoldItalicUnderlineToggles,
@@ -29,9 +29,10 @@ import { useAppState } from '../AppState'
 import type { Note } from '../types'
 import type { Panel } from '../types'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
+import { panelContentProps } from '../panelSurface'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
-  const { notes, moments } = useAppState()
+  const { notes, panels } = useAppState()
   const commands = usePanelCommands()
   // Full screen is treated as the writing state: the panel sheds its form
   // chrome and becomes a page. The default panel size is deliberately left
@@ -42,7 +43,8 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // starts folded away behind the Aa toggle in both the default panel and
   // writing mode -- one preference, remembered across both.
   const [isToolbarVisible, setIsToolbarVisible] = useState(() => readToolbarVisible())
-  const activeNoteId = (moments.activeMoment?.panels.find(panel => panel.id === panelId) as Extract<Panel, { type: 'notes' }> | undefined)?.config.activeNoteId
+  const found = panels.get(panelId)
+  const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
 
   async function handleDocumentSelection(documentId: string) {
@@ -51,16 +53,15 @@ export function NotesPanel({ panelId }: { panelId: string }) {
       return
     }
 
-    notes.selectNote(documentId, panelId)
+    await notes.selectNote(documentId, panelId)
   }
 
   const noteSelect = (
     <select
       className="app-dropdown note-select"
       value={activeNote?.id ?? ''}
-      onChange={(event) => void handleDocumentSelection(event.target.value)}
+      onChange={(event) => void handleDocumentSelection(event.target.value).catch(() => {})}
       aria-label="Choose a note"
-      {...canvasEventBlockerProps}
     >
       <option value={newDocumentSelectValue}>
         Create new note
@@ -91,9 +92,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             title={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
             aria-label={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
             aria-pressed={isToolbarVisible}
-            {...canvasEventBlockerProps}
-            onClick={(event) => {
-              stopCanvasEvent(event)
+            onClick={() => {
               const next = !isToolbarVisible
               setIsToolbarVisible(next)
               window.localStorage.setItem(toolbarVisibleStorageKey, next ? 'true' : 'false')
@@ -104,7 +103,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         }
       >
           {isWritingMode ? (
-            <label className="writing-note-picker" {...canvasEventBlockerProps}>
+            <label className="writing-note-picker">
               <span className="sr-only">Choose a note</span>
               {noteSelect}
             </label>
@@ -113,10 +112,8 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             className="card-icon-button"
             type="button"
             title="New note"
-            {...canvasEventBlockerProps}
-            onClick={(event) => {
-              stopCanvasEvent(event)
-              void notes.createNote(panelId)
+            onClick={() => {
+              void notes.createNote(panelId).catch(() => {})
             }}
           >
             <FilePlus2 size={18} />
@@ -126,9 +123,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             type="button"
             title="Save markdown file"
             disabled={!activeNote}
-            {...canvasEventBlockerProps}
-            onClick={(event) => {
-              stopCanvasEvent(event)
+            onClick={() => {
               if (activeNote) exportMarkdownNote(activeNote)
             }}
           >
@@ -139,12 +134,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             type="button"
             title="Delete note"
             disabled={!activeNote}
-            {...canvasEventBlockerProps}
-            onClick={(event) => {
-              stopCanvasEvent(event)
+            onClick={() => {
               if (!activeNote) return
               const confirmed = window.confirm(`Delete "${getDisplayNoteTitle(activeNote)}"?`)
-              if (confirmed) void notes.deleteNote(activeNote.id, panelId)
+              if (confirmed) void notes.deleteNote(activeNote.id, panelId).catch(() => {})
             }}
           >
             <Trash2 size={18} />
@@ -153,22 +146,21 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
       <div className={`panel-body notes-body${isWritingMode ? ' notes-body-writing' : ''}`}>
         {isWritingMode ? null : (
-          <div className="notes-document-controls">
-            <label className="note-control-field" {...canvasEventBlockerProps}>
+          <div className="notes-document-controls" {...panelContentProps}>
+            <label className="note-control-field">
               <span>Choose a note</span>
               {noteSelect}
             </label>
 
-            <label className="note-control-field" {...canvasEventBlockerProps}>
+            <label className="note-control-field">
               <span>Note title</span>
               <input
-                className="note-title-input panel-interactive"
+                className="note-title-input"
                 value={activeNote?.title ?? ''}
                 onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
                 disabled={!activeNote}
                 aria-label="Note title"
                 placeholder="Name this note"
-                {...canvasEventBlockerProps}
               />
             </label>
           </div>
@@ -177,22 +169,21 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         {activeNote ? (
           <div
             className={[
-              'notes-editor-blocker',
+              'notes-editor',
               'card-content',
               isWritingMode ? 'is-writing' : '',
               isToolbarVisible ? '' : 'is-toolbar-hidden',
             ].filter(Boolean).join(' ')}
             style={{ '--notes-editor-font-size': fontSize } as CSSProperties}
-            {...canvasEventBlockerProps}
+            {...panelContentProps}
           >
             {isWritingMode ? (
               <input
-                className="writing-title panel-interactive"
+                className="writing-title"
                 value={activeNote.title}
                 onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
                 aria-label="Note title"
                 placeholder="Untitled"
-                {...canvasEventBlockerProps}
               />
             ) : null}
             <MDXEditor
@@ -209,15 +200,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             />
           </div>
         ) : (
-          <div className="notes-empty-state">
+          <div className="notes-empty-state" {...panelContentProps}>
             <h3>Start a note</h3>
             <button
               className="card-icon-button is-primary is-wide empty-note-button"
               type="button"
-              {...canvasEventBlockerProps}
-              onClick={(event) => {
-                stopCanvasEvent(event)
-                void notes.createNote(panelId)
+              onClick={() => {
+                void notes.createNote(panelId).catch(() => {})
               }}
             >
               <FilePlus2 size={18} />
@@ -227,7 +216,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         )}
       </div>
 
-      <footer className="card-footer panel-interactive">
+      <footer className="card-footer" {...panelContentProps}>
         <span className="card-footer-meta">
           {activeNote
             ? isWritingMode
@@ -271,25 +260,6 @@ function countWords(markdown: string) {
 
 function formatWordCount(count: number) {
   return `${count} ${count === 1 ? 'word' : 'words'}`
-}
-
-const canvasEventBlockerProps = {
-  onBeforeInput: stopCanvasEvent,
-  onClick: stopCanvasEvent,
-  onCompositionEnd: stopCanvasEvent,
-  onCompositionStart: stopCanvasEvent,
-  onCopy: stopCanvasEvent,
-  onCut: stopCanvasEvent,
-  onDoubleClick: stopCanvasEvent,
-  onInput: stopCanvasEvent,
-  onKeyDown: stopCanvasEvent,
-  onKeyUp: stopCanvasEvent,
-  onMouseDown: stopCanvasEvent,
-  onPaste: stopCanvasEvent,
-  onPointerDown: stopCanvasEvent,
-  onPointerMove: stopCanvasEvent,
-  onPointerUp: stopCanvasEvent,
-  onWheel: stopCanvasEvent,
 }
 
 function createNotesEditorPlugins(fontSize: string, onFontSizeChange: (value: string) => void) {
@@ -360,24 +330,6 @@ function handleToolbarPointerDownCapture(event: ReactPointerEvent<HTMLDivElement
     code: 'Escape',
     bubbles: true,
   }))
-}
-
-function stopCanvasEvent(event: SyntheticEvent) {
-  if ('button' in event && event.button === 2) return
-  // Radix uses document-level pointer events to detect outside clicks. Let
-  // select triggers and options bubble so clicking the open trigger can close
-  // the menu again.
-  if (event.target instanceof Element && event.target.closest('[role="combobox"], [role="option"], [data-radix-select-viewport]')) {
-    return
-  }
-
-  // The notes editor needs the browser's native drag-to-select behavior. The
-  // killed flag prevents most tldraw handling, while stopping propagation
-  // keeps the canvas pointer handlers from starting a panel drag during a
-  // selection gesture.
-  event.stopPropagation()
-  event.nativeEvent.stopPropagation()
-
 }
 
 function exportMarkdownNote(note: Note) {

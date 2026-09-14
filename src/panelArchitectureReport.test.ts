@@ -1,127 +1,121 @@
 import { describe, expect, it } from 'vitest'
-import type { TLShape } from 'tldraw'
+import type { TLShape, TLStoreSnapshot } from 'tldraw'
 import { buildPanelArchitectureReport } from './panelArchitectureReport'
-import { duplicatePanel } from './panelDuplication'
-import type { Panel, Moment } from './types'
+import { createPanelProps } from './panelStore'
+import type { Moment, PanelType } from './types'
 
-function makePanel(type: Panel['type'], id = `panel-${type}`): Panel {
-  const base = { id, type, createdAt: 1, updatedAt: 1 }
-  if (type === 'spotify') return { ...base, type, config: { playlist: { id: null, uri: null, name: null, url: null } } }
-  if (type === 'notes') return { ...base, type, config: { activeNoteId: null } }
-  return {
-    ...base,
-    type,
-    config: {
-      folderName: null,
-      imageSource: { type: 'none' },
-      currentIndex: 0,
-      intervalMs: 5000,
-      transitionMs: 300,
-      shuffle: false,
-      zoom: 1,
-    },
-  }
-}
-
-function makeShape(panelId: string, id = `shape:${panelId}`, x = 10): TLShape {
+function makeShape(type: PanelType, panelId: string, id = `shape:${panelId}`, overrides: Partial<{ x: number; index: string; isLocked: boolean; visible: boolean; config: unknown }> = {}): TLShape {
+  const props = createPanelProps(type, panelId)
   return {
     id,
     type: 'music-panel',
-    x,
+    x: overrides.x ?? 10,
     y: 20,
     rotation: 0,
-    index: 'a1',
+    index: overrides.index ?? 'a1',
     parentId: 'page:page',
-    isLocked: false,
+    isLocked: overrides.isLocked ?? false,
     opacity: 1,
-    props: { panelId, w: 460, h: 720 },
+    props: {
+      ...props,
+      visible: overrides.visible ?? true,
+      panel: overrides.config !== undefined ? { type, config: overrides.config } : props.panel,
+    },
     meta: {},
     typeName: 'shape',
   } as unknown as TLShape
 }
 
-function makeMoment(panels: Panel[], layouts = panels.map((panel, index) => ({ panelId: panel.id, x: index * 500, y: 0, w: 460, h: 720 }))): Moment {
+function makeMoment(shapes: TLShape[], overrides: Partial<Moment> = {}): Moment {
+  const document: TLStoreSnapshot = {
+    store: Object.fromEntries(shapes.map((shape) => [shape.id, shape])) as TLStoreSnapshot['store'],
+    schema: { schemaVersion: 2, sequences: {} },
+  }
   return {
     id: 'moment-1',
     name: 'Test moment',
-    schemaVersion: 2,
+    schemaVersion: 1,
     createdAt: 1,
     updatedAt: 1,
-    panels,
-    canvas: { camera: { x: 0, y: 0, z: 1 }, panels: layouts },
+    camera: { x: 0, y: 0, z: 1 },
+    document,
+    ...overrides,
   }
 }
 
 function editorWith(...shapes: TLShape[]) {
-  return { getCurrentPageShapes: () => shapes }
+  return { getCurrentPageShapesSorted: () => shapes }
 }
+
+const check = (report: ReturnType<typeof buildPanelArchitectureReport>, id: string) => report.checks.find((candidate) => candidate.id === id)?.status
 
 describe('panel architecture report', () => {
   it('reports a healthy single-panel state', () => {
-    const panel = makePanel('notes')
-    const report = buildPanelArchitectureReport(makeMoment([panel]), editorWith(makeShape(panel.id)))
+    const shape = makeShape('notes', 'panel-notes')
+    const report = buildPanelArchitectureReport(makeMoment([shape]), editorWith(shape))
 
     expect(report.summary.status).toBe('PASS')
     expect(report.summary.errors).toBe(0)
-    expect(report.panels[0]).toMatchObject({ panelId: panel.id, panelType: 'notes', rendererKey: 'NotesPanel' })
+    expect(report.panels[0]).toMatchObject({ panelId: 'panel-notes', panelType: 'notes', rendererKey: 'Notes' })
   })
 
-  it('reports multiple panel types and explicit ownership', () => {
-    const panels = [makePanel('spotify'), makePanel('slideshow'), makePanel('notes')]
-    const report = buildPanelArchitectureReport(makeMoment(panels), editorWith(...panels.map((panel) => makeShape(panel.id))))
+  it('reports every panel kind and describes ownership as the system has it', () => {
+    const shapes = [makeShape('spotify', 'p1', 'shape:1', { index: 'a1' }), makeShape('slideshow', 'p2', 'shape:2', { index: 'a2' }), makeShape('notes', 'p3', 'shape:3', { index: 'a3' })]
+    const report = buildPanelArchitectureReport(makeMoment(shapes), editorWith(...shapes))
 
     expect(report.summary.status).toBe('PASS')
-    expect(report.ownership.tldraw).toContain('position')
-    expect(report.ownership.panelModel).toContain('stable panelId')
+    expect(report.ownership.tldraw.join(' ')).toContain('configuration')
+    expect(report.ownership.tldraw.join(' ')).toContain('outside a declared content region')
+    expect(report.ownership.momentRecord).toContain('the tldraw document snapshot')
     expect(report.ownership.react).toContain('component-internal UI state')
   })
 
-  it('reports missing and orphaned relationships', () => {
-    const panel = makePanel('notes')
-    const report = buildPanelArchitectureReport(makeMoment([panel]), editorWith(makeShape('missing-panel')))
+  it('reports two shapes sharing a panelId', () => {
+    const one = makeShape('slideshow', 'panel-a', 'shape:one')
+    const two = makeShape('slideshow', 'panel-a', 'shape:two')
+    const report = buildPanelArchitectureReport(makeMoment([one, two]), editorWith(one, two))
 
+    expect(check(report, 'stable-panel-ids')).toBe('ERROR')
     expect(report.summary.status).toBe('ERROR')
-    expect(report.checks.find((check) => check.id === 'panel-shape-cardinality')?.status).toBe('ERROR')
-    expect(report.checks.find((check) => check.id === 'orphan-shapes')?.status).toBe('ERROR')
   })
 
-  it('reports duplicate shape references and stale legacy shape identity', () => {
-    const panel = makePanel('slideshow')
-    const duplicateShape = { ...makeShape(panel.id, 'shape:two'), props: { ...makeShape(panel.id).props, panelType: 'slideshow' } } as unknown as TLShape
-    const report = buildPanelArchitectureReport(makeMoment([panel]), editorWith(makeShape(panel.id, 'shape:one'), duplicateShape))
+  it('reports a configuration the schema rejects', () => {
+    const shape = makeShape('slideshow', 'panel-a', 'shape:a', { config: { folderName: null, imageSource: { type: 'folder' }, currentIndex: 1.5, intervalMs: 5000, transitionMs: 0, shuffle: false, zoom: 1 } })
+    const report = buildPanelArchitectureReport(makeMoment([shape]), editorWith(shape))
 
-    expect(report.checks.find((check) => check.id === 'panel-shape-cardinality')?.status).toBe('ERROR')
-    expect(report.checks.find((check) => check.id === 'legacy-runtime-representation')?.status).toBe('ERROR')
+    expect(check(report, 'config-validates')).toBe('ERROR')
   })
 
-  it('reports duplicated panels as independently addressable objects', () => {
-    const source = makePanel('slideshow', 'panel-source')
-    const duplicate = duplicatePanel(source)
-    expect(duplicate).not.toBeNull()
-    const report = buildPanelArchitectureReport(
-      makeMoment([source, duplicate!]),
-      editorWith(makeShape(source.id, 'shape:source'), makeShape(duplicate!.id, 'shape:duplicate', 510)),
-    )
+  it('reports a second copy of a singleton kind', () => {
+    const one = makeShape('spotify', 'panel-a', 'shape:one')
+    const two = makeShape('spotify', 'panel-b', 'shape:two')
+    const report = buildPanelArchitectureReport(makeMoment([one, two]), editorWith(one, two))
 
-    expect(report.summary.status).toBe('PASS')
-    expect(report.panels.map((panel) => panel.panelId)).toEqual([source.id, duplicate!.id])
-    expect(source.id).not.toBe(duplicate!.id)
+    expect(check(report, 'singletons')).toBe('ERROR')
   })
 
-  it('reports deletion when a shape remains for a deleted panel', () => {
-    const remaining = makePanel('notes', 'panel-remaining')
-    const deletedShape = makeShape('panel-deleted', 'shape:deleted')
-    const report = buildPanelArchitectureReport(makeMoment([remaining]), editorWith(makeShape(remaining.id), deletedShape))
-
-    expect(report.checks.find((check) => check.id === 'orphan-shapes')?.status).toBe('ERROR')
+  it('reports a hidden panel that the canvas could still act on', () => {
+    const hidden = makeShape('notes', 'panel-a', 'shape:a', { visible: false, isLocked: false })
+    const locked = makeShape('notes', 'panel-b', 'shape:b', { visible: false, isLocked: true })
+    expect(check(buildPanelArchitectureReport(makeMoment([hidden]), editorWith(hidden)), 'hidden-panels-locked')).toBe('ERROR')
+    expect(check(buildPanelArchitectureReport(makeMoment([locked]), editorWith(locked)), 'hidden-panels-locked')).toBe('PASS')
   })
 
-  it('keeps legacy schema compatibility visible without treating it as an identity failure', () => {
-    const panel = makePanel('notes')
-    const legacy = { ...makeMoment([panel]), schemaVersion: 1 as Moment['schemaVersion'] }
-    const report = buildPanelArchitectureReport(legacy, editorWith(makeShape(panel.id)))
+  it('reports a moment whose document has not been built yet, and one that kept its draft', () => {
+    const shape = makeShape('notes', 'panel-a')
+    const notBuilt = makeMoment([shape], { document: null, draft: { panels: [], canvas: null } })
+    expect(check(buildPanelArchitectureReport(notBuilt, editorWith(shape)), 'document-persisted')).toBe('ERROR')
 
-    expect(report.checks.find((check) => check.id === 'schema-version')?.status).toBe('WARNING')
-    expect(report.checks.find((check) => check.id === 'stable-panel-ids')?.status).toBe('PASS')
+    const stale = makeMoment([shape], { draft: { panels: [], canvas: null } })
+    expect(check(buildPanelArchitectureReport(stale, editorWith(shape)), 'document-persisted')).toBe('WARNING')
+  })
+
+  it('reports a shape the document has not caught up with as a warning, not a violation', () => {
+    const saved = makeShape('notes', 'panel-a', 'shape:a')
+    const fresh = makeShape('notes', 'panel-b', 'shape:b')
+    const report = buildPanelArchitectureReport(makeMoment([saved]), editorWith(saved, fresh))
+
+    expect(check(report, 'document-correlation')).toBe('WARNING')
+    expect(report.summary.status).toBe('WARNING')
   })
 })

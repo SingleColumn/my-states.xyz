@@ -4,8 +4,9 @@ import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 import { SampleCollectionCard, useBundledCollections } from './SampleCollectionCard'
-import { PanelHeader, stopPanelHeaderEvent, usePanelCommands } from '../PanelHeader'
+import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { ImageAttributionOverlay } from './imageAttribution'
+import { panelContentProps } from '../panelSurface'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 5000
@@ -17,11 +18,19 @@ const focusHintDurationMs = 3500
    entered most recently acts. */
 const focusViewStack: string[] = []
 
+/**
+ * This panel follows the content-region rule in panelSurface.ts. It carries no pointer
+ * handlers of its own and no pointer-events overrides: each region the
+ * user operates -- the header actions, the picture, the controls, the footer
+ * -- is declared with `panelContentProps`, and nothing else is.
+ */
 export function SlideshowPanel({ panelId }: { panelId: string }) {
-  const { slideshow, moments } = useAppState()
+  const { slideshow, panels } = useAppState()
   const commands = usePanelCommands()
-  const panel = moments.activeMoment?.panels.find(candidate => candidate.id === panelId) as Extract<Panel, { type: 'slideshow' }> | undefined
+  const found = panels.get(panelId)
+  const panel = found?.type === 'slideshow' ? (found as Panel<'slideshow'>) : undefined
   const panelSettings = panel?.config ?? slideshow.settingsFor(panelId)
+  const currentIndex = slideshow.currentIndexFor(panelId)
   // Focus view leaves the picture alone on the panel: every control is dropped,
   // including the header, so Escape is the only way back out.
   const focusView = panel?.focusView === true
@@ -30,7 +39,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const panelStatus = slideshow.statusFor(panelId)
   const panelError = slideshow.errorFor(panelId)
   const firstImage = panelImages[0]
-  const currentImage = panelImages[panelSettings.currentIndex]
+  const currentImage = panelImages[currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
   const [isSamplePickerOpen, setIsSamplePickerOpen] = useState(false)
@@ -39,6 +48,12 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const attribution = currentImage?.attribution ?? null
   const [isFocusHintVisible, setIsFocusHintVisible] = useState(false)
   const focusHintTimeoutRef = useRef<number | null>(null)
+
+  // The stage is content whenever it holds something to operate: the empty
+  // state's buttons, or a picture a click must not drag. In focus view the
+  // header that normally drags the panel is gone, so the picture becomes
+  // frame and the whole panel can be moved by it.
+  const stageIsContent = !(focusView && currentImage)
 
   function revealFocusHint() {
     if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
@@ -99,12 +114,6 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
     await slideshow.selectBundledCollection(collectionId, panelId)
   }
 
-  function stopCanvasEvent(event: React.SyntheticEvent) {
-    if ('button' in event && event.button === 2) return
-    ;(event as unknown as { isKilled?: boolean }).isKilled = true
-    ;(event.nativeEvent as unknown as { isKilled?: boolean }).isKilled = true
-  }
-
   return (
     <section
       className={focusView ? 'panel panel-slideshow-surface is-focus-view' : 'panel panel-slideshow-surface'}
@@ -120,10 +129,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             aria-label={`${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`}
             aria-controls="loaded-images-picker"
             aria-expanded={isImagePickerOpen}
-            onPointerDown={stopCanvasEvent}
             onClick={() => { setIsSamplePickerOpen(false); setIsImagePickerOpen((current) => !current) }}
           ><Images size={18} /></button>
-          <button className="card-icon-button" type="button" title="Choose a local folder" aria-label="Choose a local folder" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}>
+          <button className="card-icon-button" type="button" title="Choose a local folder" aria-label="Choose a local folder" onClick={() => void chooseFolder()}>
             <FolderOpen size={18} />
           </button>
           <button
@@ -133,10 +141,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             aria-label="Load a sample collection"
             aria-controls="sample-collection-picker"
             aria-expanded={isSamplePickerOpen}
-            onPointerDown={stopCanvasEvent}
             onClick={() => { setIsImagePickerOpen(false); setIsSamplePickerOpen((current) => !current) }}
           ><Sparkles size={18} /></button>
-          <button className="card-icon-button" type="button" title="Clear images" aria-label="Clear images" onPointerDown={stopCanvasEvent} onClick={() => void slideshow.resetFolder(panelId)}>
+          <button className="card-icon-button" type="button" title="Clear images" aria-label="Clear images" onClick={() => void slideshow.resetFolder(panelId)}>
             <Trash2 size={18} />
           </button>
           <button
@@ -145,17 +152,15 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             title={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
             aria-label={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
             aria-pressed={focusView}
-            onPointerDown={stopPanelHeaderEvent}
-            onMouseDown={stopPanelHeaderEvent}
-            onClick={(event) => { stopPanelHeaderEvent(event); commands.togglePanelFocusView(panelId) }}
+            onClick={() => commands.togglePanelFocusView(panelId)}
           >{focusView ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}</button>
         {isImagePickerOpen ? (
-          <section className="slideshow-image-picker panel-interactive" id="loaded-images-picker" aria-label="Loaded images" onPointerDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+          <section className="slideshow-image-picker" id="loaded-images-picker" aria-label="Loaded images" {...panelContentProps}>
             <div className="slideshow-image-picker-heading"><span>Loaded images</span><span>{panelImages.length ? `${panelImages.length} total` : 'None yet'}</span></div>
             {panelImages.length ? (
               <div className="slideshow-image-picker-list">
                 {panelImages.map((image, index) => (
-                  <button className={`slideshow-image-thumbnail ${index === panelSettings.currentIndex ? 'is-current' : ''}`} type="button" key={image.id} aria-label={`Show ${image.name}`} aria-pressed={index === panelSettings.currentIndex} title={image.name} onClick={() => slideshow.updateSettings({ currentIndex: index }, panelId)}>
+                  <button className={`slideshow-image-thumbnail ${index === currentIndex ? 'is-current' : ''}`} type="button" key={image.id} aria-label={`Show ${image.name}`} aria-pressed={index === currentIndex} title={image.name} onClick={() => slideshow.updateSettings({ currentIndex: index }, panelId)}>
                     <img src={image.url} alt="" draggable={false} />
                   </button>
                 ))}
@@ -165,7 +170,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         ) : null}
 
         {isSamplePickerOpen ? (
-          <section className="sample-collection-popover panel-interactive" id="sample-collection-picker" aria-label="Sample collections" onPointerDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+          <section className="sample-collection-popover" id="sample-collection-picker" aria-label="Sample collections" {...panelContentProps}>
             <span className="sample-collection-heading">Sample collections</span>
             <div className="sample-collection-list">
               {collections.map((collection) => (
@@ -186,20 +191,15 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
 
       {/* Focus view drops the aspect-ratio box so the stage fills the panel and the
           picture, which is contained inside it, gets every pixel the panel allows. */}
-      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView ? undefined : stageAspectRatio }}>
+      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView ? undefined : stageAspectRatio }} {...(stageIsContent ? panelContentProps : {})}>
         {currentImage ? (
           <>
-          {/* In focus view the picture covers the whole panel and the header that
-              normally drags it is gone, so the image has to let the press reach the
-              canvas. Everywhere else it still swallows the press, which keeps a
-              click on the picture from moving the panel. */}
           <CrossfadeImage
             image={currentImage}
             transitionMs={panelSettings.transitionMs}
             zoom={panelSettings.zoom}
-            onPointerDown={focusView ? undefined : stopCanvasEvent}
           />
-          {attribution ? <ImageAttributionOverlay attribution={attribution} onPointerDown={stopCanvasEvent} /> : null}
+          {attribution ? <ImageAttributionOverlay attribution={attribution} /> : null}
           {focusView ? (
             <p className={isFocusHintVisible ? 'focus-view-hint is-visible' : 'focus-view-hint'} role="status">
               Press <kbd>Esc</kbd> to show the controls
@@ -212,7 +212,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
                 so neither the folder nor the samples read as the afterthought. */}
             <div className="empty-stage-option">
               <h3>Select images from a folder</h3>
-              <button className="card-icon-button is-wide empty-stage-folder-button" type="button" onPointerDown={stopCanvasEvent} onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
+              <button className="card-icon-button is-wide empty-stage-folder-button" type="button" onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
             </div>
             <div className="empty-stage-option">
               <h3>Or try a sample collection</h3>
@@ -223,7 +223,6 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
                     collection={collection}
                     variant="tile"
                     onSelect={() => void chooseSample(collection.id)}
-                    onPointerDown={stopCanvasEvent}
                   />
                 ))}
               </div>
@@ -235,7 +234,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
 
       {focusView ? null : (
         <>
-        <div className="panel-body panel-interactive slideshow-controls" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent} onDragStart={(event) => event.preventDefault()}>
+        <div className="panel-body slideshow-controls" {...panelContentProps} onDragStart={(event) => event.preventDefault()}>
           <div className="transport-row">
             <button className="card-icon-button" type="button" title="Previous image" aria-label="Previous image" onClick={() => slideshow.previous(panelId)}><SkipBack size={18} /></button>
             <button className="card-icon-button is-primary is-large" type="button" title="Start or pause" aria-label={slideshow.isPlayingFor(panelId) ? 'Pause slideshow' : 'Start slideshow'} onClick={() => slideshow.setIsPlaying(!slideshow.isPlayingFor(panelId), panelId)}>{slideshow.isPlayingFor(panelId) ? <Pause size={20} /> : <Play size={20} />}</button>
@@ -254,10 +253,10 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           </div>
         </div>
 
-        <footer className="card-footer panel-interactive" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
+        <footer className="card-footer" {...panelContentProps}>
             <span className="card-footer-meta">{currentImage?.name ?? panelStatus}</span>
           <div className="card-footer-status">
-            {panelError ? <span className="error-text">{panelError}</span> : <span>{panelImages.length ? `${panelSettings.currentIndex + 1} / ${panelImages.length}` : '0 / 0'}</span>}
+            {panelError ? <span className="error-text">{panelError}</span> : <span>{panelImages.length ? `${currentIndex + 1} / ${panelImages.length}` : '0 / 0'}</span>}
           </div>
         </footer>
         </>
@@ -271,12 +270,10 @@ function CrossfadeImage({
   image,
   transitionMs,
   zoom,
-  onPointerDown,
 }: {
   image: ImageItem
   transitionMs: number
   zoom: number
-  onPointerDown?(event: React.SyntheticEvent): void
 }) {
   const [displayedImage, setDisplayedImage] = useState(image)
   const [outgoingImage, setOutgoingImage] = useState<ImageItem | null>(null)
@@ -296,6 +293,9 @@ function CrossfadeImage({
   }, [image])
 
   const imageStyle = { transform: `scale(${zoom})` }
+  // The browser's own image drag would fight both the panel drag (focus view)
+  // and the click that must not drag (full view); neither wants it.
+  const preventNativeDrag = (event: React.DragEvent) => event.preventDefault()
 
   return (
     <>
@@ -306,8 +306,7 @@ function CrossfadeImage({
           alt=""
           aria-hidden="true"
           draggable={false}
-          onDragStart={(event) => { event.preventDefault(); onPointerDown?.(event) }}
-          onPointerDown={onPointerDown}
+          onDragStart={preventNativeDrag}
           style={imageStyle}
         />
       ) : null}
@@ -317,8 +316,7 @@ function CrossfadeImage({
         src={displayedImage.url}
         alt={displayedImage.name}
         draggable={false}
-        onDragStart={(event) => { event.preventDefault(); onPointerDown?.(event) }}
-        onPointerDown={onPointerDown}
+        onDragStart={preventNativeDrag}
         style={{ ...imageStyle, animationDuration: `${transitionMs}ms` }}
       />
     </>
