@@ -7,15 +7,12 @@ import {
   momentLimits,
 } from './storage'
 import { draftFromDocument } from './panelStore'
+import { normalizeDraftPanel } from './panelInput'
 import type {
   CanvasState,
-  MomentDraft,
-  Moment,
   Note,
   Panel,
   MomentImage,
-  SlideshowSettings,
-  SpotifyPlaylistReference,
 } from './types'
 
 /**
@@ -75,7 +72,7 @@ export async function exportMomentArchive(momentId: string) {
   // The archive carries a moment as a draft, in the app's own terms: the
   // tldraw document is the app's persistence format, not its interchange
   // format, so a change to tldraw's is not a change to the file.
-  const { panels: draftPanels, canvas } = draftForArchive(moment)
+  const { panels: draftPanels, canvas } = draftFromDocument(moment.document, moment.camera)
   const noteIds = new Set(notes.map((note) => note.id))
   // A Notes panel can be left pointing at a note that no longer exists (a
   // second panel showing a note deleted through a different one). Import
@@ -192,11 +189,6 @@ export function downloadMomentArchive(blob: Blob, momentName: string) {
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
-}
-
-function draftForArchive(moment: Moment): MomentDraft {
-  if (moment.document) return draftFromDocument(moment.document, moment.camera)
-  return moment.draft ?? { panels: [], canvas: null }
 }
 
 function validateExportContent(notes: Note[], assets: Array<MomentImage & { blob: Blob }>) {
@@ -460,37 +452,6 @@ function isMomentMetadata(value: unknown): value is MomentManifest['moment'] {
   )
 }
 
-function isPlaylistReference(value: unknown): value is SpotifyPlaylistReference {
-  return isRecord(value) && ['id', 'uri', 'name', 'url'].every((key) => value[key] === null || typeof value[key] === 'string')
-}
-
-function isSlideshowSettings(value: unknown): value is SlideshowSettings {
-  return (
-    isRecord(value) &&
-    (value.folderName === null || typeof value.folderName === 'string') &&
-    (value.imageSource === undefined || isImageSource(value.imageSource)) &&
-    typeof value.currentIndex === 'number' &&
-    Number.isInteger(value.currentIndex) &&
-    value.currentIndex >= 0 &&
-    typeof value.intervalMs === 'number' &&
-    Number.isFinite(value.intervalMs) &&
-    value.intervalMs >= 100 &&
-    typeof value.transitionMs === 'number' &&
-    Number.isFinite(value.transitionMs) &&
-    value.transitionMs >= 0 &&
-    typeof value.shuffle === 'boolean' &&
-    typeof value.zoom === 'number' &&
-    Number.isFinite(value.zoom) &&
-    value.zoom > 0
-  )
-}
-
-function isImageSource(value: unknown) {
-  if (!isRecord(value) || typeof value.type !== 'string') return false
-  if (value.type === 'none' || value.type === 'session-assets') return true
-  return value.type === 'bundled' && typeof value.collectionId === 'string' && value.collectionId.length > 0
-}
-
 function isCanvasState(value: unknown): value is CanvasState | null {
   if (value === null) return true
   if (!isRecord(value) || !isRecord(value.camera) || !Array.isArray(value.panels)) return false
@@ -506,17 +467,23 @@ function isCanvasState(value: unknown): value is CanvasState | null {
   )
 }
 
+/**
+ * Whether every entry is a well-formed panel, by trying the one place that
+ * already knows what "well-formed" means for each registered type
+ * (`normalizeDraftPanel`, which reads the registry) rather than a second,
+ * hand-written check kept in step with it by hand.
+ */
 function isPanels(value: unknown): value is Panel[] {
   if (!Array.isArray(value)) return false
   const ids = new Set<string>()
   return value.every((panel) => {
     if (!isRecord(panel) || !isSafeId(panel.id) || ids.has(panel.id)) return false
-    if (panel.visible !== undefined && typeof panel.visible !== 'boolean') return false
-    if (panel.focusView !== undefined && typeof panel.focusView !== 'boolean') return false
+    try {
+      normalizeDraftPanel(panel)
+    } catch {
+      return false
+    }
     ids.add(panel.id)
-    if (panel.type === 'spotify') return isRecord(panel.config) && isPlaylistReference(panel.config.playlist)
-    if (panel.type === 'slideshow') return isRecord(panel.config) && isSlideshowSettings(panel.config)
-    if (panel.type === 'notes') return isRecord(panel.config) && (panel.config.activeNoteId === null || isSafeId(panel.config.activeNoteId))
-    return false
+    return true
   })
 }

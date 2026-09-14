@@ -8,9 +8,10 @@ import {
   importMomentContent,
   normalizeSlideshowSettings,
 } from './storage'
+import { draftFromDocument } from './panelStore'
 import type { Moment, Panel } from './types'
 
-const slideshowOf = (moment: Moment | undefined) => moment?.draft?.panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+const slideshowOf = (moment: Moment | undefined) => moment && draftFromDocument(moment.document, moment.camera).panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
 
 describe('persisted slideshow image sources', () => {
   it('defaults a missing image source to none and fills other missing settings from the registry', () => {

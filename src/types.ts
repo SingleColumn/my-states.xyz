@@ -132,11 +132,12 @@ export interface CanvasCamera {
 }
 
 /**
- * A moment's canvas in the app's own terms: its panels and where they sit.
- * Every new or imported moment starts as a draft; the canvas turns it into
- * a tldraw document the first time it opens the moment, and the draft is
- * dropped. The exported archive carries a draft too, so the file format
- * stays in the app's vocabulary rather than tldraw's.
+ * A moment's canvas in the app's own terms: its panels and where they sit,
+ * rather than tldraw's document shape. This is the interchange format: a
+ * new or imported moment is built from one (storage turns it straight into
+ * a document, with no editor involved), and the exported archive carries
+ * one too, so the file format stays in the app's own vocabulary and a
+ * change to tldraw's does not become a change to the file.
  */
 export interface MomentDraft {
   panels: Panel[]
@@ -146,16 +147,12 @@ export interface MomentDraft {
 export interface Moment {
   id: string
   name: string
-  schemaVersion: 1
+  schemaVersion: 2
   createdAt: number
   updatedAt: number
   camera: CanvasCamera | null
-  /**
-   * tldraw's document: every panel shape with its geometry, order and
-   * configuration. Null until the canvas has built it from `draft`.
-   */
-  document: TLStoreSnapshot | null
-  draft?: MomentDraft
+  /** tldraw's document: every panel shape with its geometry, order and configuration. */
+  document: TLStoreSnapshot
 }
 
 export interface MomentSummary {

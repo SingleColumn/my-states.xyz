@@ -1,7 +1,7 @@
-import { T, createShapeId, type Editor, type TLShape, type TLShapePartial, type TLStoreSnapshot } from 'tldraw'
+import { T, createShapeId, createTLStore, getIndices, type Editor, type TLPage, type TLShape, type TLShapePartial, type TLStoreSnapshot } from 'tldraw'
 import type { CanvasCamera, MomentDraft, Panel, PanelConfigs, PanelLayout, PanelType } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
-import { panelShapeProps, type PanelShape, type PanelShapeProps } from './panelShapeSchema'
+import { documentSchema, panelShapeProps, type PanelShape, type PanelShapeProps } from './panelShapeSchema'
 import { getPanelDefinition } from './panelRegistry'
 import { createId } from './utils'
 
@@ -231,6 +231,26 @@ export function shapesForDraft(draft: MomentDraft): TLShapePartial<PanelShape>[]
     T.number.validate(shape.rotation)
     return shape
   })
+}
+
+/**
+ * A draft's shapes as a real tldraw document, built with no editor at all:
+ * storage calls this so a moment has its document from creation, rather
+ * than waiting for the canvas to build one on first open. Uses only
+ * documented store primitives (`RecordType.create`, `getIndices`), not the
+ * editor's own internal bootstrap, since nothing here is ever shown on
+ * screen directly.
+ */
+export function documentFromDraft(draft: MomentDraft): TLStoreSnapshot {
+  const store = createTLStore({ schema: documentSchema })
+  const page = documentSchema.types.page.create({ name: '', index: 'a1' as TLPage['index'] })
+  const shapes = shapesForDraft(draft)
+  const indices = getIndices(shapes.length)
+  store.put([
+    page,
+    ...shapes.map((shape, order) => documentSchema.types.shape.create({ ...shape, parentId: page.id, index: indices[order] })),
+  ])
+  return store.getStoreSnapshot('document')
 }
 
 /**

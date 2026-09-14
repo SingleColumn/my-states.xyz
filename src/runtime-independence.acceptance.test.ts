@@ -2,6 +2,7 @@ import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { duplicatePanel } from './panelDuplication'
 import { createDefaultPanels, createMoment, getMoment, importMomentContent } from './storage'
+import { draftFromDocument } from './panelStore'
 import type { Moment, Panel } from './types'
 
 type PanelRuntimeState = Record<string, unknown>
@@ -20,7 +21,7 @@ async function runtimeContract() {
   return (appState as unknown as { panelRuntime?: RuntimeContract }).panelRuntime
 }
 
-const panelsOf = (moment: Moment | undefined) => moment?.draft?.panels ?? []
+const panelsOf = (moment: Moment | undefined) => (moment ? draftFromDocument(moment.document, moment.camera).panels : [])
 
 /** A stored moment holding two panels of one kind, as an import produces it. */
 async function twoPanelsOfType<T extends 'slideshow' | 'notes'>(name: string, type: T) {

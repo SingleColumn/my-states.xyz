@@ -34,7 +34,7 @@ function makeMoment(shapes: TLShape[], overrides: Partial<Moment> = {}): Moment 
   return {
     id: 'moment-1',
     name: 'Test moment',
-    schemaVersion: 1,
+    schemaVersion: 2,
     createdAt: 1,
     updatedAt: 1,
     camera: { x: 0, y: 0, z: 1 },
@@ -99,15 +99,6 @@ describe('panel architecture report', () => {
     const locked = makeShape('notes', 'panel-b', 'shape:b', { visible: false, isLocked: true })
     expect(check(buildPanelArchitectureReport(makeMoment([hidden]), editorWith(hidden)), 'hidden-panels-locked')).toBe('ERROR')
     expect(check(buildPanelArchitectureReport(makeMoment([locked]), editorWith(locked)), 'hidden-panels-locked')).toBe('PASS')
-  })
-
-  it('reports a moment whose document has not been built yet, and one that kept its draft', () => {
-    const shape = makeShape('notes', 'panel-a')
-    const notBuilt = makeMoment([shape], { document: null, draft: { panels: [], canvas: null } })
-    expect(check(buildPanelArchitectureReport(notBuilt, editorWith(shape)), 'document-persisted')).toBe('ERROR')
-
-    const stale = makeMoment([shape], { draft: { panels: [], canvas: null } })
-    expect(check(buildPanelArchitectureReport(stale, editorWith(shape)), 'document-persisted')).toBe('WARNING')
   })
 
   it('reports a shape the document has not caught up with as a warning, not a violation', () => {

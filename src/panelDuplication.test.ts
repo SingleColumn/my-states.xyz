@@ -2,6 +2,7 @@ import './test/setup'
 import { describe, expect, it } from 'vitest'
 import { duplicatePanel } from './panelDuplication'
 import { createPanel, createDefaultPanels, getMoment, importMomentContent } from './storage'
+import { draftFromDocument } from './panelStore'
 
 describe('panel duplication', () => {
   it('creates a fresh panel for each kind in the registry', () => {
@@ -30,14 +31,14 @@ describe('panel duplication', () => {
     expect(duplicatePanel(createPanel('spotify'))).toBeNull()
   })
 
-  it('keeps a copy in a moment that has not yet been opened on a canvas', async () => {
+  it('keeps a copy in a moment built by import, with no canvas involved', async () => {
     const panels = createDefaultPanels()
     const source = panels.find((panel) => panel.type === 'notes')!
     const duplicate = duplicatePanel(source)
     if (!duplicate) throw new Error('Notes panel unexpectedly rejected for duplication')
     const moment = await importMomentContent({ name: 'Duplicate panels', panels: [...panels, duplicate], canvas: null, notes: [], assets: [] })
     const reloaded = await getMoment(moment.id)
-    const notesPanels = reloaded?.draft?.panels.filter((panel) => panel.type === 'notes') ?? []
+    const notesPanels = reloaded ? draftFromDocument(reloaded.document, reloaded.camera).panels.filter((panel) => panel.type === 'notes') : []
     expect(notesPanels).toHaveLength(2)
     // Import reissues identities; the copy keeps its own configuration.
     expect(new Set(notesPanels.map((panel) => panel.id)).size).toBe(2)

@@ -26,6 +26,13 @@ export interface PanelDefinition<Type extends PanelType> {
   createConfig(): PanelConfigs[Type]
   /** tldraw validates every write to the shape against this. */
   configValidator: T.Validator<PanelConfigs[Type]>
+  /**
+   * Projects arbitrary input onto this type's known keys and validates the
+   * result: a missing key takes its default, a malformed known value
+   * throws. The one place a panel from outside the canvas (a new moment's
+   * defaults, an imported archive) becomes trustworthy.
+   */
+  normalizeConfig(value: unknown): PanelConfigs[Type]
   /** The config a copy of this panel starts with. Null means a copy is not allowed. */
   duplicateConfig(config: PanelConfigs[Type]): PanelConfigs[Type] | null
 }
@@ -57,21 +64,66 @@ export const spotifyPlaylistReferenceValidator: T.Validator<SpotifyPlaylistRefer
   image: T.optional(T.nullable(T.string)),
 })
 
+export const spotifyConfigValidator: T.Validator<PanelConfigs['spotify']> = T.object({ playlist: spotifyPlaylistReferenceValidator })
+
 export const imageCollectionSourceValidator: T.Validator<ImageCollectionSource> = T.union('type', {
   none: T.object({ type: T.literal('none') }),
   'session-assets': T.object({ type: T.literal('session-assets') }),
   bundled: T.object({ type: T.literal('bundled'), collectionId: T.string }),
 })
 
+// The floor a slideshow's own timer already enforces (SlideshowPanel.tsx);
+// stated here too so a value this low is rejected before it ever reaches a
+// running timer, not just clamped once one is already ticking.
+const MIN_SLIDESHOW_INTERVAL_MS = 100
+
 export const slideshowSettingsValidator: T.Validator<SlideshowSettings> = T.object({
   folderName: T.nullable(T.string),
   imageSource: imageCollectionSourceValidator,
-  currentIndex: T.integer,
-  intervalMs: T.positiveNumber,
-  transitionMs: T.number,
+  // A negative index is never corrected elsewhere (AppState.tsx only
+  // resets an index the image count has outgrown, not a negative one), so
+  // it is rejected here, at the one gate every source of configuration -
+  // live edit, import, agent command - writes through.
+  currentIndex: T.positiveInteger,
+  intervalMs: T.positiveNumber.check((value) => {
+    if (value < MIN_SLIDESHOW_INTERVAL_MS) throw new T.ValidationError(`Expected at least ${MIN_SLIDESHOW_INTERVAL_MS}ms, got ${value}`)
+  }),
+  transitionMs: T.positiveNumber,
   shuffle: T.boolean,
   zoom: T.positiveNumber,
 })
+
+export const notesConfigValidator: T.Validator<PanelConfigs['notes']> = T.object({ activeNoteId: T.nullable(T.string) })
+
+/** Input that is not a plain object is rejected outright; `undefined` (a missing key) becomes an empty object so its fields take their defaults below. */
+export function record(value: unknown): Record<string, unknown> {
+  if (value === undefined) return {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('The saved panel configuration is not an object.')
+  return value as Record<string, unknown>
+}
+
+/** Copy only known keys; a missing one takes its default. */
+function fields(defaults: object, input: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, input[key] === undefined ? fallback : input[key]]))
+}
+
+export function normalizePlaylist(value: unknown): SpotifyPlaylistReference {
+  const input = record(value)
+  return {
+    ...fields(defaultSpotifyPlaylistReference, input),
+    ...(input.image !== undefined ? { image: input.image } : {}),
+  } as SpotifyPlaylistReference
+}
+
+export function normalizeSlideshowSettings(value: unknown): SlideshowSettings {
+  const input = record(value)
+  const source = input.imageSource === undefined ? { type: 'none' } : record(input.imageSource)
+  const imageSource = source.type === 'bundled'
+    ? { type: source.type, collectionId: source.collectionId }
+    : { type: source.type }
+  const config = { ...fields(defaultSlideshowSettings, input), imageSource }
+  return slideshowSettingsValidator.validate(config)
+}
 
 const spotify: PanelDefinition<'spotify'> = {
   type: 'spotify',
@@ -83,7 +135,8 @@ const spotify: PanelDefinition<'spotify'> = {
   // and keeps playback, so it needs far less room.
   focusViewSize: { w: 380, h: 460 },
   createConfig: () => ({ playlist: { ...defaultSpotifyPlaylistReference } }),
-  configValidator: T.object({ playlist: spotifyPlaylistReferenceValidator }),
+  configValidator: spotifyConfigValidator,
+  normalizeConfig: (value) => spotifyConfigValidator.validate({ playlist: normalizePlaylist(record(value).playlist) }),
   duplicateConfig: () => null,
 }
 
@@ -98,6 +151,7 @@ const slideshow: PanelDefinition<'slideshow'> = {
   focusViewSize: null,
   createConfig: () => ({ ...defaultSlideshowSettings, imageSource: { ...defaultSlideshowSettings.imageSource } }),
   configValidator: slideshowSettingsValidator,
+  normalizeConfig: normalizeSlideshowSettings,
   duplicateConfig: (config) => ({ ...config, imageSource: { ...config.imageSource } }),
 }
 
@@ -109,7 +163,11 @@ const notes: PanelDefinition<'notes'> = {
   minimumSize: { w: 320, h: 260 },
   focusViewSize: null,
   createConfig: () => ({ activeNoteId: null }),
-  configValidator: T.object({ activeNoteId: T.nullable(T.string) }),
+  configValidator: notesConfigValidator,
+  normalizeConfig: (value) => {
+    const input = record(value)
+    return notesConfigValidator.validate({ activeNoteId: input.activeNoteId === undefined ? null : input.activeNoteId })
+  },
   duplicateConfig: (config) => ({ activeNoteId: config.activeNoteId }),
 }
 
