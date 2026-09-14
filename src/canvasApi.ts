@@ -53,6 +53,7 @@ export type CanvasCommand =
   | { kind: 'panel.remove'; panelId: string }
   | { kind: 'note.create'; panelId: string }
   | { kind: 'note.select'; panelId: string; noteId: string }
+  | { kind: 'note.delete'; panelId: string; noteId: string }
   | { kind: 'note.setTitle'; panelId: string; title: string }
   | { kind: 'note.setContent'; panelId: string; content: string }
   | { kind: 'images.selectSampleCollection'; panelId: string; collectionId: string }
@@ -170,6 +171,10 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
         case 'note.select':
           requirePanel(command.panelId)
           await state.notes.selectNote(command.noteId, command.panelId)
+          return
+        case 'note.delete':
+          requirePanel(command.panelId)
+          await state.notes.deleteNote(command.noteId, command.panelId)
           return
         case 'note.setTitle':
           requirePanel(command.panelId)
