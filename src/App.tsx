@@ -542,6 +542,21 @@ function AppContent() {
   const editorOptions = useMemo(() => ({ maxPages: 1 }), [])
 
   const uiOverrides = useMemo<TLUiOverrides>(() => ({
+    // Hiding the Toolbar component (below) only hides its buttons: tldraw's
+    // tools keep their keyboard shortcuts regardless, so 'd'/'b'/'x' still
+    // arm the draw tool, 'e' the eraser, 'r' a rectangle, and so on, with no
+    // menu entry pointing at any of it. Every one of those tools produces a
+    // native tldraw shape, and this app's canvas is architected to hold only
+    // panels -- panelArchitectureReport.ts and momentArchive.ts's export both
+    // only look at panel shapes, so a shape created this way is invisible to
+    // them and just accumulates in the document forever. Keeping only
+    // 'select' and 'hand' (the one other tool this app drives itself, via
+    // togglePanMode) unbinds every other tool's shortcut the same way
+    // removing an action below unbinds its shortcut.
+    tools: (_editor, tools) => {
+      const { select, hand } = tools
+      return { select, hand }
+    },
     actions: (editor, actions) => {
       // Neither of these applies to a panel: "Flatten to image" rasterises a
       // shape, and panels are live HTML; locking one leaves it stuck with no
