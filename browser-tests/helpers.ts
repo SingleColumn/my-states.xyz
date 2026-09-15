@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import type { CanvasCommand, CanvasDescription, PanelDescription } from '../src/canvasApi'
 import type { PanelType } from '../src/types'
 
@@ -15,12 +15,21 @@ import type { PanelType } from '../src/types'
 
 export type { CanvasCommand, CanvasDescription, PanelDescription }
 
-/** Loads the app in a fresh profile and waits for the first moment's panels. */
+/**
+ * Loads the app in a fresh profile and waits for the first moment's panels.
+ * On a themed project (playwright.config.ts) the project's theme is then
+ * selected as the global theme, so every test that follows runs under it.
+ */
 export async function openApp(page: Page) {
   const pageErrors: Error[] = []
   page.on('pageerror', (error) => pageErrors.push(error))
   await page.goto('/')
   await waitForCanvas(page)
+  const themeId = test.info().project.metadata.themeId as string | undefined
+  if (themeId) {
+    await dispatch(page, { kind: 'appearance.setGlobalTheme', themeId })
+    await expect.poll(async () => (await describeCanvas(page)).theme.id).toBe(themeId)
+  }
   return {
     /** Uncaught exceptions in the page since it was opened. */
     pageErrors,
@@ -225,6 +234,15 @@ export async function expectCanvasSaved(page: Page) {
   await expect.poll(async () => (await readStorage(page, canvas.moment!.id)).panels, { message: 'the stored document matches the canvas' }).toEqual(expected)
 }
 
+/** The panel report lives under Settings > Developer; opening it closes Settings. */
+export async function openPanelReport(page: Page) {
+  await page.getByRole('button', { name: 'Settings' }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByRole('button', { name: 'Developer' }).click()
+  await settings.getByRole('button', { name: 'Open panel report' }).click()
+  await expect(settings).toBeHidden()
+}
+
 /**
  * The in-app Panel report (dev build only) validates panel/shape
  * cardinality, orphaned references and the schema version. Canvas saves are
@@ -233,7 +251,7 @@ export async function expectCanvasSaved(page: Page) {
  */
 export async function expectArchitectureReportPass(page: Page) {
   await expect.poll(async () => {
-    await page.getByRole('button', { name: 'Panel report' }).click()
+    await openPanelReport(page)
     const dialog = page.getByRole('dialog', { name: 'Panel architecture report' })
     const status = (await dialog.locator('.architecture-report-status').textContent())?.trim()
     await dialog.getByRole('button', { name: 'Close' }).click()

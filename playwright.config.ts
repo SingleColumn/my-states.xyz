@@ -34,7 +34,18 @@ export default defineConfig({
   // The viewport is set after the device profile (which would make it
   // 1280x720): the three default panels are 720 page units tall and must
   // fit on screen with the toolbar for a drag on any part of them to land.
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
+  //
+  // The themed projects run the same specs with a built-in theme selected
+  // before each test (see openApp in helpers.ts): one dark, one light, so
+  // both of tldraw's colour schemes are exercised. Nothing the suite asserts
+  // is about colour, so a theme that changes an outcome is a bug in the
+  // theme system, not in the test. theme.spec.ts manages themes itself and
+  // runs only on the default project.
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'chromium-terminal', metadata: { themeId: 'terminal' }, testIgnore: /theme\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'chromium-paper', metadata: { themeId: 'paper' }, testIgnore: /theme\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+  ],
   webServer: {
     command: 'npm run dev',
     url: baseURL,
