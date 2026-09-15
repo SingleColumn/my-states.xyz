@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./tsconfig.browser-tests.tsbuildinfo"
+  },
+  "include": ["browser-tests", "src/global.d.ts"]
+}
