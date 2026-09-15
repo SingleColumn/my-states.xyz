@@ -88,18 +88,6 @@ export function CanvasViewControls({
         <option value="notes">Notes</option>
       </select>
       <button
-        className="app-chrome-control app-chrome-fit-control"
-        type="button"
-        aria-label="Fit all panels"
-        title="Fit all panels into view"
-        disabled={!isReady}
-        onClick={onFitPanels}
-      >
-        <Focus size={16} aria-hidden="true" />
-        <span className="canvas-control-label-long">Fit all</span>
-        <span className="canvas-control-label-short">Fit</span>
-      </button>
-      <button
         ref={triggerRef}
         className="app-chrome-control app-chrome-menu-trigger"
         type="button"
@@ -114,6 +102,10 @@ export function CanvasViewControls({
       </button>
       {isMenuOpen ? (
         <div className="canvas-view-menu" role="menu" aria-label="Panel view and layout actions">
+          <button type="button" role="menuitem" title="Fit all panels into view" onClick={() => runMenuAction(onFitPanels)}>
+            <Focus size={16} aria-hidden="true" />
+            <span>Fit all panels</span>
+          </button>
           <button
             type="button"
             role="menuitem"

@@ -39,14 +39,14 @@ The workspace is an infinite canvas with panels for Music, Images, and Notes. A 
 - Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.
 - Resize a panel by dragging one of the handles on its selection outline.
 - Pan around the canvas with the usual canvas gestures, or select **Pan canvas** and drag anywhere. Select it again to leave pan mode.
-- Select **Fit all** (shown as **Fit** on narrower screens) to bring every panel into view.
+- Select **Fit all panels** in the panel view menu (the **…** button next to **Add panel**) to bring every panel into view.
 - Undo and redo are in the toolbar at the top right. Deleting a panel by mistake is undoable.
 
 ### Buttons on every panel
 
 The right-hand end of each panel's header carries the same three buttons:
 
-- **Hide panel** takes the panel off the canvas without deleting anything. Bring it back from the **Hidden panels** list in the panel view menu (the **…** button next to **Fit all**).
+- **Hide panel** takes the panel off the canvas without deleting anything. Bring it back from the **Hidden panels** list in the panel view menu (the same **…** button).
 - **Expand panel to full screen** grows the panel to fill the window; the same button then reads **Restore previous panel size**.
 - **Restore panel to default size** returns the panel to the size it started with.
 
@@ -93,6 +93,8 @@ A moment is everything on the canvas at once: the camera and panel layout, the M
 The controls at the top left of the canvas manage moments. Pick one from **Open moment**, create one with **New moment**, and use **Rename moment** or **Delete moment** on the current one; the **…** button beside them repeats these actions. Deleting a moment removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
 
 Use **Export moment** to download a portable `.moment.zip` archive, and **Import moment** to load one (in .zip format). An imported moment brings its canvas layout, settings, Markdown notes, and embedded local images. Spotify login tokens and live playback data are never included.
+
+**Themes** change how everything looks: the canvas, the toolbar, the panels and their menus. Open **Settings** (the gear button at the top right) and choose a theme under **Appearance**; every moment follows that choice unless it picks its own from the **Theme** list in the moment toolbar, where **Global (…)** means "follow Settings". Settings also has a light/dark mode preference, an **Import theme…** button for `.theme.json` files, and a **Reset appearance** button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a moment that used a deleted theme falls back to the global one.
 
 Moments live in your browser's storage, not on a server. The browser keeps the moments themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a moment when you need a backup.
 

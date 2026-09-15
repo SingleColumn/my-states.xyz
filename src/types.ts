@@ -153,12 +153,20 @@ export interface Moment {
   camera: CanvasCamera | null
   /** tldraw's document: every panel shape with its geometry, order and configuration. */
   document: TLStoreSnapshot
+  /**
+   * The theme this moment pins, by id. Absent means the moment follows the
+   * theme chosen in Settings, which is what every moment written before
+   * themes existed does. A pinned theme that is not installed is kept, not
+   * cleared: the app falls back to the global theme and says so.
+   */
+  themeId?: string
 }
 
 export interface MomentSummary {
   id: string
   name: string
   updatedAt: number
+  themeId?: string
 }
 
 export interface SpotifyTrackState {

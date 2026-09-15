@@ -32,6 +32,7 @@ import {
   saveNote,
   renameMoment,
   saveMomentDocument,
+  setMomentTheme,
   subscribeStorageStatus,
   saveSpotifyTokens,
   setActiveMomentId,
@@ -39,6 +40,7 @@ import {
   loadSpotifyTokens,
 } from './storage'
 import { downloadMomentArchive, exportMomentArchive, importMomentArchive } from './momentArchive'
+import { useAppearanceState, type AppearanceState } from './appearanceState'
 import { createId } from './utils'
 import { SaveQueue } from './saveQueue'
 import { persistNoteSnapshot } from './notePersistence'
@@ -145,9 +147,12 @@ interface MomentsState {
   create(name: string): Promise<void>
   open(momentId: string): Promise<void>
   rename(name: string): Promise<void>
+  /** Pins a theme to the active moment; null returns it to the global theme. */
+  setTheme(themeId: string | null): Promise<void>
   remove(momentId: string): Promise<void>
   exportActive(): Promise<void>
-  importFile(file: File): Promise<void>
+  /** Resolves to a notice worth showing (a theme that came with the archive was renamed), or null. */
+  importFile(file: File): Promise<string | null>
   /** The canvas has changed; this is the whole of what a moment persists about it. */
   updateDocument(momentId: string, document: TLStoreSnapshot, camera: CanvasCamera): void
   /** Last successfully read/written moment, including its document. React's activeMoment is not updated on every document save. */
@@ -186,6 +191,7 @@ export interface AppStateValue {
   notes: NotesState
   slideshow: SlideshowState
   spotify: SpotifyState
+  appearance: AppearanceState
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null)
@@ -196,6 +202,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const notes = useNotesState(momentCore.activeMoment, panels, momentCore.operation)
   const slideshow = useSlideshowState(momentCore.activeMoment, panels)
   const spotify = useSpotifyState(momentCore.activeMoment, panels)
+  const appearance = useAppearanceState(momentCore.activeMoment)
 
   const moments = useMemo<MomentsState>(
     () => ({
@@ -214,6 +221,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await momentCore.open(momentId)
       }),
       rename: (name) => momentCore.operation.run(() => momentCore.rename(name)),
+      setTheme: (themeId) => momentCore.operation.run(() => momentCore.setTheme(themeId)),
       remove: (momentId) => momentCore.operation.run(async () => {
         await notes.flush()
         await momentCore.flush()
@@ -230,10 +238,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await notes.flush()
         await momentCore.flush()
         const imported = await importMomentArchive(file)
-        // The picker lists summaries; without this the imported moment is
-        // open but absent from the list until the next create or delete.
+        // The archive may have installed a theme; the library is read from
+        // storage, so tell it. The picker likewise lists summaries; without
+        // this the imported moment is open but absent from the list until
+        // the next create or delete.
+        if (imported.theme) await appearance.refreshLibrary()
         await momentCore.refreshSummaries()
-        await momentCore.open(imported.id)
+        await momentCore.open(imported.moment.id)
+        return imported.theme?.outcome === 'renamed'
+          ? `The theme "${imported.theme.name}" that came with this moment was added under a new id because one with the same id was already installed.`
+          : null
       }),
       updateDocument: momentCore.updateDocument,
       getActiveMomentRecord: momentCore.getActiveMomentRecord,
@@ -247,10 +261,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await Promise.all([notes.flush(), momentCore.flush()])
       },
     }),
-    [notes, momentCore],
+    [notes, momentCore, appearance],
   )
 
-  const value = useMemo(() => ({ moments, panels, notes, slideshow, spotify }), [moments, panels, notes, slideshow, spotify])
+  const value = useMemo(() => ({ moments, panels, notes, slideshow, spotify, appearance }), [moments, panels, notes, slideshow, spotify, appearance])
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
 }
@@ -425,6 +439,24 @@ function useMomentState() {
     await refreshSummaries()
   }, [refreshSummaries, saveQueue])
 
+  const setTheme = useCallback(async (themeId: string | null) => {
+    const current = activeMomentRef.current
+    if (!current) return
+    saveQueue.enqueue(`theme:${current.id}`, async () => {
+      const saved = await setMomentTheme(current.id, themeId)
+      if (activeMomentRef.current?.id !== saved.id) return
+      const { themeId: _previous, ...rest } = activeMomentRef.current
+      activeMomentRef.current = { ...rest, ...(saved.themeId ? { themeId: saved.themeId } : {}), updatedAt: saved.updatedAt }
+      setActiveMoment((active) => {
+        if (active?.id !== saved.id) return active
+        const { themeId: _stale, ...kept } = active
+        return { ...kept, ...(saved.themeId ? { themeId: saved.themeId } : {}), updatedAt: saved.updatedAt }
+      })
+    })
+    await saveQueue.flush()
+    await refreshSummaries()
+  }, [refreshSummaries, saveQueue])
+
   const remove = useCallback(async (momentId: string) => {
     const removingActive = activeMomentRef.current?.id === momentId
     await deleteStoredMoment(momentId)
@@ -468,6 +500,7 @@ function useMomentState() {
     create,
     open,
     rename,
+    setTheme,
     remove,
     refreshSummaries,
     updateDocument,

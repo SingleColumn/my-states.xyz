@@ -127,7 +127,7 @@ button {
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
-  background: var(--background-toast);
+  background: var(--background-menu);
   box-shadow: var(--shadow-app-badge);
   backdrop-filter: var(--blur-app-badge);
 }
@@ -389,7 +389,7 @@ button {
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
-  background: var(--background-toast);
+  background: var(--background-menu);
   box-shadow: var(--shadow-app-badge);
   backdrop-filter: var(--blur-app-badge);
 }
@@ -549,6 +549,7 @@ button {
   max-width: 100%;
   overflow: hidden;
   color: var(--card-title-color);
+  font-family: var(--font-family-display);
   font-size: var(--card-title-size);
   font-weight: var(--card-title-weight);
   line-height: var(--line-height-panel-title);
@@ -582,6 +583,22 @@ button {
 }
 
 .card-header > .card-title { min-width: 0; }
+
+/* The theme's figure on every panel: a bow, a star, nothing. Centred on the
+   top edge, in the gap between the title and the buttons, like a bow on a
+   parcel. Drawn by the shell, over the header, outside the pointer. */
+.canvas-panel-shell::after {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  z-index: 3;
+  width: 40px;
+  height: 26px;
+  background: var(--panel-ornament) center / contain no-repeat;
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
+}
 
 .card-icon-button {
   display: inline-flex;
@@ -772,8 +789,75 @@ button:focus-visible {
   font-weight: var(--font-weight-medium);
 }
 
+/* Sliders draw their own track and thumb so a theme can make them a pencil
+   line and an ink dot as easily as a pill and a disc. The two vendor blocks
+   say the same thing; a browser drops a rule whose selector it does not
+   know, so they cannot be combined. */
 input[type="range"] {
+  height: 20px;
+  margin: 0;
+  border-color: var(--range-well-border);
+  background: var(--range-well);
   accent-color: var(--range-accent);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--range-track);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--range-thumb);
+  appearance: none;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--range-track);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--range-thumb);
+}
+
+input[type="range"]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* The outline tldraw draws around the selected panel follows the panel's
+   corner radius and the theme's stroke width; its colour comes through the
+   bridge in theme.css. `rx` is a presentation attribute, so the property
+   wins over the value PanelShape.tsx writes. */
+.tl-shape-indicator {
+  stroke-width: calc(var(--selection-stroke-width) * var(--tl-scale));
+  stroke-linejoin: round;
+}
+
+.tl-shape-indicator rect {
+  rx: var(--radius-panel);
+  ry: var(--radius-panel);
+}
+
+/* Icons are strokes; a theme sets their weight. Lucide writes the width as
+   an attribute, which a property overrides. */
+.panel svg,
+.app-chrome svg,
+.help-about-dialog svg {
+  stroke-width: var(--icon-stroke-width);
 }
 
 .spotify-login {
@@ -1082,9 +1166,25 @@ input[type="range"] {
   user-select: none;
 }
 
-.slideshow-image-layer {
+/* The picture is sized to itself inside the stage rather than stretched to
+   the stage with object-fit, so its box is the picture: a frame, a shadow or
+   a torn-edge mask lands on the picture's edge, not on the letterbox. The
+   cost is that a picture smaller than the stage is not scaled up; the Zoom
+   control covers that. */
+.slideshow-stage img.slideshow-image-layer {
   position: absolute;
   inset: 0;
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 2 * var(--image-inset));
+  max-height: calc(100% - 2 * var(--image-inset));
+  margin: auto;
+  object-fit: fill;
+  border: var(--image-frame-border);
+  box-shadow: var(--image-frame-shadow);
+  mask: var(--image-edge-mask);
+  /* `rotate` rather than `transform`: the zoom control writes an inline transform on the picture. */
+  rotate: var(--image-tilt);
 }
 
 /* Credit sits quietly over the picture until the pointer arrives, so a
@@ -1232,7 +1332,7 @@ input[type="range"] {
 }
 
 .slideshow-image-picker-heading span:first-child {
-  color: color-mix(in srgb, var(--accent) 55%, white);
+  color: color-mix(in srgb, var(--accent) 55%, var(--accent-lift));
   font-weight: var(--font-weight-emphasis);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
@@ -1266,7 +1366,7 @@ input[type="range"] {
 }
 
 .slideshow-image-thumbnail:hover {
-  border-color: color-mix(in srgb, var(--accent) 55%, white);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--accent-lift));
 }
 
 .slideshow-image-thumbnail.is-current {
@@ -1426,6 +1526,7 @@ input[type="range"] {
 }
 
 .note-title-input {
+  font-family: var(--font-family-display);
   width: 100%;
   max-width: var(--size-note-title-max-width);
   height: calc(var(--size-note-title-height) + 6px);
@@ -1512,6 +1613,11 @@ input[type="range"] {
 }
 
 .notes-rich-editor {
+  /* The bridge into MDXEditor: it reads these two names for the document
+     and code fonts, so the note is set in the theme's type like everything
+     else. Only names MDXEditor defines are set here. */
+  --font-body: var(--font-family-ui);
+  --font-mono: var(--font-family-code);
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1667,6 +1773,7 @@ input[type="range"] {
 .notes-editor-content h3 {
   margin: 0 0 var(--space-rich-content-block);
   color: var(--color-note-title);
+  font-family: var(--font-family-display);
   line-height: var(--line-height-tight);
 }
 
@@ -1752,6 +1859,7 @@ input[type="range"] {
 }
 
 .writing-title {
+  font-family: var(--font-family-display);
   width: 100%;
   max-width: var(--writing-measure);
   margin: var(--space-writing-title-top) auto var(--space-writing-title-bottom);
@@ -1998,7 +2106,8 @@ input[type="range"] {
 }
 
 @media (max-width: 1199px) {
-  .moment-action-secondary {
+  .moment-action-secondary,
+  .moment-theme-control {
     display: none !important;
   }
 
@@ -2019,8 +2128,7 @@ input[type="range"] {
     white-space: nowrap;
   }
 
-  .app-chrome-pan-control,
-  .app-chrome-fit-control {
+  .app-chrome-pan-control {
     width: var(--size-top-toolbar-control);
     justify-content: center;
     padding: 0;
@@ -2113,7 +2221,7 @@ input[type="range"] {
 .sample-collection-heading {
   display: block;
   margin-bottom: 8px;
-  color: color-mix(in srgb, var(--accent) 55%, white);
+  color: color-mix(in srgb, var(--accent) 55%, var(--accent-lift));
   font-size: var(--card-footer-meta-size);
   font-weight: var(--font-weight-emphasis);
   letter-spacing: var(--tracking-label);
@@ -2191,7 +2299,7 @@ input[type="range"] {
 .sample-collection-cover-fallback {
   width: 40%;
   height: 40%;
-  color: color-mix(in srgb, var(--accent) 60%, white);
+  color: color-mix(in srgb, var(--accent) 60%, var(--accent-lift));
 }
 
 /* Square by default, but never taller than a share of the panel: a wide, short
@@ -2384,7 +2492,7 @@ input[type="range"] {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(0 0 0 / 55%);
+  background: var(--background-backdrop);
 }
 
 .architecture-report {
@@ -2494,7 +2602,7 @@ input[type="range"] {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(0 0 0 / 55%);
+  background: var(--background-backdrop);
 }
 
 .help-about-dialog {
@@ -2503,11 +2611,11 @@ input[type="range"] {
   width: min(760px, 100%);
   max-height: min(850px, 92vh);
   overflow: hidden;
-  border: 1px solid rgb(220 228 238 / 32%);
+  border: 1px solid var(--color-dialog-border);
   border-radius: var(--radius-card);
-  background: #181d24;
+  background: var(--background-dialog);
   color: var(--color-text);
-  box-shadow: 0 24px 80px rgb(0 0 0 / 48%);
+  box-shadow: var(--shadow-dialog);
 }
 
 .help-about-header {
@@ -2516,14 +2624,15 @@ input[type="range"] {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 24px;
-  border-bottom: 1px solid rgb(220 228 238 / 22%);
-  background: rgb(255 255 255 / 3%);
+  border-bottom: 1px solid var(--color-panel-divider);
+  background: var(--card-button-bg);
 }
 
 .help-about-header h2,
 .help-about-content h3,
 .help-about-content h4 {
   margin: 0;
+  font-family: var(--font-family-display);
 }
 
 .help-about-close {
@@ -2532,7 +2641,7 @@ input[type="range"] {
   height: 36px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid rgb(220 228 238 / 28%);
+  border: 1px solid var(--color-control-border-hover);
   border-radius: 8px;
   background: var(--color-input);
   color: var(--color-input-text);
@@ -2550,9 +2659,9 @@ input[type="range"] {
 
 .help-about-content section {
   padding: 16px;
-  border: 1px solid rgb(220 228 238 / 16%);
+  border: 1px solid var(--color-panel-divider);
   border-radius: 10px;
-  background: rgb(255 255 255 / 2%);
+  background: var(--card-button-bg);
 }
 
 .help-about-content section + section { margin-top: 16px; }
@@ -2561,7 +2670,7 @@ input[type="range"] {
 .help-about-content p { margin: 0 0 12px; }
 .help-about-content ul { margin: 0 0 12px; padding-left: 22px; }
 .help-about-content a { color: var(--card-button-active-icon); text-decoration: underline; text-underline-offset: 2px; }
-.help-about-content code { padding: 1px 4px; border-radius: 4px; background: rgb(0 0 0 / 20%); }
+.help-about-content code { padding: 1px 4px; border-radius: 4px; background: var(--color-code-block-bg); }
 .help-about-details { display: grid; gap: 6px; margin: 16px 0; }
 .help-about-details div { display: grid; grid-template-columns: 84px 1fr; gap: 12px; }
 .help-about-details dt { color: var(--color-text-muted); }
@@ -2572,6 +2681,123 @@ input[type="range"] {
   .help-about-backdrop { padding: 10px; }
   .help-about-dialog { max-height: 94vh; }
   .help-about-header, .help-about-content { padding: 16px; }
+}
+
+/* Settings: the same dialog shell as Help & About, with a section nav on
+   the left. Every colour here is a theme token, so the dialog repaints as
+   the theme it edits changes. */
+.app-settings-body {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-settings-nav {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--color-panel-divider);
+}
+
+.app-settings-nav-item {
+  padding: 8px 12px;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.app-settings-nav-item[aria-current="page"] {
+  background: var(--card-button-active-bg);
+  color: var(--color-text);
+}
+
+.app-settings-content { min-width: 0; }
+
+.app-settings-field { display: grid; gap: 8px; margin: 0 0 20px; }
+.app-settings-field > label,
+.app-settings-field > legend,
+.app-settings-field > h4 { margin: 0; color: var(--color-text); font-size: 15px; font-weight: var(--font-weight-semibold); }
+.app-settings-field .app-dropdown { width: min(320px, 100%); height: var(--size-input-height); }
+
+.app-settings-modes { padding: 0; border: 0; }
+.app-settings-mode { display: flex; align-items: center; gap: 8px; }
+.app-settings-mode input { accent-color: var(--range-accent); }
+.app-settings-mode small { color: var(--color-text-muted); }
+
+.app-settings-hint { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: var(--line-height-hint); }
+.app-settings-hint strong { color: var(--color-text); }
+
+.app-settings-theme-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.app-settings-theme {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-panel-divider);
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg);
+}
+.app-settings-theme-name { display: flex; align-items: center; gap: 8px; }
+.app-settings-theme-meta { color: var(--color-text-muted); white-space: nowrap; }
+.app-settings-active-badge {
+  padding: 1px 7px;
+  border: 1px solid var(--color-attention-glow);
+  border-radius: 999px;
+  color: var(--color-attention-glow);
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.app-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.app-settings-actions .app-chrome-control { gap: 6px; }
+.app-settings-notice { margin: 0; padding: 10px 12px; border-radius: var(--button-radius); background: var(--color-input-bg); color: var(--color-text); }
+
+@media (max-width: 560px) {
+  .app-settings-body { grid-template-columns: 1fr; }
+  .app-settings-nav { padding: 8px 12px 0; border-right: 0; }
+  .app-settings-theme { grid-template-columns: 1fr auto; }
+  .app-settings-theme-meta { grid-column: 1 / -1; }
+}
+
+/* The moment's theme choice: a select beside the Settings button at full
+   width, a group of radio items in the moment … menu when the chrome is
+   compact. */
+.moment-theme-control {
+  position: relative;
+  display: inline-flex;
+}
+
+.app-chrome-tldraw .moment-theme-select {
+  width: clamp(130px, 12vw, 180px);
+  height: var(--size-top-toolbar-control);
+  min-height: var(--size-top-toolbar-control);
+  padding: 0 var(--space-detail-3);
+}
+
+.moment-theme-control .moment-toolbar-error {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.moment-theme-menu-spacer { display: inline-block; width: 16px; }
+
+.moment-actions-menu button[role="menuitemradio"][aria-checked="true"] {
+  color: var(--color-text);
+}
+
+.moment-toolbar-notice { color: var(--color-text-muted); }
+
+.settings-launcher {
+  width: var(--size-top-toolbar-control);
+  justify-content: center;
+  padding: 0;
 }
 
 

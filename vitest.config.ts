@@ -9,5 +9,6 @@ export default defineConfig({
     // Modules that read the panel schema import tldraw, which is slow to load
     // under a full parallel run.
     testTimeout: 20000,
+    hookTimeout: 20000,
   },
 })

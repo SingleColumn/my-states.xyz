@@ -32,7 +32,7 @@ import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
-  const { notes, panels } = useAppState()
+  const { notes, panels, appearance } = useAppState()
   const commands = usePanelCommands()
   // Full screen is treated as the writing state: the panel sheds its form
   // chrome and becomes a page. The default panel size is deliberately left
@@ -194,7 +194,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             ) : null}
             <MDXEditor
               key={activeNote.id}
-              className="notes-rich-editor dark-theme"
+              className={`notes-rich-editor${appearance.effective.mode === 'dark' ? ' dark-theme' : ''}`}
               contentEditableClassName="notes-editor-content"
               markdown={activeNote.content}
               placeholder={editorPlaceholder}
