@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "generate:sample-images": "node scripts/generate-sample-images-manifest.mjs",
     "dev": "npm run generate:sample-images && vite --host 127.0.0.1",

@@ -1086,7 +1086,7 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
       try {
         await loadSpotifySdk()
         if (cancelled || !window.Spotify || !tokens?.accessToken) return
-        const player = new window.Spotify.Player({ name: 'Music Images Canvas', getOAuthToken: (callback) => callback(tokensRef.current?.accessToken ?? ''), volume: 0.7 })
+        const player = new window.Spotify.Player({ name: 'my-states.xyz', getOAuthToken: (callback) => callback(tokensRef.current?.accessToken ?? ''), volume: 0.7 })
         player.addListener('ready', ({ device_id }) => {
           setDeviceId(device_id)
           setIsReady(true)

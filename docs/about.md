@@ -24,7 +24,12 @@ I want my-states to be an expressive tool, that doesn't get in the way of writin
 
 If you like it and want to reach out: robert.tomas.johnston@gmail.com.
 
-The application uses third-party software. See [Third-party licences](#third-party-licences).
+my-states' own source code is source-available under the Apache License
+2.0, subject to the "Commons Clause" License Condition v1.0: you may
+view, use, modify, and redistribute it, including commercially, but you
+may not sell the software itself or offer it as a paid hosted service
+without permission. See [Licence](#licence) and
+[Third-party licences](#third-party-licences).
 
 ## Getting started
 
@@ -91,8 +96,22 @@ Use **Export moment** to download a portable `.moment.zip` archive, and **Import
 
 Moments live in your browser's storage, not on a server. The browser keeps the moments themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a moment when you need a backup.
 
+## Licence
+
+my-states' own source code is licensed under the Apache License 2.0,
+subject to the "Commons Clause" License Condition v1.0. This is a
+source-available licence, not an OSI-approved open-source licence: the
+source can be viewed, used, modified, and redistributed, including for
+commercial purposes, but the Commons Clause restricts selling the
+software itself, or offering a product or service whose value derives
+substantially from it (such as a paid hosted version of this app),
+without permission from the copyright holder. See the repository's
+`LICENSE` file for the complete terms.
+
 ## Third-party licences
 
-my-states uses third-party software. [tldraw](https://tldraw.dev/) is the canvas SDK used to provide the drawing surface, canvas interactions, and canvas UI.
+my-states uses third-party software. [tldraw](https://tldraw.dev/) is the canvas SDK used to provide the drawing surface, canvas interactions, and canvas UI. tldraw is governed entirely by its own licence, not by my-states' Commons Clause terms.
 
 This application includes tldraw version **3.15.6**. Read the [tldraw licence](/licenses/tldraw-3.15.6.txt).
+
+Other third-party components (React, Vite, and other bundled packages) remain under their own licences; see the repository's `THIRD_PARTY_LICENSES.md` for the full list.

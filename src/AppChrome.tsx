@@ -160,7 +160,7 @@ export function AppChrome({
             setPulseAbout(false)
             onOpenHelpAbout()
           }}
-          title="About Music Images Canvas"
+          title="About my-states.xyz"
         >
           {HELP_ABOUT_LABEL}
         </button>

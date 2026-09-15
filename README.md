@@ -1,6 +1,6 @@
-# Music Images Canvas
+# my-states.xyz
 
-Music Images Canvas is a local-first, desktop-oriented creative workspace. It places a Spotify playlist player, image slideshow, and Markdown editor on a persistent infinite canvas, so you can arrange music, visual references, and writing in one place.
+my-states.xyz is a local-first, desktop-oriented creative workspace. It places a Spotify playlist player, image slideshow, and Markdown editor on a persistent infinite canvas, so you can arrange music, visual references, and writing in one place.
 
 The app is a single-user MVP: it has no backend, accounts, cloud sync, or sharing (other than Spotify authentication).
 
@@ -154,3 +154,28 @@ Clearing this site's browser data removes the stored moments, notes, images, set
 | `npm run build` | Regenerate the sample manifest, type-check, and build the app into `dist/`. |
 | `npm run preview` | Preview the production build on localhost. |
 | `npm test` | Run application and sample-manifest tests. |
+
+## License
+
+This project's original source code is **source-available**, not
+open source in the OSI-approved sense. It is licensed under the
+[Apache License 2.0](LICENSE), subject to the
+["Commons Clause" License Condition v1.0](LICENSE).
+
+In practice, this means:
+
+- You may view, use, modify, fork, and redistribute the source, including
+  for commercial purposes (for example, using or adapting the app as part
+  of your work at a company), subject to the terms in [`LICENSE`](LICENSE).
+- The Commons Clause restricts one specific thing: selling the software
+  itself, or offering a product or service whose value derives entirely
+  or substantially from this software's functionality (for example,
+  charging for access to a hosted version of this app) is not permitted
+  without a separate agreement with the copyright holder.
+- Third-party components — including [tldraw](https://www.tldraw.com/),
+  React, Vite, and other dependencies — remain licensed under their own,
+  unmodified terms. See [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)
+  for details, and [`public/licenses/tldraw-3.15.6.txt`](public/licenses/tldraw-3.15.6.txt)
+  for the full tldraw license.
+
+See the [`LICENSE`](LICENSE) file for the complete, authoritative terms.
