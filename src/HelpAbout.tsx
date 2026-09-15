@@ -89,14 +89,14 @@ export function HelpAbout({ isOpen, onClose, returnFocusRef }: HelpAboutProps) {
               <li>Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.</li>
               <li>Resize a panel by dragging one of the handles on its selection outline.</li>
               <li>Pan around the canvas with the usual canvas gestures, or select <strong>Pan canvas</strong> and drag anywhere. Select it again to leave pan mode.</li>
-              <li>Select <strong>Fit all</strong> (shown as <strong>Fit</strong> on narrower screens) to bring every panel into view.</li>
+              <li>Select <strong>Fit all panels</strong> in the panel view menu (the <strong>…</strong> button next to <strong>Add panel</strong>) to bring every panel into view.</li>
               <li>Undo and redo are in the toolbar at the top right. Deleting a panel by mistake is undoable.</li>
             </ul>
 
             <h4>Buttons on every panel</h4>
             <p>The right-hand end of each panel's header carries the same three buttons:</p>
             <ul>
-              <li><strong>Hide panel</strong> takes the panel off the canvas without deleting anything. Bring it back from the <strong>Hidden panels</strong> list in the panel view menu (the <strong>…</strong> button next to <strong>Fit all</strong>).</li>
+              <li><strong>Hide panel</strong> takes the panel off the canvas without deleting anything. Bring it back from the <strong>Hidden panels</strong> list in the panel view menu (the same <strong>…</strong> button).</li>
               <li><strong>Expand panel to full screen</strong> grows the panel to fill the window; the same button then reads <strong>Restore previous panel size</strong>.</li>
               <li><strong>Restore panel to default size</strong> returns the panel to the size it started with.</li>
             </ul>
@@ -135,6 +135,7 @@ export function HelpAbout({ isOpen, onClose, returnFocusRef }: HelpAboutProps) {
             <p>A moment is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, and your Notes.</p>
             <p>The controls at the top left of the canvas manage moments. Pick one from <strong>Open moment</strong>, create one with <strong>New moment</strong>, and use <strong>Rename moment</strong> or <strong>Delete moment</strong> on the current one; the <strong>…</strong> button beside them repeats these actions. Deleting a moment removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.</p>
             <p>Use <strong>Export moment</strong> to download a portable <code>.moment.zip</code> archive, and <strong>Import moment</strong> to load one. An imported moment brings its canvas layout, settings, Markdown notes, and embedded local images. Spotify login tokens and live playback data are never included.</p>
+            <p><strong>Themes</strong> change how everything looks: the canvas, the toolbar, the panels and their menus. Open <strong>Settings</strong> (the gear button at the top right) and choose a theme under <strong>Appearance</strong>; every moment follows that choice unless it picks its own from the <strong>Theme</strong> list in the moment toolbar, where <strong>Global (…)</strong> means "follow Settings". Settings also has a light/dark mode preference, an <strong>Import theme…</strong> button for <code>.theme.json</code> files, and a <strong>Reset appearance</strong> button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a moment that used a deleted theme falls back to the global one.</p>
             <p>Moments live in your browser's storage, not on a server. The browser keeps the moments themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a moment when you need a backup.</p>
           </section>
 

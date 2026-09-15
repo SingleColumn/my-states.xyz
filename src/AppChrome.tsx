@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiToolbar } from 'tldraw'
-import { Hand } from 'lucide-react'
+import { Hand, Settings } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
-import { isPanelReportEnabled } from './panelReportFeature'
 import { MomentToolbar } from './MomentToolbar'
+import { MomentThemeSelect } from './MomentThemeSelect'
 import type { PanelType } from './types'
 
 export interface AppChromeRect {
@@ -24,8 +24,10 @@ interface AppChromeProps {
   onFitSelectedPanel(): void
   onResetSelectedPanel(): void
   onResetPanelLayout(): void
-  onOpenArchitectureReport?(): void
   onOpenHelpAbout(): void
+  onOpenSettings(): void
+  /** Named on the Settings button so the theme in use can be read from the chrome. */
+  activeThemeName: string
   onMeasure(rect: AppChromeRect): void
   canHideSelectedPanel: boolean
   hiddenPanels: Array<{ id: string; type: PanelType }>
@@ -49,8 +51,9 @@ export function AppChrome({
   onFitSelectedPanel,
   onResetSelectedPanel,
   onResetPanelLayout,
-  onOpenArchitectureReport,
   onOpenHelpAbout,
+  onOpenSettings,
+  activeThemeName,
   onMeasure,
   canHideSelectedPanel,
   hiddenPanels,
@@ -148,11 +151,16 @@ export function AppChrome({
             <DefaultActionsMenuContent />
           </DefaultActionsMenu>
         </TldrawUiToolbar>
-        {isPanelReportEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_PANEL_REPORT) && onOpenArchitectureReport ? (
-          <button className="app-chrome-control architecture-report-launcher" type="button" onClick={onOpenArchitectureReport} title="Inspect panel architecture">
-            Panel report
-          </button>
-        ) : null}
+        <button
+          className="app-chrome-control settings-launcher"
+          type="button"
+          aria-label="Settings"
+          title={`Settings. Theme: ${activeThemeName}`}
+          onClick={onOpenSettings}
+        >
+          <Settings size={16} aria-hidden="true" />
+        </button>
+        <MomentThemeSelect />
         <button
           className={`app-chrome-control about-launcher${pulseAbout ? ' about-launcher-pulse' : ''}`}
           type="button"

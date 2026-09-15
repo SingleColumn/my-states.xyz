@@ -1,0 +1,1655 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://my-states.xyz/theme.schema.json",
+  "title": "my-states theme",
+  "description": "A theme for my-states: structured values the application turns into its own CSS custom properties. Themes change how the application looks, never where panels sit. Every value is optional; the application derives what a theme leaves out.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "version",
+    "modes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "The theme format version this file is written for."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "maxLength": 64,
+      "description": "A stable identifier, unique in the local theme library. Lower-case letters, digits and hyphens."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "The name shown in the theme picker."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "The theme's own version, e.g. 1.0.0."
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Who made the theme."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "A sentence about the theme."
+    },
+    "derivedFrom": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "The id of the theme this one was based on. Informational only."
+    },
+    "modes": {
+      "type": "object",
+      "description": "The modes the theme supports. At least one of light or dark.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "light": {
+          "type": "object",
+          "description": "One mode of a theme: light or dark.",
+          "additionalProperties": false,
+          "properties": {
+            "foundation": {
+              "type": "object",
+              "description": "Low-level primitives the rest of the theme is derived from.",
+              "additionalProperties": false,
+              "properties": {
+                "color": {
+                  "type": "object",
+                  "description": "The palette.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The base background colour of the whole application. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The main text colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "muted": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Secondary text. Derived from foreground when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "faint": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Tertiary text and captions. Derived from foreground when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The attention colour: selection outlines and glows. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The default border colour. Derived from foreground when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "danger": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Errors and destructive actions. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "selection": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Canvas selection outline. Derived from accent when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "typography": {
+                  "type": "object",
+                  "description": "Font stacks. Only fonts already available to the browser; no remote fonts.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "uiFont": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The interface font stack. A CSS font-family stack. Only fonts already available to the browser. Must not contain url(), var() or other references."
+                    },
+                    "headingFont": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The font stack for panel titles, note titles and dialog headings. The interface font when absent. A CSS font-family stack. Only fonts already available to the browser. Must not contain url(), var() or other references."
+                    },
+                    "headingWeight": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The weight of panel titles, e.g. \"500\" (the default) or \"700\". A CSS font-weight, e.g. \"500\" or \"700\". Must not contain url(), var() or other references."
+                    },
+                    "monoFont": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The monospace font stack, for code. A CSS font-family stack. Only fonts already available to the browser. Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "shape": {
+                  "type": "object",
+                  "description": "Corner radii, from panels down to buttons. Every rounded corner in the app is one of these three, or an offset from one.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "radiusLarge": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Panels, the toolbar and dialogs, e.g. \"22px\"; \"0\" for hard corners. A CSS border-radius length, e.g. \"12px\" or \"0\". Must not contain url(), var() or other references."
+                    },
+                    "radiusMedium": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Controls, inputs, menus, artwork and content areas, e.g. \"12px\". A CSS border-radius length, e.g. \"12px\" or \"0\". Must not contain url(), var() or other references."
+                    },
+                    "radiusSmall": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Small buttons and thumbnails, e.g. \"8px\". A CSS border-radius length, e.g. \"12px\" or \"0\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "depth": {
+                  "type": "object",
+                  "description": "Shadows and blur.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "shadowSmall": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A small box-shadow, for artwork and thumbnails. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "shadowMedium": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A medium box-shadow, for toolbars. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "shadowLarge": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A large box-shadow, for panels and dialogs. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "backdropBlur": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The backdrop-filter behind translucent surfaces, for example blur(18px). A CSS backdrop-filter, e.g. \"blur(18px)\" or \"none\". Must not contain url(), var() or other references."
+                    }
+                  }
+                }
+              }
+            },
+            "semantic": {
+              "type": "object",
+              "description": "Visual roles. Each is derived from the foundation when absent.",
+              "additionalProperties": false,
+              "properties": {
+                "surfacePrimary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "The main surface colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "surfaceElevated": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Surfaces that float over the canvas: toolbars, menus, toasts. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "surfaceOverlay": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Opaque surfaces over everything else: dropdown lists. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textPrimary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Main text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textSecondary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Text that supports the main text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textMuted": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Secondary text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textFaint": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Captions and metadata. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "borderSubtle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Hairlines and dividers. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "borderNormal": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Borders of panels and controls. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "borderStrong": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Borders on hover and of dialogs. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "focusRing": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "The keyboard focus outline. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "interactive": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "The resting background of a control. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "interactiveHover": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "A control under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "interactiveActive": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "A pressed or selected control. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "danger": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Errors and destructive actions. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "accentLift": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "What an accent is mixed toward to read as text or an outline on this theme's surfaces: white on a dark theme, the ink colour on a light one. Derived from the text colour, which is the right answer for both. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                }
+              }
+            },
+            "components": {
+              "type": "object",
+              "description": "Values for one class of component, or for one named panel. Each overrides the semantic role it is derived from.",
+              "additionalProperties": false,
+              "properties": {
+                "canvas": {
+                  "type": "object",
+                  "description": "The infinite canvas and its selection chrome.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The canvas colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backdrop": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The background behind the canvas: a colour or gradients. A CSS background: a colour, or one or more gradients. Must not contain url(), var() or other references."
+                    },
+                    "gridColor": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The colour of the canvas grid lines. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "selectionStroke": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Selection outlines and the glow of the selected panel. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "selectionStrokeWidth": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The width of the outline around the selected panel, e.g. \"1.5px\" (the default) or \"4px\" for a ribbon. A CSS stroke-width, a plain number such as \"1.5\" or a length such as \"4px\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "panel": {
+                  "type": "object",
+                  "description": "The shell every panel shares.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel border colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "divider": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dividers inside panels and the toolbar. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "frame": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The frame around panel content. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shellBorder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The card shell border, as a border shorthand such as \"0.5px solid #333\". A CSS border shorthand, e.g. \"1px solid #333\". Must not contain url(), var() or other references."
+                    },
+                    "headerForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Panel titles. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "footerForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Panel footer metadata. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel shadow. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "backdropBlur": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The blur behind a panel. A CSS backdrop-filter, e.g. \"blur(18px)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "contentBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The background of the content area inside a panel. Derived from the panel accent when absent; set it to give panels a plain interior with the accent kept to the frame. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "texture": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "paper",
+                        "dots"
+                      ],
+                      "description": "A pattern laid over every panel surface. One of: none, paper, dots."
+                    },
+                    "ornament": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "bow",
+                        "star"
+                      ],
+                      "description": "A small figure drawn at the top corner of every panel. One of: none, bow, star."
+                    }
+                  }
+                },
+                "button": {
+                  "type": "object",
+                  "description": "Icon buttons in panel headers and footers.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Icon colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Background under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backgroundActive": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Background when active or pressed. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "borderActive": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Border when active. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foregroundActive": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Icon colour when active. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "control": {
+                  "type": "object",
+                  "description": "Other controls: selects, chrome buttons, sliders.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "borderHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Border under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "emptyBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Buttons in an empty panel. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "emptyBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Buttons in an empty panel, under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeAccent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The accent colour of sliders. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeTrack": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The line a slider runs along. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeThumb": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The dot a slider is dragged by. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeWell": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The surface behind a slider; \"transparent\" for a bare line. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeWellBorder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The border of that surface; \"transparent\" for none. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "iconStrokeWidth": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The stroke width of icons, e.g. \"2\" (the default) or \"1.5\" for a lighter pen line. A CSS stroke-width, a plain number such as \"1.5\" or a length such as \"4px\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "input": {
+                  "type": "object",
+                  "description": "Text fields.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Field background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Field text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "menu": {
+                  "type": "object",
+                  "description": "Dropdown lists and popover menus.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The opaque background of a dropdown list. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "surface": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The background of a popover menu. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "toolbar": {
+                  "type": "object",
+                  "description": "The application toolbar across the top.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar text and icons. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar shadow. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "backdropBlur": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The blur behind the toolbar. A CSS backdrop-filter, e.g. \"blur(18px)\" or \"none\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "toast": {
+                  "type": "object",
+                  "description": "Status messages.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toast background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toast border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toast text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "dialog": {
+                  "type": "object",
+                  "description": "Settings and other dialogs.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dialog background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dialog border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backdrop": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The dimmed backdrop behind a dialog. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dialog shadow. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "editor": {
+                  "type": "object",
+                  "description": "The Notes text editor.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Editor background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Editor border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "toolbarBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The formatting toolbar, which is sticky over the text and needs an opaque surface. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "spotify": {
+                  "type": "object",
+                  "description": "The Music panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkShadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Shadow under album art. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Where album art would be, before there is any. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholderHighlight": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The highlight on the placeholder. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "images": {
+                  "type": "object",
+                  "description": "The Images panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "frameBorder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A border around the picture, as a border shorthand: a photo matte such as \"8px solid #fff\", or \"none\". A CSS border shorthand, e.g. \"1px solid #333\". Must not contain url(), var() or other references."
+                    },
+                    "frameShadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A shadow under the picture, or \"none\". Not drawn when the edge is torn. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "edge": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "deckle"
+                      ],
+                      "description": "The edge of the picture. One of: none, deckle."
+                    },
+                    "tilt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A rotation of the picture, e.g. \"-1.5deg\" for a photo glued in by hand; \"0deg\" (the default) for straight. A CSS angle, e.g. \"-1.5deg\" or \"0deg\". Must not contain url(), var() or other references."
+                    },
+                    "inset": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Room kept around the picture inside its stage, e.g. \"14px\" so a matte, a shadow or a tilt is not clipped; \"0px\" (the default) fills the stage. A CSS length, e.g. \"14px\" or \"0px\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "notes": {
+                  "type": "object",
+                  "description": "The Notes panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "titleForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The note title. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "controlBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The note selector and title field. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "controlBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Those controls under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "dark": {
+          "type": "object",
+          "description": "One mode of a theme: light or dark.",
+          "additionalProperties": false,
+          "properties": {
+            "foundation": {
+              "type": "object",
+              "description": "Low-level primitives the rest of the theme is derived from.",
+              "additionalProperties": false,
+              "properties": {
+                "color": {
+                  "type": "object",
+                  "description": "The palette.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The base background colour of the whole application. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The main text colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "muted": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Secondary text. Derived from foreground when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "faint": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Tertiary text and captions. Derived from foreground when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The attention colour: selection outlines and glows. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The default border colour. Derived from foreground when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "danger": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Errors and destructive actions. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "selection": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Canvas selection outline. Derived from accent when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "typography": {
+                  "type": "object",
+                  "description": "Font stacks. Only fonts already available to the browser; no remote fonts.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "uiFont": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The interface font stack. A CSS font-family stack. Only fonts already available to the browser. Must not contain url(), var() or other references."
+                    },
+                    "headingFont": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The font stack for panel titles, note titles and dialog headings. The interface font when absent. A CSS font-family stack. Only fonts already available to the browser. Must not contain url(), var() or other references."
+                    },
+                    "headingWeight": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The weight of panel titles, e.g. \"500\" (the default) or \"700\". A CSS font-weight, e.g. \"500\" or \"700\". Must not contain url(), var() or other references."
+                    },
+                    "monoFont": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The monospace font stack, for code. A CSS font-family stack. Only fonts already available to the browser. Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "shape": {
+                  "type": "object",
+                  "description": "Corner radii, from panels down to buttons. Every rounded corner in the app is one of these three, or an offset from one.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "radiusLarge": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Panels, the toolbar and dialogs, e.g. \"22px\"; \"0\" for hard corners. A CSS border-radius length, e.g. \"12px\" or \"0\". Must not contain url(), var() or other references."
+                    },
+                    "radiusMedium": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Controls, inputs, menus, artwork and content areas, e.g. \"12px\". A CSS border-radius length, e.g. \"12px\" or \"0\". Must not contain url(), var() or other references."
+                    },
+                    "radiusSmall": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Small buttons and thumbnails, e.g. \"8px\". A CSS border-radius length, e.g. \"12px\" or \"0\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "depth": {
+                  "type": "object",
+                  "description": "Shadows and blur.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "shadowSmall": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A small box-shadow, for artwork and thumbnails. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "shadowMedium": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A medium box-shadow, for toolbars. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "shadowLarge": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A large box-shadow, for panels and dialogs. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "backdropBlur": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The backdrop-filter behind translucent surfaces, for example blur(18px). A CSS backdrop-filter, e.g. \"blur(18px)\" or \"none\". Must not contain url(), var() or other references."
+                    }
+                  }
+                }
+              }
+            },
+            "semantic": {
+              "type": "object",
+              "description": "Visual roles. Each is derived from the foundation when absent.",
+              "additionalProperties": false,
+              "properties": {
+                "surfacePrimary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "The main surface colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "surfaceElevated": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Surfaces that float over the canvas: toolbars, menus, toasts. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "surfaceOverlay": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Opaque surfaces over everything else: dropdown lists. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textPrimary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Main text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textSecondary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Text that supports the main text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textMuted": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Secondary text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "textFaint": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Captions and metadata. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "borderSubtle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Hairlines and dividers. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "borderNormal": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Borders of panels and controls. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "borderStrong": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Borders on hover and of dialogs. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "focusRing": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "The keyboard focus outline. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "interactive": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "The resting background of a control. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "interactiveHover": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "A control under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "interactiveActive": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "A pressed or selected control. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "danger": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Errors and destructive actions. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                },
+                "accentLift": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "What an accent is mixed toward to read as text or an outline on this theme's surfaces: white on a dark theme, the ink colour on a light one. Derived from the text colour, which is the right answer for both. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                }
+              }
+            },
+            "components": {
+              "type": "object",
+              "description": "Values for one class of component, or for one named panel. Each overrides the semantic role it is derived from.",
+              "additionalProperties": false,
+              "properties": {
+                "canvas": {
+                  "type": "object",
+                  "description": "The infinite canvas and its selection chrome.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The canvas colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backdrop": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The background behind the canvas: a colour or gradients. A CSS background: a colour, or one or more gradients. Must not contain url(), var() or other references."
+                    },
+                    "gridColor": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The colour of the canvas grid lines. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "selectionStroke": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Selection outlines and the glow of the selected panel. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "selectionStrokeWidth": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The width of the outline around the selected panel, e.g. \"1.5px\" (the default) or \"4px\" for a ribbon. A CSS stroke-width, a plain number such as \"1.5\" or a length such as \"4px\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "panel": {
+                  "type": "object",
+                  "description": "The shell every panel shares.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel border colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "divider": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dividers inside panels and the toolbar. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "frame": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The frame around panel content. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shellBorder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The card shell border, as a border shorthand such as \"0.5px solid #333\". A CSS border shorthand, e.g. \"1px solid #333\". Must not contain url(), var() or other references."
+                    },
+                    "headerForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Panel titles. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "footerForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Panel footer metadata. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel shadow. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "backdropBlur": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The blur behind a panel. A CSS backdrop-filter, e.g. \"blur(18px)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "contentBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The background of the content area inside a panel. Derived from the panel accent when absent; set it to give panels a plain interior with the accent kept to the frame. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "texture": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "paper",
+                        "dots"
+                      ],
+                      "description": "A pattern laid over every panel surface. One of: none, paper, dots."
+                    },
+                    "ornament": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "bow",
+                        "star"
+                      ],
+                      "description": "A small figure drawn at the top corner of every panel. One of: none, bow, star."
+                    }
+                  }
+                },
+                "button": {
+                  "type": "object",
+                  "description": "Icon buttons in panel headers and footers.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Icon colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Background under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backgroundActive": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Background when active or pressed. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "borderActive": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Border when active. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foregroundActive": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Icon colour when active. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "control": {
+                  "type": "object",
+                  "description": "Other controls: selects, chrome buttons, sliders.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Resting border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "borderHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Border under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "emptyBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Buttons in an empty panel. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "emptyBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Buttons in an empty panel, under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeAccent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The accent colour of sliders. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeTrack": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The line a slider runs along. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeThumb": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The dot a slider is dragged by. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeWell": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The surface behind a slider; \"transparent\" for a bare line. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "rangeWellBorder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The border of that surface; \"transparent\" for none. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "iconStrokeWidth": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The stroke width of icons, e.g. \"2\" (the default) or \"1.5\" for a lighter pen line. A CSS stroke-width, a plain number such as \"1.5\" or a length such as \"4px\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "input": {
+                  "type": "object",
+                  "description": "Text fields.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Field background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Field text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "menu": {
+                  "type": "object",
+                  "description": "Dropdown lists and popover menus.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The opaque background of a dropdown list. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "surface": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The background of a popover menu. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "toolbar": {
+                  "type": "object",
+                  "description": "The application toolbar across the top.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar text and icons. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toolbar shadow. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "backdropBlur": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The blur behind the toolbar. A CSS backdrop-filter, e.g. \"blur(18px)\" or \"none\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "toast": {
+                  "type": "object",
+                  "description": "Status messages.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toast background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toast border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "foreground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Toast text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "dialog": {
+                  "type": "object",
+                  "description": "Settings and other dialogs.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dialog background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dialog border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "backdrop": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The dimmed backdrop behind a dialog. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "shadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Dialog shadow. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "editor": {
+                  "type": "object",
+                  "description": "The Notes text editor.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Editor background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "border": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Editor border. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "toolbarBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The formatting toolbar, which is sticky over the text and needs an opaque surface. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "spotify": {
+                  "type": "object",
+                  "description": "The Music panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkShadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Shadow under album art. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Where album art would be, before there is any. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholderHighlight": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The highlight on the placeholder. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "images": {
+                  "type": "object",
+                  "description": "The Images panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "frameBorder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A border around the picture, as a border shorthand: a photo matte such as \"8px solid #fff\", or \"none\". A CSS border shorthand, e.g. \"1px solid #333\". Must not contain url(), var() or other references."
+                    },
+                    "frameShadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A shadow under the picture, or \"none\". Not drawn when the edge is torn. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "edge": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "deckle"
+                      ],
+                      "description": "The edge of the picture. One of: none, deckle."
+                    },
+                    "tilt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A rotation of the picture, e.g. \"-1.5deg\" for a photo glued in by hand; \"0deg\" (the default) for straight. A CSS angle, e.g. \"-1.5deg\" or \"0deg\". Must not contain url(), var() or other references."
+                    },
+                    "inset": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Room kept around the picture inside its stage, e.g. \"14px\" so a matte, a shadow or a tilt is not clipped; \"0px\" (the default) fills the stage. A CSS length, e.g. \"14px\" or \"0px\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "notes": {
+                  "type": "object",
+                  "description": "The Notes panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "titleForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The note title. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "controlBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The note selector and title field. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "controlBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Those controls under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -27,10 +27,10 @@ beforeAll(async () => {
 })
 
 describe('the fresh database', () => {
-  it('opens its own database at version 1 and never reads the earlier one', async () => {
+  it('opens its own database and never reads the earlier one', async () => {
     const db = await openDB('my-states')
-    expect(db.version).toBe(1)
-    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'directoryHandles', 'moments', 'notes', 'preferences'])
+    expect(db.version).toBe(2)
+    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'directoryHandles', 'moments', 'notes', 'preferences', 'themes'])
     const moments = await db.getAll('moments')
     expect(moments).toHaveLength(1)
     expect(moments[0]).toMatchObject({ name: 'A new moment', schemaVersion: storage.MOMENT_SCHEMA_VERSION })

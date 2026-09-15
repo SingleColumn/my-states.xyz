@@ -37,7 +37,9 @@ export interface PanelDescription {
 }
 
 export interface CanvasDescription {
-  moment: { id: string; name: string } | null
+  moment: { id: string; name: string; themeId: string | null } | null
+  /** The theme on screen and where the choice came from; see themes/resolve.ts. */
+  theme: { id: string; name: string; mode: 'light' | 'dark'; source: 'moment' | 'global' | 'fallback'; globalThemeId: string }
   panelTypes: Array<{ type: PanelType; label: string; singleton: boolean }>
   panels: PanelDescription[]
 }
@@ -64,6 +66,8 @@ export type CanvasCommand =
   | { kind: 'spotify.login' }
   | { kind: 'spotify.loadPlaylistUrl'; panelId: string; url: string }
   | { kind: 'spotify.togglePlay'; panelId: string }
+  | { kind: 'appearance.setGlobalTheme'; themeId: string }
+  | { kind: 'appearance.setMomentTheme'; themeId: string | null }
 
 export interface CanvasApi {
   describe(): CanvasDescription
@@ -82,7 +86,14 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
       const state = getState()
       const moment = state.moments.activeMoment
       return {
-        moment: moment ? { id: moment.id, name: moment.name } : null,
+        moment: moment ? { id: moment.id, name: moment.name, themeId: moment.themeId ?? null } : null,
+        theme: {
+          id: state.appearance.effective.themeId,
+          name: state.appearance.effective.definition.name,
+          mode: state.appearance.effective.mode,
+          source: state.appearance.effective.source,
+          globalThemeId: state.appearance.settings.globalThemeId,
+        },
         panelTypes: PANEL_TYPES.map((type) => {
           const definition = getPanelDefinition(type)
           return { type, label: definition.label, singleton: definition.singleton }
@@ -214,6 +225,12 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
         case 'spotify.togglePlay':
           requirePanel(command.panelId)
           await state.spotify.togglePlay(command.panelId)
+          return
+        case 'appearance.setGlobalTheme':
+          await state.appearance.setGlobalTheme(command.themeId)
+          return
+        case 'appearance.setMomentTheme':
+          await state.moments.setTheme(command.themeId)
           return
         default: {
           const unknown: never = command

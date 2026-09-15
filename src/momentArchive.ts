@@ -3,11 +3,17 @@ import {
   getNotes,
   getMoment,
   getMomentAssets,
+  getStoredTheme,
   importMomentContent,
+  importStoredTheme,
   momentLimits,
+  type ThemeImportOutcome,
 } from './storage'
 import { draftFromDocument } from './panelStore'
 import { normalizeDraftPanel } from './panelInput'
+import { isBuiltInThemeId } from './themes/registry'
+import type { ThemeDefinition } from './themes/types'
+import { acceptEveryValue, THEME_ID_PATTERN, validateThemeDefinition, type SupportsCssValue } from './themes/validate'
 import type {
   CanvasState,
   Note,
@@ -21,6 +27,12 @@ import type {
  * message that says so; that generation of saved work was discarded along
  * with the browser data it came from. From version 2 on,
  * a file this app exports is meant to stay openable by later versions.
+ *
+ * The optional `theme` field was added on 2026-09-15 without a version
+ * change: a build without themes ignores an unknown manifest key, and a
+ * manifest without the key means the moment follows the global theme, which
+ * is what every earlier moment did. It is inline in the manifest rather than
+ * a file of its own because earlier builds refuse a file they do not expect.
  */
 const FORMAT_VERSION = 2
 const maxNoteCount = 500
@@ -43,6 +55,14 @@ interface MomentManifest {
     createdAt: number
     updatedAt: number
   }
+  /**
+   * The theme the moment pins. Absent: the moment follows the global theme.
+   * A built-in theme travels as its id alone, since every build has it; an
+   * imported one travels with its definition, so the moment looks the same
+   * in another browser. A pinned theme that was not installed at export
+   * travels as its id, as the spec asks: it may be installed at the other end.
+   */
+  theme?: { id: string; definition?: ThemeDefinition }
   /** The moment's draft: panels and their layout, in the app's own terms. */
   panels: Panel[]
   canvas: CanvasState | null
@@ -69,6 +89,7 @@ interface MomentManifest {
 export async function exportMomentArchive(momentId: string) {
   const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
   if (!moment) throw new Error('The selected moment no longer exists.')
+  const theme = moment.themeId ? await themeForArchive(moment.themeId) : undefined
   // The archive carries a moment as a draft, in the app's own terms: the
   // tldraw document is the app's persistence format, not its interchange
   // format, so a change to tldraw's is not a change to the file.
@@ -93,6 +114,7 @@ export async function exportMomentArchive(momentId: string) {
       createdAt: moment.createdAt,
       updatedAt: moment.updatedAt,
     },
+    ...(theme ? { theme } : {}),
     panels,
     canvas,
     notes: [],
@@ -138,7 +160,13 @@ export async function exportMomentArchive(momentId: string) {
   return new Blob([archive], { type: 'application/zip' })
 }
 
-export async function importMomentArchive(file: File) {
+export interface MomentArchiveImport {
+  moment: Awaited<ReturnType<typeof importMomentContent>>
+  /** Set when the archive carried a theme definition: what happened to it. */
+  theme?: { name: string; outcome: ThemeImportOutcome }
+}
+
+export async function importMomentArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue): Promise<MomentArchiveImport> {
   if (file.size > momentLimits.maxArchiveBytes) {
     throw new Error('The selected archive exceeds the 260 MB limit.')
   }
@@ -148,7 +176,17 @@ export async function importMomentArchive(file: File) {
   if (!manifestBytes) throw new Error('The moment archive is missing manifest.json.')
 
   const manifest = parseManifest(manifestBytes)
-  validateManifest(manifest, files)
+  validateManifest(manifest, files, supportsCssValue)
+
+  // An embedded theme is installed first, under whatever id is free, and
+  // the moment pins that id. The library is never overwritten by an import.
+  let themeId = manifest.theme?.id
+  let theme: MomentArchiveImport['theme']
+  if (manifest.theme?.definition) {
+    const installed = await importStoredTheme(manifest.theme.definition)
+    themeId = installed.theme.id
+    theme = { name: installed.theme.name, outcome: installed.outcome }
+  }
 
   const notes = manifest.notes.map((note) => ({
     id: note.id,
@@ -170,13 +208,21 @@ export async function importMomentArchive(file: File) {
     blob: new Blob([toArrayBuffer(files.get(image.path)!)], { type: image.mimeType }),
   }))
 
-  return importMomentContent({
+  const moment = await importMomentContent({
     name: manifest.moment.name,
+    ...(themeId ? { themeId } : {}),
     panels: manifest.panels,
     canvas: manifest.canvas,
     notes,
     assets,
   })
+  return { moment, ...(theme ? { theme } : {}) }
+}
+
+async function themeForArchive(themeId: string): Promise<MomentManifest['theme']> {
+  if (isBuiltInThemeId(themeId)) return { id: themeId }
+  const stored = await getStoredTheme(themeId)
+  return stored ? { id: themeId, definition: stored.definition } : { id: themeId }
 }
 
 export function downloadMomentArchive(blob: Blob, momentName: string) {
@@ -275,7 +321,7 @@ function parseManifest(bytes: Uint8Array): MomentManifest {
   }
 }
 
-function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Array>) {
+function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Array>, supportsCssValue: SupportsCssValue) {
   if (!isRecord(manifest)) throw new Error('This moment archive uses an unsupported format version.')
   const formatVersion: unknown = manifest.formatVersion
   if (formatVersion === 1) {
@@ -290,6 +336,7 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
   if (!isCanvasState(manifest.canvas) || !Array.isArray(manifest.notes) || !Array.isArray(manifest.images)) {
     throw new Error('The moment manifest has invalid workspace data.')
   }
+  if (manifest.theme !== undefined) validateManifestTheme(manifest.theme, supportsCssValue)
   if (manifest.notes.length > maxNoteCount || manifest.images.length > momentLimits.maxImageCount) {
     throw new Error('The moment archive exceeds the permitted number of notes or images.')
   }
@@ -340,6 +387,16 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
     }
   }
   if (files.size !== referencedPaths.size) throw new Error('The archive contains unexpected files.')
+}
+
+/** The theme reference goes through the same validator a theme file does; its id must match the id it is filed under. */
+function validateManifestTheme(theme: unknown, supportsCssValue: SupportsCssValue) {
+  if (!isRecord(theme) || typeof theme.id !== 'string' || !THEME_ID_PATTERN.test(theme.id) || theme.id.length > 64) {
+    throw new Error('The moment manifest has an invalid theme reference.')
+  }
+  if (theme.definition === undefined) return
+  const definition = validateThemeDefinition(theme.definition, supportsCssValue)
+  if (definition.id !== theme.id) throw new Error('The moment manifest has an invalid theme reference.')
 }
 
 function validateArchivePath(path: string) {

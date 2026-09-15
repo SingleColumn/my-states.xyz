@@ -1,15 +1,20 @@
-import { Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Check, Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
+import { useMomentThemeOptions } from './MomentThemeSelect'
 
 export function MomentToolbar() {
   const { moments } = useAppState()
+  // The theme select itself sits beside the Settings button (MomentThemeSelect);
+  // the compact toolbar repeats the choice in the … menu.
+  const theme = useMomentThemeOptions()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -34,11 +39,13 @@ export function MomentToolbar() {
     }
   }, [isMenuOpen])
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<void | string | null>) {
     setBusy(true)
     setError(null)
+    setNotice(null)
     try {
-      await action()
+      const result = await action()
+      if (typeof result === 'string') setNotice(result)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The action could not be completed.')
     } finally {
@@ -73,6 +80,10 @@ export function MomentToolbar() {
   function runMenuAction(action: () => void) {
     setIsMenuOpen(false)
     action()
+  }
+
+  function chooseTheme(themeId: string) {
+    void run(() => theme.choose(themeId))
   }
 
   return (
@@ -151,6 +162,15 @@ export function MomentToolbar() {
           <button className="is-destructive" type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(deleteMoment)}>
             <Trash2 size={17} aria-hidden="true" /><span>Delete moment</span>
           </button>
+          <div className="canvas-view-menu-section" role="group" aria-label="Theme for this moment">
+            <span className="canvas-view-menu-heading">Theme</span>
+            {theme.options.map((option) => (
+              <button key={option.id} type="button" role="menuitemradio" aria-checked={option.id === theme.pinnedThemeId} disabled={!moments.activeMoment} onClick={() => runMenuAction(() => chooseTheme(option.id))}>
+                {option.id === theme.pinnedThemeId ? <Check size={16} aria-hidden="true" /> : <span className="moment-theme-menu-spacer" aria-hidden="true" />}
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
       <input
@@ -165,6 +185,7 @@ export function MomentToolbar() {
         }}
       />
       {error ? <span className="moment-toolbar-error">{error}</span> : null}
+      {notice ? <span className="moment-toolbar-error moment-toolbar-notice" role="status">{notice}</span> : null}
     </section>
   )
 }

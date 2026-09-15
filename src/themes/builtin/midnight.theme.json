@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "id": "midnight",
+  "name": "Midnight",
+  "version": "1.0.0",
+  "author": "my-states",
+  "description": "The original look: a near-black ambient canvas with a warm/cool drift, rounded translucent panels, and a distinct identity per panel.",
+  "modes": {
+    "dark": {
+      "foundation": {
+        "color": {
+          "background": "#101114",
+          "foreground": "#f5f3ee",
+          "muted": "rgba(245, 243, 238, 0.64)",
+          "faint": "rgba(255, 255, 255, 0.32)",
+          "accent": "#a49cf0",
+          "border": "rgba(255, 255, 255, 0.16)",
+          "danger": "#ffb4a9",
+          "selection": "#a49cf0"
+        },
+        "typography": {
+          "uiFont": "\"Inter Variable\", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+          "monoFont": "\"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace",
+          "headingWeight": "500"
+        },
+        "shape": {
+          "radiusLarge": "22px",
+          "radiusMedium": "12px",
+          "radiusSmall": "8px"
+        },
+        "depth": {
+          "shadowSmall": "0 14px 32px rgba(0, 0, 0, 0.35)",
+          "shadowMedium": "0 14px 34px rgba(0, 0, 0, 0.28)",
+          "shadowLarge": "0 26px 70px rgba(0, 0, 0, 0.34)",
+          "backdropBlur": "blur(18px)"
+        }
+      },
+      "semantic": {
+        "surfacePrimary": "#101114",
+        "surfaceElevated": "rgba(12, 13, 15, 0.68)",
+        "surfaceOverlay": "#000",
+        "textPrimary": "#f5f3ee",
+        "textSecondary": "rgba(245, 243, 238, 0.8)",
+        "textMuted": "rgba(245, 243, 238, 0.64)",
+        "textFaint": "rgba(255, 255, 255, 0.32)",
+        "borderSubtle": "rgba(255, 255, 255, 0.1)",
+        "borderNormal": "rgba(255, 255, 255, 0.16)",
+        "borderStrong": "rgba(255, 255, 255, 0.25)",
+        "focusRing": "rgba(255, 255, 255, 0.46)",
+        "interactive": "rgba(255, 255, 255, 0.1)",
+        "interactiveHover": "rgba(255, 255, 255, 0.15)",
+        "interactiveActive": "rgba(255, 255, 255, 0.12)",
+        "danger": "#ffb4a9",
+        "accentLift": "white"
+      },
+      "components": {
+        "canvas": {
+          "background": "#101114",
+          "backdrop": "radial-gradient(circle at 25% 20%, rgba(55, 79, 92, 0.26), transparent 32%), radial-gradient(circle at 80% 12%, rgba(117, 85, 62, 0.2), transparent 27%), linear-gradient(135deg, #101114 0%, #181715 54%, #12151a 100%)",
+          "gridColor": "rgba(255, 255, 255, 0.045)",
+          "selectionStroke": "#a49cf0",
+          "selectionStrokeWidth": "1.5px"
+        },
+        "panel": {
+          "border": "rgba(255, 255, 255, 0.16)",
+          "divider": "rgba(255, 255, 255, 0.1)",
+          "frame": "rgba(255, 255, 255, 0.11)",
+          "shellBorder": "0.5px solid rgba(255, 255, 255, 0.09)",
+          "headerForeground": "rgba(255, 255, 255, 0.94)",
+          "footerForeground": "rgba(255, 255, 255, 0.32)",
+          "shadow": "0 26px 70px rgba(0, 0, 0, 0.34)",
+          "backdropBlur": "blur(20px)"
+        },
+        "button": {
+          "background": "rgba(255, 255, 255, 0.04)",
+          "border": "rgba(255, 255, 255, 0.1)",
+          "foreground": "rgba(255, 255, 255, 0.58)",
+          "backgroundHover": "rgba(255, 255, 255, 0.08)",
+          "backgroundActive": "rgba(255, 255, 255, 0.12)",
+          "borderActive": "rgba(255, 255, 255, 0.18)",
+          "foregroundActive": "rgba(255, 255, 255, 0.75)"
+        },
+        "control": {
+          "background": "rgba(255, 255, 255, 0.1)",
+          "border": "rgba(255, 255, 255, 0.14)",
+          "borderHover": "rgba(255, 255, 255, 0.25)",
+          "emptyBackground": "rgba(255, 255, 255, 0.09)",
+          "emptyBackgroundHover": "rgba(255, 255, 255, 0.15)",
+          "rangeAccent": "#f5eee0",
+          "iconStrokeWidth": "2"
+        },
+        "input": {
+          "background": "rgba(0, 0, 0, 0.24)",
+          "foreground": "#fffaf2"
+        },
+        "menu": {
+          "background": "#000",
+          "surface": "rgba(14, 15, 18, 0.92)"
+        },
+        "toolbar": {
+          "background": "rgba(12, 13, 15, 0.68)",
+          "border": "rgba(255, 255, 255, 0.12)",
+          "foreground": "#f6f2ea",
+          "shadow": "0 14px 34px rgba(0, 0, 0, 0.28)",
+          "backdropBlur": "blur(18px)"
+        },
+        "toast": {
+          "background": "rgba(14, 15, 18, 0.92)",
+          "border": "rgba(255, 255, 255, 0.15)",
+          "foreground": "#f8f4ef"
+        },
+        "dialog": {
+          "background": "#181d24",
+          "border": "rgb(220 228 238 / 32%)",
+          "backdrop": "rgb(0 0 0 / 55%)",
+          "shadow": "0 24px 80px rgb(0 0 0 / 48%)"
+        },
+        "editor": {
+          "background": "rgba(12, 23, 22, 0.78)",
+          "border": "rgba(255, 255, 255, 0.12)",
+          "toolbarBackground": "rgba(9, 17, 17, 0.97)"
+        },
+        "spotify": {
+          "accent": "#1db954",
+          "panelBackground": "#0e1712",
+          "artworkShadow": "0 14px 32px rgba(0, 0, 0, 0.35)",
+          "artworkPlaceholder": "rgba(255, 255, 255, 0.08)",
+          "artworkPlaceholderHighlight": "rgba(255, 255, 255, 0.16)",
+          "playlistRowBackground": "rgba(0, 0, 0, 0.18)",
+          "playlistRowBackgroundHover": "rgba(255, 255, 255, 0.11)"
+        },
+        "images": {
+          "accent": "#7f77dd",
+          "panelBackground": "#16121f",
+          "frameBorder": "none",
+          "frameShadow": "none",
+          "tilt": "0deg",
+          "inset": "0px"
+        },
+        "notes": {
+          "accent": "#8fb7a2",
+          "panelBackground": "#101918",
+          "titleForeground": "#fff8ee",
+          "controlBackground": "rgba(7, 13, 14, 0.94)",
+          "controlBackgroundHover": "rgba(13, 26, 25, 0.98)"
+        }
+      }
+    }
+  }
+}

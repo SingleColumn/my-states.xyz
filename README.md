@@ -73,6 +73,42 @@ npm run build
 npm run preview
 ```
 
+## Tests
+
+There are two test suites, and they check different things.
+
+`npm test` runs the pure-function and storage tests (Vitest, in Node, plus
+the sample-manifest script tests). They are fast and they cannot see a
+browser: nothing in them mounts React or tldraw or sends a real pointer or
+keyboard event.
+
+`npm run test:browser` runs the browser suite (Playwright, in Chromium)
+against the real app on a dev server it starts itself, on port 5199 so it
+does not collide with `npm run dev`. Every test opens a fresh browser
+profile, drives the app with real pointer and keyboard input, and reads the
+result back through `window.myStates.describe()` and the in-app Panel
+report. It covers the frame/content pointer boundary of a panel, undo across
+deletes, duplicates, focus view and moment switches, and the moment
+lifecycle (reload, export/import, the save flush the page runs when it is
+hidden or left -- with a synthetic event, not a real unload -- and refusing
+commands mid-switch). The one-off setup is downloading the
+browser:
+
+```bash
+npx playwright install chromium
+```
+
+```bash
+npm run test:browser
+```
+
+`npm run test:browser:headed` runs the same suite in a visible window.
+tldraw's pointer handling can differ subtly between headless and headed
+Chromium, so a change to `PanelShape.tsx`, the handlers in `App.tsx`, or the
+pointer rules in `styles.css` should be checked both ways. A failed run
+leaves a screenshot and a trace under `test-results/`; open a trace with
+`npx playwright show-trace <path-to-trace.zip>`.
+
 ## Deploy to Vercel
 
 This repository includes `vercel.json`, which rewrites all routes to `index.html` so Spotify can return users to `/callback` in this Vite SPA.
@@ -154,6 +190,8 @@ Clearing this site's browser data removes the stored moments, notes, images, set
 | `npm run build` | Regenerate the sample manifest, type-check, and build the app into `dist/`. |
 | `npm run preview` | Preview the production build on localhost. |
 | `npm test` | Run application and sample-manifest tests. |
+| `npm run test:browser` | Run the browser suite against the real app in headless Chromium. |
+| `npm run test:browser:headed` | The same suite in a visible browser window. |
 
 ## License
 

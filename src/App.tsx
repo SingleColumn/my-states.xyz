@@ -13,13 +13,13 @@ import { getPanelDefinition } from './panelRegistry'
 import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
-import { applyTheme, builtInTheme } from './theme'
 import { debounce } from './utils'
 import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
 import { registerHiddenCanvasPersistence } from './canvasPersistence'
 import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
+import { AppSettings } from './AppSettings'
 import type { Moment, PanelLayout, PanelType } from './types'
 
 const shapeUtils = [PanelShapeUtil]
@@ -37,7 +37,6 @@ if (!documentSchemaMatchesEditor(editorSchema)) {
 }
 
 export default function App() {
-  useEffect(() => applyTheme(builtInTheme), [])
   return (
     <AppStateProvider>
       <AppContent />
@@ -47,7 +46,7 @@ export default function App() {
 
 function AppContent() {
   const appState = useAppState()
-  const { spotify, moments, panels } = appState
+  const { spotify, moments, panels, appearance } = appState
   const [callbackStatus, setCallbackStatus] = useState<string | null>(null)
   const callbackHandledRef = useRef(false)
   const [isPanMode, setIsPanMode] = useState(false)
@@ -56,11 +55,13 @@ function AppContent() {
   const [chromeHeight, setChromeHeight] = useState(0)
   const [architectureReport, setArchitectureReport] = useState<PanelArchitectureReport | null>(null)
   const [isHelpAboutOpen, setIsHelpAboutOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   // previousPanelGeometryRef stays the source of truth for restoring geometry;
   // this mirrors it purely so the root element re-renders when a panel enters
   // or leaves full screen.
   const [fullScreenPanelId, setFullScreenPanelId] = useState<string | null>(null)
   const helpAboutReturnFocusRef = useRef<HTMLElement | null>(null)
+  const settingsReturnFocusRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<Editor | null>(null)
   const appRootRef = useRef<HTMLElement | null>(null)
   const chromeRectRef = useRef<AppChromeRect | null>(null)
@@ -70,6 +71,7 @@ function AppContent() {
   const momentsRef = useRef(moments)
   const panelsRef = useRef(panels)
   const appStateRef = useRef(appState)
+  const appearanceRef = useRef(appearance)
   const previousPanelGeometryRef = useRef(new Map<string, PanelLayout>())
   const preFocusPanelGeometryRef = useRef(new Map<string, PanelLayout>())
 
@@ -77,7 +79,24 @@ function AppContent() {
     momentsRef.current = moments
     panelsRef.current = panels
     appStateRef.current = appState
-  }, [appState, moments, panels])
+    appearanceRef.current = appearance
+  }, [appState, appearance, moments, panels])
+
+  // tldraw's light/dark switch lives in its user preferences, not the DOM,
+  // so the theme's mode is pushed to it here whenever the theme changes;
+  // theme.css hands tldraw the app's palette under either scheme's class.
+  useEffect(() => {
+    editorRef.current?.user.updateUserPreferences({ colorScheme: appearance.effective.mode })
+  }, [appearance.effective.mode, isCanvasReady])
+
+  // A moment can pin a theme that is not installed here (it was deleted, or
+  // the moment came from another browser). The id is kept and the global
+  // theme is shown; say so once per moment.
+  useEffect(() => {
+    const missing = appearance.effective.missingThemeId
+    if (!missing) return
+    setCallbackStatus(`This moment was saved with the theme "${missing}", which is not installed. Your current theme is being used instead.`)
+  }, [moments.activeMoment?.id, appearance.effective.missingThemeId])
 
   useEffect(() => {
     if (window.location.pathname !== '/callback' || callbackHandledRef.current) return
@@ -164,10 +183,9 @@ function AppContent() {
     // tldraw otherwise picks its menu language from the browser, so the same
     // build reads differently machine to machine. This app is written in
     // English, so keep its wording fixed. The colour scheme is the theme's
-    // to choose: theme.css hands tldraw the app's palette under the names of
-    // that scheme, so the two must agree or tldraw's menus and outlines fall
-    // back to its own colours.
-    editor.user.updateUserPreferences({ locale: 'en', colorScheme: builtInTheme.tldrawColorScheme })
+    // to choose and is kept in step by the effect below; it is set here too
+    // so the first frame is right.
+    editor.user.updateUserPreferences({ locale: 'en', colorScheme: appearanceRef.current.effective.mode })
     if (moments.activeMoment) restoreCanvas(editor, moments.activeMoment)
 
     // Whatever changes on the canvas, by the user's hand or the app's, the
@@ -510,6 +528,13 @@ function AppContent() {
 
   const closeHelpAbout = useCallback(() => setIsHelpAboutOpen(false), [])
 
+  const openSettings = useCallback(() => {
+    settingsReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setIsSettingsOpen(true)
+  }, [])
+
+  const closeSettings = useCallback(() => setIsSettingsOpen(false), [])
+
   useEffect(() => {
     if (editorRef.current && moments.activeMoment) restoreCanvas(editorRef.current, moments.activeMoment)
   }, [restoreCanvas, moments.activeMoment?.id])
@@ -531,8 +556,9 @@ function AppContent() {
     onHideSelectedPanel: hideSelectedPanel,
     onRestorePanel: restorePanel,
     onAddPanel: addPanel,
-    onOpenArchitectureReport: openArchitectureReport,
     onOpenHelpAbout: openHelpAbout,
+    onOpenSettings: openSettings,
+    activeThemeName: appearance.effective.definition.name,
     onMeasure: handleChromeMeasure,
   }
 
@@ -623,6 +649,7 @@ function AppContent() {
       </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
+      <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />
       {moments.error ? <div className="callback-toast" role="alert">{moments.error} <button type="button" onClick={() => { void moments.flush().catch(() => {}) }}>Retry save</button></div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>

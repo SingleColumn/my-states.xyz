@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "id": "scrapbook",
+  "name": "Scrapbook",
+  "version": "1.1.0",
+  "author": "my-states",
+  "description": "A travel journal spread: kraft paper with a grain, coloured cards pasted on for each panel, handwritten headings, a teal cover accent on the chrome, rounded corners, and photos matted in white and glued in slightly askew. Light mode only.",
+  "modes": {
+    "light": {
+      "foundation": {
+        "color": {
+          "background": "#f2ead9",
+          "foreground": "#3d3427",
+          "muted": "#5f5443",
+          "faint": "rgba(61, 52, 39, 0.55)",
+          "accent": "#4a9d94",
+          "border": "#d6c9a8",
+          "danger": "#b5542f",
+          "selection": "#4a9d94"
+        },
+        "typography": {
+          "uiFont": "Quicksand, \"Varela Round\", Nunito, \"Segoe UI\", sans-serif",
+          "headingFont": "Caveat, \"Segoe Print\", \"Bradley Hand\", \"Comic Sans MS\", cursive",
+          "headingWeight": "700",
+          "monoFont": "Consolas, \"Courier New\", monospace"
+        },
+        "shape": {
+          "radiusLarge": "22px",
+          "radiusMedium": "12px",
+          "radiusSmall": "8px"
+        },
+        "depth": {
+          "shadowSmall": "0 1px 2px rgba(61, 52, 39, 0.12)",
+          "shadowMedium": "0 4px 10px rgba(61, 52, 39, 0.16)",
+          "shadowLarge": "0 10px 24px rgba(61, 52, 39, 0.2)",
+          "backdropBlur": "blur(6px)"
+        }
+      },
+      "semantic": {
+        "surfaceElevated": "#f4ecd8",
+        "surfaceOverlay": "#f6efdf",
+        "textMuted": "#5f5443",
+        "textFaint": "rgba(61, 52, 39, 0.55)",
+        "borderSubtle": "rgba(61, 52, 39, 0.08)",
+        "borderNormal": "rgba(61, 52, 39, 0.16)",
+        "borderStrong": "rgba(61, 52, 39, 0.32)",
+        "focusRing": "#2f7a72",
+        "interactive": "#e4d9bd",
+        "interactiveHover": "#dccfab",
+        "interactiveActive": "#cfc093"
+      },
+      "components": {
+        "canvas": {
+          "backdrop": "#e2d2ae",
+          "gridColor": "rgba(61, 52, 39, 0.08)",
+          "selectionStroke": "#4a9d94",
+          "selectionStrokeWidth": "3px"
+        },
+        "toolbar": {
+          "background": "#f4ecd8",
+          "border": "rgba(61, 52, 39, 0.12)",
+          "foreground": "#3d3427",
+          "shadow": "0 2px 6px rgba(61, 52, 39, 0.1)",
+          "backdropBlur": "blur(8px)"
+        },
+        "panel": {
+          "border": "rgba(61, 52, 39, 0.14)",
+          "shellBorder": "1px solid rgba(61, 52, 39, 0.18)",
+          "divider": "rgba(61, 52, 39, 0.12)",
+          "frame": "rgba(61, 52, 39, 0.1)",
+          "headerForeground": "#3d3427",
+          "footerForeground": "#6b604e",
+          "shadow": "0 2px 3px rgba(61, 52, 39, 0.12), 0 12px 28px rgba(61, 52, 39, 0.18)",
+          "backdropBlur": "none",
+          "contentBackground": "#eee3cc",
+          "texture": "paper",
+          "ornament": "none"
+        },
+        "button": {
+          "background": "rgba(255, 253, 247, 0.55)",
+          "border": "transparent",
+          "foreground": "#5f5443",
+          "backgroundHover": "rgba(74, 157, 148, 0.12)",
+          "backgroundActive": "rgba(74, 157, 148, 0.22)",
+          "borderActive": "#4a9d94",
+          "foregroundActive": "#3d3427"
+        },
+        "control": {
+          "background": "#fbf8f0",
+          "border": "rgba(61, 52, 39, 0.18)",
+          "borderHover": "#4a9d94",
+          "rangeAccent": "#4a9d94",
+          "rangeTrack": "rgba(61, 52, 39, 0.14)",
+          "rangeThumb": "#4a9d94",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "rgba(61, 52, 39, 0.2)",
+          "iconStrokeWidth": "2"
+        },
+        "input": {
+          "background": "#f8f2e4",
+          "foreground": "#3d3427"
+        },
+        "menu": {
+          "surface": "rgba(250, 246, 236, 0.96)",
+          "background": "#faf6ec"
+        },
+        "toast": {
+          "background": "#faf6ec",
+          "border": "rgba(61, 52, 39, 0.14)",
+          "foreground": "#3d3427"
+        },
+        "dialog": {
+          "background": "#fbf8f0",
+          "border": "rgba(61, 52, 39, 0.14)"
+        },
+        "editor": {
+          "background": "#f5eddb",
+          "border": "rgba(61, 52, 39, 0.14)",
+          "toolbarBackground": "#ecdfc4"
+        },
+        "spotify": {
+          "accent": "#3a6636",
+          "panelBackground": "#c9d8ba",
+          "artworkShadow": "0 6px 14px rgba(61, 52, 39, 0.18)",
+          "artworkPlaceholder": "#d7ddc8",
+          "playlistRowBackground": "rgba(255, 253, 247, 0.45)",
+          "playlistRowBackgroundHover": "rgba(111, 155, 106, 0.12)"
+        },
+        "images": {
+          "accent": "#8f3d1d",
+          "panelBackground": "#e6c9ab",
+          "frameBorder": "8px solid #fffdf7",
+          "frameShadow": "0 2px 3px rgba(61, 52, 39, 0.18), 0 10px 22px rgba(61, 52, 39, 0.26)",
+          "edge": "none",
+          "tilt": "-2deg",
+          "inset": "16px"
+        },
+        "notes": {
+          "accent": "#2f6187",
+          "panelBackground": "#c3d6e2",
+          "titleForeground": "#3d3427",
+          "controlBackground": "#f8f2e4",
+          "controlBackgroundHover": "#eef4f6"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "id": "kitty-bow",
+  "name": "Kitty Bow",
+  "version": "1.1.0",
+  "author": "my-states",
+  "description": "Inspired by a certain white cat with a red bow: white panels with pink trim, a bow-red accent, gold details, bubbly rounded corners and type, polka dots and a soft pink glow. Light mode only.",
+  "modes": {
+    "light": {
+      "foundation": {
+        "color": {
+          "background": "#ffe9f0",
+          "foreground": "#4a2b35",
+          "muted": "rgba(74, 43, 53, 0.62)",
+          "faint": "rgba(74, 43, 53, 0.42)",
+          "accent": "#e5395f",
+          "border": "rgba(229, 57, 95, 0.22)",
+          "danger": "#d7263d",
+          "selection": "#e5395f"
+        },
+        "typography": {
+          "uiFont": "\"Varela Round\", Nunito, Quicksand, \"Comic Sans MS\", \"Trebuchet MS\", \"Segoe UI\", sans-serif",
+          "headingFont": "\"Baloo 2\", Baloo, Fredoka, \"Varela Round\", Nunito, \"Comic Sans MS\", \"Trebuchet MS\", sans-serif"
+        },
+        "shape": {
+          "radiusLarge": "30px",
+          "radiusMedium": "18px",
+          "radiusSmall": "14px"
+        },
+        "depth": {
+          "shadowSmall": "0 0 0 3px rgba(255, 255, 255, 0.7), 0 8px 20px rgba(229, 57, 95, 0.14)",
+          "shadowMedium": "0 0 0 3px rgba(255, 255, 255, 0.7), 0 10px 26px rgba(229, 57, 95, 0.14)",
+          "shadowLarge": "0 0 0 4px rgba(255, 255, 255, 0.75), 0 0 40px rgba(255, 143, 171, 0.35), 0 18px 48px rgba(229, 57, 95, 0.16)",
+          "backdropBlur": "blur(14px)"
+        }
+      },
+      "semantic": {
+        "surfaceElevated": "rgba(255, 255, 255, 0.92)",
+        "surfaceOverlay": "#fffafc",
+        "borderSubtle": "rgba(229, 57, 95, 0.12)",
+        "borderNormal": "rgba(229, 57, 95, 0.28)",
+        "borderStrong": "rgba(229, 57, 95, 0.45)",
+        "focusRing": "#f2c14e",
+        "interactive": "rgba(255, 255, 255, 0.7)",
+        "interactiveHover": "#ffe1ea",
+        "interactiveActive": "#ffd0dd"
+      },
+      "components": {
+        "canvas": {
+          "backdrop": "radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.9), transparent 28%), radial-gradient(circle at 82% 12%, rgba(255, 214, 226, 0.9), transparent 30%), linear-gradient(135deg, #ffe4ec 0%, #fff4f8 52%, #ffdde7 100%)",
+          "gridColor": "rgba(229, 57, 95, 0.07)",
+          "selectionStrokeWidth": "4px"
+        },
+        "panel": {
+          "border": "rgba(229, 57, 95, 0.3)",
+          "shellBorder": "2px solid #fff",
+          "contentBackground": "rgba(255, 255, 255, 0.92)",
+          "headerForeground": "#e5395f",
+          "texture": "dots"
+        },
+        "button": {
+          "background": "rgba(255, 255, 255, 0.85)",
+          "border": "rgba(229, 57, 95, 0.25)",
+          "foreground": "#e5395f",
+          "backgroundHover": "#ffe1ea",
+          "backgroundActive": "#ffd0dd",
+          "borderActive": "#f2c14e",
+          "foregroundActive": "#c92a4e"
+        },
+        "control": {
+          "rangeAccent": "#e5395f",
+          "rangeTrack": "#ffc6d5",
+          "rangeThumb": "#e5395f",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "2.25"
+        },
+        "input": {
+          "background": "#fff",
+          "foreground": "#4a2b35"
+        },
+        "menu": {
+          "surface": "rgba(255, 255, 255, 0.95)"
+        },
+        "toolbar": {
+          "background": "rgba(255, 255, 255, 0.85)",
+          "border": "rgba(229, 57, 95, 0.25)",
+          "foreground": "#c92a4e"
+        },
+        "editor": {
+          "background": "#fff",
+          "border": "rgba(229, 57, 95, 0.18)",
+          "toolbarBackground": "#fff6f9"
+        },
+        "dialog": {
+          "background": "#fff8fa",
+          "border": "rgba(229, 57, 95, 0.3)",
+          "backdrop": "rgba(229, 57, 95, 0.22)"
+        },
+        "spotify": {
+          "accent": "#ff6f91",
+          "panelBackground": "#ffd9e3",
+          "playlistRowBackground": "#fff"
+        },
+        "images": {
+          "accent": "#e5395f",
+          "panelBackground": "#ffdbe4",
+          "frameBorder": "6px solid #fff",
+          "frameShadow": "0 0 0 2px #ffc6d5, 0 8px 20px rgba(229, 57, 95, 0.18)"
+        },
+        "notes": {
+          "accent": "#f2c14e",
+          "panelBackground": "#fff1d6",
+          "titleForeground": "#c92a4e",
+          "controlBackground": "#fff"
+        }
+      }
+    }
+  }
+}

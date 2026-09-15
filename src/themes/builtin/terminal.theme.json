@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "terminal",
+  "name": "Terminal",
+  "version": "1.0.0",
+  "author": "my-states",
+  "description": "Phosphor green on black, monospace throughout, hard edges and no shadows.",
+  "modes": {
+    "dark": {
+      "foundation": {
+        "color": {
+          "background": "#050807",
+          "foreground": "#c8f5d2",
+          "muted": "rgba(200, 245, 210, 0.6)",
+          "faint": "rgba(200, 245, 210, 0.38)",
+          "accent": "#39ff88",
+          "border": "rgba(57, 255, 136, 0.35)",
+          "danger": "#ff6b6b"
+        },
+        "typography": {
+          "uiFont": "\"JetBrains Mono\", \"Fira Code\", \"Cascadia Code\", Consolas, \"SFMono-Regular\", \"Liberation Mono\", monospace",
+          "monoFont": "\"JetBrains Mono\", \"Fira Code\", \"Cascadia Code\", Consolas, \"SFMono-Regular\", \"Liberation Mono\", monospace"
+        },
+        "depth": {
+          "shadowSmall": "none",
+          "shadowMedium": "none",
+          "shadowLarge": "none",
+          "backdropBlur": "none"
+        },
+        "shape": {
+          "radiusLarge": "0",
+          "radiusMedium": "0",
+          "radiusSmall": "0"
+        }
+      },
+      "semantic": {
+        "surfaceElevated": "rgba(5, 8, 7, 0.96)",
+        "surfaceOverlay": "#020403",
+        "focusRing": "#39ff88"
+      },
+      "components": {
+        "canvas": {
+          "backdrop": "#050807",
+          "gridColor": "rgba(57, 255, 136, 0.12)"
+        },
+        "panel": {
+          "shellBorder": "1px solid rgba(57, 255, 136, 0.45)"
+        },
+        "spotify": {
+          "accent": "#39ff88",
+          "panelBackground": "#04110a"
+        },
+        "images": {
+          "accent": "#ffb000",
+          "panelBackground": "#0b0a04"
+        },
+        "notes": {
+          "accent": "#5ad1ff",
+          "panelBackground": "#04090c"
+        }
+      }
+    }
+  }
+}
