@@ -89,8 +89,9 @@ profile, drives the app with real pointer and keyboard input, and reads the
 result back through `window.myStates.describe()` and the in-app Panel
 report. It covers the frame/content pointer boundary of a panel, undo across
 deletes, duplicates, focus view and moment switches, and the moment
-lifecycle (reload, export/import, saving when the page is hidden or left,
-and refusing commands mid-switch). The one-off setup is downloading the
+lifecycle (reload, export/import, the save flush the page runs when it is
+hidden or left -- with a synthetic event, not a real unload -- and refusing
+commands mid-switch). The one-off setup is downloading the
 browser:
 
 ```bash

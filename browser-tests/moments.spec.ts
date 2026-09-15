@@ -58,10 +58,16 @@ test('panels, hiding, settings and stacking order survive a reload', async ({ pa
   const music = await panelOfType(page, 'spotify')
   const images = await panelOfType(page, 'slideshow')
 
-  // Add a panel and move it.
+  // Add a panel and move it. A new panel lands on its type's default
+  // layout, exactly on top of the Notes panel already there, so this also
+  // exercises telling two co-located panels apart: the added one moves and
+  // the original stays.
+  const originalNotes = await panelOfType(page, 'notes')
   const added = await addPanelFromToolbar(page, 'notes')
+  expect(geometryOf(added)).toEqual(geometryOf(originalNotes))
   await dragLocator(page, await titleOf(page, added.panelId), { dx: -80, dy: 140 })
   expect(geometryOf(await panelById(page, added.panelId))).not.toEqual(geometryOf(added))
+  expect(geometryOf(await panelById(page, originalNotes.panelId))).toEqual(geometryOf(originalNotes))
 
   // Hide Music from its own context menu.
   await clickAt(page, await titleOf(page, music.panelId), { button: 'right' })
@@ -142,13 +148,21 @@ test('export writes a .moment.zip and import brings the moment back, listed in t
   await expectArchitectureReportPass(page)
 })
 
-test.describe('leaving the page right after an edit', () => {
+test.describe('the flush the page runs when it is hidden or left', () => {
   /**
-   * Both saves the app makes on its own are on timers (a 300ms debounce for
-   * the canvas, 500ms for a note), and tldraw hands store changes to its
-   * listeners on the next animation frame. Freezing the page's clock takes
-   * every one of those off the table, so the only way an edit can reach
-   * storage is the flush the lifecycle event triggers.
+   * What is under test here is the flush itself: the `pagehide` and
+   * `visibilitychange` handlers in App.tsx save the canvas and the notes
+   * without waiting for the debounced timers. Both saves the app makes on
+   * its own are on timers (a 300ms debounce for the canvas, 500ms for a
+   * note), and tldraw hands store changes to its listeners on the next
+   * animation frame. Freezing the page's clock takes every one of those
+   * off the table, so the only way an edit can reach storage is the flush.
+   *
+   * What is deliberately NOT under test: a real unload. The events are
+   * dispatched synthetically and the document stays alive while the
+   * IndexedDB write completes. A real reload or close inside the debounce
+   * window destroys the page before that write lands, and the edit is
+   * lost; see the fixme below. Do not read these two tests as covering it.
    */
   async function editWithClockFrozen(page: Page) {
     const notes = await panelOfType(page, 'notes')
@@ -165,12 +179,13 @@ test.describe('leaving the page right after an edit', () => {
     return { notes, movedTo: { x: notes.x - 175, y: notes.y + 125 } }
   }
 
-  async function expectPersistedAfterReload(page: Page, momentId: string, panelId: string, movedTo: { x: number; y: number }) {
+  async function expectFlushedToStorage(page: Page, momentId: string, panelId: string, movedTo: { x: number; y: number }) {
     await expect.poll(() => readStorage(page, momentId)).toMatchObject({
       found: true,
       panels: expect.arrayContaining([expect.objectContaining({ panelId, x: movedTo.x, y: movedTo.y })]),
       notes: expect.arrayContaining([expect.objectContaining({ content: expect.stringContaining('Written just before leaving.') })]),
     })
+    // And the app reads back what storage holds.
     await page.clock.resume()
     await page.reload()
     await waitForCanvas(page)
@@ -178,15 +193,15 @@ test.describe('leaving the page right after an edit', () => {
     expect(geometryOf(await panelById(page, panelId))).toMatchObject(movedTo)
   }
 
-  test('pagehide flushes the pending save', async ({ page }) => {
+  test('the pagehide handler writes the pending edit to storage', async ({ page }) => {
     await openApp(page)
     const momentId = (await describeCanvas(page)).moment?.id ?? ''
     const { notes, movedTo } = await editWithClockFrozen(page)
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
-    await expectPersistedAfterReload(page, momentId, notes.panelId, movedTo)
+    await expectFlushedToStorage(page, momentId, notes.panelId, movedTo)
   })
 
-  test('hiding the tab flushes the pending save', async ({ page }) => {
+  test('the tab-hidden handler writes the pending edit to storage', async ({ page }) => {
     await openApp(page)
     const momentId = (await describeCanvas(page)).moment?.id ?? ''
     const { notes, movedTo } = await editWithClockFrozen(page)
@@ -194,7 +209,22 @@ test.describe('leaving the page right after an edit', () => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await expectPersistedAfterReload(page, momentId, notes.panelId, movedTo)
+    await expectFlushedToStorage(page, momentId, notes.panelId, movedTo)
+  })
+
+  // Known to fail (2026-09-15): probed at 0, 50 and 150ms after the edit the
+  // move was never there after the reload; at 400ms it always was. The
+  // pagehide flush starts an IndexedDB write that the unload does not wait
+  // for. Kept as the statement of the user-facing path the two tests above
+  // do not cover; turn it into a test once the app closes that window.
+  test.fixme('an edit survives a real reload inside the save debounce', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    await dragLocator(page, await titleOf(page, notes.panelId), { dx: -175, dy: 125 })
+    const moved = geometryOf(await panelById(page, notes.panelId))
+    await page.reload()
+    await waitForCanvas(page)
+    expect(geometryOf(await panelById(page, notes.panelId))).toEqual(moved)
   })
 })
 

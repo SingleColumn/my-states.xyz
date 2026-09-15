@@ -70,23 +70,32 @@ export function geometryOf(panel: PanelDescription) {
 }
 
 /**
- * The tldraw shape element that renders a panel. `describe()` reports page
- * coordinates and tldraw positions each `.tl-shape` with a translate of
- * exactly those coordinates, so the two are matched on geometry; the app
- * exposes no shape id and none is needed.
+ * The tldraw shape element that renders a panel. The app exposes no shape
+ * id, so identity comes from stacking order: describe() lists panels in
+ * tldraw's sorted order and tldraw gives each rendered `.tl-shape` a
+ * z-index in that same order, so the panel at `order` k is the element with
+ * the k-th smallest z-index. Geometry is then checked as a guard; it cannot
+ * be the key, because two panels can sit at exactly the same place (a new
+ * panel is created at its type's default layout, on top of any panel still
+ * there).
  */
 export async function shapeOf(page: Page, panelId: string): Promise<Locator> {
   const panel = await panelById(page, panelId)
-  const shapeId = await page.evaluate(({ x, y }) => {
-    for (const element of document.querySelectorAll<HTMLElement>('.tl-shape')) {
-      const match = /matrix\(1, 0, 0, 1, (-?[\d.]+), (-?[\d.]+)\)/.exec(element.style.transform)
-      if (!match) continue
-      if (Math.abs(Number(match[1]) - x) < 0.5 && Math.abs(Number(match[2]) - y) < 0.5) return element.dataset.shapeId
+  const shapeId = await page.evaluate(({ order, x, y }) => {
+    const shapes = [...document.querySelectorAll<HTMLElement>('.tl-shape')]
+      .map((element) => ({ element, z: Number(element.style.zIndex) }))
+      .filter((entry) => Number.isFinite(entry.z))
+      .sort((left, right) => left.z - right.z)
+    const candidate = shapes[order]?.element
+    if (!candidate) return { shapeId: null, reason: `${shapes.length} rendered shapes, none at order ${order}` }
+    const match = /matrix\(1, 0, 0, 1, (-?[\d.]+), (-?[\d.]+)\)/.exec(candidate.style.transform)
+    if (!match || Math.abs(Number(match[1]) - x) >= 0.5 || Math.abs(Number(match[2]) - y) >= 0.5) {
+      return { shapeId: null, reason: `shape at order ${order} is at "${candidate.style.transform}", not (${x}, ${y})` }
     }
-    return null
-  }, { x: panel.x, y: panel.y })
-  if (!shapeId) throw new Error(`No rendered shape at (${panel.x}, ${panel.y}) for panel ${panelId}`)
-  return page.locator(`.tl-shape[data-shape-id="${shapeId}"]`)
+    return { shapeId: candidate.dataset.shapeId ?? null, reason: '' }
+  }, { order: panel.order, x: panel.x, y: panel.y })
+  if (!shapeId.shapeId) throw new Error(`No rendered shape for panel ${panelId}: ${shapeId.reason}`)
+  return page.locator(`.tl-shape[data-shape-id="${shapeId.shapeId}"]`)
 }
 
 /** The title in a panel's header: frame, so a press there is tldraw's. */
