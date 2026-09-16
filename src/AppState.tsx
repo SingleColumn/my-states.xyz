@@ -153,8 +153,14 @@ interface MomentsState {
   /** A copy of the active moment, named "<name> (copy)" or the next free number, opened once made. Never asks: the name is chosen to already be free. */
   duplicate(): Promise<void>
   exportActive(): Promise<void>
-  /** Resolves to a notice worth showing (a theme that came with the archive was renamed), or null. */
-  importFile(file: File): Promise<string | null>
+  /**
+   * Resolves to a notice worth showing (a theme that came with the archive
+   * was renamed), or null. `name`, when given, overrides the archive's own
+   * name -- used to resolve a collision with an existing moment's name in
+   * the same step as the import, rather than importing under the colliding
+   * name and asking for a separate rename afterward.
+   */
+  importFile(file: File, name?: string): Promise<string | null>
   /** The canvas has changed; this is the whole of what a moment persists about it. */
   updateDocument(momentId: string, document: TLStoreSnapshot, camera: CanvasCamera): void
   /** Last successfully read/written moment, including its document. React's activeMoment is not updated on every document save. */
@@ -246,7 +252,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const blob = await exportMomentArchive(momentCore.activeMoment.id)
         downloadMomentArchive(blob, momentCore.activeMoment.name)
       }),
-      importFile: (file) => momentCore.operation.run(async () => {
+      importFile: (file, name) => momentCore.operation.run(async () => {
         await notes.flush()
         await momentCore.flush()
         const imported = await importMomentArchive(file)
@@ -257,6 +263,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (imported.theme) await appearance.refreshLibrary()
         await momentCore.refreshSummaries()
         await momentCore.open(imported.moment.id)
+        // A caller resolving a name collision renames within this same
+        // operation, so the picker never shows the colliding name at all,
+        // not even for the instant between two separate actions.
+        if (name !== undefined && name !== imported.moment.name) {
+          await momentCore.rename(name)
+          await momentCore.refreshSummaries()
+        }
         return imported.theme?.outcome === 'renamed'
           ? `The theme "${imported.theme.name}" that came with this moment was added under a new id because one with the same id was already installed.`
           : null

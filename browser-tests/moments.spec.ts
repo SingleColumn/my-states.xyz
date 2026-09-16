@@ -132,8 +132,10 @@ test('export writes a .moment.zip and import brings the moment back, listed in t
   await download.saveAs(archivePath)
 
   // A moment named exactly like the source is already open, so re-importing
-  // this file asks for confirmation before adding a same-named duplicate.
-  page.once('dialog', (dialog) => void dialog.accept())
+  // this file offers a new name; typing the original name back is how a
+  // genuine same-named duplicate -- what this round trip is testing -- is
+  // still produced deliberately.
+  page.once('dialog', (dialog) => void dialog.accept(source.name))
   await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
   await expect.poll(async () => (await describeCanvas(page)).moment?.id).not.toBe(source.id)
   const imported = (await describeCanvas(page)).moment
@@ -168,7 +170,7 @@ test('Duplicate moment makes an independent, already-open copy named "(copy)", n
   await expectArchitectureReportPass(page)
 })
 
-test('importing an archive whose name collides with an existing moment asks first, and declining adds nothing', async ({ page }, testInfo) => {
+test('importing an archive whose name collides with an existing moment offers a new name, suggesting one free', async ({ page }, testInfo) => {
   await openApp(page)
   await createMomentFromToolbar(page, 'Kept aside')
 
@@ -180,6 +182,35 @@ test('importing an archive whose name collides with an existing moment asks firs
 
   // Switch away, so the collision is with a moment other than the one open
   // -- the warning is not limited to re-importing the currently open moment.
+  await switchMoment(page, 'A new moment')
+
+  page.once('dialog', (dialog) => {
+    expect(dialog.type()).toBe('prompt')
+    expect(dialog.message()).toContain('"Kept aside"')
+    expect(dialog.defaultValue()).toBe('Kept aside (copy)')
+    void dialog.accept('Kept aside, imported')
+  })
+  await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
+
+  // The import is opened under the chosen name, not the colliding one --
+  // the picker never carries two moments with the same name for this.
+  await expect.poll(async () => (await describeCanvas(page)).moment?.name).toBe('Kept aside, imported')
+  const names = await momentPickerNames(page)
+  expect(names.sort()).toEqual(['A new moment', 'Kept aside', 'Kept aside, imported'].sort())
+  expect(new Set(names).size).toBe(names.length)
+  await expectArchitectureReportPass(page)
+})
+
+test('declining the rename-or-import prompt for a colliding name adds nothing', async ({ page }, testInfo) => {
+  await openApp(page)
+  await createMomentFromToolbar(page, 'Kept aside')
+
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export moment' }).click()
+  const download = await downloading
+  const archivePath = testInfo.outputPath(download.suggestedFilename())
+  await download.saveAs(archivePath)
+
   await switchMoment(page, 'A new moment')
   const before = await momentPickerNames(page)
 

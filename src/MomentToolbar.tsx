@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
 import { useMomentThemeOptions } from './MomentThemeSelect'
 import { peekMomentArchiveName } from './momentArchive'
+import { nextDuplicateName } from './utils'
 
 export function MomentToolbar() {
   const { moments } = useAppState()
@@ -80,17 +81,27 @@ export function MomentToolbar() {
 
   /**
    * A moment picked by name, not by identity -- two entries reading the same
-   * is a real source of "which one is this?" confusion, so a file import
-   * that would create one is confirmed first. The name is read from the
-   * archive without importing it; Duplicate moment never hits this because
-   * it names its own copy something already known to be free.
+   * is a real source of "which one is this?" confusion, so a colliding name
+   * is resolved before the import happens, not cleaned up after. The
+   * archive's name is read without importing it; a suggested free name is
+   * offered but not forced, since a deliberate same-named duplicate (typing
+   * the original name back) is still allowed. Duplicate moment never hits
+   * this prompt because it names its own copy something already known to be
+   * free.
    */
   async function importFile(file: File) {
     const name = await peekMomentArchiveName(file)
-    if (name && moments.moments.some((existing) => existing.name === name)) {
-      if (!window.confirm(`A moment named "${name}" already exists. Import this as a separate moment with the same name?`)) return
+    const collides = name !== null && moments.moments.some((existing) => existing.name === name)
+    if (!collides) {
+      void run(() => moments.importFile(file))
+      return
     }
-    void run(() => moments.importFile(file))
+    const chosen = window.prompt(
+      `A moment named "${name}" already exists. Choose a name for the imported moment (or leave it as "${name}" to import it anyway).`,
+      nextDuplicateName(name, moments.moments.map((existing) => existing.name)),
+    )
+    if (chosen === null) return
+    void run(() => moments.importFile(file, chosen))
   }
 
   function runMenuAction(action: () => void) {
