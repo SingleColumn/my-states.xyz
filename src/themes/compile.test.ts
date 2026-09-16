@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { compileThemeMode } from './compile'
+import { compileThemeAttributes, compileThemeMode } from './compile'
 import { builtInThemes, getBuiltInTheme } from './registry'
 import { THEME_TOKEN_NAMES } from './tokens'
 
@@ -77,6 +77,16 @@ describe('compileThemeMode', () => {
     expect(tokens['--panel-texture']).toBe('var(--texture-paper)')
     expect(tokens['--image-edge-mask']).toBe('var(--image-edge-deckle)')
     expect(compileThemeMode({})['--panel-texture']).toBeUndefined()
+  })
+
+  it('reports a style choice as a root attribute, not a token, and only when the theme names it', () => {
+    expect(compileThemeAttributes({ components: { panel: { headerStyle: 'band' } } })).toEqual({ 'header-style': 'band' })
+    expect(compileThemeAttributes({})).toEqual({})
+    expect(compileThemeMode({ components: { panel: { headerStyle: 'band' } } })).not.toHaveProperty('--card-header-band-style')
+    // The band's colours are ordinary derived tokens.
+    expect(compileThemeMode({ foundation: { color: { background: '#fff', accent: 'red' } } })).toMatchObject({ '--card-header-band-foreground': '#fff' })
+    // The band and rule colours have no derivation: absent, the stylesheet falls through to each panel's own accent.
+    expect(compileThemeMode({ foundation: { color: { accent: 'red' } } })).not.toHaveProperty('--card-header-band')
   })
 
   it('turns the grid colour into the two gradients the stylesheet draws', () => {

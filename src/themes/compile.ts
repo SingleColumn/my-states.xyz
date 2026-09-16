@@ -49,3 +49,19 @@ export function compileThemeMode(mode: ThemeMode): CompiledTokens {
   for (const { path, spec } of listLeaves(componentsSpec)) emit(spec, valueOf(spec, readPath(mode.components, path), context))
   return tokens
 }
+
+/**
+ * The root attributes a mode asks for (`data-<name>="<value>"`): choices
+ * that switch a set of rules rather than one value. Only what the theme
+ * names; an absent choice leaves the attribute off, which the stylesheet
+ * treats as the first option.
+ */
+export function compileThemeAttributes(mode: ThemeMode): Readonly<Record<string, string>> {
+  const attributes: Record<string, string> = {}
+  for (const { path, spec } of listLeaves(componentsSpec)) {
+    if (!spec.attribute) continue
+    const value = readPath(mode.components, path)
+    if (value !== undefined) attributes[spec.attribute] = value
+  }
+  return attributes
+}

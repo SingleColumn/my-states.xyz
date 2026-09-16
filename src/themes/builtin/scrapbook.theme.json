@@ -74,7 +74,8 @@
           "backdropBlur": "none",
           "contentBackground": "#eee3cc",
           "texture": "paper",
-          "ornament": "none"
+          "ornament": "none",
+          "headerStyle": "band"
         },
         "button": {
           "background": "rgba(255, 253, 247, 0.55)",

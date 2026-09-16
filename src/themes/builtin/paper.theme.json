@@ -59,7 +59,8 @@
           "shellBorder": "1px solid rgba(43, 36, 32, 0.14)",
           "headerForeground": "#2b2420",
           "footerForeground": "rgba(43, 36, 32, 0.56)",
-          "texture": "paper"
+          "texture": "paper",
+          "headerStyle": "underline"
         },
         "button": {
           "background": "rgba(139, 74, 47, 0.07)",

@@ -29,6 +29,7 @@ For the idea, decide explicitly:
 | Heavy or airy type? Serif, sans, mono, rounded? | `typography.uiFont` (body), `headingFont` (titles), `monoFont` (code) |
 | Flat or deep? | `foundation.depth.shadow*` and `backdropBlur`; `"none"` is a legitimate value |
 | Any texture or figure? | `panel.texture` (`none`, `paper`, `dots`), `panel.ornament` (`none`, `bow`, `star`), `images.edge` (`none`, `deckle`) |
+| How is a panel header drawn? | `panel.headerStyle`: `plain` (title over the panel), `band` (a solid strip in each panel's accent, or one colour via `panel.headerBand`; `headerBandForeground` for the title and buttons on it), `underline` (a rule beneath, `panel.headerRule`). The single biggest lever for making two themes look structurally different. |
 
 ## 2. Fill the foundation completely
 
@@ -53,7 +54,7 @@ A theme is complete when each of these has been *looked at*, not when the file v
 
 - **Canvas**: `canvas.backdrop` (a colour or gradients behind everything), `canvas.gridColor`, `canvas.selectionStroke` and `selectionStrokeWidth`.
 - **Toolbar** (top strip): `toolbar.background/border/foreground/shadow/backdropBlur`.
-- **Panel shell**: `panel.border`, `shellBorder` (a full border shorthand), `divider`, `frame`, `headerForeground`, `footerForeground`, `shadow`, `backdropBlur`, `contentBackground`, `texture`, `ornament`.
+- **Panel shell**: `panel.border`, `shellBorder` (a full border shorthand), `divider`, `frame`, `headerForeground`, `footerForeground`, `shadow`, `backdropBlur`, `contentBackground`, `texture`, `ornament`, `headerStyle` with `headerBand` / `headerBandForeground` / `headerRule`.
 - **Buttons in panel headers/footers**: the seven `button.*` states — resting, hover, active, and their borders and icon colours. Check the *active* state is distinguishable from hover.
 - **Other controls** (selects, chrome buttons, sliders): `control.background/border/borderHover`, the slider quartet `rangeTrack/rangeThumb/rangeWell/rangeWellBorder` (`transparent` well for a bare line), `iconStrokeWidth` (thinner reads as pen, thicker as chunky).
 - **Text fields**: `input.background/foreground`.

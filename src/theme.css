@@ -64,6 +64,7 @@
   --card-footer-meta-color: rgba(255, 255, 255, 0.32);
   --shadow-panel: 0 26px 70px rgba(0, 0, 0, 0.34);
   --blur-panel: blur(20px);
+  --card-header-band-foreground: #101114;
   --card-button-bg: rgba(255, 255, 255, 0.04);
   --card-button-border: rgba(255, 255, 255, 0.1);
   --card-button-icon-color: rgba(255, 255, 255, 0.58);
@@ -136,6 +137,9 @@
      makes the var() in design-tokens.css fall through to its accent-tinted
      default; a theme that sets this gets a plain interior. */
   --panel-content-background: initial;
+  /* The band and the rule likewise fall through to each panel's own accent. */
+  --card-header-band: initial;
+  --card-header-rule: initial;
   --panel-texture: var(--texture-none);
   --panel-ornament: var(--ornament-none);
   --image-edge-mask: var(--image-edge-none);

@@ -23,6 +23,7 @@ async function themeOnScreen(page: Page) {
       ...window.myStates!.describe().theme,
       rootTheme: root.dataset.theme,
       rootMode: root.dataset.themeMode,
+      headerStyle: root.dataset.headerStyle ?? null,
       canvas: getComputedStyle(root).getPropertyValue('--color-canvas').trim(),
       tldrawBackground: getComputedStyle(document.querySelector('.tl-container')!).getPropertyValue('--color-background').trim(),
       tldrawScheme: document.querySelector('.tl-container')!.classList.contains('tl-theme__light') ? 'light' : 'dark',
@@ -62,7 +63,7 @@ test('a fresh profile shows the built-in default, from Settings, in dark mode', 
   const { pageErrors } = await openApp(page)
   await expect.poll(() => themeOnScreen(page)).toMatchObject({
     id: 'midnight', name: 'Midnight', source: 'global', globalThemeId: 'midnight', mode: 'dark',
-    rootTheme: 'midnight', rootMode: 'dark', canvas: '#101114', tldrawBackground: '#101114', tldrawScheme: 'dark',
+    rootTheme: 'midnight', rootMode: 'dark', canvas: '#101114', tldrawBackground: '#101114', tldrawScheme: 'dark', headerStyle: 'plain',
   })
   await expect(momentThemePicker(page)).toHaveValue('')
   await expect(momentThemePicker(page).locator('option').first()).toHaveText('Global (Midnight)')
@@ -87,7 +88,7 @@ test('a moment follows Global until it pins a theme, and the pin survives a canv
   await openApp(page)
   const picker = momentThemePicker(page)
   await picker.selectOption('paper')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'moment', mode: 'light', canvas: '#f3eee4', tldrawScheme: 'light', colorScheme: 'light' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'moment', mode: 'light', canvas: '#f3eee4', tldrawScheme: 'light', colorScheme: 'light', headerStyle: 'underline' })
   await expect.poll(async () => (await describeCanvas(page)).moment?.themeId).toBe('paper')
 
   // A canvas write triggers the debounced document save, which rebuilds the
@@ -101,7 +102,7 @@ test('a moment follows Global until it pins a theme, and the pin survives a canv
   await expect(picker).toHaveValue('paper')
 
   await picker.selectOption('')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', mode: 'dark', tldrawScheme: 'dark' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', mode: 'dark', tldrawScheme: 'dark', headerStyle: 'plain' })
   await expect.poll(async () => (await describeCanvas(page)).moment?.themeId).toBeNull()
   await expectArchitectureReportPass(page)
 })

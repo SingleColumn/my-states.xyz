@@ -531,6 +531,43 @@ button {
   border-bottom: var(--card-border);
 }
 
+/* Header styles, chosen by a theme (`panel.headerStyle`) and carried as
+   data-header-style on the root. Plain is the rules above. A band is a
+   solid strip in the panel's accent with everything on it recoloured to
+   read against it; an underline keeps the plain header and draws a rule
+   beneath it in the accent. Both are colour and border only: the header's
+   size and its buttons' positions do not move, so the frame the pointer
+   rules rely on is the same in every style. */
+:root[data-header-style="band"] .card-header {
+  border-bottom: 0;
+  background: var(--card-header-band, var(--accent));
+}
+
+:root[data-header-style="band"] .card-header .card-title,
+:root[data-header-style="band"] .card-header .card-eyebrow {
+  color: var(--card-header-band-foreground);
+}
+
+:root[data-header-style="band"] .card-header .card-icon-button {
+  border-color: color-mix(in srgb, var(--card-header-band-foreground) 35%, transparent);
+  background: color-mix(in srgb, var(--card-header-band-foreground) 10%, transparent);
+  color: var(--card-header-band-foreground);
+}
+
+:root[data-header-style="band"] .card-header .card-icon-button:hover,
+:root[data-header-style="band"] .card-header .card-icon-button.is-active {
+  background: color-mix(in srgb, var(--card-header-band-foreground) 22%, transparent);
+  color: var(--card-header-band-foreground);
+}
+
+:root[data-header-style="band"] .card-header .card-header-group + .card-header-group {
+  border-left-color: color-mix(in srgb, var(--card-header-band-foreground) 30%, transparent);
+}
+
+:root[data-header-style="underline"] .card-header {
+  border-bottom: 2px solid var(--card-header-rule, var(--accent));
+}
+
 .card-header h2,
 .card-header p {
   margin: 0;

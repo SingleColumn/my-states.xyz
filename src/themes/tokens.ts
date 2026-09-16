@@ -23,7 +23,7 @@
  */
 
 import { PANEL_TYPES, getPanelDefinition } from '../panelRegistry'
-import { choice, color, f, isGroupSpec, mix, mixF, mixS, s, type GroupSpec, type LeafSpec } from './leaf'
+import { choice, color, f, isGroupSpec, mix, mixF, mixS, s, styleChoice, type GroupSpec, type LeafSpec } from './leaf'
 
 export { isGroupSpec, type DeriveContext, type GroupSpec, type LeafSpec, type ValueKind } from './leaf'
 
@@ -123,6 +123,10 @@ export const componentsSpec: GroupSpec = {
         shadow: { kind: 'shadow', description: 'The panel shadow.', token: '--shadow-panel', derive: f('shadowLarge') },
         backdropBlur: { kind: 'filter', description: 'The blur behind a panel.', token: '--blur-panel', derive: f('backdropBlur') },
         contentBackground: color('The background of the content area inside a panel. Derived from the panel accent when absent; set it to give panels a plain interior with the accent kept to the frame.', { token: '--panel-content-background' }),
+        headerStyle: styleChoice('How a panel header is drawn: plain (title over the panel), band (a solid strip in the panel accent with a contrasting title), or underline (a rule beneath the header).', 'header-style', ['plain', 'band', 'underline']),
+        headerBand: color('The band behind the header when headerStyle is band. The panel’s own accent when absent; set it for one colour across every panel.', { token: '--card-header-band' }),
+        headerBandForeground: color('Title and buttons on the band. The main surface colour when absent, which contrasts with an accent band on light and dark themes alike.', { token: '--card-header-band-foreground', derive: s('surfacePrimary') }),
+        headerRule: color('The rule beneath the header when headerStyle is underline. The panel’s own accent when absent.', { token: '--card-header-rule' }),
         texture: choice('A pattern laid over every panel surface.', 'texture', ['none', 'paper', 'dots'], '--panel-texture'),
         ornament: choice('A small figure drawn at the top corner of every panel.', 'ornament', ['none', 'bow', 'star'], '--panel-ornament'),
       },
@@ -246,6 +250,9 @@ export function listLeaves(group: GroupSpec, prefix = ''): Array<{ path: string;
     return isGroupSpec(spec) ? listLeaves(spec, path) : [{ path, spec }]
   })
 }
+
+/** The names of the root attributes a compiled mode can set (`data-<name>`). */
+export const THEME_ATTRIBUTE_NAMES: readonly string[] = listLeaves(themeModeSpec).flatMap(({ spec }) => spec.attribute ? [spec.attribute] : [])
 
 /** The custom property names a compiled mode can set, in declaration order. */
 export const THEME_TOKEN_NAMES: readonly string[] = listLeaves(themeModeSpec).flatMap(({ spec }) => spec.token ? [spec.token] : [])

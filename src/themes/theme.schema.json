@@ -413,6 +413,33 @@
                       "maxLength": 512,
                       "description": "The background of the content area inside a panel. Derived from the panel accent when absent; set it to give panels a plain interior with the accent kept to the frame. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     },
+                    "headerStyle": {
+                      "type": "string",
+                      "enum": [
+                        "plain",
+                        "band",
+                        "underline"
+                      ],
+                      "description": "How a panel header is drawn: plain (title over the panel), band (a solid strip in the panel accent with a contrasting title), or underline (a rule beneath the header). One of: plain, band, underline."
+                    },
+                    "headerBand": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The band behind the header when headerStyle is band. The panel’s own accent when absent; set it for one colour across every panel. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "headerBandForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Title and buttons on the band. The main surface colour when absent, which contrasts with an accent band on light and dark themes alike. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "headerRule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The rule beneath the header when headerStyle is underline. The panel’s own accent when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
                     "texture": {
                       "type": "string",
                       "enum": [
@@ -1209,6 +1236,33 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "The background of the content area inside a panel. Derived from the panel accent when absent; set it to give panels a plain interior with the accent kept to the frame. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "headerStyle": {
+                      "type": "string",
+                      "enum": [
+                        "plain",
+                        "band",
+                        "underline"
+                      ],
+                      "description": "How a panel header is drawn: plain (title over the panel), band (a solid strip in the panel accent with a contrasting title), or underline (a rule beneath the header). One of: plain, band, underline."
+                    },
+                    "headerBand": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The band behind the header when headerStyle is band. The panel’s own accent when absent; set it for one colour across every panel. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "headerBandForeground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Title and buttons on the band. The main surface colour when absent, which contrasts with an accent band on light and dark themes alike. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "headerRule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The rule beneath the header when headerStyle is underline. The panel’s own accent when absent. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     },
                     "texture": {
                       "type": "string",

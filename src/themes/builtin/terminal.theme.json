@@ -44,7 +44,8 @@
           "gridColor": "rgba(57, 255, 136, 0.12)"
         },
         "panel": {
-          "shellBorder": "1px solid rgba(57, 255, 136, 0.45)"
+          "shellBorder": "1px solid rgba(57, 255, 136, 0.45)",
+          "headerStyle": "underline"
         },
         "spotify": {
           "accent": "#39ff88",

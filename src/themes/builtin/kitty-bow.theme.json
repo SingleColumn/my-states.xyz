@@ -56,7 +56,9 @@
           "shellBorder": "2px solid #fff",
           "contentBackground": "rgba(255, 255, 255, 0.92)",
           "headerForeground": "#e5395f",
-          "texture": "dots"
+          "texture": "dots",
+          "headerStyle": "band",
+          "headerBandForeground": "#fff"
         },
         "button": {
           "background": "rgba(255, 255, 255, 0.85)",

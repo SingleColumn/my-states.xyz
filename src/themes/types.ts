@@ -112,6 +112,10 @@ export interface ComponentTokens {
     contentBackground?: string
     texture?: 'none' | 'paper' | 'dots'
     ornament?: 'none' | 'bow' | 'star'
+    headerStyle?: 'plain' | 'band' | 'underline'
+    headerBand?: string
+    headerBandForeground?: string
+    headerRule?: string
   }
   button?: {
     background?: string

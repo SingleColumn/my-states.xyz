@@ -24,6 +24,12 @@ export interface LeafSpec {
   compile?: (value: string) => string
   /** For `choice`: the names the author may pick from. */
   values?: readonly string[]
+  /**
+   * For a choice that switches a set of rules rather than one value: the
+   * chosen name is written as `data-<attribute>` on the document root (by
+   * theme.ts) and the stylesheet selects on it. No token is emitted.
+   */
+  attribute?: string
 }
 
 export interface GroupSpec {
@@ -54,4 +60,9 @@ export const color = (description: string, rest: Omit<LeafSpec, 'kind' | 'descri
 export const choice = (description: string, family: string, values: readonly string[], token: `--${string}`): LeafSpec => ({
   kind: 'choice', description: `${description} One of: ${values.join(', ')}.`, values, token,
   compile: (value) => `var(--${family}-${value})`,
+})
+
+/** A choice among ways of drawing something, each a set of stylesheet rules selected by `data-<attribute>` on the root. */
+export const styleChoice = (description: string, attribute: string, values: readonly string[]): LeafSpec => ({
+  kind: 'choice', description: `${description} One of: ${values.join(', ')}.`, values, attribute,
 })
