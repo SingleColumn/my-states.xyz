@@ -179,3 +179,19 @@ test('built-in themes cannot be deleted and an invalid file is refused with its 
   await expect(globalThemeOption(page, 'Impostor (imported)')).toHaveCount(1)
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', canvas: '#101114' })
 })
+
+test('a theme is imported and deleted through the command surface, with the same validation as the file path', async ({ page }) => {
+  await openApp(page)
+  const dispatch = (command: unknown) => page.evaluate((cmd) => window.myStates!.dispatch(cmd as never), command)
+  const definition = JSON.parse(customTheme('ember', 'Ember', '#2a0a00'))
+
+  await dispatch({ kind: 'appearance.importTheme', definition })
+  await dispatch({ kind: 'appearance.setGlobalTheme', themeId: 'ember' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'ember', source: 'global', canvas: '#2a0a00' })
+
+  await expect(dispatch({ kind: 'appearance.importTheme', definition: { ...definition, id: 'Bad Id' } })).rejects.toThrow(/id must be/)
+  await expect(dispatch({ kind: 'appearance.deleteTheme', themeId: 'midnight' })).rejects.toThrow(/Built-in themes cannot be deleted/)
+
+  await dispatch({ kind: 'appearance.deleteTheme', themeId: 'ember' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', globalThemeId: 'midnight' })
+})

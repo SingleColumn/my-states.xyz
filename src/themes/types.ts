@@ -166,31 +166,13 @@ export interface ComponentTokens {
     border?: string
     toolbarBackground?: string
   }
-  spotify?: {
-    accent?: string
-    panelBackground?: string
-    artworkShadow?: string
-    artworkPlaceholder?: string
-    artworkPlaceholderHighlight?: string
-    playlistRowBackground?: string
-    playlistRowBackgroundHover?: string
-  }
-  images?: {
-    accent?: string
-    panelBackground?: string
-    frameBorder?: string
-    frameShadow?: string
-    edge?: 'none' | 'deckle'
-    tilt?: string
-    inset?: string
-  }
-  notes?: {
-    accent?: string
-    panelBackground?: string
-    titleForeground?: string
-    controlBackground?: string
-    controlBackgroundHover?: string
-  }
+  /**
+   * One group per kind of panel, under the name its registry entry gives
+   * (`spotify`, `images`, `notes`, ...). Every panel accepts `accent` and
+   * `panelBackground`; the rest is declared by the panel itself in
+   * panelRegistry.ts and documented in theme.schema.json.
+   */
+  [panel: string]: Record<string, string | undefined> | undefined
 }
 
 /** A theme the user brought in, as the database keeps it. Built-ins are never stored. */

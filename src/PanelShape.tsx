@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentType } from 'react'
+import { useEffect, useRef, type ComponentType, type CSSProperties } from 'react'
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
@@ -90,7 +90,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
           height: shape.props.h,
         }}
       >
-        <div ref={wheelScopeRef} className="canvas-panel-wheel-scope">
+        <div ref={wheelScopeRef} className="canvas-panel-wheel-scope" data-panel={shape.props.panel.type} style={panelIdentityStyle(shape.props.panel.type)}>
           <PanelContent shape={shape} />
         </div>
       </HTMLContainer>
@@ -188,6 +188,17 @@ function findScrollableAncestor(start: Node, boundary: Element): HTMLElement | n
     node = node.parentNode
   }
   return null
+}
+
+/**
+ * The two tokens everything inside a panel derives its identity from. They
+ * point at the theme's per-panel values on :root; set here, on the panel's
+ * own wrapper, because a property declared on an element beats one
+ * inherited from the root, so this is the one place the alias can live.
+ * Adding a panel type needs no stylesheet rule for this.
+ */
+function panelIdentityStyle(type: PanelType): CSSProperties {
+  return { '--accent': `var(--accent-${type})`, '--bg': `var(--bg-${type})` } as CSSProperties
 }
 
 function PanelContent({ shape }: { shape: PanelShape }) {

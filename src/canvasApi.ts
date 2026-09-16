@@ -68,6 +68,9 @@ export type CanvasCommand =
   | { kind: 'spotify.togglePlay'; panelId: string }
   | { kind: 'appearance.setGlobalTheme'; themeId: string }
   | { kind: 'appearance.setMomentTheme'; themeId: string | null }
+  /** A theme definition (the contents of a .theme.json file) as data; validated like a file import. */
+  | { kind: 'appearance.importTheme'; definition: unknown }
+  | { kind: 'appearance.deleteTheme'; themeId: string }
 
 export interface CanvasApi {
   describe(): CanvasDescription
@@ -231,6 +234,12 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
           return
         case 'appearance.setMomentTheme':
           await state.moments.setTheme(command.themeId)
+          return
+        case 'appearance.importTheme':
+          await state.appearance.importThemeDefinition(command.definition)
+          return
+        case 'appearance.deleteTheme':
+          await state.appearance.deleteTheme(command.themeId)
           return
         default: {
           const unknown: never = command
