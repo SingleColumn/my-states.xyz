@@ -24,6 +24,8 @@ import type { Moment, PanelLayout, PanelType } from './types'
 
 const shapeUtils = [PanelShapeUtil]
 
+const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
+
 // Storage builds a moment's document with no editor at all (documentSchema
 // in panelShapeSchema.ts), on the verified premise that it is exactly the
 // schema this mounted editor derives from PanelShapeUtil's own statics. If
@@ -644,7 +646,14 @@ function AppContent() {
     >
       <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView }}>
         <AppChromePropsProvider value={appChromeProps}>
-          <Tldraw shapeUtils={shapeUtils} components={components} overrides={uiOverrides} options={editorOptions} onMount={handleMount} />
+          <Tldraw
+            shapeUtils={shapeUtils}
+            components={components}
+            overrides={uiOverrides}
+            options={editorOptions}
+            onMount={handleMount}
+            licenseKey={TLDRAW_LICENSE_KEY}
+          />
         </AppChromePropsProvider>
       </PanelCommandsProvider>
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}

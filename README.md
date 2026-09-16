@@ -52,6 +52,8 @@ The app is a single-user MVP: it has no backend, accounts, cloud sync, or sharin
 
    If you serve the app at a different origin or port, update the redirect URI in Spotify and set the optional `VITE_SPOTIFY_REDIRECT_URI` value in `.env` to the same callback URL.
 
+   Optionally set `VITE_TLDRAW_LICENSE_KEY` in `.env` to your tldraw license key to remove the watermark. The app runs fine without it.
+
 > Keep `.env` private. It is intentionally excluded from version control. The Spotify Client ID is public browser configuration; never place a Spotify client secret in this app or a `VITE_*` variable.
 
 ## Run locally
