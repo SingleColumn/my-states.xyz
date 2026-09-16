@@ -13,7 +13,7 @@ import { applyTheme } from './theme'
 import { DEFAULT_THEME_ID, mergeLibrary, toThemeEntry } from './themes/registry'
 import { resolveEffectiveTheme } from './themes/resolve'
 import type { AppearanceSettings, EffectiveTheme, StoredTheme, ThemeEntry, ThemeModePreference } from './themes/types'
-import { parseThemeFile, type SupportsCssValue } from './themes/validate'
+import { parseThemeFile, validateThemeDefinition, type SupportsCssValue } from './themes/validate'
 
 /**
  * Appearance: the theme library, the app-level settings, and the one
@@ -33,6 +33,8 @@ export interface AppearanceState {
   setGlobalTheme(themeId: string): Promise<void>
   setModePreference(preference: ThemeModePreference): Promise<void>
   importThemeFile(file: File): Promise<{ theme: ThemeEntry; outcome: ThemeImportOutcome }>
+  /** The same import from data already in hand: what a command carries. */
+  importThemeDefinition(definition: unknown): Promise<{ theme: ThemeEntry; outcome: ThemeImportOutcome }>
   deleteTheme(themeId: string): Promise<void>
   /** Back to the built-in default and the system mode. Works whatever an imported theme did to the page. */
   resetAppearance(): Promise<void>
@@ -104,12 +106,14 @@ export function useAppearanceState(activeMoment: Moment | null): AppearanceState
     setSettings((current) => ({ ...current, modePreference: preference }))
   }, [])
 
-  const importThemeFile = useCallback(async (file: File) => {
-    const definition = parseThemeFile(await file.text(), supportsCssValue)
+  const importThemeDefinition = useCallback(async (candidate: unknown) => {
+    const definition = validateThemeDefinition(candidate, supportsCssValue)
     const result = await importStoredTheme(definition)
     await refreshLibrary()
     return { theme: toThemeEntry(result.theme.definition), outcome: result.outcome }
   }, [refreshLibrary])
+
+  const importThemeFile = useCallback(async (file: File) => importThemeDefinition(parseThemeFile(await file.text(), supportsCssValue)), [importThemeDefinition])
 
   const deleteTheme = useCallback(async (themeId: string) => {
     await deleteStoredTheme(themeId)
@@ -133,8 +137,9 @@ export function useAppearanceState(activeMoment: Moment | null): AppearanceState
     setGlobalTheme,
     setModePreference,
     importThemeFile,
+    importThemeDefinition,
     deleteTheme,
     resetAppearance,
     refreshLibrary,
-  }), [isReady, themes, settings, effective, library, setGlobalTheme, setModePreference, importThemeFile, deleteTheme, resetAppearance, refreshLibrary])
+  }), [isReady, themes, settings, effective, library, setGlobalTheme, setModePreference, importThemeFile, importThemeDefinition, deleteTheme, resetAppearance, refreshLibrary])
 }

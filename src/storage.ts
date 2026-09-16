@@ -517,7 +517,7 @@ export async function deleteStoredTheme(id: string) {
   await tx.objectStore('themes').delete(id)
   // The global choice must always name an installed theme.
   const global = await tx.objectStore('preferences').get(GLOBAL_THEME_KEY)
-  if (global?.value === id) await tx.objectStore('preferences').put({ key: GLOBAL_THEME_KEY, value: DEFAULT_THEME_ID })
+  if (global?.value === id) await writeGlobalThemeId(tx.objectStore('preferences'), DEFAULT_THEME_ID)
   await tx.done
 }
 
@@ -548,7 +548,14 @@ export async function getAppearanceSettings(): Promise<AppearanceSettings> {
 
 export async function setGlobalThemeId(themeId: string) {
   const db = await dbPromise
-  await db.put('preferences', { key: GLOBAL_THEME_KEY, value: themeId })
+  const tx = db.transaction('preferences', 'readwrite')
+  await writeGlobalThemeId(tx.store, themeId)
+  await tx.done
+}
+
+/** The one write of the global theme choice; a caller with a transaction of its own (deleting a theme) passes its store. */
+function writeGlobalThemeId(preferences: { put(value: PreferenceRecord): Promise<unknown> }, themeId: string) {
+  return preferences.put({ key: GLOBAL_THEME_KEY, value: themeId })
 }
 
 export async function setThemeModePreference(preference: ThemeModePreference) {
