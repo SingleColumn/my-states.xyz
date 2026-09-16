@@ -1,5 +1,6 @@
 import { T } from 'tldraw'
 import type { ImageCollectionSource, PanelConfigs, PanelType, SlideshowSettings, SpotifyPlaylistReference } from './types'
+import { choice, color, f, mixS, s, type LeafSpec } from './themes/leaf'
 
 /**
  * One entry per panel type: everything the rest of the app needs to know
@@ -35,6 +36,21 @@ export interface PanelDefinition<Type extends PanelType> {
   normalizeConfig(value: unknown): PanelConfigs[Type]
   /** The config a copy of this panel starts with. Null means a copy is not allowed. */
   duplicateConfig(config: PanelConfigs[Type]): PanelConfigs[Type] | null
+  /**
+   * How a theme addresses this panel. Every panel gets `accent` and
+   * `panelBackground` (the tokens `--accent-<type>` and `--bg-<type>`, set
+   * on the panel by PanelShape.tsx); `fields` are the further values this
+   * panel exposes. The theme spec, its JSON Schema and the compiler read
+   * this, so a new panel type is themeable by declaring it here.
+   */
+  theme: PanelThemeIdentity
+}
+
+export interface PanelThemeIdentity {
+  /** The group name in a theme file, e.g. `components.images` for the slideshow. */
+  key: string
+  description?: string
+  fields?: Record<string, LeafSpec>
 }
 
 export const DEFAULT_SLIDESHOW_ZOOM = 1.1
@@ -138,6 +154,17 @@ const spotify: PanelDefinition<'spotify'> = {
   configValidator: spotifyConfigValidator,
   normalizeConfig: (value) => spotifyConfigValidator.validate({ playlist: normalizePlaylist(record(value).playlist) }),
   duplicateConfig: () => null,
+  theme: {
+    key: 'spotify',
+    description: 'The Music panel.',
+    fields: {
+      artworkShadow: { kind: 'shadow', description: 'Shadow under album art.', token: '--shadow-album-art', derive: f('shadowSmall') },
+      artworkPlaceholder: color('Where album art would be, before there is any.', { token: '--color-album-empty', derive: mixS('textPrimary', 8) }),
+      artworkPlaceholderHighlight: color('The highlight on the placeholder.', { token: '--color-album-empty-highlight', derive: mixS('textPrimary', 16) }),
+      playlistRowBackground: color('A playlist row.', { token: '--color-card-bg', derive: mixS('surfacePrimary', 18) }),
+      playlistRowBackgroundHover: color('A playlist row under the pointer.', { token: '--color-card-bg-hover', derive: s('interactiveHover') }),
+    },
+  },
 }
 
 const slideshow: PanelDefinition<'slideshow'> = {
@@ -153,6 +180,17 @@ const slideshow: PanelDefinition<'slideshow'> = {
   configValidator: slideshowSettingsValidator,
   normalizeConfig: normalizeSlideshowSettings,
   duplicateConfig: (config) => ({ ...config, imageSource: { ...config.imageSource } }),
+  theme: {
+    key: 'images',
+    description: 'The Images panel.',
+    fields: {
+      frameBorder: { kind: 'border', description: 'A border around the picture, as a border shorthand: a photo matte such as "8px solid #fff", or "none".', token: '--image-frame-border' },
+      frameShadow: { kind: 'shadow', description: 'A shadow under the picture, or "none". Not drawn when the edge is torn.', token: '--image-frame-shadow' },
+      edge: choice('The edge of the picture.', 'image-edge', ['none', 'deckle'], '--image-edge-mask'),
+      tilt: { kind: 'angle', description: 'A rotation of the picture, e.g. "-1.5deg" for a photo glued in by hand; "0deg" (the default) for straight.', token: '--image-tilt' },
+      inset: { kind: 'length', description: 'Room kept around the picture inside its stage, e.g. "14px" so a matte, a shadow or a tilt is not clipped; "0px" (the default) fills the stage.', token: '--image-inset' },
+    },
+  },
 }
 
 const notes: PanelDefinition<'notes'> = {
@@ -169,6 +207,15 @@ const notes: PanelDefinition<'notes'> = {
     return notesConfigValidator.validate({ activeNoteId: input.activeNoteId === undefined ? null : input.activeNoteId })
   },
   duplicateConfig: (config) => ({ activeNoteId: config.activeNoteId }),
+  theme: {
+    key: 'notes',
+    description: 'The Notes panel.',
+    fields: {
+      titleForeground: color('The note title.', { token: '--color-note-title', derive: s('textPrimary') }),
+      controlBackground: color('The note selector and title field.', { token: '--color-note-control-bg', derive: s('surfaceOverlay') }),
+      controlBackgroundHover: color('Those controls under the pointer.', { token: '--color-note-control-bg-hover', derive: s('interactiveHover') }),
+    },
+  },
 }
 
 export const panelRegistry: { readonly [K in PanelType]: PanelDefinition<K> } = { spotify, slideshow, notes }

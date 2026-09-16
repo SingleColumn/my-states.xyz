@@ -16,55 +16,16 @@
  * The token names are the ones theme.css declares; the test in
  * compile.test.ts checks that the built-in Midnight theme reproduces that
  * file exactly, so the two cannot drift apart unnoticed.
+ *
+ * The per-panel groups are not written here: each panel's registry entry
+ * declares its theme key and fields (principle 6, a panel type is one
+ * registration), and `panelGroups` below assembles them.
  */
 
-export type ValueKind = 'color' | 'background' | 'shadow' | 'filter' | 'border' | 'font' | 'stroke' | 'radius' | 'weight' | 'angle' | 'length' | 'choice'
+import { PANEL_TYPES, getPanelDefinition } from '../panelRegistry'
+import { choice, color, f, isGroupSpec, mix, mixF, mixS, s, type GroupSpec, type LeafSpec } from './leaf'
 
-/** Resolved values of the layers a derivation may read. */
-export interface DeriveContext {
-  foundation: Record<string, string | undefined>
-  semantic: Record<string, string | undefined>
-}
-
-export interface LeafSpec {
-  kind: ValueKind
-  description: string
-  token?: `--${string}`
-  derive?: (context: DeriveContext) => string | null
-  /** Turns the author's value into the token's value (the grid colour becomes two gradients). */
-  compile?: (value: string) => string
-  /** For `choice`: the names the author may pick from. */
-  values?: readonly string[]
-}
-
-/**
- * A choice among things the app ships (a grain texture, a torn-edge mask):
- * a theme cannot carry image data, so it names one and the compiled token
- * points at the stylesheet's `--<family>-<name>` definition.
- */
-const choice = (description: string, family: string, values: readonly string[], token: `--${string}`): LeafSpec => ({
-  kind: 'choice', description: `${description} One of: ${values.join(', ')}.`, values, token,
-  compile: (value) => `var(--${family}-${value})`,
-})
-
-export interface GroupSpec {
-  description: string
-  fields: Record<string, LeafSpec | GroupSpec>
-}
-
-export function isGroupSpec(spec: LeafSpec | GroupSpec): spec is GroupSpec {
-  return 'fields' in spec
-}
-
-/** `color-mix(in srgb, <colour> <pct>%, transparent)`: "a bit of this colour", the way the built-in theme writes its borders and controls. */
-const mix = (color: string | undefined, percent: number) => color ? `color-mix(in srgb, ${color} ${percent}%, transparent)` : null
-
-const f = (name: string) => (context: DeriveContext) => context.foundation[name] ?? null
-const s = (name: string) => (context: DeriveContext) => context.semantic[name] ?? null
-const mixS = (name: string, percent: number) => (context: DeriveContext) => mix(context.semantic[name], percent)
-const mixF = (name: string, percent: number) => (context: DeriveContext) => mix(context.foundation[name], percent)
-
-const color = (description: string, rest: Omit<LeafSpec, 'kind' | 'description'> = {}): LeafSpec => ({ kind: 'color', description, ...rest })
+export { isGroupSpec, type DeriveContext, type GroupSpec, type LeafSpec, type ValueKind } from './leaf'
 
 export const foundationSpec: GroupSpec = {
   description: 'Low-level primitives the rest of the theme is derived from.',
@@ -243,41 +204,30 @@ export const componentsSpec: GroupSpec = {
         toolbarBackground: color('The formatting toolbar, which is sticky over the text and needs an opaque surface.', { token: '--background-notes-toolbar', derive: s('surfaceOverlay') }),
       },
     },
-    spotify: {
-      description: 'The Music panel.',
-      fields: {
-        accent: color('The panel accent colour.', { token: '--accent-spotify', derive: f('accent') }),
-        panelBackground: color('The panel background.', { token: '--bg-spotify', derive: s('surfacePrimary') }),
-        artworkShadow: { kind: 'shadow', description: 'Shadow under album art.', token: '--shadow-album-art', derive: f('shadowSmall') },
-        artworkPlaceholder: color('Where album art would be, before there is any.', { token: '--color-album-empty', derive: mixS('textPrimary', 8) }),
-        artworkPlaceholderHighlight: color('The highlight on the placeholder.', { token: '--color-album-empty-highlight', derive: mixS('textPrimary', 16) }),
-        playlistRowBackground: color('A playlist row.', { token: '--color-card-bg', derive: mixS('surfacePrimary', 18) }),
-        playlistRowBackgroundHover: color('A playlist row under the pointer.', { token: '--color-card-bg-hover', derive: s('interactiveHover') }),
-      },
-    },
-    images: {
-      description: 'The Images panel.',
-      fields: {
-        accent: color('The panel accent colour.', { token: '--accent-slideshow', derive: f('accent') }),
-        panelBackground: color('The panel background.', { token: '--bg-slideshow', derive: s('surfacePrimary') }),
-        frameBorder: { kind: 'border', description: 'A border around the picture, as a border shorthand: a photo matte such as "8px solid #fff", or "none".', token: '--image-frame-border' },
-        frameShadow: { kind: 'shadow', description: 'A shadow under the picture, or "none". Not drawn when the edge is torn.', token: '--image-frame-shadow' },
-        edge: choice('The edge of the picture.', 'image-edge', ['none', 'deckle'], '--image-edge-mask'),
-        tilt: { kind: 'angle', description: 'A rotation of the picture, e.g. "-1.5deg" for a photo glued in by hand; "0deg" (the default) for straight.', token: '--image-tilt' },
-        inset: { kind: 'length', description: 'Room kept around the picture inside its stage, e.g. "14px" so a matte, a shadow or a tilt is not clipped; "0px" (the default) fills the stage.', token: '--image-inset' },
-      },
-    },
-    notes: {
-      description: 'The Notes panel.',
-      fields: {
-        accent: color('The panel accent colour.', { token: '--accent-notes', derive: f('accent') }),
-        panelBackground: color('The panel background.', { token: '--bg-notes', derive: s('surfacePrimary') }),
-        titleForeground: color('The note title.', { token: '--color-note-title', derive: s('textPrimary') }),
-        controlBackground: color('The note selector and title field.', { token: '--color-note-control-bg', derive: s('surfaceOverlay') }),
-        controlBackgroundHover: color('Those controls under the pointer.', { token: '--color-note-control-bg-hover', derive: s('interactiveHover') }),
-      },
-    },
+    ...panelGroups(),
   },
+}
+
+/**
+ * One group per kind of panel, named the way a theme file addresses it.
+ * Every panel has an accent and a background; the registry adds whatever
+ * else that panel exposes. Adding a panel type touches the registry and
+ * nothing here.
+ */
+function panelGroups(): Record<string, GroupSpec> {
+  const groups: Record<string, GroupSpec> = {}
+  for (const type of PANEL_TYPES) {
+    const { theme, label } = getPanelDefinition(type)
+    groups[theme.key] = {
+      description: theme.description ?? `The ${label} panel.`,
+      fields: {
+        accent: color('The panel accent colour.', { token: `--accent-${type}`, derive: f('accent') }),
+        panelBackground: color('The panel background.', { token: `--bg-${type}`, derive: s('surfacePrimary') }),
+        ...theme.fields,
+      },
+    }
+  }
+  return groups
 }
 
 export const themeModeSpec: GroupSpec = {

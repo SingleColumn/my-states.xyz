@@ -142,9 +142,8 @@
      lifts. */
   --accent-lift: white;
 
-  /* Per-card identity, declared here on :root so a theme can set it: a
-     property declared on the surface element itself would beat anything a
-     theme sets on the root, so the surfaces below only alias these. */
+  /* Per-panel identity, one pair per registered panel type. PanelShape.tsx
+     points each panel's --accent and --bg at its pair. */
   --accent-slideshow: #7f77dd;
   --bg-slideshow: #16121f;
   --accent-spotify: #1db954;
@@ -157,23 +156,6 @@
    The attribute is set by theme.ts from the theme's mode. */
 :root[data-theme-mode="light"] {
   color-scheme: light;
-}
-
-/* The two tokens each card needs; everything else about a card derives from
-   them in design-tokens.css. */
-.panel-slideshow-surface {
-  --accent: var(--accent-slideshow);
-  --bg: var(--bg-slideshow);
-}
-
-.panel-spotify-surface {
-  --accent: var(--accent-spotify);
-  --bg: var(--bg-spotify);
-}
-
-.panel-notes-surface {
-  --accent: var(--accent-notes);
-  --bg: var(--bg-notes);
 }
 
 /*
