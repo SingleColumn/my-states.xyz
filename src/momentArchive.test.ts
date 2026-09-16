@@ -2,7 +2,7 @@ import './test/setup'
 import { openDB } from 'idb'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { describe, expect, it, vi } from 'vitest'
-import { exportMomentArchive, importMomentArchive } from './momentArchive'
+import { duplicateMoment, exportMomentArchive, importMomentArchive, peekMomentArchiveName } from './momentArchive'
 import {
   createDefaultPanels,
   createMoment,
@@ -10,6 +10,7 @@ import {
   getNotes,
   getMoment,
   getMomentAssets,
+  getMomentSummaries,
   importMomentContent,
   saveMomentAssets,
   saveSpotifyTokens,
@@ -242,7 +243,7 @@ describe('portable moment archives', () => {
     const sourceManifest = manifest(entries)
 
     await expect(importMomentArchive(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).rejects.toThrow('manifest.json is not valid JSON')
-    await expect(importMomentArchive(asFile(new Blob([zipSync({ '../manifest.json': strToU8('{}') })])))).rejects.toThrow('unsafe file path')
+    await expect(importMomentArchive(asFile(new Blob([zipSync({ '../manifest.json': strToU8('{}') })])))).rejects.toThrow('unsafe file path: "../manifest.json"')
 
     const missingImage = { ...entries }
     delete missingImage[sourceManifest.images[0].path]
@@ -321,3 +322,103 @@ describe('portable moment archives', () => {
     await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('unsupported format version')
   })
 })
+
+describe('directory-marker entries', () => {
+  it('imports a moment fine when the archive was re-zipped with an empty directory entry, the way Explorer\'s "Compress to ZIP file" writes one for a subfolder', async () => {
+    const entries = await archiveEntries(await createCompleteArchive())
+    entries['notes/'] = new Uint8Array(0)
+    entries['images/'] = new Uint8Array(0)
+
+    const { moment: imported } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
+    expect(await getNotes(imported.id)).toHaveLength(1)
+    expect(await getMomentAssets(imported.id)).toHaveLength(2)
+  })
+
+  it('still rejects an entry named like a directory that unexpectedly carries content, naming its path', async () => {
+    const entries = await archiveEntries(await createCompleteArchive())
+    entries['notes/'] = strToU8('a real file masquerading as the notes folder')
+    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('"notes/"')
+  })
+
+  it('names every path in an archive that carries a file its manifest does not reference', async () => {
+    const entries = await archiveEntries(await createCompleteArchive())
+    entries['images/stowaway.png'] = strToU8('not referenced by the manifest')
+    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('"images/stowaway.png"')
+  })
+})
+
+describe('duplicateMoment', () => {
+  it('makes an independent copy under a new identity, keeping panels, canvas, notes, assets and the pinned theme, and leaves the source untouched', async () => {
+    const now = Date.now()
+    const note = { id: 'note_dup', title: 'Original note', content: 'Body text', createdAt: now, updatedAt: now }
+    const sourcePanels = createDefaultPanels().map((panel): Panel => panel.type === 'notes'
+      ? { ...panel, config: { activeNoteId: note.id } }
+      : panel.type === 'slideshow'
+        ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' } } }
+        : panel)
+    const source = await storeMoment('Original', sourcePanels, { camera: { x: 5, y: 6, z: 1 }, panels: [] }, [note])
+    await setMomentTheme(source.id, 'terminal')
+    await saveMomentAssets(source.id, [makeAsset('asset_dup', 'pic.png', new Uint8Array([9, 9, 9]))])
+
+    // storeMoment is importMomentContent under the hood, so it already
+    // reissued the note's id (and the panel ids) once, on the way in; read
+    // back what actually landed rather than assuming 'note_dup' survived.
+    const sourceNotes = await getNotes(source.id)
+    const sourceNotesPanel = panelsOf(source).find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
+
+    const copy = await duplicateMoment(source.id, 'Original (copy)')
+
+    expect(copy.id).not.toBe(source.id)
+    expect(copy.name).toBe('Original (copy)')
+    expect(copy.themeId).toBe('terminal')
+    const copiedPanels = panelsOf(copy)
+    expect(copiedPanels).toHaveLength(3)
+
+    const copiedNotesPanel = copiedPanels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
+    expect(copiedNotesPanel.id).not.toBe(sourceNotesPanel.id)
+
+    const copiedNotes = await getNotes(copy.id)
+    expect(copiedNotes).toHaveLength(1)
+    expect(copiedNotes[0].id).not.toBe(sourceNotes[0].id)
+    expect(copiedNotes[0].content).toBe('Body text')
+    expect(copiedNotesPanel.config.activeNoteId).toBe(copiedNotes[0].id)
+
+    const copiedAssets = await getMomentAssets(copy.id)
+    expect(copiedAssets).toHaveLength(1)
+    expect(copiedAssets[0].id).not.toBe('asset_dup')
+    expect(copiedAssets[0].filename).toBe('pic.png')
+
+    expect(await getMoment(source.id)).toBeDefined()
+    expect(await getNotes(source.id)).toEqual(sourceNotes)
+  })
+
+  it('does not go through a zip at all, so a moment that could not be exported (over a size limit) can still be duplicated', async () => {
+    // The note-size ceiling is an export-only, zip-file concern; duplicating
+    // stays a direct database copy and is not bound by it.
+    const bigNote = { id: 'note_big', title: 'Big', content: 'x'.repeat(1024), createdAt: Date.now(), updatedAt: Date.now() }
+    const panels = createDefaultPanels().map((panel): Panel => panel.type === 'notes' ? { ...panel, config: { activeNoteId: bigNote.id } } : panel)
+    const source = await storeMoment('Has a note', panels, null, [bigNote])
+    const copy = await duplicateMoment(source.id, 'Has a note (copy)')
+    expect((await getNotes(copy.id))[0].content).toBe(bigNote.content)
+  })
+})
+
+describe('peekMomentArchiveName', () => {
+  it('reads the name an archive would import under, without importing anything', async () => {
+    // createCompleteArchive() stores its own source moment to build the
+    // archive from; the "no side effect" claim under test is peek's alone,
+    // so the baseline is taken after that, not before.
+    const blob = await createCompleteArchive()
+    const before = await getMomentSummaries()
+    const name = await peekMomentArchiveName(asFile(blob))
+    expect(name).toBe('Archive source')
+    expect(await getMomentSummaries()).toEqual(before)
+  })
+
+  it('resolves to null, rather than throwing, for a file that is not a readable archive', async () => {
+    expect(await peekMomentArchiveName(asFile(new Blob(['not a zip'])))).toBeNull()
+    expect(await peekMomentArchiveName(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).toBeNull()
+    expect(await peekMomentArchiveName(asFile(new Blob([zipSync({})])))).toBeNull()
+  })
+})
+

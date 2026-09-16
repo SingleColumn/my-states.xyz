@@ -18,6 +18,7 @@ import {
   readStorage,
   selectPanel,
   shapeOf,
+  switchMoment,
   titleOf,
   waitForCanvas,
   type PanelDescription,
@@ -130,6 +131,9 @@ test('export writes a .moment.zip and import brings the moment back, listed in t
   const archivePath = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(archivePath)
 
+  // A moment named exactly like the source is already open, so re-importing
+  // this file asks for confirmation before adding a same-named duplicate.
+  page.once('dialog', (dialog) => void dialog.accept())
   await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
   await expect.poll(async () => (await describeCanvas(page)).moment?.id).not.toBe(source.id)
   const imported = (await describeCanvas(page)).moment
@@ -146,6 +150,46 @@ test('export writes a .moment.zip and import brings the moment back, listed in t
   await waitForCanvas(page)
   await expect.poll(async () => (await describeCanvas(page)).panels.map(persistedShape)).toEqual(exported)
   await expectArchitectureReportPass(page)
+})
+
+test('Duplicate moment makes an independent, already-open copy named "(copy)", never asking', async ({ page }) => {
+  await openApp(page)
+  const source = (await describeCanvas(page)).moment
+  if (!source) throw new Error('No moment is open')
+  const sourcePanels = (await describeCanvas(page)).panels.map(persistedShape)
+
+  await page.getByRole('button', { name: 'Duplicate moment' }).click()
+  await expect.poll(async () => (await describeCanvas(page)).moment?.id).not.toBe(source.id)
+  const duplicate = (await describeCanvas(page)).moment
+  if (!duplicate) throw new Error('No moment is open after duplicating')
+  expect(duplicate.name).toBe(`${source.name} (copy)`)
+  expect((await describeCanvas(page)).panels.map(persistedShape)).toEqual(sourcePanels)
+  expect((await momentPickerNames(page)).sort()).toEqual([source.name, duplicate.name].sort())
+  await expectArchitectureReportPass(page)
+})
+
+test('importing an archive whose name collides with an existing moment asks first, and declining adds nothing', async ({ page }, testInfo) => {
+  await openApp(page)
+  await createMomentFromToolbar(page, 'Kept aside')
+
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export moment' }).click()
+  const download = await downloading
+  const archivePath = testInfo.outputPath(download.suggestedFilename())
+  await download.saveAs(archivePath)
+
+  // Switch away, so the collision is with a moment other than the one open
+  // -- the warning is not limited to re-importing the currently open moment.
+  await switchMoment(page, 'A new moment')
+  const before = await momentPickerNames(page)
+
+  let dialogMessage = ''
+  page.once('dialog', (dialog) => { dialogMessage = dialog.message(); void dialog.dismiss() })
+  await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
+  await expect.poll(() => dialogMessage).toContain('"Kept aside"')
+  // Declined: the open moment and the picker are unchanged.
+  await expect.poll(async () => (await describeCanvas(page)).moment?.name).toBe('A new moment')
+  expect(await momentPickerNames(page)).toEqual(before)
 })
 
 test.describe('the flush the page runs when it is hidden or left', () => {

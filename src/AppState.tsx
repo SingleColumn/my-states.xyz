@@ -39,9 +39,9 @@ import {
   momentLimits,
   loadSpotifyTokens,
 } from './storage'
-import { downloadMomentArchive, exportMomentArchive, importMomentArchive } from './momentArchive'
+import { downloadMomentArchive, duplicateMoment as duplicateStoredMoment, exportMomentArchive, importMomentArchive } from './momentArchive'
 import { useAppearanceState, type AppearanceState } from './appearanceState'
-import { createId } from './utils'
+import { createId, nextDuplicateName } from './utils'
 import { SaveQueue } from './saveQueue'
 import { persistNoteSnapshot } from './notePersistence'
 import { MomentOperation } from './momentOperation'
@@ -150,6 +150,8 @@ interface MomentsState {
   /** Pins a theme to the active moment; null returns it to the global theme. */
   setTheme(themeId: string | null): Promise<void>
   remove(momentId: string): Promise<void>
+  /** A copy of the active moment, named "<name> (copy)" or the next free number, opened once made. Never asks: the name is chosen to already be free. */
+  duplicate(): Promise<void>
   exportActive(): Promise<void>
   /** Resolves to a notice worth showing (a theme that came with the archive was renamed), or null. */
   importFile(file: File): Promise<string | null>
@@ -226,6 +228,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await notes.flush()
         await momentCore.flush()
         await momentCore.remove(momentId)
+      }),
+      duplicate: () => momentCore.operation.run(async () => {
+        const current = momentCore.activeMoment
+        if (!current) throw new Error('No moment is open.')
+        await notes.flush()
+        await momentCore.flush()
+        const name = nextDuplicateName(current.name, momentCore.moments.map((summary) => summary.name))
+        const duplicated = await duplicateStoredMoment(current.id, name)
+        await momentCore.refreshSummaries()
+        await momentCore.open(duplicated.id)
       }),
       exportActive: () => momentCore.operation.run(async () => {
         await notes.flush()

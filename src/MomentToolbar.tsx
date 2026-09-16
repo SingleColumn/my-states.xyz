@@ -1,7 +1,8 @@
-import { Check, Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
 import { useMomentThemeOptions } from './MomentThemeSelect'
+import { peekMomentArchiveName } from './momentArchive'
 
 export function MomentToolbar() {
   const { moments } = useAppState()
@@ -77,6 +78,21 @@ export function MomentToolbar() {
     }
   }
 
+  /**
+   * A moment picked by name, not by identity -- two entries reading the same
+   * is a real source of "which one is this?" confusion, so a file import
+   * that would create one is confirmed first. The name is read from the
+   * archive without importing it; Duplicate moment never hits this because
+   * it names its own copy something already known to be free.
+   */
+  async function importFile(file: File) {
+    const name = await peekMomentArchiveName(file)
+    if (name && moments.moments.some((existing) => existing.name === name)) {
+      if (!window.confirm(`A moment named "${name}" already exists. Import this as a separate moment with the same name?`)) return
+    }
+    void run(() => moments.importFile(file))
+  }
+
   function runMenuAction(action: () => void) {
     setIsMenuOpen(false)
     action()
@@ -119,6 +135,16 @@ export function MomentToolbar() {
       >
         <Pencil size={16} />
       </button>
+      <button
+        className="card-icon-button moment-action-secondary"
+        type="button"
+        title="Duplicate moment"
+        aria-label="Duplicate moment"
+        disabled={busy || !moments.activeMoment}
+        onClick={() => void run(moments.duplicate)}
+      >
+        <Copy size={16} />
+      </button>
       <button className="card-icon-button moment-action-secondary moment-action-transfer" type="button" title="Export moment" aria-label="Export moment" disabled={busy || !moments.activeMoment} onClick={() => void run(moments.exportActive)}>
         <Download size={17} />
       </button>
@@ -153,6 +179,9 @@ export function MomentToolbar() {
           <button type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(renameMoment)}>
             <Pencil size={16} aria-hidden="true" /><span>Rename moment</span>
           </button>
+          <button type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(() => void run(moments.duplicate))}>
+            <Copy size={16} aria-hidden="true" /><span>Duplicate moment</span>
+          </button>
           <button type="button" role="menuitem" disabled={!moments.activeMoment} onClick={() => runMenuAction(() => void run(moments.exportActive))}>
             <Download size={17} aria-hidden="true" /><span>Export moment</span>
           </button>
@@ -180,7 +209,7 @@ export function MomentToolbar() {
         accept=".zip,.moment.zip,application/zip"
         onChange={(event) => {
           const file = event.target.files?.[0]
-          if (file) void run(() => moments.importFile(file))
+          if (file) void importFile(file)
           event.currentTarget.value = ''
         }}
       />

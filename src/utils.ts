@@ -50,3 +50,20 @@ export function formatDuration(ms: number) {
 export function createId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
+
+/**
+ * A name for a copy that is guaranteed free among `existingNames`: "X
+ * (copy)", then "X (copy 2)", "X (copy 3)", and so on. Used so Duplicate
+ * moment never needs to ask -- two moments with the same name in the picker
+ * is confusing, and a duplicate's whole point is not to require a decision
+ * before it can be made.
+ */
+export function nextDuplicateName(sourceName: string, existingNames: readonly string[]): string {
+  const taken = new Set(existingNames)
+  const base = `${sourceName} (copy)`
+  if (!taken.has(base)) return base
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${sourceName} (copy ${suffix})`
+    if (!taken.has(candidate)) return candidate
+  }
+}

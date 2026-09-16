@@ -7,6 +7,7 @@ import {
   importMomentContent,
   importStoredTheme,
   momentLimits,
+  type ImportedMomentContent,
   type ThemeImportOutcome,
 } from './storage'
 import { draftFromDocument } from './panelStore'
@@ -16,6 +17,7 @@ import type { ThemeDefinition } from './themes/types'
 import { acceptEveryValue, THEME_ID_PATTERN, validateThemeDefinition, type SupportsCssValue } from './themes/validate'
 import type {
   CanvasState,
+  Moment,
   Note,
   Panel,
   MomentImage,
@@ -86,10 +88,16 @@ interface MomentManifest {
   }>
 }
 
-export async function exportMomentArchive(momentId: string) {
+/**
+ * A moment read out in the app's own interchange terms -- the same shape
+ * `importMomentContent` takes -- plus the stored record it came from. The
+ * one place a moment is turned from "a record in the database" into "data
+ * that could become a different moment"; `exportMomentArchive` packages it
+ * into a zip, `duplicateMoment` hands it straight back to storage.
+ */
+async function buildMomentContent(momentId: string): Promise<{ moment: Moment; content: ImportedMomentContent }> {
   const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
   if (!moment) throw new Error('The selected moment no longer exists.')
-  const theme = moment.themeId ? await themeForArchive(moment.themeId) : undefined
   // The archive carries a moment as a draft, in the app's own terms: the
   // tldraw document is the app's persistence format, not its interchange
   // format, so a change to tldraw's is not a change to the file.
@@ -98,13 +106,28 @@ export async function exportMomentArchive(momentId: string) {
   // A Notes panel can be left pointing at a note that no longer exists (a
   // second panel showing a note deleted through a different one). Import
   // rejects that reference outright, so a moment carrying it must not be
-  // allowed to produce a backup it cannot itself restore.
+  // allowed to produce a copy it cannot itself restore.
   const panels = draftPanels.map((panel) => panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)
     ? { ...panel, config: { activeNoteId: null } }
     : panel)
-  // Bundled files already ship with the app; inactive local assets are not duplicated in the archive.
+  // Bundled files already ship with the app; inactive local assets are not duplicated.
   const exportedAssets = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   validateExportContent(notes, exportedAssets)
+
+  const content: ImportedMomentContent = {
+    name: moment.name,
+    ...(moment.themeId ? { themeId: moment.themeId } : {}),
+    panels,
+    canvas,
+    notes: notes.map(({ id, title, content: body, createdAt, updatedAt }) => ({ id, title, content: body, createdAt, updatedAt })),
+    assets: exportedAssets,
+  }
+  return { moment, content }
+}
+
+export async function exportMomentArchive(momentId: string) {
+  const { moment, content } = await buildMomentContent(momentId)
+  const theme = moment.themeId ? await themeForArchive(moment.themeId) : undefined
 
   const files: Record<string, Uint8Array> = {}
   const manifest: MomentManifest = {
@@ -115,14 +138,14 @@ export async function exportMomentArchive(momentId: string) {
       updatedAt: moment.updatedAt,
     },
     ...(theme ? { theme } : {}),
-    panels,
-    canvas,
+    panels: content.panels,
+    canvas: content.canvas,
     notes: [],
     images: [],
   }
 
   const usedNotePaths = new Set<string>()
-  for (const note of notes) {
+  for (const note of content.notes) {
     const path = createNoteArchivePath(note.title, usedNotePaths)
     files[path] = strToU8(note.content)
     manifest.notes.push({
@@ -134,7 +157,7 @@ export async function exportMomentArchive(momentId: string) {
     })
   }
 
-  for (const asset of exportedAssets) {
+  for (const asset of content.assets) {
     const extension = extensionForAsset(asset)
     const path = `images/${asset.id}.${extension}`
     files[path] = new Uint8Array(await asset.blob.arrayBuffer())
@@ -158,6 +181,39 @@ export async function exportMomentArchive(momentId: string) {
   }
 
   return new Blob([archive], { type: 'application/zip' })
+}
+
+/**
+ * A copy of a moment made without ever leaving the browser: no zip is
+ * produced or parsed, so none of the archive format's edge cases (a zip
+ * tool's directory-marker entries among them) can apply to it. The copy
+ * gets its own identity throughout -- `importMomentContent` reissues every
+ * id, the same as a file import -- and the name the caller gives it, which
+ * is expected to already be free of collisions (see `nextDuplicateName`).
+ */
+export async function duplicateMoment(momentId: string, name: string) {
+  const { content } = await buildMomentContent(momentId)
+  return importMomentContent({ ...content, name })
+}
+
+/**
+ * The name a moment archive would import under, read without importing it:
+ * used to warn before an import would create a same-named duplicate in the
+ * picker. Best effort -- any problem with the file is left for the real
+ * import to diagnose properly, so this resolves to null rather than
+ * throwing.
+ */
+export async function peekMomentArchiveName(file: File): Promise<string | null> {
+  try {
+    if (file.size > momentLimits.maxArchiveBytes) return null
+    const files = extractArchive(new Uint8Array(await file.arrayBuffer()))
+    const manifestBytes = files.get('manifest.json')
+    if (!manifestBytes) return null
+    const manifest = parseManifest(manifestBytes)
+    return isMomentMetadata(manifest.moment) ? manifest.moment.name : null
+  } catch {
+    return null
+  }
 }
 
 export interface MomentArchiveImport {
@@ -269,6 +325,16 @@ function extractArchive(source: Uint8Array) {
 
   const unzip = new Unzip((entry) => {
     if (failure) return
+    // A directory marker: many ordinary zip tools (Explorer's "Compress to
+    // ZIP file" among them) write one whenever the thing being zipped
+    // contains a subfolder. It carries no content and is none of the three
+    // shapes a moment archive uses, so an empty one is ignored rather than
+    // rejected; one that unexpectedly carries bytes is treated as the
+    // unexpected entry it would otherwise be.
+    if (entry.name.endsWith('/')) {
+      if (entry.originalSize) failure = new Error(`The archive contains an unexpected file path: "${entry.name}"`)
+      return
+    }
     try {
       validateArchivePath(entry.name)
       if (files.has(entry.name) || ++fileCount > maxFileCount) {
@@ -386,7 +452,10 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
       throw new Error('A Notes panel refers to a note that is not included in the archive.')
     }
   }
-  if (files.size !== referencedPaths.size) throw new Error('The archive contains unexpected files.')
+  if (files.size !== referencedPaths.size) {
+    const unexpected = [...files.keys()].filter((path) => !referencedPaths.has(path))
+    throw new Error(`The archive contains ${unexpected.length === 1 ? 'a file' : 'files'} its manifest does not reference: ${unexpected.map((path) => `"${path}"`).join(', ')}.`)
+  }
 }
 
 /** The theme reference goes through the same validator a theme file does; its id must match the id it is filed under. */
@@ -401,14 +470,14 @@ function validateManifestTheme(theme: unknown, supportsCssValue: SupportsCssValu
 
 function validateArchivePath(path: string) {
   if (!path || path.startsWith('/') || path.includes('\\') || path.split('/').includes('..') || path.includes('//')) {
-    throw new Error('The archive contains an unsafe file path.')
+    throw new Error(`The archive contains an unsafe file path: "${path}"`)
   }
   if (path !== 'manifest.json' && !isValidNoteArchivePath(path) && !/^images\/[A-Za-z0-9_-]+\.(jpg|png|webp|gif|avif|bmp|svg)$/.test(path)) {
-    throw new Error('The archive contains an unexpected file path.')
+    throw new Error(`The archive contains an unexpected file path: "${path}"`)
   }
 }
 
-function extensionForAsset(asset: MomentImage) {
+function extensionForAsset(asset: Pick<MomentImage, 'mimeType'>) {
   return extensionForMimeType(asset.mimeType)
 }
 
