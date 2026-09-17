@@ -47,6 +47,9 @@
           "shellBorder": "1px solid rgba(57, 255, 136, 0.45)",
           "headerStyle": "underline"
         },
+        "typography": {
+          "scale": "compact"
+        },
         "spotify": {
           "accent": "#39ff88",
           "panelBackground": "#04110a"

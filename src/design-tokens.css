@@ -74,7 +74,12 @@
   --font-size-panel-body: var(--type-md);
   --font-size-panel-label: var(--type-sm);
   --font-size-app-badge-title: 13px;
-  --font-size-app-badge-meta: 12px;
+  /* Follows the ladder so the toolbar (the moment picker, panel-view menu,
+     etc.) grows under a spacious scale instead of staying fixed while panel
+     content moves around it -- but never below its original 12px, so a
+     compact scale (chosen for panel density) does not also shrink the
+     toolbar past where it has always been legible. */
+  --font-size-app-badge-meta: max(var(--type-sm), 12px);
   --font-size-dropdown: var(--font-size-app-badge-meta);
   --font-size-spotify-login-title: var(--type-md);
   --font-size-track-title: var(--type-lg);
@@ -404,6 +409,45 @@
   --card-primary-border: color-mix(in srgb, var(--accent) 45%, transparent);
   --card-primary-icon: color-mix(in srgb, var(--accent) 85%, var(--accent-lift));
   --card-bg-gradient: var(--panel-texture), linear-gradient(160deg, color-mix(in srgb, var(--accent) 28%, transparent), var(--bg) 62%), var(--bg);
+}
+
+/* Alternate type scales, chosen by a theme (`typography.scale`) and carried
+   as data-type-scale on the root. Standard is the ladder above; these two
+   are the same six-rung shape, each rung scaled by one factor so the ratio
+   between rungs is preserved. The weight and letter-spacing that go with
+   each (so the two ends read as a style rather than a zoom level) are in
+   styles.css, beside the rest of .card-title and .panel's own rules. */
+:root[data-type-scale="compact"] {
+  --type-xs: 9.5px;
+  --type-sm: 11px;
+  --type-md: 12px;
+  --type-lg: 15px;
+  --type-xl: 17px;
+  --type-2xl: 21px;
+}
+:root[data-type-scale="compact"] .panel {
+  --type-xs: clamp(9.5px, min(1.65cqi, 1.4cqb), 68px);
+  --type-sm: clamp(11px, min(2cqi, 1.65cqb), 83px);
+  --type-md: clamp(12px, min(2.35cqi, 1.9cqb), 104px);
+  --type-lg: clamp(15px, min(2.87cqi, 2.35cqb), 126px);
+  --type-xl: clamp(17px, min(3.65cqi, 3.05cqb), 157px);
+  --type-2xl: clamp(21px, min(4.52cqi, 3.74cqb), 191px);
+}
+:root[data-type-scale="spacious"] {
+  --type-xs: 13.5px;
+  --type-sm: 15px;
+  --type-md: 17px;
+  --type-lg: 21px;
+  --type-xl: 24px;
+  --type-2xl: 29px;
+}
+:root[data-type-scale="spacious"] .panel {
+  --type-xs: clamp(13.5px, min(2.3cqi, 1.95cqb), 95px);
+  --type-sm: clamp(15px, min(2.8cqi, 2.3cqb), 116px);
+  --type-md: clamp(17px, min(3.3cqi, 2.7cqb), 146px);
+  --type-lg: clamp(21px, min(4cqi, 3.3cqb), 177px);
+  --type-xl: clamp(24px, min(5.1cqi, 4.3cqb), 220px);
+  --type-2xl: clamp(29px, min(6.3cqi, 5.25cqb), 268px);
 }
 
 /* Per-card structure. The accent and background each card carries are theme

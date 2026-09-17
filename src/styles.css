@@ -64,6 +64,10 @@ button {
   box-shadow: var(--shadow-app-badge);
   backdrop-filter: var(--blur-app-badge);
   color: var(--color-app-badge-text);
+  /* Set here, not per control: the toolbar renders inside tldraw's layout,
+     whose container fixes 12px, and every plain button would otherwise
+     inherit that while the dropdowns beside it follow the type scale. */
+  font-size: var(--font-size-app-badge-meta);
   pointer-events: auto;
 }
 
@@ -566,6 +570,31 @@ button {
 
 :root[data-header-style="underline"] .card-header {
   border-bottom: 2px solid var(--card-header-rule, var(--accent));
+}
+
+/* Type scales, chosen by a theme (`typography.scale`) and carried as
+   data-type-scale on the root. Standard is the rules below, using
+   --card-title-weight and no extra tracking. The size ladder itself
+   (--type-*) is in design-tokens.css, next to its standard values; this is
+   just the weight and letter-spacing that make compact read as denser
+   rather than only smaller, and spacious as more open rather than only
+   larger. The weight is a nudge off --card-title-weight, not a fixed
+   number: a theme that sets its own heading weight (Paper's bold serif at
+   700) keeps its own identity, heavier or lighter by the same amount as
+   Midnight's default, rather than being pulled to one absolute value. */
+:root[data-type-scale="compact"] .panel {
+  letter-spacing: -0.006em;
+}
+:root[data-type-scale="compact"] .card-title {
+  font-weight: calc(var(--card-title-weight) + 120);
+  letter-spacing: -0.01em;
+}
+:root[data-type-scale="spacious"] .panel {
+  letter-spacing: 0.008em;
+}
+:root[data-type-scale="spacious"] .card-title {
+  font-weight: calc(var(--card-title-weight) - 120);
+  letter-spacing: 0.01em;
 }
 
 .card-header h2,

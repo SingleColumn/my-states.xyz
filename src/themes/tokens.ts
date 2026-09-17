@@ -208,6 +208,16 @@ export const componentsSpec: GroupSpec = {
         toolbarBackground: color('The formatting toolbar, which is sticky over the text and needs an opaque surface.', { token: '--background-notes-toolbar', derive: s('surfaceOverlay') }),
       },
     },
+    typography: {
+      description: 'The size and weight of text across every panel.',
+      fields: {
+        scale: styleChoice(
+          'How large and how heavy panel titles and body text are. Compact is smaller and a little heavier, for density; spacious is larger and a little lighter, for an airier, more editorial feel. Both keep the same ratio between title and body sizes as standard.',
+          'type-scale',
+          ['standard', 'compact', 'spacious'],
+        ),
+      },
+    },
     ...panelGroups(),
   },
 }

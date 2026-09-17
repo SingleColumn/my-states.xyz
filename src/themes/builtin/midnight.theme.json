@@ -122,6 +122,9 @@
           "border": "rgba(255, 255, 255, 0.12)",
           "toolbarBackground": "rgba(9, 17, 17, 0.97)"
         },
+        "typography": {
+          "scale": "standard"
+        },
         "spotify": {
           "accent": "#1db954",
           "panelBackground": "#0e1712",

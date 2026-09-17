@@ -81,6 +81,7 @@ describe('compileThemeMode', () => {
 
   it('reports a style choice as a root attribute, not a token, and only when the theme names it', () => {
     expect(compileThemeAttributes({ components: { panel: { headerStyle: 'band' } } })).toEqual({ 'header-style': 'band' })
+    expect(compileThemeAttributes({ components: { typography: { scale: 'compact' } } })).toEqual({ 'type-scale': 'compact' })
     expect(compileThemeAttributes({})).toEqual({})
     expect(compileThemeMode({ components: { panel: { headerStyle: 'band' } } })).not.toHaveProperty('--card-header-band-style')
     // The band's colours are ordinary derived tokens.

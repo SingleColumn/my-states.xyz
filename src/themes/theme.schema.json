@@ -738,6 +738,22 @@
                     }
                   }
                 },
+                "typography": {
+                  "type": "object",
+                  "description": "The size and weight of text across every panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "scale": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "compact",
+                        "spacious"
+                      ],
+                      "description": "How large and how heavy panel titles and body text are. Compact is smaller and a little heavier, for density; spacious is larger and a little lighter, for an airier, more editorial feel. Both keep the same ratio between title and body sizes as standard. One of: standard, compact, spacious."
+                    }
+                  }
+                },
                 "spotify": {
                   "type": "object",
                   "description": "The Music panel.",
@@ -1559,6 +1575,22 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "The formatting toolbar, which is sticky over the text and needs an opaque surface. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "typography": {
+                  "type": "object",
+                  "description": "The size and weight of text across every panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "scale": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "compact",
+                        "spacious"
+                      ],
+                      "description": "How large and how heavy panel titles and body text are. Compact is smaller and a little heavier, for density; spacious is larger and a little lighter, for an airier, more editorial feel. Both keep the same ratio between title and body sizes as standard. One of: standard, compact, spacious."
                     }
                   }
                 },

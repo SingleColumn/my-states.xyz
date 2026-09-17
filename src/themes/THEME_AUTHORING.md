@@ -30,6 +30,7 @@ For the idea, decide explicitly:
 | Flat or deep? | `foundation.depth.shadow*` and `backdropBlur`; `"none"` is a legitimate value |
 | Any texture or figure? | `panel.texture` (`none`, `paper`, `dots`), `panel.ornament` (`none`, `bow`, `star`), `images.edge` (`none`, `deckle`) |
 | How is a panel header drawn? | `panel.headerStyle`: `plain` (title over the panel), `band` (a solid strip in each panel's accent, or one colour via `panel.headerBand`; `headerBandForeground` for the title and buttons on it), `underline` (a rule beneath, `panel.headerRule`). The single biggest lever for making two themes look structurally different. |
+| How large and heavy is panel text? | `typography.scale`: `standard`, `compact` (smaller and a little heavier, for density), `spacious` (larger and a little lighter, for an airier feel). Both alternates keep the same ratio between title and body sizes as standard — this is a size lever, not a font-pairing one. |
 
 ## 2. Fill the foundation completely
 
@@ -64,6 +65,7 @@ A theme is complete when each of these has been *looked at*, not when the file v
 - **Music panel**: `spotify.accent/panelBackground`, artwork shadow and placeholder, playlist rows.
 - **Images panel**: `images.accent/panelBackground`, `frameBorder` (a matte), `frameShadow`, `edge`. A matte the same colour as `panelBackground` is invisible; a torn edge needs contrast between the picture and what is behind it.
 - **Notes panel**: `notes.accent/panelBackground/titleForeground/controlBackground/controlBackgroundHover`.
+- **Type scale**: `typography.scale`. Leave it `standard` unless the idea specifically calls for denser or airier text — it changes every panel at once, so try `compact`/`spacious` on the app's narrowest panel width before committing, since a fixed-width panel can start wrapping labels it didn't before.
 
 ## 5. Check contrast in four places
 

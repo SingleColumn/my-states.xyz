@@ -94,6 +94,9 @@
           "background": "#f4efe5",
           "backdrop": "rgba(60, 40, 20, 0.3)"
         },
+        "typography": {
+          "scale": "spacious"
+        },
         "spotify": {
           "accent": "#8b4a2f",
           "panelBackground": "#f1ebe0",
