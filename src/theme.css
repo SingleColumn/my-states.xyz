@@ -53,7 +53,8 @@
   --accent-lift: white;
   --color-canvas: #101114;
   --background-app: radial-gradient(circle at 25% 20%, rgba(55, 79, 92, 0.26), transparent 32%), radial-gradient(circle at 80% 12%, rgba(117, 85, 62, 0.2), transparent 27%), linear-gradient(135deg, #101114 0%, #181715 54%, #12151a 100%);
-  --background-canvas-grid: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  --color-canvas-grid: rgba(255, 255, 255, 0.045);
+  --size-grid: 48px;
   --color-attention-glow: #a49cf0;
   --selection-stroke-width: 1.5px;
   --color-panel-border: rgba(255, 255, 255, 0.16);
@@ -140,6 +141,7 @@
   /* The band and the rule likewise fall through to each panel's own accent. */
   --card-header-band: initial;
   --card-header-rule: initial;
+  --canvas-pattern: var(--canvas-pattern-grid);
   --panel-texture: var(--texture-none);
   --panel-ornament: var(--ornament-none);
   --image-edge-mask: var(--image-edge-none);

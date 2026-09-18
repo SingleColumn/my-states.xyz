@@ -90,9 +90,14 @@ describe('compileThemeMode', () => {
     expect(compileThemeMode({ foundation: { color: { accent: 'red' } } })).not.toHaveProperty('--card-header-band')
   })
 
-  it('turns the grid colour into the two gradients the stylesheet draws', () => {
-    const tokens = compileThemeMode({ components: { canvas: { gridColor: 'rgba(0, 0, 0, 0.1)' } } })
-    expect(tokens['--background-canvas-grid']).toBe('linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px)')
+  it('hands the canvas pattern, colour and spacing to the stylesheet separately', () => {
+    const tokens = compileThemeMode({ components: { canvas: { pattern: 'dots', gridColor: 'rgba(0, 0, 0, 0.1)', gridSize: '24px' } } })
+    expect(tokens['--canvas-pattern']).toBe('var(--canvas-pattern-dots)')
+    expect(tokens['--color-canvas-grid']).toBe('rgba(0, 0, 0, 0.1)')
+    expect(tokens['--size-grid']).toBe('24px')
+    // Absent, the stylesheet's fallthrough draws the grid; the colour is always derived.
+    expect(compileThemeMode({})['--canvas-pattern']).toBeUndefined()
+    expect(compileThemeMode({ foundation: { color: { foreground: '#fff' } } })['--color-canvas-grid']).toBeDefined()
   })
 
   it('compiles every built-in theme without error and sets the canvas colour', () => {

@@ -334,11 +334,27 @@
                       "maxLength": 512,
                       "description": "The background behind the canvas: a colour or gradients. A CSS background: a colour, or one or more gradients. Must not contain url(), var() or other references."
                     },
+                    "pattern": {
+                      "type": "string",
+                      "enum": [
+                        "grid",
+                        "dots",
+                        "lines",
+                        "none"
+                      ],
+                      "description": "The pattern drawn on the canvas: grid (squared paper), dots (a bullet journal), lines (ruled paper) or none (plain). One of: grid, dots, lines, none."
+                    },
                     "gridColor": {
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 512,
-                      "description": "The colour of the canvas grid lines. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                      "description": "The colour of the canvas pattern. Dots need a stronger colour than lines to be seen at all: a 1px line reads at 5% opacity, a dot wants 15-25%. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "gridSize": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The spacing of the canvas pattern, e.g. \"48px\" (the default) or \"24px\" for a tight dot grid. A CSS length, e.g. \"14px\" or \"0px\". Must not contain url(), var() or other references."
                     },
                     "selectionStroke": {
                       "type": "string",
@@ -1174,11 +1190,27 @@
                       "maxLength": 512,
                       "description": "The background behind the canvas: a colour or gradients. A CSS background: a colour, or one or more gradients. Must not contain url(), var() or other references."
                     },
+                    "pattern": {
+                      "type": "string",
+                      "enum": [
+                        "grid",
+                        "dots",
+                        "lines",
+                        "none"
+                      ],
+                      "description": "The pattern drawn on the canvas: grid (squared paper), dots (a bullet journal), lines (ruled paper) or none (plain). One of: grid, dots, lines, none."
+                    },
                     "gridColor": {
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 512,
-                      "description": "The colour of the canvas grid lines. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                      "description": "The colour of the canvas pattern. Dots need a stronger colour than lines to be seen at all: a 1px line reads at 5% opacity, a dot wants 15-25%. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "gridSize": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The spacing of the canvas pattern, e.g. \"48px\" (the default) or \"24px\" for a tight dot grid. A CSS length, e.g. \"14px\" or \"0px\". Must not contain url(), var() or other references."
                     },
                     "selectionStroke": {
                       "type": "string",

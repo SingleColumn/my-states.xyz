@@ -28,6 +28,7 @@ For the idea, decide explicitly:
 | Rounded or square? | `foundation.shape.radiusLarge/Medium/Small` — the three rungs round or square the whole app; `0` for hard corners |
 | Heavy or airy type? Serif, sans, mono, rounded? | `typography.uiFont` (body), `headingFont` (titles), `monoFont` (code) |
 | Flat or deep? | `foundation.depth.shadow*` and `backdropBlur`; `"none"` is a legitimate value |
+| What is the canvas drawn on? | `canvas.pattern`: `grid` (squared paper), `dots` (a bullet journal), `lines` (ruled), `none` (plain); `gridColor` and `gridSize` tune it |
 | Any texture or figure? | `panel.texture` (`none`, `paper`, `dots`), `panel.ornament` (`none`, `bow`, `star`), `images.edge` (`none`, `deckle`) |
 | How is a panel header drawn? | `panel.headerStyle`: `plain` (title over the panel), `band` (a solid strip in each panel's accent, or one colour via `panel.headerBand`; `headerBandForeground` for the title and buttons on it), `underline` (a rule beneath, `panel.headerRule`). The single biggest lever for making two themes look structurally different. |
 | How large and heavy is panel text? | `typography.scale`: `standard`, `compact` (smaller and a little heavier, for density), `spacious` (larger and a little lighter, for an airier feel). Both alternates keep the same ratio between title and body sizes as standard — this is a size lever, not a font-pairing one. |
@@ -53,7 +54,7 @@ The compiler derives every semantic role from the foundation (`textMuted` from `
 
 A theme is complete when each of these has been *looked at*, not when the file validates. For each, name the field that controls it or decide that the derived value is right:
 
-- **Canvas**: `canvas.backdrop` (a colour or gradients behind everything), `canvas.gridColor`, `canvas.selectionStroke` and `selectionStrokeWidth`.
+- **Canvas**: `canvas.backdrop` (a colour or gradients behind everything), `canvas.pattern` (`grid`, `dots`, `lines`, `none`) with `gridColor` and `gridSize`, `canvas.selectionStroke` and `selectionStrokeWidth`. Dots need a stronger `gridColor` than lines (about 20% opacity against 5%).
 - **Toolbar** (top strip): `toolbar.background/border/foreground/shadow/backdropBlur`.
 - **Panel shell**: `panel.border`, `shellBorder` (a full border shorthand), `divider`, `frame`, `headerForeground`, `footerForeground`, `shadow`, `backdropBlur`, `contentBackground`, `texture`, `ornament`, `headerStyle` with `headerBand` / `headerBandForeground` / `headerRule`.
 - **Buttons in panel headers/footers**: the seven `button.*` states — resting, hover, active, and their borders and icon colours. Check the *active* state is distinguishable from hover.

@@ -102,11 +102,9 @@ export const componentsSpec: GroupSpec = {
       fields: {
         background: color('The canvas colour.', { token: '--color-canvas', derive: s('surfacePrimary') }),
         backdrop: { kind: 'background', description: 'The background behind the canvas: a colour or gradients.', token: '--background-app', derive: s('surfacePrimary') },
-        gridColor: color('The colour of the canvas grid lines.', {
-          token: '--background-canvas-grid',
-          derive: mixS('textPrimary', 4.5),
-          compile: (value) => `linear-gradient(${value} 1px, transparent 1px), linear-gradient(90deg, ${value} 1px, transparent 1px)`,
-        }),
+        pattern: choice('The pattern drawn on the canvas: grid (squared paper), dots (a bullet journal), lines (ruled paper) or none (plain).', 'canvas-pattern', ['grid', 'dots', 'lines', 'none'], '--canvas-pattern'),
+        gridColor: color('The colour of the canvas pattern. Dots need a stronger colour than lines to be seen at all: a 1px line reads at 5% opacity, a dot wants 15-25%.', { token: '--color-canvas-grid', derive: mixS('textPrimary', 4.5) }),
+        gridSize: { kind: 'length', description: 'The spacing of the canvas pattern, e.g. "48px" (the default) or "24px" for a tight dot grid.', token: '--size-grid' },
         selectionStroke: color('Selection outlines and the glow of the selected panel.', { token: '--color-attention-glow', derive: (context) => context.foundation.selection ?? context.foundation.accent ?? null }),
         selectionStrokeWidth: { kind: 'stroke', description: 'The width of the outline around the selected panel, e.g. "1.5px" (the default) or "4px" for a ribbon.', token: '--selection-stroke-width' },
       },

@@ -96,7 +96,9 @@ export interface ComponentTokens {
   canvas?: {
     background?: string
     backdrop?: string
+    pattern?: string
     gridColor?: string
+    gridSize?: string
     selectionStroke?: string
     selectionStrokeWidth?: string
   }

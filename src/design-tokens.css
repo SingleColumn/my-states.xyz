@@ -219,7 +219,14 @@
   --size-zoom-readout-min: 44px;
   --size-toast-max-width: 520px;
   --size-toast-viewport-inset: 40px;
-  --size-grid: 48px;
+  /* The canvas patterns a theme chooses from by name (canvas.pattern). Each
+     is one tile of --size-grid (theme.css), drawn in the theme's grid
+     colour: the stylesheet owns the drawing, the theme owns the colour and
+     spacing. The dot is 1.5px of colour feathered to 2.5px so it stays round. */
+  --canvas-pattern-none: none;
+  --canvas-pattern-grid: linear-gradient(var(--color-canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-canvas-grid) 1px, transparent 1px);
+  --canvas-pattern-lines: linear-gradient(var(--color-canvas-grid) 1px, transparent 1px);
+  --canvas-pattern-dots: radial-gradient(circle, var(--color-canvas-grid) 1.5px, transparent 2.5px);
   --size-top-toolbar-height: 54px;
   --size-top-toolbar-control: 36px;
   --size-moment-selector-width: 260px;

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "paper",
   "name": "Paper",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "my-states",
   "description": "A printed page: one cream stock with a visible grain and no colour but ink and a single terracotta, sharp corners, hairline rules, bold serif headings over a warm sans, thin pen-line icons, and pictures torn straight from the sheet. Text is set to clear WCAG AA on every surface.",
   "modes": {
@@ -51,7 +51,9 @@
       "components": {
         "canvas": {
           "backdrop": "linear-gradient(135deg, #f5f0e7 0%, #efe8dc 100%)",
-          "gridColor": "rgba(43, 36, 32, 0.06)",
+          "pattern": "lines",
+          "gridColor": "rgba(43, 36, 32, 0.09)",
+          "gridSize": "32px",
           "selectionStrokeWidth": "1.5px"
         },
         "panel": {

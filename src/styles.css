@@ -178,7 +178,7 @@ button {
 
 .tl-background {
   background-color: transparent !important;
-  background-image: var(--background-canvas-grid);
+  background-image: var(--canvas-pattern);
   background-size: var(--size-grid) var(--size-grid);
 }
 

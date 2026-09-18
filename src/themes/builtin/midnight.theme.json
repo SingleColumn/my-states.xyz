@@ -58,6 +58,7 @@
           "background": "#101114",
           "backdrop": "radial-gradient(circle at 25% 20%, rgba(55, 79, 92, 0.26), transparent 32%), radial-gradient(circle at 80% 12%, rgba(117, 85, 62, 0.2), transparent 27%), linear-gradient(135deg, #101114 0%, #181715 54%, #12151a 100%)",
           "gridColor": "rgba(255, 255, 255, 0.045)",
+          "gridSize": "48px",
           "selectionStroke": "#a49cf0",
           "selectionStrokeWidth": "1.5px"
         },

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "scrapbook",
   "name": "Scrapbook",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "my-states",
   "description": "A travel journal spread: kraft paper with a grain, coloured cards pasted on for each panel, handwritten headings, a teal cover accent on the chrome, rounded corners, and photos matted in white and glued in slightly askew. Light mode only.",
   "modes": {
@@ -52,7 +52,9 @@
       "components": {
         "canvas": {
           "backdrop": "#e2d2ae",
-          "gridColor": "rgba(61, 52, 39, 0.08)",
+          "pattern": "dots",
+          "gridColor": "rgba(61, 52, 39, 0.22)",
+          "gridSize": "28px",
           "selectionStroke": "#4a9d94",
           "selectionStrokeWidth": "3px"
         },
