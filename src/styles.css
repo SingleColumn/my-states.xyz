@@ -34,6 +34,31 @@ button {
   color: var(--color-text-muted);
 }
 
+/* Replaces the app entirely on phones and tablets (see main.tsx). */
+.desktop-only-notice {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  gap: var(--space-detail-5);
+  padding: 32px 24px;
+  max-width: 34rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.desktop-only-notice h1 {
+  margin: 0;
+  font-size: var(--type-2xl);
+  font-weight: var(--font-weight-display);
+}
+
+.desktop-only-notice p {
+  margin: 0;
+  font-size: var(--type-lg);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
 .tlui-layout__top {
   pointer-events: none;
 }
