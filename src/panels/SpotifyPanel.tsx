@@ -92,28 +92,18 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         panelId={panelId}
         panelType="spotify"
         title="Music"
-        trailing={spotify.tokens ? (
-            <button
-              className="card-icon-button"
-              type="button"
-              title="Log out"
-              onClick={() => spotify.logout()}
-            >
-              <LogOut size={18} />
-            </button>
-        ) : null}
-      >
-        <button
-          className="card-icon-button"
-          type="button"
-          title={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
-          aria-label={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
-          aria-pressed={focusView}
-          onClick={() => commands.togglePanelFocusView(panelId)}
-        >
-          {focusView ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}
-        </button>
-      </PanelHeader>
+        menuItems={[
+          {
+            id: 'focus-view',
+            label: focusView ? 'Expand panel to full view' : 'Reduce panel to focus view',
+            icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
+            onSelect: () => commands.togglePanelFocusView(panelId),
+          },
+        ]}
+        trailingMenuItems={spotify.tokens ? [
+          { id: 'log-out', label: 'Log out', icon: <LogOut size={17} aria-hidden="true" />, onSelect: () => spotify.logout() },
+        ] : undefined}
+      />
 
       <div className="panel-body" {...panelContentProps}>
         {!spotify.tokens ? (
