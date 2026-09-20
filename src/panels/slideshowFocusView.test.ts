@@ -9,6 +9,16 @@ const panel = vi.hoisted(() => ({ focusView: false }))
 
 const image = { id: 'image_1', momentId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
 
+// The header's menu is closed until clicked, and a static render cannot
+// click, so the real header is rendered with its menu open.
+vi.mock('../PanelHeader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../PanelHeader')>()
+  return {
+    ...actual,
+    PanelHeader: (props: Parameters<typeof actual.PanelHeader>[0]) => createElement(actual.PanelHeader, { ...props, menuDefaultOpen: true }),
+  }
+})
+
 vi.mock('../AppState', () => ({
   useAppState: () => ({
     slideshow: {
@@ -79,8 +89,8 @@ describe('Images panel focus view', () => {
     expect(focused).not.toContain('slideshow-controls')
     expect(focused).not.toContain('aria-label="Next image"')
     expect(focused).not.toContain('aria-label="Stop slideshow"')
-    expect(focused).not.toContain('aria-label="Choose a local folder"')
-    expect(focused).not.toContain('aria-label="Clear images"')
+    expect(focused).not.toContain('Choose a local folder')
+    expect(focused).not.toContain('Clear images')
     expect(focused).not.toContain('>Speed ')
     expect(focused).not.toContain('>Fade ')
     expect(focused).not.toContain('>Zoom ')
@@ -95,8 +105,8 @@ describe('Images panel focus view', () => {
     expect(full).toContain('>Fade ')
     expect(full).toContain('>Zoom ')
     expect(full).toContain('card-footer')
-    expect(full).toContain('aria-label="Choose a local folder"')
-    expect(full).toContain('aria-label="Clear images"')
+    expect(full).toContain('>Choose a local folder<')
+    expect(full).toContain('>Clear images<')
   })
 
   it('offers the focus view toggle from the panel header, before the hide button', () => {
@@ -104,14 +114,15 @@ describe('Images panel focus view', () => {
     expect(markup.indexOf('Reduce panel to focus view')).toBeLessThan(markup.indexOf('Hide panel'))
   })
 
-  it('keeps the source buttons in the panel header', () => {
+  it('keeps the source actions in the panel header menu', () => {
     const markup = renderImagesPanel(false)
     expect(markup).not.toContain('slideshow-source-row')
+    expect(markup).toContain('aria-label="Images panel actions"')
     for (const label of ['Show loaded images', 'Choose a local folder', 'Load a sample collection', 'Clear images']) {
-      // In the header means before the shared panel controls, and well before
-      // the transport row down in the body.
-      expect(markup.indexOf(`aria-label="${label}"`)).toBeLessThan(markup.indexOf('aria-label="Hide panel"'))
-      expect(markup.indexOf(`aria-label="${label}"`)).toBeLessThan(markup.indexOf('aria-label="Previous image"'))
+      // In the header menu means before the shared panel controls, and well
+      // before the transport row down in the body.
+      expect(markup.indexOf(`>${label}<`)).toBeLessThan(markup.indexOf('>Hide panel<'))
+      expect(markup.indexOf(`>${label}<`)).toBeLessThan(markup.indexOf('aria-label="Previous image"'))
     }
   })
 

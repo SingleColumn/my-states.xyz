@@ -119,39 +119,35 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
       onPointerLeave={focusView ? hideFocusHint : undefined}
     >
       {focusView ? null : (
-      <PanelHeader panelId={panelId} panelType="slideshow" title="Images">
-          <button
-            className={`card-icon-button ${isImagePickerOpen ? 'is-active' : ''}`}
-            type="button"
-            title={`${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`}
-            aria-label={`${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`}
-            aria-controls="loaded-images-picker"
-            aria-expanded={isImagePickerOpen}
-            onClick={() => { setIsSamplePickerOpen(false); setIsImagePickerOpen((current) => !current) }}
-          ><Images size={18} /></button>
-          <button className="card-icon-button" type="button" title="Choose a local folder" aria-label="Choose a local folder" onClick={() => void chooseFolder()}>
-            <FolderOpen size={18} />
-          </button>
-          <button
-            className={`card-icon-button ${isSamplePickerOpen ? 'is-active' : ''}`}
-            type="button"
-            title="Load a sample collection"
-            aria-label="Load a sample collection"
-            aria-controls="sample-collection-picker"
-            aria-expanded={isSamplePickerOpen}
-            onClick={() => { setIsImagePickerOpen(false); setIsSamplePickerOpen((current) => !current) }}
-          ><Sparkles size={18} /></button>
-          <button className="card-icon-button" type="button" title="Clear images" aria-label="Clear images" onClick={() => void slideshow.resetFolder(panelId)}>
-            <Trash2 size={18} />
-          </button>
-          <button
-            className="card-icon-button"
-            type="button"
-            title={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
-            aria-label={focusView ? 'Expand panel to full view' : 'Reduce panel to focus view'}
-            aria-pressed={focusView}
-            onClick={() => commands.togglePanelFocusView(panelId)}
-          >{focusView ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}</button>
+      <PanelHeader
+        panelId={panelId}
+        panelType="slideshow"
+        title="Images"
+        menuItems={[
+          {
+            id: 'loaded-images',
+            label: `${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`,
+            icon: <Images size={17} aria-hidden="true" />,
+            checked: isImagePickerOpen,
+            onSelect: () => { setIsSamplePickerOpen(false); setIsImagePickerOpen((current) => !current) },
+          },
+          { id: 'choose-folder', label: 'Choose a local folder', icon: <FolderOpen size={17} aria-hidden="true" />, onSelect: () => void chooseFolder() },
+          {
+            id: 'sample-collection',
+            label: 'Load a sample collection',
+            icon: <Sparkles size={17} aria-hidden="true" />,
+            checked: isSamplePickerOpen,
+            onSelect: () => { setIsImagePickerOpen(false); setIsSamplePickerOpen((current) => !current) },
+          },
+          { id: 'clear', label: 'Clear images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) },
+          {
+            id: 'focus-view',
+            label: focusView ? 'Expand panel to full view' : 'Reduce panel to focus view',
+            icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
+            onSelect: () => commands.togglePanelFocusView(panelId),
+          },
+        ]}
+      >
         {isImagePickerOpen ? (
           <section className="slideshow-image-picker" id="loaded-images-picker" aria-label="Loaded images" {...panelContentProps}>
             <div className="slideshow-image-picker-heading"><span>Loaded images</span><span>{panelImages.length ? `${panelImages.length} total` : 'None yet'}</span></div>

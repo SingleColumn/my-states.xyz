@@ -7,6 +7,16 @@ import { SpotifyPanel } from './SpotifyPanel'
 
 const panel = vi.hoisted(() => ({ focusView: false }))
 
+// The header's menu is closed until clicked, and a static render cannot
+// click, so the real header is rendered with its menu open.
+vi.mock('../PanelHeader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../PanelHeader')>()
+  return {
+    ...actual,
+    PanelHeader: (props: Parameters<typeof actual.PanelHeader>[0]) => createElement(actual.PanelHeader, { ...props, menuDefaultOpen: true }),
+  }
+})
+
 vi.mock('../AppState', () => ({
   useAppState: () => ({
     spotify: {
@@ -101,11 +111,11 @@ describe('Music panel focus view', () => {
     expect(renderMusicPanel(true)).toContain('Expand panel to full view')
   })
 
-  it('puts Log out furthest to the right, after every shared panel control', () => {
+  it('puts Log out last in the header menu, after every shared panel control', () => {
     const markup = renderMusicPanel(false)
-    expect(markup.indexOf('title="Reduce panel to focus view"')).toBeLessThan(markup.indexOf('title="Log out"'))
-    expect(markup.indexOf('title="Hide panel"')).toBeLessThan(markup.indexOf('title="Log out"'))
-    expect(markup.indexOf('title="Expand panel to full screen"')).toBeLessThan(markup.indexOf('title="Log out"'))
-    expect(markup.indexOf('title="Restore panel to default size"')).toBeLessThan(markup.indexOf('title="Log out"'))
+    expect(markup.indexOf('>Reduce panel to focus view<')).toBeLessThan(markup.indexOf('>Log out<'))
+    expect(markup.indexOf('>Hide panel<')).toBeLessThan(markup.indexOf('>Log out<'))
+    expect(markup.indexOf('>Expand panel to full screen<')).toBeLessThan(markup.indexOf('>Log out<'))
+    expect(markup.indexOf('>Restore panel to default size<')).toBeLessThan(markup.indexOf('>Log out<'))
   })
 })

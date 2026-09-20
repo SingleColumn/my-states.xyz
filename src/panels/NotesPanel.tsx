@@ -89,63 +89,46 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         panelId={panelId}
         panelType="notes"
         title="Writing"
-        leadingActions={
-          <button
-            className={`card-icon-button${isToolbarVisible ? ' is-active' : ''}`}
-            type="button"
-            title={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
-            aria-label={isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools'}
-            aria-pressed={isToolbarVisible}
-            onClick={() => {
+        menuItems={[
+          {
+            id: 'formatting-tools',
+            label: isToolbarVisible ? 'Hide formatting tools' : 'Show formatting tools',
+            icon: <Type size={17} aria-hidden="true" />,
+            checked: isToolbarVisible,
+            onSelect: () => {
               const next = !isToolbarVisible
               setIsToolbarVisible(next)
               window.localStorage.setItem(toolbarVisibleStorageKey, next ? 'true' : 'false')
-            }}
-          >
-            <Type size={18} />
-          </button>
-        }
-      >
-          {isWritingMode && hasNotes ? (
-            <label className="writing-note-picker">
-              <span className="sr-only">Choose a note</span>
-              {noteSelect}
-            </label>
-          ) : null}
-          <button
-            className="card-icon-button"
-            type="button"
-            title="New note"
-            onClick={() => {
-              void notes.createNote(panelId).catch(() => {})
-            }}
-          >
-            <FilePlus2 size={18} />
-          </button>
-          <button
-            className="card-icon-button"
-            type="button"
-            title="Save markdown file"
-            disabled={!activeNote}
-            onClick={() => {
-              if (activeNote) exportMarkdownNote(activeNote)
-            }}
-          >
-            <Download size={18} />
-          </button>
-          <button
-            className="card-icon-button"
-            type="button"
-            title="Delete note"
-            disabled={!activeNote}
-            onClick={() => {
+            },
+          },
+          { id: 'new-note', label: 'New note', icon: <FilePlus2 size={17} aria-hidden="true" />, onSelect: () => { void notes.createNote(panelId).catch(() => {}) } },
+          {
+            id: 'save-markdown',
+            label: 'Save markdown file',
+            icon: <Download size={17} aria-hidden="true" />,
+            disabled: !activeNote,
+            onSelect: () => { if (activeNote) exportMarkdownNote(activeNote) },
+          },
+          {
+            id: 'delete-note',
+            label: 'Delete note',
+            icon: <Trash2 size={17} aria-hidden="true" />,
+            disabled: !activeNote,
+            destructive: true,
+            onSelect: () => {
               if (!activeNote) return
               const confirmed = window.confirm(`Delete "${getDisplayNoteTitle(activeNote)}"?`)
               if (confirmed) void notes.deleteNote(activeNote.id, panelId).catch(() => {})
-            }}
-          >
-            <Trash2 size={18} />
-          </button>
+            },
+          },
+        ]}
+      >
+        {isWritingMode && hasNotes ? (
+          <label className="writing-note-picker">
+            <span className="sr-only">Choose a note</span>
+            {noteSelect}
+          </label>
+        ) : null}
       </PanelHeader>
 
       <div className={`panel-body notes-body${isWritingMode ? ' notes-body-writing' : ''}`}>
