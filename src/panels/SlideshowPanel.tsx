@@ -46,6 +46,11 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const attribution = currentImage?.attribution ?? null
   const [isFocusHintVisible, setIsFocusHintVisible] = useState(false)
   const focusHintTimeoutRef = useRef<number | null>(null)
+  // True while the hint shown on entering focus view is up. That showing runs
+  // its full course: the instant the controls vanish, the browser reports the
+  // pointer leaving the panel (the picture now under it is frame, not
+  // content), which would otherwise dismiss the hint before anyone reads it.
+  const focusHintIsEntryRef = useRef(false)
 
   // The stage is content whenever it holds something to operate: the empty
   // state's buttons, or a picture a click must not drag. In focus view the
@@ -53,13 +58,24 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // frame and the whole panel can be moved by it.
   const stageIsContent = !(focusView && currentImage)
 
-  function revealFocusHint() {
+  function showFocusHint(onEntry: boolean) {
     if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
+    focusHintIsEntryRef.current = onEntry
     setIsFocusHintVisible(true)
-    focusHintTimeoutRef.current = window.setTimeout(() => setIsFocusHintVisible(false), focusHintDurationMs)
+    focusHintTimeoutRef.current = window.setTimeout(() => {
+      focusHintIsEntryRef.current = false
+      setIsFocusHintVisible(false)
+    }, focusHintDurationMs)
+  }
+
+  function revealFocusHint() {
+    // A pointer move during the entry showing neither restarts nor demotes it.
+    if (focusHintIsEntryRef.current) return
+    showFocusHint(false)
   }
 
   function hideFocusHint() {
+    if (focusHintIsEntryRef.current) return
     if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
     setIsFocusHintVisible(false)
   }
@@ -93,9 +109,12 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // The hint names the only way out, so it shows on entry and whenever the
   // pointer is over a panel that has no visible controls.
   useEffect(() => {
-    if (focusView) revealFocusHint()
-    else hideFocusHint()
-    return () => { if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current) }
+    if (focusView) showFocusHint(true)
+    return () => {
+      if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
+      focusHintIsEntryRef.current = false
+      setIsFocusHintVisible(false)
+    }
   }, [focusView])
 
   async function chooseFolder() {
