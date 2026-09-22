@@ -6,18 +6,21 @@ import { history } from '@milkdown/plugin-history'
 import { clipboard } from '@milkdown/plugin-clipboard'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
-import { $prose } from '@milkdown/utils'
-import { ProsemirrorAdapterProvider, usePluginViewFactory } from '@prosemirror-adapter/react'
+import { $prose, $view } from '@milkdown/utils'
+import { ProsemirrorAdapterProvider, useNodeViewFactory, usePluginViewFactory } from '@prosemirror-adapter/react'
+import type { NoteDocument } from '../types'
 import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
 import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTooltip'
 import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
+import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
  * The writing surface: Milkdown (ProseMirror + remark) mounted by hand into
- * a ref. Markdown goes in once, when the editor is created, and comes back
- * out through `onChange` on every edit -- the same contract the previous
- * editor had, so the notes store is untouched.
+ * a ref. The note goes in once, when the editor is created -- as its
+ * structured document when the note has one, as Markdown otherwise -- and
+ * every edit comes back out through `onChange` as both, so the store keeps
+ * the exact document and the Markdown the exports and bundles need.
  *
  * The parent keys this component on the note id, so a change of note is a
  * fresh mount rather than a value swap; that keeps the caret and the undo
@@ -51,16 +54,38 @@ export function NotesEditor(props: NotesEditorProps) {
 
 interface NotesEditorProps {
   markdown: string
+  document: NoteDocument | undefined
   placeholder: string
-  onChange: (markdown: string) => void
+  onChange: (markdown: string, document: NoteDocument) => void
 }
 
-function NotesEditorInner({ markdown, placeholder, onChange, editorRef, keyHandlers }: NotesEditorProps & {
+/**
+ * The version written into every stored document. Bump it when the editor
+ * schema can no longer read documents written before the change; older
+ * documents are then read from their Markdown instead.
+ */
+export const NOTE_DOCUMENT_SCHEMA_VERSION = 1
+
+/**
+ * A stored document is preferred over the Markdown unless this local flag
+ * turns it off -- a way to check what the Markdown alone gives back, since
+ * that is what a moment bundle carries.
+ */
+function prefersMarkdown() {
+  try {
+    return window.localStorage.getItem('mic:notes-load-from-markdown') === 'true'
+  } catch {
+    return false
+  }
+}
+
+function NotesEditorInner({ markdown, document: noteDocument, placeholder, onChange, editorRef, keyHandlers }: NotesEditorProps & {
   editorRef: MutableRefObject<Editor | undefined>
   keyHandlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const pluginViewFactory = usePluginViewFactory()
+  const nodeViewFactory = useNodeViewFactory()
   // The callback is read through a ref so a new closure from the parent
   // does not recreate the editor (which would drop the caret mid-sentence).
   const onChangeRef = useRef(onChange)
@@ -70,10 +95,11 @@ function NotesEditorInner({ markdown, placeholder, onChange, editorRef, keyHandl
     const host = hostRef.current
     if (!host) return
 
-    const editor = Editor.make()
+    const storedDocument = noteDocument && noteDocument.schemaVersion === NOTE_DOCUMENT_SCHEMA_VERSION && !prefersMarkdown() ? noteDocument.doc : null
+    const make = (fromDocument: boolean) => Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, host)
-        ctx.set(defaultValueCtx, markdown)
+        ctx.set(defaultValueCtx, fromDocument && storedDocument ? { type: 'json', value: storedDocument as never } : markdown)
         // The class the theme's prose rules already target; ProseMirror puts
         // it on the contenteditable itself, so the writing surface is styled
         // like the previous editor's content area was.
@@ -91,14 +117,31 @@ function NotesEditorInner({ markdown, placeholder, onChange, editorRef, keyHandl
       .use(gfm)
       .use(history)
       .use(clipboard)
-      .use(changeReporter((next) => onChangeRef.current(next)))
+      .use(changeReporter((next, doc) => onChangeRef.current(next, { schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc })))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
       .use(formattingTooltip)
       .use(insertMenu)
+      .use(panelEmbedRemark)
+      .use(panelEmbed)
+      .use($view(panelEmbed, () => nodeViewFactory({ component: PanelEmbedView, as: 'div', contentAs: 'div' })))
+      .use(panelEmbedDrop)
+      .use(panelEmbedDropCursor)
 
+    let editor = make(true)
     editorRef.current = editor
-    void editor.create()
+    void editor.create().catch(async (error: unknown) => {
+      // A stored document the current schema cannot read (a node type gone,
+      // an attribute changed) is not the end of the note: the Markdown
+      // written beside it is what it looked like, so the note opens from
+      // that and the next edit writes a fresh document.
+      if (!storedDocument) throw error
+      console.warn('The stored note document could not be read; opening it from its Markdown instead.', error)
+      await editor.destroy()
+      editor = make(false)
+      editorRef.current = editor
+      await editor.create()
+    })
 
     return () => {
       editorRef.current = undefined
@@ -113,7 +156,8 @@ function NotesEditorInner({ markdown, placeholder, onChange, editorRef, keyHandl
 }
 
 /**
- * Hands every edit to the store as Markdown, in the same tick as the edit.
+ * Hands every edit to the store, in the same tick as the edit: the document
+ * itself (cheap, exact) and its Markdown (for exports and bundles).
  *
  * Milkdown's own listener plugin does the same thing 200ms after the last
  * keystroke and drops the report when the editor is destroyed. Those 200ms
@@ -123,13 +167,13 @@ function NotesEditorInner({ markdown, placeholder, onChange, editorRef, keyHandl
  * one serialisation per keystroke; the store's own 500ms debounce still
  * keeps the disk write off the typing path.
  */
-function changeReporter(report: (markdown: string) => void) {
+function changeReporter(report: (markdown: string, doc: Record<string, unknown>) => void) {
   return $prose((ctx) => new Plugin({
     key: new PluginKey('NOTES_CHANGE_REPORTER'),
     view: () => ({
       update(view, prevState) {
         if (prevState.doc.eq(view.state.doc)) return
-        report(ctx.get(serializerCtx)(view.state.doc))
+        report(ctx.get(serializerCtx)(view.state.doc), view.state.doc.toJSON() as Record<string, unknown>)
       },
     }),
   }))

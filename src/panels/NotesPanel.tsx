@@ -146,8 +146,9 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             <NotesEditor
               key={activeNote.id}
               markdown={activeNote.content}
+              document={activeNote.document}
               placeholder={editorPlaceholder}
-              onChange={(content) => notes.setActiveNoteContent(content, panelId)}
+              onChange={(content, document) => notes.setActiveNoteContent(content, panelId, document)}
             />
           </div>
         ) : (

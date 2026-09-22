@@ -2096,6 +2096,81 @@ input[type="range"]:focus-visible {
   color: var(--color-text-muted);
 }
 
+/* The grip in the Images panel's transport row that a note takes the panel
+   by. Drawn as a button so it reads as a control, but it is not one. */
+.slideshow-drag-handle {
+  cursor: grab;
+  margin-left: auto;
+}
+
+.slideshow-drag-handle:active {
+  cursor: grabbing;
+}
+
+/*
+ * A panel embedded in a note (see notesEmbed.tsx). One figure, three
+ * faces: a poster naming the source, the live frame once asked for, or a
+ * note that the source is gone. It keeps the writing measure and the
+ * note's own rhythm rather than bringing a panel's chrome into the page.
+ */
+.notes-embed {
+  margin: 0 0 var(--space-rich-content-block);
+  border: var(--border-width-hairline) solid var(--color-panel-divider);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--color-code-block-bg);
+}
+
+.notes-embed.is-selected {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+.notes-embed-poster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-detail-2);
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-detail-6);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.notes-embed-poster.is-missing {
+  cursor: default;
+  color: var(--color-text-muted);
+}
+
+.notes-embed-title {
+  font-weight: var(--font-weight-medium);
+}
+
+.notes-embed-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+  font-size: var(--type-sm);
+  color: var(--color-text-muted);
+}
+
+.notes-embed-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 0;
+  background: transparent;
+}
+
+/* ProseMirror's drop cursor between blocks, in the theme's accent. */
+.notes-drop-cursor {
+  background: var(--accent-notes);
+}
+
 .writing-note-picker {
   display: flex;
   align-items: center;

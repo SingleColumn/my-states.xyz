@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderOpen, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
@@ -7,6 +7,7 @@ import { SampleCollectionCard, useBundledCollections } from './SampleCollectionC
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { panelContentProps } from '../panelSurface'
+import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 12000
@@ -254,6 +255,27 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             <button className="card-icon-button" type="button" title="Next image" aria-label="Next image" onClick={() => slideshow.next(panelId)}><SkipForward size={18} /></button>
             <button className="card-icon-button" type="button" title="Stop" aria-label="Stop slideshow" onClick={() => slideshow.stop(panelId)}><Square size={16} /></button>
             <button className={`card-icon-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={18} /></button>
+            {/* The handle a note takes this panel by. The picture itself is
+                not draggable (see CrossfadeImage), and the controls box above
+                cancels native drags, so the handle stops the event there. */}
+            {currentImage && panel ? (
+              <span
+                className="card-icon-button slideshow-drag-handle"
+                role="img"
+                draggable
+                title="Drag into a note to embed this panel"
+                aria-label="Drag into a note to embed this panel"
+                onDragStart={(event) => {
+                  event.stopPropagation()
+                  event.dataTransfer.effectAllowed = 'copy'
+                  event.dataTransfer.setData(PANEL_DRAG_TYPE, JSON.stringify({ panelId, title: embedTitleFor(panel, currentImage.name) }))
+                  // Plain text too, so a drop anywhere else gets the title.
+                  event.dataTransfer.setData('text/plain', embedTitleFor(panel, currentImage.name))
+                }}
+              >
+                <GripVertical size={18} />
+              </span>
+            ) : null}
           </div>
           <div className="range-grid">
             <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={minSlideshowInterval} max={maxSlideshowInterval} step={250} value={panelSettings.intervalMs} onChange={(event) => slideshow.updateSettings({ intervalMs: Number(event.target.value) }, panelId)} /></label>

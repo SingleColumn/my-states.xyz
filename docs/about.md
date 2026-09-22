@@ -82,6 +82,8 @@ Select **New note** in the header, or **Create new note** in the **Choose a note
 
 There is no formatting toolbar: the page stays quiet. Select some text and a small bar appears over it with bold, italic, code and link. Type `/` at the start of a line (or after a space) for a menu of things to add: headings, a quote, lists, a divider, or the picture the Images panel is showing; keep typing to narrow the list, use the arrow keys and Enter to choose, or Esc to dismiss it. Markdown shortcuts work too: `#` for a heading, `-` for a list, `>` for a quote, `**bold**` and `*italic*`. **Text size** in the header steps the editor text through four sizes; the choice is remembered.
 
+A note can also hold a live view of another panel. Drag the grip at the right of the Images panel's playback controls into a note and an embed appears there showing what that panel is showing, and following it as it changes. It starts as a poster; select **Show** to see it. If the panel is later removed, the embed says so. In the note's Markdown the embed is a single link line, so it travels with an exported moment.
+
 **Expand panel to full screen** turns the Notes panel into a writing page: the form controls step aside, the title sits above the text, and the footer counts words instead of characters. **Restore previous panel size** brings the panel view back.
 
 Use **Save markdown file** to download the current note as a `.md` file, and **Delete note** to remove it after confirmation. Notes cannot be imported one at a time; they travel with a moment when it is exported and imported.

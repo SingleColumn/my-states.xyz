@@ -105,9 +105,25 @@ export interface Note {
   id: string
   momentId: string
   title: string
+  /** The note as Markdown: the export, the bundle format, and the form every note has. */
   content: string
+  /**
+   * The note as the editor's own structured document, when the editor has
+   * written it. Absent on notes made before the editor kept one and on
+   * notes written through the command surface, which speak Markdown; then
+   * `content` is the truth and the editor reads it. When present it was
+   * written together with `content` and is preferred on load, since it can
+   * hold what Markdown cannot.
+   */
+  document?: NoteDocument
   createdAt: number
   updatedAt: number
+}
+
+export interface NoteDocument {
+  /** Bumped when a stored document could no longer be read by the current editor schema. */
+  schemaVersion: number
+  doc: Record<string, unknown>
 }
 
 export interface SpotifyTokens {

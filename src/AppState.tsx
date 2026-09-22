@@ -4,6 +4,7 @@ import type {
   CanvasCamera,
   ImageItem,
   Note,
+  NoteDocument,
   Panel,
   PanelConfigs,
   PanelType,
@@ -86,7 +87,8 @@ const supportedImagePattern = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i
 interface NotesState {
   notes: Note[]
   error: string | null
-  setActiveNoteContent(content: string, panelId: string): void
+  /** `document` travels with the Markdown when the editor wrote both; a write without one (the command surface) makes the Markdown the truth again. */
+  setActiveNoteContent(content: string, panelId: string, document?: NoteDocument): void
   setActiveNoteTitle(title: string, panelId: string): void
   createNote(panelId: string): Promise<void>
   selectNote(id: string, panelId: string): Promise<void>
@@ -737,11 +739,12 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     }
   }), [flush, loadKey, notes, panels, runNoteOperation])
 
-  const setActiveNoteContent = useCallback((content: string, panelId: string) => {
+  const setActiveNoteContent = useCallback((content: string, panelId: string, document?: NoteDocument) => {
     const state = getNotesPanelRuntimeState(panelId)
     const current = state.activeNote
     if (!current) return
-    const next = { ...current, content, updatedAt: Date.now() }
+    const { document: _stale, ...rest } = current
+    const next: Note = { ...rest, content, ...(document ? { document } : {}), updatedAt: Date.now() }
     state.activeNote = next
     setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
     scheduleSave(panelId)

@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { cameraZoom, describeCanvas, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
+import { expect, test, type Page } from '@playwright/test'
+import { cameraZoom, describeCanvas, dispatch, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, undo, waitForCanvas } from './helpers'
 
 /**
  * The writing surface itself: what a writer types becomes structure, what
@@ -251,3 +251,106 @@ test.describe('insert menu', () => {
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain(`](${src}`)
   })
 })
+
+
+test.describe('panel embeds', () => {
+  /** Loads pictures, then drags the Images panel's grip onto the note. */
+  async function embedImagesPanel(page: Page) {
+    const images = await panelOfType(page, 'slideshow')
+    const notes = await panelOfType(page, 'notes')
+    await loadSampleImages(page, images.panelId)
+    // A sample collection starts playing; hold it so the picture the embed
+    // names stays put until the test moves it on purpose.
+    await dispatch(page, { kind: 'images.pause', panelId: images.panelId })
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('Before the embed.')
+    const grip = (await shapeOf(page, images.panelId)).getByLabel('Drag into a note to embed this panel')
+    await grip.dragTo(body, { targetPosition: { x: 40, y: 40 } })
+    return { images, notes, body, embed: body.locator('.notes-embed') }
+  }
+
+  test('a panel dragged from the Images panel becomes a live, sandboxed embed that survives a reload', async ({ page }) => {
+    await openApp(page)
+    const { images, notes, embed } = await embedImagesPanel(page)
+    await expect(embed).toHaveCount(1)
+    await expect(embed.locator('.notes-embed-title')).toHaveText(/^Images: /)
+    const title = (await embed.locator('.notes-embed-title').textContent())!
+
+    // Nothing runs until asked: a poster, then the frame, and the frame is sandboxed.
+    await expect(embed.locator('iframe')).toHaveCount(0)
+    await embed.getByRole('button', { name: /Show/ }).click()
+    const frame = embed.locator('iframe')
+    await expect(frame).toHaveAttribute('sandbox', 'allow-scripts')
+    await expect(frame).toHaveAttribute('title', title)
+
+    // Linked, not copied: the embed follows the source panel.
+    await dispatch(page, { kind: 'images.next', panelId: images.panelId })
+    await expect(frame).not.toHaveAttribute('title', title)
+
+    // Stored twice over: the exact document, and Markdown with the link line.
+    // The drop was on the paragraph's text, so the embed sits beside it --
+    // on whichever side was nearer -- never inside it.
+    const { moment } = await describeCanvas(page)
+    const line = `[${title}](my-states://panel/${images.panelId})`
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toMatch(new RegExp(`^(Before the embed\\.\\n\\n${escapeRegExp(line)}|${escapeRegExp(line)}\\n\\nBefore the embed\\.)\\n$`))
+    const stored = (await readStorage(page, moment!.id)).notes[0]!
+    expect(stored.document?.schemaVersion).toBe(1)
+    expect(stored.document?.doc.content?.map((block) => block.type).sort()).toEqual(['panelEmbed', 'paragraph'])
+
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
+    await expect(again).toHaveCount(1)
+    // Back to the poster: opening a note never starts anything.
+    await expect(again.locator('iframe')).toHaveCount(0)
+    await expect(again.getByRole('button', { name: /Show/ })).toBeVisible()
+  })
+
+  test('says so when the panel it came from is gone, and undo removes only the embed', async ({ page }) => {
+    await openApp(page)
+    const { images, embed } = await embedImagesPanel(page)
+    await expect(embed).toHaveCount(1)
+    const before = (await describeCanvas(page)).panels.length
+
+    await dispatch(page, { kind: 'panel.remove', panelId: images.panelId })
+    await expect(embed.locator('.notes-embed-note')).toHaveText('This panel is no longer on the canvas.')
+    expect((await describeCanvas(page)).panels.length).toBe(before - 1)
+  })
+
+  test('Ctrl+Z after a drop takes back the embed, not the canvas', async ({ page }) => {
+    await openApp(page)
+    const { body, embed } = await embedImagesPanel(page)
+    await expect(embed).toHaveCount(1)
+    const panelsBefore = (await describeCanvas(page)).panels.map((panel) => panel.panelId)
+    await body.click({ position: { x: 20, y: 10 } })
+    await undo(page)
+    await expect(embed).toHaveCount(0)
+    await expect(body).toContainText('Before the embed.')
+    expect((await describeCanvas(page)).panels.map((panel) => panel.panelId)).toEqual(panelsBefore)
+  })
+
+  test('the Markdown line alone brings an embed back', async ({ page }) => {
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    const notes = await panelOfType(page, 'notes')
+    await loadSampleImages(page, images.panelId)
+    // Written through the command surface, which speaks only Markdown: no
+    // stored document, so the editor reads this line.
+    await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: `Text first.\n\n[Images: whatever](my-states://panel/${images.panelId})\n\nText after.\n` })
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]).toMatchObject({ content: expect.stringContaining('my-states://panel/'), document: null })
+    await page.reload()
+    await waitForCanvas(page)
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await expect(body.locator('.notes-embed')).toHaveCount(1)
+    await expect(body.locator('.notes-embed-title')).toHaveText(/^Images: /)
+    await expect(body.locator('p').first()).toHaveText('Text first.')
+    await expect(body.locator('p').last()).toHaveText('Text after.')
+  })
+})
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

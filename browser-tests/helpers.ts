@@ -209,14 +209,14 @@ export async function readStorage(page: Page, momentId: string) {
     })
     interface StoredShape { typeName: string; index: string; x: number; y: number; props: { panelId: string; w: number; h: number; visible: boolean; focusView: boolean; panel: { config: unknown } } }
     const moment = await read<{ document: { store: Record<string, StoredShape> } } | undefined>('moments', (store) => store.get(id))
-    const notes = await read<Array<{ momentId: string; title: string; content: string }>>('notes', (store) => store.getAll())
+    const notes = await read<Array<{ momentId: string; title: string; content: string; document?: { schemaVersion: number; doc: { content?: Array<{ type: string }> } } }>>('notes', (store) => store.getAll())
     db.close()
     const shapes = moment ? Object.values(moment.document.store).filter((record) => record.typeName === 'shape') : []
     shapes.sort((left, right) => (left.index < right.index ? -1 : left.index > right.index ? 1 : 0))
     return {
       found: !!moment,
       panels: shapes.map((shape, order) => ({ panelId: shape.props.panelId, x: shape.x, y: shape.y, w: shape.props.w, h: shape.props.h, visible: shape.props.visible, focusView: shape.props.focusView, order, config: shape.props.panel.config })),
-      notes: notes.filter((note) => note.momentId === id).map((note) => ({ title: note.title, content: note.content })),
+      notes: notes.filter((note) => note.momentId === id).map((note) => ({ title: note.title, content: note.content, document: note.document ?? null })),
     }
   }, momentId)
 }
