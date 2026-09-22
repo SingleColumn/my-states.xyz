@@ -87,8 +87,27 @@ const supportedImagePattern = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i
 interface NotesState {
   notes: Note[]
   error: string | null
-  /** `document` travels with the Markdown when the editor wrote both; a write without one (the command surface) makes the Markdown the truth again. */
-  setActiveNoteContent(content: string, panelId: string, document?: NoteDocument): void
+  /**
+   * A write in the note's Markdown -- the command surface's form. It makes
+   * the Markdown the truth again, dropping any document written beside it.
+   */
+  setActiveNoteContent(content: string, panelId: string): void
+  /**
+   * A write from the editor, which holds the note as a structured document.
+   * Only the document is taken here: deriving its Markdown costs tens of
+   * milliseconds on a long note, far too much to spend on every keystroke,
+   * so it is left until something asks -- a save, an export, the editor
+   * going away. See `registerMarkdownSource`.
+   */
+  setActiveNoteDocument(document: NoteDocument, panelId: string): void
+  /**
+   * How the panel's editor offers its Markdown on demand. Registering null
+   * (as the editor goes) settles the note's Markdown one last time, since
+   * nothing can derive it afterwards.
+   */
+  registerMarkdownSource(panelId: string, render: (() => string) | null): void
+  /** The note's Markdown, brought up to date first. */
+  getNoteMarkdown(panelId: string): string
   setActiveNoteTitle(title: string, panelId: string): void
   createNote(panelId: string): Promise<void>
   selectNote(id: string, panelId: string): Promise<void>
@@ -557,9 +576,28 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     throw caught
   }), [operation])
 
+  /**
+   * Brings the note's Markdown up to date with its document, if an editor
+   * is there to derive it. Called before anything reads or stores the
+   * Markdown, which is the only work the typing path defers.
+   */
+  const settleMarkdown = useCallback((panelId: string): Note | null => {
+    const state = getNotesPanelRuntimeState(panelId)
+    const current = state.activeNote
+    if (!current) return null
+    if (!state.markdownStale || !state.renderMarkdown) return current
+    const next: Note = { ...current, content: state.renderMarkdown(), updatedAt: Date.now() }
+    state.markdownStale = false
+    state.activeNote = next
+    setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
+    return next
+  }, [])
+
   const persistPanelNote = useCallback(async (panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
-    const note = state.activeNote
+    // The Markdown is derived here rather than on the typing path, so what
+    // is written is always the note as it stands now.
+    const note = settleMarkdown(panelId)
     if (note && state.dirty) {
       // Each panel's draft needs its own acknowledgement, even when two
       // panels refer to the same note. Coalescing by note id loses one ack.
@@ -569,7 +607,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       })
     }
     await saveQueue.flush()
-  }, [saveQueue])
+  }, [saveQueue, settleMarkdown])
 
   const flush = useCallback(async (panelId?: string) => {
     const panelIds = panelId
@@ -599,6 +637,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       for (const state of notesPanelRuntimeStates.values()) {
         state.activeNote = null
         state.dirty = false
+        state.markdownStale = false
         if (state.saveTimer !== null) window.clearTimeout(state.saveTimer)
         state.saveTimer = null
       }
@@ -739,16 +778,42 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     }
   }), [flush, loadKey, notes, panels, runNoteOperation])
 
-  const setActiveNoteContent = useCallback((content: string, panelId: string, document?: NoteDocument) => {
+  const setActiveNoteContent = useCallback((content: string, panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
     const current = state.activeNote
     if (!current) return
-    const { document: _stale, ...rest } = current
-    const next: Note = { ...rest, content, ...(document ? { document } : {}), updatedAt: Date.now() }
+    const { document: _dropped, ...rest } = current
+    const next: Note = { ...rest, content, updatedAt: Date.now() }
     state.activeNote = next
+    state.markdownStale = false
     setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
     scheduleSave(panelId)
   }, [scheduleSave])
+
+  const setActiveNoteDocument = useCallback((document: NoteDocument, panelId: string) => {
+    const state = getNotesPanelRuntimeState(panelId)
+    const current = state.activeNote
+    if (!current) return
+    // Kept off React state: like the Markdown, the document is read from the
+    // note only when an editor opens it, and settling writes both back.
+    state.activeNote = { ...current, document }
+    state.markdownStale = true
+    scheduleSave(panelId)
+  }, [scheduleSave])
+
+  const registerMarkdownSource = useCallback((panelId: string, render: (() => string) | null) => {
+    const state = getNotesPanelRuntimeState(panelId)
+    if (render) {
+      state.renderMarkdown = render
+      return
+    }
+    settleMarkdown(panelId)
+    state.renderMarkdown = null
+  }, [settleMarkdown])
+
+  const getNoteMarkdown = useCallback((panelId: string) => {
+    return settleMarkdown(panelId)?.content ?? ''
+  }, [settleMarkdown])
 
   const setActiveNoteTitle = useCallback((title: string, panelId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
@@ -760,7 +825,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     scheduleSave(panelId)
   }, [scheduleSave])
 
-  return { notes, error, setActiveNoteContent, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
+  return { notes, error, setActiveNoteContent, setActiveNoteDocument, registerMarkdownSource, getNoteMarkdown, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
@@ -1344,6 +1409,10 @@ interface NotesPanelRuntimeState {
   activeNote: Note | null
   dirty: boolean
   saveTimer: number | null
+  /** The note's `content` is behind its `document` and must be derived again. */
+  markdownStale: boolean
+  /** The panel's editor, offering the note as Markdown; null when none is mounted. */
+  renderMarkdown: (() => string) | null
 }
 
 interface SlideshowPanelRuntimeState {
@@ -1362,7 +1431,7 @@ const slideshowPanelRuntimeStates = new Map<string, SlideshowPanelRuntimeState>(
 function getNotesPanelRuntimeState(panelId: string): NotesPanelRuntimeState {
   const existing = notesPanelRuntimeStates.get(panelId)
   if (existing) return existing
-  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null }
+  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null, markdownStale: false, renderMarkdown: null }
   notesPanelRuntimeStates.set(panelId, created)
   return created
 }

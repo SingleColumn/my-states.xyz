@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
-import { Editor, defaultValueCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/core'
+import { Editor, EditorStatus, defaultValueCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
 import { history } from '@milkdown/plugin-history'
 import { clipboard } from '@milkdown/plugin-clipboard'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
+import type { Node as ProseNode } from '@milkdown/prose/model'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
-import { $prose, $view } from '@milkdown/utils'
+import { $prose, $view, getMarkdown } from '@milkdown/utils'
 import { ProsemirrorAdapterProvider, useNodeViewFactory, usePluginViewFactory } from '@prosemirror-adapter/react'
 import type { NoteDocument } from '../types'
 import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
@@ -19,8 +20,9 @@ import '@milkdown/prose/view/style/prosemirror.css'
  * The writing surface: Milkdown (ProseMirror + remark) mounted by hand into
  * a ref. The note goes in once, when the editor is created -- as its
  * structured document when the note has one, as Markdown otherwise -- and
- * every edit comes back out through `onChange` as both, so the store keeps
- * the exact document and the Markdown the exports and bundles need.
+ * every edit comes back out through `onChange` as the document, which is
+ * what the store keeps. Its Markdown, which the exports and bundles need,
+ * is derived through `onMarkdownSource` only when something asks for it.
  *
  * The parent keys this component on the note id, so a change of note is a
  * fresh mount rather than a value swap; that keeps the caret and the undo
@@ -56,7 +58,20 @@ interface NotesEditorProps {
   markdown: string
   document: NoteDocument | undefined
   placeholder: string
-  onChange: (markdown: string, document: NoteDocument) => void
+  /** Every edit: the document as it now stands, and what the footer counts. */
+  onChange: (document: NoteDocument, stats: NoteStats) => void
+  /**
+   * Offers the note as Markdown on demand. Called with a function once the
+   * editor is ready and with null as it goes, which is the store's cue to
+   * take the Markdown one last time.
+   */
+  onMarkdownSource: (render: (() => string) | null) => void
+}
+
+/** What the panel's footer reports, counted from the document, not its Markdown. */
+export interface NoteStats {
+  characters: number
+  words: number
 }
 
 /**
@@ -79,7 +94,7 @@ function prefersMarkdown() {
   }
 }
 
-function NotesEditorInner({ markdown, document: noteDocument, placeholder, onChange, editorRef, keyHandlers }: NotesEditorProps & {
+function NotesEditorInner({ markdown, document: noteDocument, placeholder, onChange, onMarkdownSource, editorRef, keyHandlers }: NotesEditorProps & {
   editorRef: MutableRefObject<Editor | undefined>
   keyHandlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>
 }) {
@@ -90,6 +105,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
   // does not recreate the editor (which would drop the caret mid-sentence).
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const sourceRef = useRef(onMarkdownSource)
+  sourceRef.current = onMarkdownSource
 
   useEffect(() => {
     const host = hostRef.current
@@ -126,7 +143,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       .use(gfm)
       .use(history)
       .use(clipboard)
-      .use(changeReporter((next, doc) => onChangeRef.current(next, { schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc })))
+      .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
       .use(formattingTooltip)
@@ -137,9 +154,13 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       .use(panelEmbedDrop)
       .use(panelEmbedDropCursor)
 
+    const offerMarkdown = () => {
+      const ready = editorRef.current
+      if (ready?.status === EditorStatus.Created) sourceRef.current(() => ready.action(getMarkdown()))
+    }
     let editor = make(true)
     editorRef.current = editor
-    void editor.create().catch(async (error: unknown) => {
+    void editor.create().then(offerMarkdown).catch(async (error: unknown) => {
       // A stored document the current schema cannot read (a node type gone,
       // an attribute changed) is not the end of the note: the Markdown
       // written beside it is what it looked like, so the note opens from
@@ -150,9 +171,13 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       editor = make(false)
       editorRef.current = editor
       await editor.create()
+      offerMarkdown()
     })
 
     return () => {
+      // Withdrawn while the editor can still be asked, so the store can take
+      // the Markdown for anything typed since the last save.
+      sourceRef.current(null)
       editorRef.current = undefined
       void editor.destroy()
       mount.remove()
@@ -166,28 +191,35 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
 }
 
 /**
- * Hands every edit to the store, in the same tick as the edit: the document
- * itself (cheap, exact) and its Markdown (for exports and bundles).
+ * Hands every edit to the store in the same tick as the edit.
  *
- * Milkdown's own listener plugin does the same thing 200ms after the last
- * keystroke and drops the report when the editor is destroyed. Those 200ms
- * are the app's problem: the flush that runs when the tab is hidden or the
- * page is left can only save what the store has heard, so a sentence typed
- * just before closing the tab would be lost. Reporting synchronously costs
- * one serialisation per keystroke; the store's own 500ms debounce still
- * keeps the disk write off the typing path.
+ * Reporting synchronously rather than on a timer is deliberate: the flush
+ * the app runs when the tab is hidden or the page is left can only save what
+ * the store has already heard, so anything still sitting in a debounce would
+ * be lost. Milkdown's own listener plugin waits 200ms and cancels on
+ * destroy, which is exactly that hole.
+ *
+ * What is reported is cheap to take: about 0.4ms for the document and 0.1ms
+ * for the counts on a 20,000-word note. Its Markdown is not -- around 80ms
+ * on the same note -- so that is left until something asks for it.
  */
-function changeReporter(report: (markdown: string, doc: Record<string, unknown>) => void) {
-  return $prose((ctx) => new Plugin({
+function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
+  return $prose(() => new Plugin({
     key: new PluginKey('NOTES_CHANGE_REPORTER'),
     view: () => ({
       update(view, prevState) {
-        if (prevState.doc.eq(view.state.doc)) return
-        report(ctx.get(serializerCtx)(view.state.doc), view.state.doc.toJSON() as Record<string, unknown>)
+        const { doc } = view.state
+        if (prevState.doc.eq(doc)) return
+        // Counting the prose rather than the Markdown source also drops the
+        // old count's habit of inflating itself with syntax.
+        const text = doc.textBetween(0, doc.content.size, NEWLINE, ' ')
+        report(doc, { characters: text.length, words: text.match(/\S+/g)?.length ?? 0 })
       },
     }),
   }))
 }
+
+const NEWLINE = String.fromCharCode(10)
 
 /**
  * Lets floating UI answer a key before the editor's own keymap does. Plugins

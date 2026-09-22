@@ -499,6 +499,77 @@ test.describe('two Notes panels', () => {
   })
 })
 
+test.describe('deriving the Markdown', () => {
+  test('the footer counts the document while the Markdown waits for the save', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    await body.click()
+
+    await page.keyboard.type('One two three four five six seven eight')
+    // The count comes from the document, which every keystroke reports, so
+    // it is current even though nothing has derived the Markdown yet.
+    await expect(shape.locator('.card-footer-meta')).toHaveText('39 characters')
+
+    // The save derives the Markdown once, and what lands is the note as typed.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('One two three four five six seven eight\n')
+
+    // Counted from the prose, so Markdown syntax no longer inflates it.
+    // Control+Home, not Home: under a theme whose text wraps, Home lands at
+    // the start of the visual line rather than of the paragraph, and `# `
+    // typed mid-sentence is just two characters.
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.type('# ')
+    await expect(shape.locator('.card-footer-meta')).toHaveText('39 characters')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('# One two three four five six seven eight\n')
+  })
+
+  test('hiding the tab derives the Markdown for what was just typed', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('Typed and then hidden.')
+    // No pause: the save debounce has not fired, so only the flush can get
+    // this into storage -- and it has to derive the Markdown to do so.
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('Typed and then hidden.\n')
+  })
+
+  test('saving a markdown file asks for the Markdown as it stands', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    await body.click()
+    await page.keyboard.type('# Straight to the file')
+
+    // Captured at the blob rather than as a download, so the assertion is
+    // on the text the export was handed. Written without pausing first: it
+    // comes from the document, not from whatever Markdown the store holds.
+    await page.evaluate(() => {
+      const create = URL.createObjectURL.bind(URL)
+      URL.createObjectURL = (blob: Blob) => {
+        void blob.text().then((text) => { (window as unknown as { __exported?: string }).__exported = text })
+        return create(blob)
+      }
+    })
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Save markdown file' }).click()
+    await expect.poll(async () => page.evaluate(() => (window as unknown as { __exported?: string }).__exported))
+      .toBe('# Straight to the file\n')
+  })
+})
+
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

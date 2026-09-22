@@ -1,11 +1,10 @@
 import { useState, type CSSProperties } from 'react'
 import { Download, FilePlus2, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
-import type { Note } from '../types'
-import type { Panel } from '../types'
+import type { Note, Panel } from '../types'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
-import { NotesEditor } from './NotesEditor'
+import { NotesEditor, type NoteStats } from './NotesEditor'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const { notes, panels } = useAppState()
@@ -15,6 +14,9 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // untouched so the two treatments can be compared side by side.
   const isWritingMode = commands.isPanelFullScreen(panelId)
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
+  // What the footer reports. It comes from the editor rather than from the
+  // note's Markdown, which is no longer derived on every keystroke.
+  const [stats, setStats] = useState<NoteStats | null>(null)
   const found = panels.get(panelId)
   const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
@@ -80,7 +82,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             label: 'Save markdown file',
             icon: <Download size={17} aria-hidden="true" />,
             disabled: !activeNote,
-            onSelect: () => { if (activeNote) exportMarkdownNote(activeNote) },
+            // The Markdown is asked for here rather than read off the note:
+            // the editor holds the document, and its Markdown is derived
+            // only when something -- this -- needs it.
+            onSelect: () => { if (activeNote) exportMarkdownNote(activeNote.title, notes.getNoteMarkdown(panelId)) },
           },
           {
             id: 'delete-note',
@@ -148,7 +153,11 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               markdown={activeNote.content}
               document={activeNote.document}
               placeholder={editorPlaceholder}
-              onChange={(content, document) => notes.setActiveNoteContent(content, panelId, document)}
+              onChange={(document, next) => {
+                notes.setActiveNoteDocument(document, panelId)
+                setStats(next)
+              }}
+              onMarkdownSource={(render) => notes.registerMarkdownSource(panelId, render)}
             />
           </div>
         ) : (
@@ -172,8 +181,8 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         <span className="card-footer-meta">
           {activeNote
             ? isWritingMode
-              ? formatWordCount(countWords(activeNote.content))
-              : `${activeNote.content.length} characters`
+              ? formatWordCount(stats?.words ?? countWords(activeNote.content))
+              : `${stats?.characters ?? activeNote.content.length} characters`
             : 'No note selected'}
         </span>
         <div className="card-footer-status">
@@ -207,9 +216,9 @@ function nextEditorFontSize(current: string) {
   return sizes[(sizes.indexOf(current) + 1) % sizes.length]
 }
 
-// Counts the markdown source, so syntax like "##" or "*" inflates the total
-// slightly. Close enough to be useful while writing, and far more meaningful
-// to a writer than a character count.
+// Counts the note's Markdown, which is what there is to count before the
+// editor has reported anything: the moment it does, its own count of the
+// prose replaces this one.
 function countWords(markdown: string) {
   const words = markdown.trim().match(/\S+/g)
   return words ? words.length : 0
@@ -219,9 +228,9 @@ function formatWordCount(count: number) {
   return `${count} ${count === 1 ? 'word' : 'words'}`
 }
 
-function exportMarkdownNote(note: Note) {
-  const fileName = `${sanitizeMarkdownFileName(note.title)}.md`
-  const blob = new Blob([note.content], { type: 'text/markdown;charset=utf-8' })
+function exportMarkdownNote(title: string, markdown: string) {
+  const fileName = `${sanitizeMarkdownFileName(title)}.md`
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
 

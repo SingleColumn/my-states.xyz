@@ -119,7 +119,11 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
           }
           if (panel.type === 'notes') {
             const note = state.notes.notes.find((candidate) => candidate.id === panel.config.activeNoteId)
-            description.note = note ? { id: note.id, title: note.title, content: note.content } : null
+            // Asked for rather than read off the note: the editor keeps the
+            // note as a document while it is open and its Markdown is
+            // derived on demand, so this is where a caller gets the note as
+            // it stands rather than as it was last saved.
+            description.note = note ? { id: note.id, title: note.title, content: state.notes.getNoteMarkdown(shape.props.panelId) } : null
           }
           return description
         }),
