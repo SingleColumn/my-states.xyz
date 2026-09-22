@@ -1786,11 +1786,6 @@ input[type="range"]:focus-visible {
 }
 
 .notes-rich-editor {
-  /* The bridge into MDXEditor: it reads these two names for the document
-     and code fonts, so the note is set in the theme's type like everything
-     else. Only names MDXEditor defines are set here. */
-  --font-body: var(--font-family-ui);
-  --font-mono: var(--font-family-code);
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1800,100 +1795,13 @@ input[type="range"]:focus-visible {
   color: var(--color-input-text);
 }
 
-.notes-editor-toolbar {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  flex-shrink: 0;
-  align-items: center;
-  align-content: start;
-  justify-content: flex-start !important;
-  gap: var(--space-notes-toolbar-gap) !important;
-  border-bottom: var(--card-border);
-  /* MDXEditor pins this bar with `position: sticky; top: 0`, so it sits over
-     the note as it scrolls. It has to be opaque or the text shows through the
-     buttons. */
-  background: var(--background-notes-toolbar) !important;
-  backdrop-filter: var(--blur-panel);
-  font-size: var(--font-size-notes-toolbar);
-  min-height: calc(var(--size-notes-toolbar-control) + 2 * var(--space-notes-toolbar-padding));
-  padding: var(--space-notes-toolbar-padding) !important;
-  overflow-x: visible !important;
-  white-space: normal;
-}
-
-.notes-editor-toolbar > *,
-.notes-editor-toolbar [class*="diffSourceToggleWrapper"],
-.notes-editor-toolbar [class*="toolbarModeSwitch"],
-.notes-editor-toolbar [class*="toolbarTitleMode"],
-.notes-editor-toolbar [class*="selectWithLabel"] {
-  margin-left: 0 !important;
-}
-
-.notes-editor-toolbar-interaction-surface {
-  display: contents;
-}
-
-.notes-editor-toolbar [class*="diffSourceToggleWrapper"] {
-  order: 99;
-}
-
-.notes-editor-toolbar [role="separator"] {
-  flex-shrink: 0;
-  height: calc(var(--size-notes-toolbar-control) * 0.6) !important;
-  margin: 0 calc(var(--space-notes-toolbar-gap) / 2) !important;
-}
-
-.notes-editor-toolbar button,
-.notes-editor-toolbar [role="button"],
-.notes-editor-toolbar [role="combobox"],
-.notes-editor-toolbar [data-radix-collection-item] {
-  flex-shrink: 0;
-  min-width: var(--size-notes-toolbar-control) !important;
-  height: var(--size-notes-toolbar-control) !important;
-  min-height: var(--size-notes-toolbar-control) !important;
-  padding: 0 calc(var(--size-notes-toolbar-control) * 0.2) !important;
-  border: var(--border-width-hairline) solid var(--color-control-border) !important;
-  border-radius: var(--radius-control);
-  background: var(--color-control) !important;
-  color: var(--color-input-text) !important;
-  font-size: var(--font-size-notes-toolbar) !important;
-}
-
-.notes-editor-toolbar [role="combobox"],
-.notes-editor-toolbar select,
-.notes-editor-toolbar [class*="selectWithLabel"] [role="button"] {
-  width: var(--size-notes-toolbar-select-width) !important;
-  min-width: var(--size-notes-toolbar-select-width) !important;
-  height: var(--size-notes-toolbar-select-height) !important;
-  font-size: var(--font-size-notes-toolbar) !important;
-}
-
-.notes-editor-toolbar svg {
-  width: var(--size-notes-toolbar-icon) !important;
-  height: var(--size-notes-toolbar-icon) !important;
-}
-
-/* MDXEditor keeps dropdown content in a Radix portal inside the editor root.
-   Its default base page color is white, which makes the light text disappear
-   until an option receives a hover highlight. */
-.notes-rich-editor .mdxeditor-select-content {
-  z-index: 4;
-  overflow: hidden;
-  border: var(--border-width-hairline) solid var(--color-control-border);
-  border-radius: var(--radius-control);
-  background: var(--color-note-control-bg);
-  color: var(--color-input-text);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 28%);
-}
-
-.notes-rich-editor .mdxeditor-select-content [role="option"] {
-  color: var(--color-input-text);
-}
-
-.notes-rich-editor .mdxeditor-select-content [role="option"][data-highlighted],
-.notes-rich-editor .mdxeditor-select-content [role="option"][data-state="checked"] {
-  background: var(--color-note-control-bg-hover);
-  color: var(--color-input-text);
+/* Milkdown wraps the editable in one `.milkdown` div. It is the scroll box:
+   the editable inside grows with the note and this box clips and scrolls
+   it, so a long note scrolls within the panel instead of overflowing it. */
+.notes-rich-editor .milkdown {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .notes-editor-content {
@@ -1904,31 +1812,25 @@ input[type="range"]:focus-visible {
   line-height: var(--line-height-rich-content);
 }
 
-.notes-font-size-control {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.notes-font-size-control select {
-  width: auto !important;
-  min-width: 0 !important;
-  padding-inline: calc(var(--size-notes-toolbar-control) * 0.2) !important;
-}
-
 .notes-editor-content:focus {
   outline: none;
 }
 
-/* MDXEditor's placeholder ships as a single, ellipsis-truncated line, sized
-   for a short field rather than this panel's default width. It shares the
-   editor's own content class, so it is picked out here by the "placeholder"
-   half of its module class name -- the one part of that name unlikely to
-   change with an MDXEditor upgrade, unlike the build-specific hash next to it. */
-.notes-editor-content[class*="placeholder"] {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
+/* The hint on an empty note. NotesEditor marks the one empty paragraph with
+   the text; drawing it here keeps it out of the document. Floated at zero
+   height so the caret sits at the start of the line, over the hint. */
+.notes-editor-content .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* ProseMirror's own selected-node outline is a fixed light blue; the app's
+   focus ring is the theme's. */
+.notes-editor-content .ProseMirror-selectednode {
+  outline: 2px solid var(--color-focus-ring);
 }
 
 .notes-editor-content p,
@@ -1971,13 +1873,6 @@ input[type="range"]:focus-visible {
 .notes-editor-content code,
 .notes-editor-content pre {
   font-family: var(--font-family-code);
-}
-
-.notes-rich-editor .cm-scroller,
-.notes-rich-editor .cm-content,
-.notes-rich-editor .cm-line {
-  font-size: var(--font-size-notes-code-editor);
-  line-height: var(--line-height-rich-content);
 }
 
 .notes-editor-content pre {
@@ -2056,7 +1951,7 @@ input[type="range"]:focus-visible {
 
 /* Reserving the scrollbar on both edges keeps the centred text column on the
    same axis as the title above it once the note grows past one screen. */
-.notes-editor.is-writing .mdxeditor-root-contenteditable {
+.notes-editor.is-writing .milkdown {
   scrollbar-gutter: stable both-edges;
 }
 
@@ -2071,63 +1966,10 @@ input[type="range"]:focus-visible {
   padding-block: 0 var(--space-writing-bottom);
 }
 
-/* Flattening the editor wrapper makes the toolbar and the text siblings of
-   the title, so the bar can be ordered above the whole document instead of
-   interrupting it between the title and the first paragraph. */
+/* Flattening the editor wrapper makes the scroll box a sibling of the title,
+   so the title sits above the whole document inside the same column. */
 .notes-editor.is-writing .notes-rich-editor {
   display: contents;
-}
-
-/* MDXEditor nests the toolbar and every view (rich-text, source, diff) inside
-   several of its own wrapper elements, none of which fill the height they're
-   given by default -- they size to content and rely on a fixed-height page to
-   clip them, which this app doesn't have. Without this, a note longer than
-   the panel just overflows and gets hard-clipped by the nearest
-   `overflow: hidden` ancestor instead of scrolling: there is no scrollbar and
-   no way to reach the rest of it, in either the default panel or writing
-   mode. Unscoped from any mode, since the wrapper chain is identical in both
-   -- only which ancestor is the real flex container changes (`.notes-rich-editor`
-   normally, or `.notes-editor.is-writing` once writing mode flattens it). */
-.notes-editor .mdxeditor-diff-source-wrapper {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* The rich-text, source and diff views are swapped in this slot, so fill
-   whichever one is mounted rather than naming them. */
-.notes-editor .mdxeditor-diff-source-wrapper > * {
-  flex: 1;
-  min-height: 0;
-}
-
-/* The rich-text wrapper in the middle is filled by height rather than by
-   flex: MDXEditor sets its `display` inline to swap between the rich-text,
-   source and diff views, so overriding that property here would leave every
-   view visible at once. The rule above already gives it a determinate height
-   as a flex item, so `height: 100%` on its child resolves against that. */
-.notes-editor .mdxeditor-root-contenteditable {
-  height: 100%;
-  overflow: auto;
-}
-
-.notes-editor.is-writing .notes-editor-toolbar {
-  order: -1;
-  border-bottom: var(--card-border);
-  opacity: var(--opacity-writing-toolbar);
-  transition: opacity var(--transition-fast);
-}
-
-.notes-editor.is-writing .notes-editor-toolbar:hover,
-.notes-editor.is-writing .notes-editor-toolbar:focus-within {
-  opacity: 1;
-}
-
-/* The base toolbar rule sets `display: flex !important`, so hiding it has to
-   match that weight. The plugin stays mounted either way - see NotesPanel. */
-.notes-editor.is-toolbar-hidden .notes-editor-toolbar {
-  display: none !important;
 }
 
 .writing-note-picker {
@@ -2232,11 +2074,6 @@ input[type="range"]:focus-visible {
 
   .notes-document-controls {
     gap: 7px;
-  }
-
-  .notes-editor-toolbar {
-    max-height: var(--size-notes-toolbar-height-compact);
-    overflow-y: auto !important;
   }
 }
 

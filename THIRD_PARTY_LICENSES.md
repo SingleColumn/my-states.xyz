@@ -32,7 +32,8 @@ published `package.json`:
 | [tldraw](https://www.tldraw.com/) | 3.15.6 | See [tldraw license](public/licenses/tldraw-3.15.6.txt) |
 | [@codemirror/lang-markdown](https://codemirror.net/) | 6.5.1 | MIT |
 | [@uiw/react-codemirror](https://uiwjs.github.io/react-codemirror/) | 4.25.11 | MIT |
-| [@mdxeditor/editor](https://mdxeditor.dev/) | 4.1.0 | MIT |
+| [@milkdown/*](https://milkdown.dev/) (core, ctx, prose, transformer, utils, exception, preset-commonmark, preset-gfm, plugin-tooltip, plugin-slash, plugin-history, plugin-clipboard, plugin-upload) | 7.22.1 | MIT |
+| [@prosemirror-adapter/react](https://github.com/Saul-Mirone/prosemirror-adapter) | 0.5.5 | MIT |
 | [radix-ui](https://www.radix-ui.com/) | 1.6.6 | MIT |
 | [lucide-react](https://lucide.dev/) | 0.468.0 | ISC |
 | [idb](https://github.com/jakearchibald/idb) | 8.0.3 | ISC |

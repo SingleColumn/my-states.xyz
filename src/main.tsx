@@ -4,7 +4,6 @@ import { Analytics } from '@vercel/analytics/react'
 import { DesktopOnlyNotice } from './DesktopOnlyNotice'
 import { currentDeviceHints, isMobileDevice } from './deviceSupport'
 import 'tldraw/tldraw.css'
-import '@mdxeditor/editor/style.css'
 // Self-hosted so the demo renders identically offline and on every machine.
 // The default entry carries the wght axis, which is the only one we vary.
 import '@fontsource-variable/inter'

@@ -21,7 +21,7 @@ The app is a single-user MVP: it has no backend, accounts, cloud sync, or sharin
 - Vite, React, and TypeScript
 - [tldraw](https://www.tldraw.com/) for the canvas
 - Spotify Web Playback SDK and Web API
-- MDXEditor for Markdown editing
+- [Milkdown](https://milkdown.dev/) (ProseMirror + remark) for the writing editor
 - `localStorage` and IndexedDB for local persistence
 
 ## Prerequisites

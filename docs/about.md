@@ -80,7 +80,7 @@ To look at the pictures on their own, select **Reduce panel to focus view** in t
 
 Select **New note** in the header, or **Create new note** in the **Choose a note** list, to start a note. **Choose a note** switches between your notes and **Note title** renames the current one. Write in the editor; changes save automatically. Type `#` at the start of a line for a heading or `-` for a list item.
 
-The formatting tools are folded away to keep the page quiet. Select **Aa** (**Show formatting tools**) in the header to reveal a toolbar with headings, bold, italic, underline, code, lists, links, tables, dividers, code blocks, a choice of editor text size, and a switch to the Markdown source. Select **Aa** again to hide it; the choice is remembered.
+There is no formatting toolbar: the page stays quiet. Type `#` at the start of a line for a heading, `-` for a list, `>` for a quote, or wrap words in `**` for bold and `*` for italic, and the marks turn into formatting as you type. **Text size** in the header steps the editor text through four sizes; the choice is remembered.
 
 **Expand panel to full screen** turns the Notes panel into a writing page: the form controls step aside, the title sits above the text, and the footer counts words instead of characters. **Restore previous panel size** brings the panel view back.
 
