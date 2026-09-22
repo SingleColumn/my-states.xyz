@@ -234,6 +234,9 @@
   --size-tldraw-page-selector-width: 112px;
   --z-app-badge: 5;
   --z-tldraw-controls: 6;
+  /* Editor UI floated on the body over a panel (the formatting bar): above
+     the canvas controls, below toasts. */
+  --z-editor-float: 8;
   --z-toast: 10;
 
   /* Every radius is one of the theme's three rungs (theme.css) or a fixed

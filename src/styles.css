@@ -1972,6 +1972,63 @@ input[type="range"]:focus-visible {
   display: contents;
 }
 
+/*
+ * The formatting bar over a text selection. It lives on the body, not in the
+ * panel (see NotesFormattingTooltip), so it is drawn with the root-level
+ * menu tokens rather than the panel-scoped button ones, which would not
+ * reach it there. floating-ui writes `left`/`top`; the plugin toggles
+ * `data-show`.
+ */
+.notes-formatting-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-editor-float);
+  display: flex;
+  gap: var(--space-detail-1);
+  padding: var(--space-detail-1);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.notes-formatting-tooltip[data-show="false"] {
+  display: none;
+}
+
+.notes-formatting-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-menu-item-height);
+  height: var(--size-menu-item-height);
+  border: 0;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.notes-formatting-button:hover {
+  background: var(--card-button-bg-hover);
+}
+
+/* The bar floats over the Writing panel, so it takes that panel's accent
+   for its pressed state; the per-panel --accent alias is out of reach on
+   the body. */
+.notes-formatting-button.is-active {
+  background: var(--card-button-active-bg);
+  color: var(--accent-notes);
+}
+
+.notes-formatting-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
 .writing-note-picker {
   display: flex;
   align-items: center;

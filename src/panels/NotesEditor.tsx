@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { Editor, defaultValueCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
@@ -7,6 +7,9 @@ import { clipboard } from '@milkdown/plugin-clipboard'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
 import { $prose } from '@milkdown/utils'
+import { ProsemirrorAdapterProvider, usePluginViewFactory } from '@prosemirror-adapter/react'
+import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
+import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTooltip'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
@@ -18,13 +21,37 @@ import '@milkdown/prose/view/style/prosemirror.css'
  * The parent keys this component on the note id, so a change of note is a
  * fresh mount rather than a value swap; that keeps the caret and the undo
  * history for the note being left from leaking into the one being opened.
+ *
+ * The adapter provider is what lets floating UI (the formatting tooltip)
+ * be a React component while ProseMirror owns its lifecycle. It renders
+ * those components itself, as portals from its own position in the tree,
+ * so anything they must read through React context has to be provided
+ * *above* it -- hence the actions live here and not in the inner component
+ * that creates the editor.
  */
-export function NotesEditor({ markdown, placeholder, onChange }: {
+export function NotesEditor(props: NotesEditorProps) {
+  const editorRef = useRef<Editor>()
+  const actions = useMemo<NotesEditorActions>(() => ({
+    run: (action) => { editorRef.current?.action(action) },
+  }), [])
+  return (
+    <NotesEditorActionsContext.Provider value={actions}>
+      <ProsemirrorAdapterProvider>
+        <NotesEditorInner {...props} editorRef={editorRef} />
+      </ProsemirrorAdapterProvider>
+    </NotesEditorActionsContext.Provider>
+  )
+}
+
+interface NotesEditorProps {
   markdown: string
   placeholder: string
   onChange: (markdown: string) => void
-}) {
+}
+
+function NotesEditorInner({ markdown, placeholder, onChange, editorRef }: NotesEditorProps & { editorRef: MutableRefObject<Editor | undefined> }) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const pluginViewFactory = usePluginViewFactory()
   // The callback is read through a ref so a new closure from the parent
   // does not recreate the editor (which would drop the caret mid-sentence).
   const onChangeRef = useRef(onChange)
@@ -42,6 +69,11 @@ export function NotesEditor({ markdown, placeholder, onChange }: {
         // it on the contenteditable itself, so the writing surface is styled
         // like the previous editor's content area was.
         ctx.set(editorViewOptionsCtx, { attributes: { class: 'notes-editor-content' } })
+        // The tooltip is rendered on the body (see NotesFormattingTooltip
+        // for why), so its React portal goes there too.
+        ctx.set(formattingTooltip.key, {
+          view: pluginViewFactory({ component: NotesFormattingTooltip, root: () => document.body }),
+        })
       })
       .use(commonmark)
       .use(gfm)
@@ -49,13 +81,17 @@ export function NotesEditor({ markdown, placeholder, onChange }: {
       .use(clipboard)
       .use(changeReporter((next) => onChangeRef.current(next)))
       .use(placeholderPlugin(placeholder))
+      .use(formattingTooltip)
 
+    editorRef.current = editor
     void editor.create()
 
     return () => {
+      editorRef.current = undefined
       void editor.destroy()
     }
-    // `markdown` is the initial value only; `placeholder` is fixed text.
+    // `markdown` is the initial value only; `placeholder` is fixed text; the
+    // factory is stable for the life of the adapter provider.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
