@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { cameraZoom, describeCanvas, geometryOf, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
+import { cameraZoom, describeCanvas, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
 
 /**
  * The writing surface itself: what a writer types becomes structure, what
@@ -161,5 +161,93 @@ test.describe('formatting tooltip', () => {
     // Above and centred on the (now larger) selected text.
     expect(after!.y + after!.height).toBeLessThanOrEqual(selection.top + 1)
     expect(Math.abs(after!.x + after!.width / 2 - selection.centreX)).toBeLessThan(2)
+  })
+})
+
+
+test.describe('insert menu', () => {
+  test('opens on /, narrows as you type, and Enter inserts the highlighted item', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+    await expect(menu).toBeHidden()
+
+    await page.keyboard.type('/')
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('option')).toHaveCount(8)
+    await expect(menu.getByRole('option', { name: /^Heading/ })).toHaveAttribute('aria-selected', 'true')
+
+    // Narrowing keeps the highlight on the first match; the arrow moves it.
+    await page.keyboard.type('head')
+    await expect(menu.getByRole('option')).toHaveCount(3)
+    await page.keyboard.press('ArrowDown')
+    await expect(menu.getByRole('option', { name: 'Subheading' })).toHaveAttribute('aria-selected', 'true')
+
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    await page.keyboard.type('Chapter one')
+    await expect(body.locator('h2')).toHaveText('Chapter one')
+    // The slash and the filter text are gone, not left in the heading.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('## Chapter one\n')
+  })
+
+  test('a click inserts too, and Escape leaves the slash as typed', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('Above')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('/')
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+    await menu.getByRole('option', { name: 'Divider' }).click()
+    await expect(menu).toBeHidden()
+    await expect(body.locator('hr')).toHaveCount(1)
+
+    // A slash mid-sentence is just a slash; Escape says so.
+    await page.keyboard.type('and/or')
+    await expect(menu).toBeHidden()
+    await page.keyboard.type(' /')
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await page.keyboard.type('done')
+    await expect(menu).toBeHidden()
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Above\n\n***\n\nand/or /done\n')
+  })
+
+  test('places the picture the Images panel is showing', async ({ page }) => {
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+
+    // Nothing loaded yet: the item is there but says why it cannot be used.
+    await body.click()
+    await page.keyboard.type('/pic')
+    await expect(menu.getByRole('option', { name: /Picture/ })).toHaveAttribute('aria-disabled', 'true')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+a')
+    await page.keyboard.press('Backspace')
+
+    await loadSampleImages(page, images.panelId)
+    await body.click()
+    await page.keyboard.type('/pic')
+    const item = menu.getByRole('option', { name: /Picture/ })
+    await expect(item).not.toHaveAttribute('aria-disabled', 'true')
+    await page.keyboard.press('Enter')
+    // ProseMirror places a zero-size img.ProseMirror-separator beside an
+    // inline image for caret placement; the document's own picture is the other one.
+    const picture = body.locator('img:not(.ProseMirror-separator)')
+    await expect(picture).toHaveCount(1)
+    const src = await picture.getAttribute('src')
+    expect(src).toMatch(/^\/|^https?:/)
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain(`](${src}`)
   })
 })

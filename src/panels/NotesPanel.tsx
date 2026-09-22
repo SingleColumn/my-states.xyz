@@ -193,8 +193,8 @@ const editorFontSizes: Record<string, string> = {
 }
 
 // The empty page has to carry the discoverability that hidden controls give
-// up, so it names the one route to structure that exists today.
-const editorPlaceholder = 'Start writing. Type # for a heading, - for a list, or > for a quote.'
+// up, so it names the one route to structure a writer needs to know.
+const editorPlaceholder = 'Start writing, or type / to add a heading, list, quote, divider or picture.'
 
 function readEditorFontSize() {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)

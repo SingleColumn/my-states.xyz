@@ -10,6 +10,7 @@ import { $prose } from '@milkdown/utils'
 import { ProsemirrorAdapterProvider, usePluginViewFactory } from '@prosemirror-adapter/react'
 import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
 import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTooltip'
+import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
@@ -31,13 +32,18 @@ import '@milkdown/prose/view/style/prosemirror.css'
  */
 export function NotesEditor(props: NotesEditorProps) {
   const editorRef = useRef<Editor>()
+  const keyHandlers = useRef(new Set<(event: KeyboardEvent) => boolean>())
   const actions = useMemo<NotesEditorActions>(() => ({
     run: (action) => { editorRef.current?.action(action) },
+    addKeyHandler: (handler) => {
+      keyHandlers.current.add(handler)
+      return () => { keyHandlers.current.delete(handler) }
+    },
   }), [])
   return (
     <NotesEditorActionsContext.Provider value={actions}>
       <ProsemirrorAdapterProvider>
-        <NotesEditorInner {...props} editorRef={editorRef} />
+        <NotesEditorInner {...props} editorRef={editorRef} keyHandlers={keyHandlers} />
       </ProsemirrorAdapterProvider>
     </NotesEditorActionsContext.Provider>
   )
@@ -49,7 +55,10 @@ interface NotesEditorProps {
   onChange: (markdown: string) => void
 }
 
-function NotesEditorInner({ markdown, placeholder, onChange, editorRef }: NotesEditorProps & { editorRef: MutableRefObject<Editor | undefined> }) {
+function NotesEditorInner({ markdown, placeholder, onChange, editorRef, keyHandlers }: NotesEditorProps & {
+  editorRef: MutableRefObject<Editor | undefined>
+  keyHandlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>
+}) {
   const hostRef = useRef<HTMLDivElement>(null)
   const pluginViewFactory = usePluginViewFactory()
   // The callback is read through a ref so a new closure from the parent
@@ -74,6 +83,9 @@ function NotesEditorInner({ markdown, placeholder, onChange, editorRef }: NotesE
         ctx.set(formattingTooltip.key, {
           view: pluginViewFactory({ component: NotesFormattingTooltip, root: () => document.body }),
         })
+        ctx.set(insertMenu.key, {
+          view: pluginViewFactory({ component: NotesInsertMenu, root: () => document.body }),
+        })
       })
       .use(commonmark)
       .use(gfm)
@@ -81,7 +93,9 @@ function NotesEditorInner({ markdown, placeholder, onChange, editorRef }: NotesE
       .use(clipboard)
       .use(changeReporter((next) => onChangeRef.current(next)))
       .use(placeholderPlugin(placeholder))
+      .use(floatingKeys(keyHandlers))
       .use(formattingTooltip)
+      .use(insertMenu)
 
     editorRef.current = editor
     void editor.create()
@@ -118,6 +132,25 @@ function changeReporter(report: (markdown: string) => void) {
         report(ctx.get(serializerCtx)(view.state.doc))
       },
     }),
+  }))
+}
+
+/**
+ * Lets floating UI answer a key before the editor's own keymap does. Plugins
+ * added with `$prose` sit ahead of Milkdown's keymap in the plugin order,
+ * so a handler that claims Enter here keeps it from splitting the paragraph.
+ */
+function floatingKeys(handlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>) {
+  return $prose(() => new Plugin({
+    key: new PluginKey('NOTES_FLOATING_KEYS'),
+    props: {
+      handleKeyDown: (_view, event) => {
+        for (const handler of handlers.current) {
+          if (handler(event)) return true
+        }
+        return false
+      },
+    },
   }))
 }
 

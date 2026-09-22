@@ -2029,6 +2029,73 @@ input[type="range"]:focus-visible {
   outline-offset: -2px;
 }
 
+/*
+ * The insert menu under the caret after a `/`. Same home and tokens as the
+ * formatting bar above; floating-ui writes `left`/`top`, the plugin toggles
+ * `data-show`.
+ */
+.notes-insert-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-editor-float);
+  display: grid;
+  min-width: var(--size-moment-menu-min-width);
+  padding: var(--space-menu-padding);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.notes-insert-menu[data-show="false"] {
+  display: none;
+}
+
+.notes-insert-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
+  border: 0;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+/* The highlight follows the arrow keys and the pointer alike, so it is one
+   class rather than :hover, or the two would fight. */
+.notes-insert-item.is-active {
+  background: var(--card-button-bg-hover);
+}
+
+.notes-insert-item[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.notes-insert-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: var(--size-control-icon);
+  justify-content: center;
+}
+
+.notes-insert-label {
+  flex: 1;
+}
+
+.notes-insert-hint {
+  font-size: var(--type-xs);
+  color: var(--color-text-muted);
+}
+
 .writing-note-picker {
   display: flex;
   align-items: center;
