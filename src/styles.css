@@ -1795,6 +1795,13 @@ input[type="range"]:focus-visible {
   color: var(--color-input-text);
 }
 
+/* The element NotesEditor hands to Milkdown (see there for why it exists).
+   It takes no part in layout, so the scroll box below is still a flex child
+   of the editor and gets a height to scroll within. */
+.notes-editor-mount {
+  display: contents;
+}
+
 /* Milkdown wraps the editable in one `.milkdown` div. It is the scroll box:
    the editable inside grows with the note and this box clips and scrolls
    it, so a long note scrolls within the panel instead of overflowing it. */
@@ -1908,10 +1915,11 @@ input[type="range"]:focus-visible {
  * Writing mode - the Notes panel at full screen.
  *
  * The panel sheds its form chrome and becomes a page: prose is held to a
- * readable measure, the formatting bar is hidden until the Aa button asks for
- * it, and the editor's own box is removed so the writing surface *is* the
- * panel rather than a field sitting inside one. The default panel size is
- * left untouched, so the two treatments can be compared side by side.
+ * readable measure, the title sits in the same column as the text, and the
+ * editor's own box is removed so the writing surface *is* the panel rather
+ * than a field sitting inside one. The contextual bar and the insert menu
+ * float on the body and need nothing here. The default panel size is left
+ * untouched, so the two treatments can be compared side by side.
  */
 .panel-body.notes-body-writing {
   grid-template-rows: minmax(0, 1fr);

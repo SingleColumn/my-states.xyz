@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { cameraZoom, describeCanvas, dispatch, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, undo, waitForCanvas } from './helpers'
+import { addPanelFromToolbar, cameraZoom, describeCanvas, dispatch, dragLocator, expectCanvasSaved, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, titleOf, undo, waitForCanvas } from './helpers'
 
 /**
  * The writing surface itself: what a writer types becomes structure, what
@@ -348,6 +348,154 @@ test.describe('panel embeds', () => {
     await expect(body.locator('.notes-embed-title')).toHaveText(/^Images: /)
     await expect(body.locator('p').first()).toHaveText('Text first.')
     await expect(body.locator('p').last()).toHaveText('Text after.')
+  })
+})
+
+
+test.describe('writing mode', () => {
+  test('holds the text to a measure, keeps the title in the same column, and leaves the note unchanged', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    await body.click()
+    await page.keyboard.type('# A heading')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('A paragraph long enough to run past a comfortable reading measure on a full-screen panel, which is the whole point of the measure.')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('A heading')
+    const before = (await readStorage(page, moment!.id)).notes[0]!.content
+
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
+    await expect(shape.locator('.notes-editor.is-writing')).toHaveCount(1)
+
+    // The form controls step aside and the title joins the text column.
+    await expect(shape.locator('.notes-document-controls')).toHaveCount(0)
+    const title = await shape.locator('.writing-title').boundingBox()
+    const paragraph = await shape.locator('.notes-editor-content > p').first().boundingBox()
+    const heading = await shape.locator('.notes-editor-content > h1').boundingBox()
+    expect(Math.abs(title!.x - paragraph!.x)).toBeLessThan(2)
+    expect(Math.abs(heading!.x - paragraph!.x)).toBeLessThan(2)
+    // Held to a measure, not the width of a full-screen panel.
+    const surface = await shape.locator('.notes-editor-content').boundingBox()
+    expect(paragraph!.width).toBeLessThan(surface!.width * 0.75)
+    // The surface itself stays full width, so a click anywhere still writes.
+    await shape.locator('.notes-editor-content').click({ position: { x: 20, y: 30 } })
+    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
+
+    // Leaving writing mode gives the panel back and the note is untouched.
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Restore previous panel size' }).click()
+    await expect(shape.locator('.notes-editor.is-writing')).toHaveCount(0)
+    expect((await readStorage(page, moment!.id)).notes[0]?.content).toBe(before)
+    expect(geometryOf(await panelById(page, notes.panelId))).toEqual(geometryOf(notes))
+  })
+})
+
+/**
+ * A second Notes panel, clear of the first and holding a note of its own.
+ * A new panel lands exactly on top of the one already there, so it is moved
+ * before anything is clicked on it; and the app assigns its opening note
+ * only to the panels present when notes finish loading, so a panel added
+ * before that opens on the empty state and is given a note here.
+ */
+async function addSecondNotesPanel(page: Page) {
+  // The first editor on screen means notes have finished loading.
+  await expect(noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))).toBeVisible()
+  const panel = await addPanelFromToolbar(page, 'notes')
+  await dragLocator(page, await titleOf(page, panel.panelId), { dx: -80, dy: 150 })
+  const shape = await shapeOf(page, panel.panelId)
+  await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+  await page.getByRole('menuitem', { name: 'New note' }).click()
+  const body = noteBodyOf(shape)
+  await expect(body).toBeVisible()
+  return { panel, shape, body }
+}
+
+test.describe('two Notes panels', () => {
+  test('each holds its own note and typing in one leaves the other alone', async ({ page }) => {
+    await openApp(page)
+    const first = await panelOfType(page, 'notes')
+    const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
+    await firstBody.click()
+    await page.keyboard.type('The first note.')
+
+    const { panel: second, body: secondBody } = await addSecondNotesPanel(page)
+    await expect(secondBody.locator('.is-empty')).toHaveCount(1)
+    await secondBody.click()
+    await page.keyboard.type('The second note.')
+
+    // Two editors, two documents, neither disturbed by the other.
+    await expect(firstBody).toHaveText('The first note.')
+    await expect(secondBody).toHaveText('The second note.')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+      .toEqual(['The first note.\n', 'The second note.\n'])
+
+    // Each panel names the note it shows, and a reload puts them back.
+    const firstNoteId = (await panelById(page, first.panelId)).config as { activeNoteId: string }
+    const secondNoteId = (await panelById(page, second.panelId)).config as { activeNoteId: string }
+    expect(firstNoteId.activeNoteId).not.toBe(secondNoteId.activeNoteId)
+    await expectCanvasSaved(page)
+    await page.reload()
+    await waitForCanvas(page)
+    await expect(noteBodyOf(await shapeOf(page, first.panelId))).toHaveText('The first note.')
+    await expect(noteBodyOf(await shapeOf(page, second.panelId))).toHaveText('The second note.')
+  })
+
+  /**
+   * Known gap, not a regression: an editor takes the note as it mounts and
+   * owns it from then on, so two panels showing the *same* note (what a
+   * duplicated Notes panel gets: see duplicateConfig in panelRegistry.ts)
+   * each hold their own copy, and whichever is typed in last writes the
+   * whole note. The previous editor behaved identically -- it captured its
+   * `markdown` prop in a ref at mount -- so nothing here made it worse.
+   * The fix is one shared document per note with the panels as views onto
+   * it, which is library-neutral work well beyond this prototype.
+   */
+  test.fixme('two panels on the same note do not overwrite each other', async ({ page }) => {
+    await openApp(page)
+    const first = await panelOfType(page, 'notes')
+    const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
+    await firstBody.click()
+    await page.keyboard.type('Written in the first panel.')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('first panel')
+    const noteId = (await panelById(page, first.panelId)).config as { activeNoteId: string }
+
+    const { panel: second, body: secondBody } = await addSecondNotesPanel(page)
+    await dispatch(page, { kind: 'note.select', panelId: second.panelId, noteId: noteId.activeNoteId })
+    await secondBody.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' Added in the second panel.')
+
+    // Back to the first panel: its editor never heard about the addition.
+    await firstBody.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' And back in the first.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('Written in the first panel. Added in the second panel. And back in the first.\n')
+  })
+
+  test('the formatting bar and insert menu belong to the panel being written in', async ({ page }) => {
+    await openApp(page)
+    const first = await panelOfType(page, 'notes')
+    const { body: secondBody } = await addSecondNotesPanel(page)
+
+    await secondBody.click()
+    await page.keyboard.type('Second panel words')
+    await page.keyboard.press('Shift+Control+ArrowLeft')
+    // One editor has the selection, so exactly one bar is on screen.
+    await expect(page.getByRole('toolbar', { name: 'Formatting' })).toHaveCount(1)
+    await page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name: 'Bold' }).click()
+    await expect(secondBody.locator('strong')).toHaveText('words')
+
+    // The other panel's note is untouched by any of it.
+    await expect(noteBodyOf(await shapeOf(page, first.panelId)).locator('strong')).toHaveCount(0)
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+      .toEqual(['', 'Second panel **words**\n'])
   })
 })
 

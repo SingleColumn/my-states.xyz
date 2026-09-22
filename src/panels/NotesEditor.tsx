@@ -95,10 +95,19 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
     const host = hostRef.current
     if (!host) return
 
+    // Milkdown mounts into the element it is given and takes it apart again
+    // on destroy, which is asynchronous. React can start the next effect --
+    // StrictMode does it on every mount -- before that teardown finishes, so
+    // a shared host would end up with two editors in it. Each editor gets
+    // its own mount element instead, removed synchronously on cleanup.
+    const mount = document.createElement('div')
+    mount.className = 'notes-editor-mount'
+    host.appendChild(mount)
+
     const storedDocument = noteDocument && noteDocument.schemaVersion === NOTE_DOCUMENT_SCHEMA_VERSION && !prefersMarkdown() ? noteDocument.doc : null
     const make = (fromDocument: boolean) => Editor.make()
       .config((ctx) => {
-        ctx.set(rootCtx, host)
+        ctx.set(rootCtx, mount)
         ctx.set(defaultValueCtx, fromDocument && storedDocument ? { type: 'json', value: storedDocument as never } : markdown)
         // The class the theme's prose rules already target; ProseMirror puts
         // it on the contenteditable itself, so the writing surface is styled
@@ -146,6 +155,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
     return () => {
       editorRef.current = undefined
       void editor.destroy()
+      mount.remove()
     }
     // `markdown` is the initial value only; `placeholder` is fixed text; the
     // factory is stable for the life of the adapter provider.
