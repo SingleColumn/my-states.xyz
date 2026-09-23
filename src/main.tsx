@@ -5,8 +5,12 @@ import { DesktopOnlyNotice } from './DesktopOnlyNotice'
 import { currentDeviceHints, isMobileDevice } from './deviceSupport'
 import 'tldraw/tldraw.css'
 // Self-hosted so the demo renders identically offline and on every machine.
-// The default entry carries the wght axis, which is the only one we vary.
+// Two entries: upright and italic, both variable on the weight axis. The
+// italic one is not decoration -- the app sets `font-synthesis: none`, so
+// without a real italic face emphasised text renders identically to the
+// prose around it, which is to say not at all.
 import '@fontsource-variable/inter'
+import '@fontsource-variable/inter/wght-italic.css'
 import './design-tokens.css'
 import './theme.css'
 import './styles.css'

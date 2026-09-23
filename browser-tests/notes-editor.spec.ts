@@ -148,7 +148,10 @@ test.describe('formatting tooltip', () => {
     await page.mouse.wheel(0, -600)
     await page.keyboard.up('Control')
     await expect.poll(() => cameraZoom(page)).toBeGreaterThan(1.05)
-    await expect(toolbar).toBeVisible()
+    // The bar comes back 150ms after the wheel goes quiet, and each wheel
+    // event restarts that wait -- so under a loaded machine the settle can
+    // take a good deal longer than the default timeout allows for.
+    await expect(toolbar).toBeVisible({ timeout: 20_000 })
 
     const after = await toolbar.boundingBox()
     const selection = await page.evaluate(() => {
@@ -614,6 +617,64 @@ test.describe('the title leads into the note', () => {
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
     await page.keyboard.type('And the body.')
     await expect(noteBodyOf(shape)).toHaveText('And the body.')
+  })
+})
+
+test.describe('floating editor UI and the canvas', () => {
+  /**
+   * The bar and the menu are mounted on the body, over the canvas but
+   * outside it. tldraw takes pointer capture on a press it thinks is its
+   * own, which retargets the mouseup and the click onto the canvas: the
+   * button never completes, and the pointer goes on dragging the panel
+   * after the press is over. Both surfaces mark their presses as handled,
+   * which is what keeps tldraw out.
+   */
+  test('a press on the formatting bar completes as a click, and leaves the canvas alone', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('alpha bravo')
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Shift+Control+ArrowRight')
+    const bar = page.getByRole('toolbar', { name: 'Formatting' })
+    await expect(bar).toBeVisible()
+
+    const events: string[] = []
+    await page.exposeFunction('__note', (name: string) => { events.push(name) })
+    await page.evaluate(() => {
+      const target = document.querySelector('.notes-formatting-tooltip')!
+      for (const type of ['mouseup', 'click']) {
+        target.addEventListener(type, () => (window as unknown as { __note: (n: string) => void }).__note(type))
+      }
+    })
+
+    const before = geometryOf(await panelById(page, notes.panelId))
+    await bar.getByRole('button', { name: 'Bold' }).click()
+    await expect(body.locator('strong')).toHaveText('alpha')
+    // The press ran its course on the bar rather than on the canvas.
+    expect(events).toEqual(['mouseup', 'click'])
+    expect(geometryOf(await panelById(page, notes.panelId))).toEqual(before)
+  })
+
+  test('a press on an insert menu item completes as a click', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('/')
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+    const events: string[] = []
+    await page.exposeFunction('__note', (name: string) => { events.push(name) })
+    await page.evaluate(() => {
+      const target = document.querySelector('.notes-insert-menu')!
+      for (const type of ['mouseup', 'click']) {
+        target.addEventListener(type, () => (window as unknown as { __note: (n: string) => void }).__note(type))
+      }
+    })
+    await menu.getByRole('option', { name: 'Quote' }).click()
+    await expect(body.locator('blockquote')).toHaveCount(1)
+    expect(events).toEqual(['mouseup', 'click'])
   })
 })
 

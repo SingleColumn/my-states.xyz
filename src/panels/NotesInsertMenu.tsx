@@ -14,6 +14,7 @@ import {
 import type { EditorView } from '@milkdown/prose/view'
 import { usePluginViewContext } from '@prosemirror-adapter/react'
 import { useAppState } from '../AppState'
+import { markPointerEventHandled } from '../panelSurface'
 import type { ImageItem } from '../types'
 import { useNotesEditorActions } from './notesEditorActions'
 
@@ -156,7 +157,7 @@ export function NotesInsertMenu() {
   }), [addKeyHandler])
 
   return (
-    <div ref={ref} className="notes-insert-menu" role="listbox" aria-label="Insert" data-show="false">
+    <div ref={ref} className="notes-insert-menu" role="listbox" aria-label="Insert" data-show="false" onPointerDown={markPointerEventHandled}>
       {items.map((item, index) => (
         <button
           key={item.id}
@@ -170,7 +171,10 @@ export function NotesInsertMenu() {
           // happens to rest, and that must not steal the highlight from
           // the first item.
           onMouseMove={() => { if (index !== active) setActiveIndex(index) }}
-          onMouseDown={(event: MouseEvent) => { event.preventDefault(); choose(item) }}
+          // The press is swallowed so the caret stays where the item is
+          // about to act; the click that follows is what acts.
+          onMouseDown={(event: MouseEvent) => event.preventDefault()}
+          onClick={() => choose(item)}
         >
           <span className="notes-insert-icon" aria-hidden="true">{item.icon}</span>
           <span className="notes-insert-label">{item.label}</span>

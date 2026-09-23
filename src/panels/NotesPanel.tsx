@@ -73,18 +73,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         panelType="notes"
         title="Writing"
         menuItems={[
-          {
-            // The formatting bar that used to hold this select is gone, so
-            // the size steps round through the ladder from the menu instead.
-            id: 'text-size',
-            label: `Text size: ${editorFontSizes[fontSize]}`,
-            icon: <Type size={17} aria-hidden="true" />,
-            onSelect: () => {
-              const next = nextEditorFontSize(fontSize)
-              setFontSize(next)
-              window.localStorage.setItem(editorFontSizeStorageKey, next)
-            },
-          },
           { id: 'new-note', label: 'New note', icon: <FilePlus2 size={17} aria-hidden="true" />, onSelect: () => { void notes.createNote(panelId).catch(() => {}) } },
           {
             id: 'save-markdown',
@@ -109,6 +97,16 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ]}
+        trailingMenuItems={Object.entries(editorFontSizes).map(([size, label]) => ({
+          id: `text-size-${size}`,
+          label,
+          icon: <Type size={17} aria-hidden="true" />,
+          checked: size === fontSize,
+          onSelect: () => {
+            setFontSize(size)
+            window.localStorage.setItem(editorFontSizeStorageKey, size)
+          },
+        }))}
       >
         {isWritingMode && hasNotes ? (
           <label className="writing-note-picker">
@@ -223,11 +221,6 @@ const editorPlaceholder = 'Start writing, or type / to add a heading, list, quot
 function readEditorFontSize() {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)
   return stored && stored in editorFontSizes ? stored : '18px'
-}
-
-function nextEditorFontSize(current: string) {
-  const sizes = Object.keys(editorFontSizes)
-  return sizes[(sizes.indexOf(current) + 1) % sizes.length]
 }
 
 // Counts the note's Markdown, which is what there is to count before the

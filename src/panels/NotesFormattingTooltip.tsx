@@ -11,6 +11,7 @@ import {
 import type { EditorState } from '@milkdown/prose/state'
 import type { MarkType } from '@milkdown/prose/model'
 import { usePluginViewContext } from '@prosemirror-adapter/react'
+import { markPointerEventHandled } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
 
 /**
@@ -78,20 +79,16 @@ export function NotesFormattingTooltip() {
   const { state } = view
   const marks = state.schema.marks
 
-  function toggle(event: MouseEvent, command: () => void) {
-    // Mousedown would move focus out of the editor, which empties the
-    // selection the command is about to format.
-    event.preventDefault()
-    command()
-  }
-
   function toggleLink() {
     if (isMarkActive(state, marks.link)) {
       run((ctx) => ctx.get(commandsCtx).call(toggleLinkCommand.key))
       return
     }
-    // A stand-in for a link editor: the prompt takes focus, so the editor
-    // is refocused before the mark is applied to the selection it still holds.
+    // A stand-in for a link editor. It has to run from the click rather
+    // than the press: a modal opened during mousedown never lets the
+    // matching mouseup reach the page, and the browser goes on believing
+    // the button is held -- which reads as a stuck button and a drag that
+    // will not let go.
     const href = window.prompt('Link address')
     run((ctx) => {
       ctx.get(editorViewCtx).focus()
@@ -108,27 +105,31 @@ export function NotesFormattingTooltip() {
   }
 
   return (
-    <div ref={ref} className="notes-formatting-tooltip" role="toolbar" aria-label="Formatting" data-show="false" onKeyDown={handleKeyDown}>
-      <FormatButton label="Bold" active={isMarkActive(state, marks.strong)} onMouseDown={(event) => toggle(event, () => run((ctx) => ctx.get(commandsCtx).call(toggleStrongCommand.key)))}>
+    <div ref={ref} className="notes-formatting-tooltip" role="toolbar" aria-label="Formatting" data-show="false" onKeyDown={handleKeyDown} onPointerDown={markPointerEventHandled}>
+      <FormatButton label="Bold" active={isMarkActive(state, marks.strong)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleStrongCommand.key))}>
         <Bold size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Italic" active={isMarkActive(state, marks.emphasis)} onMouseDown={(event) => toggle(event, () => run((ctx) => ctx.get(commandsCtx).call(toggleEmphasisCommand.key)))}>
+      <FormatButton label="Italic" active={isMarkActive(state, marks.emphasis)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleEmphasisCommand.key))}>
         <Italic size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Code" active={isMarkActive(state, marks.inlineCode)} onMouseDown={(event) => toggle(event, () => run((ctx) => ctx.get(commandsCtx).call(toggleInlineCodeCommand.key)))}>
+      <FormatButton label="Code" active={isMarkActive(state, marks.inlineCode)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleInlineCodeCommand.key))}>
         <Code size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Link" active={isMarkActive(state, marks.link)} onMouseDown={(event) => toggle(event, toggleLink)}>
+      <FormatButton label="Link" active={isMarkActive(state, marks.link)} onActivate={toggleLink}>
         <LinkIcon size={16} aria-hidden="true" />
       </FormatButton>
     </div>
   )
 }
 
-function FormatButton({ label, active, onMouseDown, children }: {
+/**
+ * The press is swallowed so the editor keeps focus and the selection the
+ * command is about to act on; the click that follows is what acts.
+ */
+function FormatButton({ label, active, onActivate, children }: {
   label: string
   active: boolean
-  onMouseDown: (event: MouseEvent) => void
+  onActivate: () => void
   children: ReactNode
 }) {
   return (
@@ -138,7 +139,8 @@ function FormatButton({ label, active, onMouseDown, children }: {
       title={label}
       aria-label={label}
       aria-pressed={active}
-      onMouseDown={onMouseDown}
+      onMouseDown={(event: MouseEvent) => event.preventDefault()}
+      onClick={onActivate}
     >
       {children}
     </button>
