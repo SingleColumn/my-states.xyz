@@ -97,13 +97,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ]}
-        trailingMenuItems={Object.entries(editorFontSizes).map(([size, label]) => ({
+        trailingMenuItems={Object.entries(editorFontSizes).map(([size, { label }]) => ({
           id: `text-size-${size}`,
           label,
           icon: <Type size={17} aria-hidden="true" />,
           checked: size === fontSize,
           onSelect: () => {
-            setFontSize(size)
+            setFontSize(size as EditorFontSize)
             window.localStorage.setItem(editorFontSizeStorageKey, size)
           },
         }))}
@@ -144,7 +144,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         {activeNote ? (
           <div
             className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
-            style={{ '--notes-editor-font-size': fontSize } as CSSProperties}
+            style={{
+              '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
+              '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
+            } as CSSProperties}
             {...panelContentProps}
           >
             {isWritingMode ? (
@@ -207,27 +210,26 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
 const newDocumentSelectValue = '__new_document__'
 const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
-// The same four steps the canvas offers its own text, so a note set beside
-// a drawing is set at the same sizes rather than a quieter scale of its own.
-// Small is the default: the steps above it are for a panel at full screen,
-// where a line of 72px text is about eight words wide.
-const editorFontSizes: Record<string, string> = {
-  '24px': 'Small',
-  '36px': 'Standard',
-  '48px': 'Large',
-  '72px': 'Extra large',
-}
-const defaultEditorFontSize = '24px'
+// Four steps for reading at, each with the leading that suits it: tighter
+// where the line is short, looser where it is long. Medium is the default.
+const editorFontSizes = {
+  small: { label: 'Small', fontSize: '14px', lineHeight: '21px' },
+  medium: { label: 'Medium', fontSize: '16px', lineHeight: '26px' },
+  large: { label: 'Large', fontSize: '18px', lineHeight: '29px' },
+  xlarge: { label: 'Extra large', fontSize: '21px', lineHeight: '34px' },
+} as const
+type EditorFontSize = keyof typeof editorFontSizes
+const defaultEditorFontSize: EditorFontSize = 'medium'
 
 // The empty page has to carry the discoverability that hidden controls give
 // up, so it names the one route to structure a writer needs to know.
 const editorPlaceholder = 'Start writing, or type / to add a heading, list, quote, divider or picture.'
 
-function readEditorFontSize() {
+function readEditorFontSize(): EditorFontSize {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)
   // A size from an older ladder is no longer one of the four, so it falls
   // back rather than being kept as a value nothing can name.
-  return stored && stored in editorFontSizes ? stored : defaultEditorFontSize
+  return stored && stored in editorFontSizes ? stored as EditorFontSize : defaultEditorFontSize
 }
 
 // Counts the note's Markdown, which is what there is to count before the

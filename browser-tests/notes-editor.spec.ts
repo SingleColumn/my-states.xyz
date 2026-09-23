@@ -704,6 +704,61 @@ test.describe('floating editor UI and the canvas', () => {
   })
 })
 
+test.describe('links and text size', () => {
+  test('a typed domain becomes an address, and Ctrl+click opens it', async ({ page, context }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('Visit the site now')
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Shift+Control+ArrowRight')
+    await page.keyboard.press('Shift+Control+ArrowRight')
+    const selection = await page.evaluate(() => {
+      const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    })
+    // What a writer types is a place, not a URL.
+    await page.evaluate(() => { window.prompt = () => 'example.com' })
+    await page.mouse.click(selection.x, selection.y, { button: 'right' })
+    await page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name: 'Link' }).click()
+
+    const link = body.locator('a')
+    await expect(link).toHaveAttribute('href', 'https://example.com')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('[Visit the](https://example.com) site now\n')
+
+    // Ctrl+click opens it; a plain click leaves the caret free to edit it.
+    const opened = context.waitForEvent('page')
+    await link.click({ modifiers: ['Control'] })
+    expect((await opened).url()).toContain('example.com')
+    await link.click()
+    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
+  })
+
+  test('each text size brings its own leading', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    await expect(noteBodyOf(shape)).toBeVisible()
+    const ladder = [
+      ['Small', '14px', '21px'],
+      ['Large', '18px', '29px'],
+      ['Extra large', '21px', '34px'],
+      ['Medium', '16px', '26px'],
+    ]
+    for (const [label, fontSize, lineHeight] of ladder) {
+      await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+      await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click()
+      await expect.poll(async () => page.evaluate(() => {
+        const style = getComputedStyle(document.querySelector('.ProseMirror')!)
+        return [style.fontSize, style.lineHeight]
+      })).toEqual([fontSize, lineHeight])
+    }
+  })
+})
+
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

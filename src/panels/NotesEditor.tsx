@@ -154,6 +154,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
+      .use(linkOpener)
       .use(formattingTooltip)
       .use(insertMenu)
       .use(panelEmbedRemark)
@@ -236,6 +237,27 @@ function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
 }
 
 const NEWLINE = String.fromCharCode(10)
+
+/**
+ * Opens a link on Ctrl+click (Cmd on a Mac), as editors that are also
+ * writing surfaces do: a plain click has to stay free to put the caret
+ * inside the link, or its text could never be edited.
+ */
+const linkOpener = $prose(() => new Plugin({
+  key: new PluginKey('NOTES_LINK_OPENER'),
+  props: {
+    handleClick(view, pos, event) {
+      if (!event.ctrlKey && !event.metaKey) return false
+      const link = view.state.doc.nodeAt(pos)?.marks.find((mark) => mark.type.name === 'link')
+      const href = link?.attrs.href as string | undefined
+      if (!href) return false
+      // No opener and no referrer: the note is the writer's, not the
+      // destination's business.
+      window.open(href, '_blank', 'noopener,noreferrer')
+      return true
+    },
+  },
+}))
 
 /**
  * Lets floating UI answer a key before the editor's own keymap does. Plugins

@@ -1825,7 +1825,7 @@ input[type="range"]:focus-visible {
   padding: var(--card-padding);
   color: var(--color-input-text);
   font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
-  line-height: var(--line-height-rich-content);
+  line-height: var(--notes-editor-line-height, var(--line-height-rich-content));
 }
 
 .notes-editor-content:focus {

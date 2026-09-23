@@ -128,7 +128,8 @@ export function NotesFormattingTooltip() {
     // matching mouseup reach the page, and the browser goes on believing
     // the button is held -- which reads as a stuck button and a drag that
     // will not let go.
-    const href = window.prompt('Link address')
+    const typed = window.prompt('Link address')
+    const href = typed ? linkAddress(typed) : ''
     run((ctx) => {
       ctx.get(editorViewCtx).focus()
       if (href) ctx.get(commandsCtx).call(toggleLinkCommand.key, { href })
@@ -185,6 +186,20 @@ function FormatButton({ label, active, onActivate, children }: {
       {children}
     </button>
   )
+}
+
+/**
+ * What a writer types is a place, not a URL: `example.com` or an email
+ * address, rarely `https://example.com`. Without a scheme the browser reads
+ * it as a path on this app and the link goes nowhere, so one is supplied.
+ */
+export function linkAddress(typed: string) {
+  const trimmed = typed.trim()
+  if (!trimmed) return ''
+  // Already addressed: a scheme, a path, or an anchor on this page.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('#')) return trimmed
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return `mailto:${trimmed}`
+  return `https://${trimmed}`
 }
 
 /** Whether every character of the selection carries the mark (or, for a caret, whether typing would). */
