@@ -149,7 +149,16 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         ) : null}
       </PanelHeader>
 
-      <div className={`panel-body notes-body${isWritingMode ? ' notes-body-writing' : ''}`}>
+      <div
+        className={`panel-body notes-body${isWritingMode ? ' notes-body-writing' : ''}`}
+        // On the body rather than the editor: the writing tools sit above
+        // the editor and line up with the column it holds the text to, so
+        // they have to see the size that column is derived from.
+        style={{
+          '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
+          '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
+        } as CSSProperties}
+      >
         {isWritingMode ? null : (
           <div className="notes-document-controls" {...panelContentProps}>
             {hasNotes ? (
@@ -187,10 +196,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         {activeNote ? (
           <div
             className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
-            style={{
-              '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
-              '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
-            } as CSSProperties}
             {...panelContentProps}
           >
             {isWritingMode ? (
@@ -293,8 +298,9 @@ type EditorFontSize = keyof typeof editorFontSizes
 const defaultEditorFontSize: EditorFontSize = 'medium'
 
 // The empty page has to carry the discoverability that hidden controls give
-// up, so it names the one route to structure a writer needs to know.
-const editorPlaceholder = 'Start writing, or type / to add a heading, list, quote, divider, emoji or picture.'
+// up. The writing tools are off until asked for, so it names where they are
+// as well as the shortcut for anyone who would rather type.
+const editorPlaceholder = 'Start writing. For headings, lists, pictures and emoji, open the ··· menu and choose Show formatting tools — or type / here.'
 
 function readEditorFontSize(): EditorFontSize {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)

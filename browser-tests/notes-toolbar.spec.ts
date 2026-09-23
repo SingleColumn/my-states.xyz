@@ -124,6 +124,41 @@ test.describe('the writing tools', () => {
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready✅\n')
   })
 
+  test('a picture can be pulled to a width, which only then costs the plain Markdown', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    await body.click()
+    const chooser = page.waitForEvent('filechooser')
+    await bar.getByRole('button', { name: 'Picture' }).click()
+    await (await chooser).setFiles(PNG_FIXTURE)
+
+    const picture = body.locator('.notes-image img')
+    await expect(picture).toHaveCount(1)
+    // Left alone it is an ordinary Markdown picture: Markdown has no width,
+    // so one is only written when there is a width to write.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('![dot](data:image/png')
+
+    const grip = (await body.locator('.notes-image-handle').boundingBox())!
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(grip.x + 200, grip.y + grip.height / 2, { steps: 8 })
+    await page.mouse.up()
+
+    // Wider than it was, and now carried as the one form that can hold a
+    // size. The width is in the panel's own pixels, which the canvas scales
+    // on the way to the screen, so the screen width is the smaller number.
+    await expect.poll(async () => Math.round((await picture.boundingBox())!.width)).toBeGreaterThan(120)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toMatch(/<img src="data:image\/png[^"]*" alt="dot" width="\d+" \/>/)
+
+    // And it comes back that size, which is the whole point of the tag.
+    const pulled = Math.round((await picture.boundingBox())!.width)
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect.poll(async () => Math.round((await again.locator('.notes-image img').boundingBox())!.width)).toBe(pulled)
+  })
+
   test('place a picture from a file, which the note then carries itself', async ({ page }) => {
     const { body, bar } = await openWithTools(page)
     await body.click()
@@ -150,6 +185,20 @@ test.describe('the writing tools', () => {
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect(again.locator('img:not(.ProseMirror-separator)')).toHaveCount(1)
+  })
+})
+
+test.describe('the empty note', () => {
+  test('names where the tools are, since they are not on show', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const hint = await body.locator('.is-empty').getAttribute('data-placeholder')
+    // The tools are off until asked for, so the one page that can say where
+    // they are says so. The slash is offered second, for anyone who types.
+    expect(hint).toContain('···')
+    expect(hint).toContain('Show formatting tools')
+    expect(hint).toContain('/')
   })
 })
 

@@ -1722,6 +1722,15 @@ input[type="range"]:focus-visible {
    those. Everything above the writing takes its own height; the writing
    takes what is left. */
 .notes-body {
+  /* A measure is counted in characters, not pixels: about 68 of them, which
+     is what 34 times the text size comes to for this face. Fixed in pixels
+     it was a different measure at every size -- generous at the smallest,
+     seven words a line at the largest. Declared here rather than with the
+     other tokens because a custom property resolves the var()s inside it
+     where it is declared, and this is the first element that knows the size
+     the writer chose. Capped at the panel so the largest sizes simply fill
+     it. */
+  --writing-measure: min(100%, calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 34));
   display: flex;
   flex-direction: column;
   gap: var(--space-notes-gap);
@@ -1801,7 +1810,6 @@ input[type="range"]:focus-visible {
      where it is declared, and this is the first element that knows the
      size the writer chose. Capped at the panel so the largest sizes simply
      fill it. */
-  --writing-measure: min(100%, calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 34));
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -1906,6 +1914,65 @@ input[type="range"]:focus-visible {
   padding-left: var(--space-rich-content-inset);
   border-left: var(--border-width-rich-content) solid var(--color-control-border-hover);
   color: var(--color-text-soft);
+}
+
+/*
+ * A picture in a note, with a handle on its right edge to pull. The handle
+ * shows on hover and while the picture is selected, so an unpicked picture
+ * is only a picture; it is a little wider than it looks, because a 4px
+ * target is a target nobody hits.
+ */
+.notes-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.notes-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-small);
+}
+
+.notes-image-handle {
+  position: absolute;
+  top: 0;
+  right: calc(var(--space-detail-1) * -1);
+  width: var(--size-image-handle-target);
+  height: 100%;
+  cursor: ew-resize;
+  opacity: 0;
+  touch-action: none;
+}
+
+.notes-image-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: var(--space-detail-1);
+  width: var(--border-width-rich-content);
+  height: var(--size-image-handle-grip);
+  transform: translateY(-50%);
+  border-radius: var(--border-width-rich-content);
+  background: var(--accent-notes, var(--color-focus-ring));
+}
+
+.notes-image:hover .notes-image-handle,
+.notes-image.is-selected .notes-image-handle,
+.notes-image.is-resizing .notes-image-handle,
+.notes-image-handle:focus-visible {
+  opacity: 1;
+}
+
+.notes-image-handle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Nothing else may be doing anything while a width is being pulled. */
+.notes-image.is-resizing img {
+  user-select: none;
 }
 
 .notes-editor-content code,
@@ -2163,23 +2230,68 @@ input[type="range"]:focus-visible {
   display: none;
 }
 
+/*
+ * The tools are chrome for the writing, not a strip of application. So they
+ * start where the words start -- the same column the text is held to -- and
+ * carry no rule under them: a line across the page would cut the note in
+ * two above its own title. What separates them from the writing is space.
+ */
 .notes-writing-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-detail-1);
-  padding: var(--space-detail-2) var(--space-panel-body-x);
-  border-bottom: var(--border-width-hairline) solid var(--color-panel-border);
+  width: 100%;
+  max-width: var(--writing-measure);
+  margin-inline: auto;
+  padding: var(--space-detail-2) 0 var(--space-detail-1);
 }
 
+/* The loudest thing on the bar was this control's own box: the app's
+   dropdown is a form field, drawn with a fill and a border so it reads as
+   something to fill in. Here it is a menu of what the line already is, so
+   it is drawn like the buttons beside it -- nothing until it is pointed at
+   -- rather than borrowing .app-dropdown and then fighting its !important. */
 .notes-style-select {
-  height: var(--size-top-toolbar-control);
-  min-height: var(--size-top-toolbar-control);
+  height: var(--size-menu-item-height);
+  min-height: var(--size-menu-item-height);
   /* Wide enough for "Small heading", the longest of them, so the control
      does not resize as the caret moves between lines. */
   flex: 0 1 var(--size-notes-style-select-width);
   min-width: 0;
-  margin-right: var(--space-detail-1);
+  padding-inline: var(--space-detail-2);
+  /* An outline and no fill: the buttons beside it are actions and carry
+     nothing until pointed at, but this is a choice with a name in it, and
+     without an edge its chevron floats away from the word at the widths a
+     fixed control needs. */
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-dropdown);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
+}
+
+.notes-style-select:hover {
+  border-color: var(--card-button-border-hover, var(--card-button-border));
+  background: var(--card-button-bg-hover);
+}
+
+.notes-style-select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* The list the browser opens is its own window: it needs a real surface
+   under it whatever the control looks like when closed. */
+.notes-style-select option {
+  background: var(--color-dropdown-bg);
+  color: var(--color-dropdown-text);
+  font-family: var(--font-family-ui);
+  font-weight: var(--font-weight-medium);
 }
 
 /* In a panel too narrow for the row, the style menu gives up its width
@@ -2189,23 +2301,27 @@ input[type="range"]:focus-visible {
 @container panel-shell (max-width: 520px) {
   .notes-writing-toolbar {
     flex-wrap: nowrap;
-    padding-inline: var(--space-detail-2);
   }
 }
 
-/* At full screen the tools line up with the writing rather than with the
-   panel edge, so the column the words are read in starts where they do. */
-.panel-notes-surface.is-writing-mode .notes-writing-toolbar {
-  justify-content: center;
-}
 
-/* Between what a line is and how its words are marked: two jobs on one
-   bar, and the eye needs to be told where one ends. */
+
+/* Between what a line is, how its words are marked, and what can be put in:
+   three jobs on one bar, and the eye needs to be told where one ends. On
+   the floating bar that is a drawn line, which is short and busy enough to
+   need one; on the writing tools it is only space, which is quieter and
+   enough at that length. */
 .notes-formatting-divider {
   align-self: stretch;
   width: var(--border-width-hairline);
   margin: var(--space-detail-2) var(--space-detail-1);
   background: var(--color-app-badge-border);
+}
+
+.notes-writing-toolbar .notes-formatting-divider {
+  width: 0;
+  margin: 0 var(--space-detail-3);
+  background: transparent;
 }
 
 .notes-insert-emoji {

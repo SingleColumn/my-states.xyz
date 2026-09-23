@@ -80,7 +80,7 @@ export function NotesWritingToolbar() {
   return (
     <div className="notes-writing-toolbar" role="toolbar" aria-label="Writing tools" onPointerDown={markPointerEventHandled} {...panelContentProps}>
       <select
-        className="app-dropdown notes-style-select"
+        className="notes-style-select"
         aria-label="Style of this line"
         title="What this line is"
         value={style}

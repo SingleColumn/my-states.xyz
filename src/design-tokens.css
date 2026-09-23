@@ -59,6 +59,10 @@
   /* Fits "Small heading", the longest style name, so the control keeps one
      width as the caret moves from line to line. */
   --size-notes-style-select-width: 150px;
+  /* The grab area for a picture's width, and the mark drawn inside it. The
+     target is wider than the mark because a 2px target is unhittable. */
+  --size-image-handle-target: 14px;
+  --size-image-handle-grip: 28px;
   --size-moment-menu-min-width: 190px;
   --size-canvas-menu-min-width: 220px;
   --space-card-eyebrow-bottom: 4px;

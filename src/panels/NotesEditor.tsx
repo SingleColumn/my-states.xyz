@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { Editor, EditorStatus, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/core'
-import { commonmark, linkAttr } from '@milkdown/preset-commonmark'
+import { commonmark, imageSchema, linkAttr } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
 import { history } from '@milkdown/plugin-history'
 import { clipboard } from '@milkdown/plugin-clipboard'
@@ -16,6 +16,7 @@ import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
 import { NotesWritingToolbar } from './NotesWritingToolbar'
+import { configureImageSize, imageSizeRemark, NotesImageView } from './notesImage'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
@@ -157,6 +158,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         // these and its null title would blank one out.
         ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))
         configureUnderlineStringify(ctx)
+        configureImageSize(ctx)
         // The tooltip is rendered on the body (see NotesFormattingTooltip
         // for why), so its React portal goes there too.
         ctx.set(formattingTooltip.key, {
@@ -171,6 +173,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       .use(history)
       .use(clipboard)
       .use(underlineRemark)
+      .use(imageSizeRemark)
+      .use($view(imageSchema.node, () => nodeViewFactory({ component: NotesImageView, as: 'span' })))
       .use(underlineSchema)
       .use(toggleUnderlineCommand)
       .use(underlineKeymap)
