@@ -256,8 +256,17 @@ const NEWLINE = String.fromCharCode(10)
 const linkOpener = $prose(() => new Plugin({
   key: new PluginKey('NOTES_LINK_OPENER'),
   props: {
-    // handleDOMEvents, not handleClick: ProseMirror routes a Shift+click to
-    // extending the selection and never offers it as a click.
+    // ProseMirror's own gesture for Ctrl+click (Cmd on a Mac) is to select
+    // the node under the pointer, which drew a box around whatever sentence
+    // was clicked. Here that modifier means "open the link", so the gesture
+    // is claimed and the box never appears. Plain clicks still select an
+    // embed, and Shift still extends the selection.
+    handleClick(_view, _pos, event) {
+      return event.ctrlKey || event.metaKey
+    },
+    // handleDOMEvents, not handleClick, for the opening itself: ProseMirror
+    // routes a Shift+click to extending the selection and never offers it
+    // as a click.
     handleDOMEvents: {
       click(view, event) {
         if (!event.ctrlKey && !event.metaKey && !event.shiftKey) return false

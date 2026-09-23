@@ -744,6 +744,13 @@ test.describe('links and text size', () => {
     // A plain click leaves the caret free to edit the link's words.
     await link.click()
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
+
+    // The same modifier is ProseMirror's own gesture for selecting the node
+    // under the pointer, which drew a box around whatever was clicked. Here
+    // the modifier belongs to links, so nothing is boxed.
+    const rect = (await body.boundingBox())!
+    await page.mouse.click(rect.x + rect.width - 30, rect.y + 12, { modifiers: ['Control'] })
+    await expect(body.locator('.ProseMirror-selectednode')).toHaveCount(0)
   })
 
   test('each text size brings its own leading', async ({ page }) => {
