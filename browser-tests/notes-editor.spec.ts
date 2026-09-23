@@ -75,35 +75,45 @@ test.describe('Notes editor', () => {
 })
 
 test.describe('formatting tooltip', () => {
-  test('appears over a selection, applies bold, and is dismissed by Escape', async ({ page }) => {
+  test('is asked for by right-clicking, applies bold, and is dismissed by Escape', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
     await body.click()
     await page.keyboard.type('Plain words here')
     const toolbar = page.getByRole('toolbar', { name: 'Formatting' })
+
+    // Selecting alone leaves the page quiet: the bar waits to be called.
+    await page.keyboard.press('Shift+Control+ArrowLeft')
+    await page.waitForTimeout(300)
     await expect(toolbar).toBeHidden()
 
-    // Select the last word with the keyboard; the bar should follow.
-    await page.keyboard.press('Shift+Control+ArrowLeft')
+    // Right-clicking within the selection keeps it and calls the bar, which
+    // sits on the body, outside the panel's clipping box, above the point.
+    const selection = await page.evaluate(() => {
+      const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+      return { top: rect.top, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    })
+    await page.mouse.click(selection.x, selection.y, { button: 'right' })
     await expect(toolbar).toBeVisible()
-
-    // The bar sits on the body, outside the panel's clipping box, and above
-    // the selected line rather than flipped below it.
-    const selectionTop = await page.evaluate(() => window.getSelection()!.getRangeAt(0).getBoundingClientRect().top)
+    // Above the point that asked for it, not over the words being read.
     const barBox = await toolbar.boundingBox()
-    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(selectionTop + 1)
+    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(selection.y + 1)
 
     const bold = toolbar.getByRole('button', { name: 'Bold' })
     await expect(bold).toHaveAttribute('aria-pressed', 'false')
     await bold.click()
     await expect(body.locator('strong')).toHaveText('here')
-    await expect(bold).toHaveAttribute('aria-pressed', 'true')
-    // Focus stayed in the editor and the panel did not move.
+    // The bar has done what it was called for, so it goes; focus never left
+    // the editor and the panel never moved.
+    await expect(toolbar).toBeHidden()
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
     expect(geometryOf(await panelById(page, notes.panelId))).toEqual(geometryOf(notes))
 
-    await bold.focus()
+    // Called again, Escape sends it away with the writing untouched.
+    await page.mouse.click(selection.x, selection.y, { button: 'right' })
+    await expect(toolbar).toBeVisible()
+    await toolbar.getByRole('button', { name: 'Bold' }).focus()
     await page.keyboard.press('Escape')
     await expect(toolbar).toBeHidden()
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
@@ -112,29 +122,41 @@ test.describe('formatting tooltip', () => {
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Plain words **here**\n')
   })
 
-  test('goes away when the selection collapses', async ({ page }) => {
+  test('goes away when the writing carries on, and when the pointer moves elsewhere', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
     await body.click()
     await page.keyboard.type('One two')
-    await page.keyboard.press('Shift+Home')
     const toolbar = page.getByRole('toolbar', { name: 'Formatting' })
+
+    const at = async () => {
+      const rect = await body.boundingBox()
+      return { x: rect!.x + 20, y: rect!.y + 10 }
+    }
+    const point = await at()
+    await page.mouse.click(point.x, point.y, { button: 'right' })
     await expect(toolbar).toBeVisible()
-    await page.keyboard.press('ArrowRight')
+    // An edit answers what the bar was called for.
+    await page.keyboard.type('!')
     await expect(toolbar).toBeHidden()
-    // ...and comes back for the next selection.
-    await page.keyboard.press('Shift+Home')
+
+    await page.mouse.click(point.x, point.y, { button: 'right' })
     await expect(toolbar).toBeVisible()
+    // So does a press anywhere else.
+    await body.click()
+    await expect(toolbar).toBeHidden()
   })
-  test('follows the selection, unscaled, when the canvas is zoomed', async ({ page }) => {
+  test('keeps its own size when the canvas is zoomed', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
     await body.click()
     await page.keyboard.type('Zoomed words')
-    await page.keyboard.press('Shift+Control+ArrowLeft')
     const toolbar = page.getByRole('toolbar', { name: 'Formatting' })
+    const first = await body.boundingBox()
+    await page.mouse.click(first!.x + 20, first!.y + 10, { button: 'right' })
     await expect(toolbar).toBeVisible()
     const before = await toolbar.boundingBox()
 
@@ -148,22 +170,16 @@ test.describe('formatting tooltip', () => {
     await page.mouse.wheel(0, -600)
     await page.keyboard.up('Control')
     await expect.poll(() => cameraZoom(page)).toBeGreaterThan(1.05)
-    // The bar comes back 150ms after the wheel goes quiet, and each wheel
-    // event restarts that wait -- so under a loaded machine the settle can
-    // take a good deal longer than the default timeout allows for.
-    await expect(toolbar).toBeVisible({ timeout: 20_000 })
+    // The wheel moved the canvas out from under the bar, so the bar goes.
+    await expect(toolbar).toBeHidden()
 
+    // Asked for again at the new zoom, it is the same size as before: the
+    // bar is app chrome, not canvas content.
+    await body.click({ button: 'right', position: { x: 20, y: 10 } })
+    await expect(toolbar).toBeVisible()
     const after = await toolbar.boundingBox()
-    const selection = await page.evaluate(() => {
-      const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
-      return { top: rect.top, centreX: rect.left + rect.width / 2 }
-    })
-    // Same size as before the zoom: the bar is app chrome, not canvas content.
     expect(Math.abs(after!.height - before!.height)).toBeLessThan(1)
     expect(Math.abs(after!.width - before!.width)).toBeLessThan(1)
-    // Above and centred on the (now larger) selected text.
-    expect(after!.y + after!.height).toBeLessThanOrEqual(selection.top + 1)
-    expect(Math.abs(after!.x + after!.width / 2 - selection.centreX)).toBeLessThan(2)
   })
 })
 
@@ -489,7 +505,12 @@ test.describe('two Notes panels', () => {
     await secondBody.click()
     await page.keyboard.type('Second panel words')
     await page.keyboard.press('Shift+Control+ArrowLeft')
-    // One editor has the selection, so exactly one bar is on screen.
+    const selection = await page.evaluate(() => {
+      const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    })
+    await page.mouse.click(selection.x, selection.y, { button: 'right' })
+    // Only the editor that was asked has a bar; the other panel's is quiet.
     await expect(page.getByRole('toolbar', { name: 'Formatting' })).toHaveCount(1)
     await page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name: 'Bold' }).click()
     await expect(secondBody.locator('strong')).toHaveText('words')
@@ -637,7 +658,12 @@ test.describe('floating editor UI and the canvas', () => {
     await page.keyboard.type('alpha bravo')
     await page.keyboard.press('Control+Home')
     await page.keyboard.press('Shift+Control+ArrowRight')
+    const selection = await page.evaluate(() => {
+      const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    })
     const bar = page.getByRole('toolbar', { name: 'Formatting' })
+    await page.mouse.click(selection.x, selection.y, { button: 'right' })
     await expect(bar).toBeVisible()
 
     const events: string[] = []

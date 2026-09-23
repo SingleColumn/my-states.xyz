@@ -15,12 +15,19 @@ import { markPointerEventHandled } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
 
 /**
- * The contextual formatting bar: appears over a text selection, offers the
- * few marks a writer reaches for mid-sentence, and goes away when the
- * selection does. Milkdown's tooltip plugin decides *when* (a non-empty
- * selection in a focused editor) and *where* (floating-ui, above the
- * selection, flipping below when there is no room); this component is the
- * *what*.
+ * The contextual formatting bar: the few marks a writer reaches for
+ * mid-sentence, asked for by right-clicking rather than offered on every
+ * selection. Selecting a phrase to re-read it, or dragging through a line
+ * to delete it, should not put a row of buttons over the words -- so the
+ * bar waits to be called, the way Typora's does.
+ *
+ * The cost is the browser's own menu inside the note: a right-click that
+ * opens this cannot also open that. Cut, copy and paste keep their
+ * keyboard shortcuts, which is where most writers reach for them anyway.
+ *
+ * Milkdown's tooltip plugin still does the positioning (floating-ui, above
+ * the point, flipping below when there is no room); what it no longer does
+ * is decide when to show, which is this component's `open` flag.
  *
  * It is mounted on `document.body`, not inside the panel. The panel body
  * clips its overflow, so a bar anchored to the first line would otherwise
@@ -37,6 +44,9 @@ export function NotesFormattingTooltip() {
   const viewRef = useRef(view)
   viewRef.current = view
   const { run } = useNotesEditorActions()
+  // Where the writer asked for the bar, and whether they have asked at all.
+  // A ref rather than state: the provider's shouldShow, made once, reads it.
+  const openAt = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const element = ref.current
@@ -44,35 +54,64 @@ export function NotesFormattingTooltip() {
     provider.current = new TooltipProvider({
       content: element,
       root: document.body,
-      // The plugin's default waits 200ms after every selection change, which
-      // reads as the bar lagging the mouse; this is short enough to feel
-      // attached to the selection without repositioning on every pixel.
-      debounce: 40,
+      debounce: 0,
       offset: 8,
+      // The bar is asked for, never offered: an update only keeps it up
+      // while the request stands.
+      shouldShow: () => openAt.current !== null,
     })
     // A wheel over the canvas pans or zooms it under a bar anchored to the
     // old place. Hide while the wheel turns, then put the bar back where
     // the selection now is. The re-show has to be asked for: the selection
     // itself has not changed, so the editor dispatches nothing that would
     // otherwise prompt the provider to look again.
-    let settle: number | undefined
-    const onWheel = () => {
+    const close = () => {
+      if (!openAt.current) return
+      openAt.current = null
       provider.current?.hide()
-      window.clearTimeout(settle)
-      settle = window.setTimeout(() => provider.current?.update(viewRef.current), 150)
+    }
+    // A wheel moves the canvas under a bar anchored to a point on it, and a
+    // press anywhere else is the writer moving on: either way the request
+    // has lapsed.
+    const onWheel = () => close()
+    const onPointerDown = (event: PointerEvent) => {
+      if (!element.contains(event.target as Node)) close()
     }
     window.addEventListener('wheel', onWheel, { capture: true, passive: true })
+    window.addEventListener('pointerdown', onPointerDown, true)
+
+    // The request itself. The browser's menu is given up here, which is the
+    // trade this makes.
+    const editorDom = viewRef.current.dom
+    const onContextMenu = (event: Event) => {
+      const mouse = event as globalThis.MouseEvent
+      event.preventDefault()
+      event.stopPropagation()
+      openAt.current = { x: mouse.clientX, y: mouse.clientY }
+      const point = openAt.current
+      provider.current?.show({
+        getBoundingClientRect: () => new DOMRect(point.x, point.y, 0, 0),
+      }, viewRef.current)
+    }
+    editorDom.addEventListener('contextmenu', onContextMenu)
+
     return () => {
-      window.clearTimeout(settle)
+      editorDom.removeEventListener('contextmenu', onContextMenu)
       window.removeEventListener('wheel', onWheel, { capture: true })
+      window.removeEventListener('pointerdown', onPointerDown, true)
       provider.current?.destroy()
     }
   }, [])
 
-  // The adapter re-renders this component after every editor transaction,
-  // so the bar tracks selection changes here rather than through its own
-  // subscription.
+  // The adapter re-renders after every editor transaction. An edit answers
+  // the request the bar was opened for, so it closes; a bare selection
+  // change leaves it alone, since the writer may be choosing what to format.
   useEffect(() => {
+    if (openAt.current && prevState && !prevState.doc.eq(view.state.doc)) {
+      openAt.current = null
+      provider.current?.hide()
+      return
+    }
     provider.current?.update(view, prevState)
   })
 
@@ -100,6 +139,7 @@ export function NotesFormattingTooltip() {
     if (event.key !== 'Escape') return
     event.preventDefault()
     event.stopPropagation()
+    openAt.current = null
     provider.current?.hide()
     run((ctx) => ctx.get(editorViewCtx).focus())
   }

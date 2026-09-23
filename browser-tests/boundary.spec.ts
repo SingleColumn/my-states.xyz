@@ -126,14 +126,15 @@ test.describe('content: the widget owns it', () => {
     expect(geometryOf(await panelById(page, notes.panelId))).toEqual(geometryOf(notes))
   })
 
-  test('right-clicking inside a note body leaves the browser menu to the browser', async ({ page }) => {
+  test('right-clicking inside a note asks the editor, not the canvas or the browser', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
     await expect(body).toBeVisible()
 
-    // The event itself is the evidence: the native menu is not a DOM thing,
-    // so what can be checked is that nothing in the page prevented it.
+    // The note's right-click summons the formatting bar, so it is the one
+    // press the editor takes the browser's own menu for. tldraw must still
+    // stay out of it: its menu would paste onto the canvas.
     await page.evaluate(() => {
       window.addEventListener('contextmenu', (event) => {
         ;(window as unknown as { __contextMenuEvent?: Event }).__contextMenuEvent = event
@@ -142,12 +143,13 @@ test.describe('content: the widget owns it', () => {
     await body.click({ button: 'right' })
 
     await expect(page.getByTestId('context-menu')).toHaveCount(0)
+    await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
     const verdict = await page.evaluate(() => {
       const event = (window as unknown as { __contextMenuEvent?: MouseEvent }).__contextMenuEvent
       const target = event?.target as Element | null
       return { seen: !!event, prevented: event?.defaultPrevented ?? null, inNote: !!target?.closest('.notes-editor-content') }
     })
-    expect(verdict).toEqual({ seen: true, prevented: false, inNote: true })
+    expect(verdict).toEqual({ seen: true, prevented: true, inNote: true })
     await page.keyboard.press('Escape')
   })
 })

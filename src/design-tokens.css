@@ -104,6 +104,8 @@
   /* Writing mode (Notes at full screen). The measure is the load-bearing
      value: ~66 characters at the 18px default, which is the range prose stays
      comfortable to read and to write in. Tune this first when judging it. */
+  /* The fallback. The real one is set on .notes-editor, which is the first
+     element that knows the writer's chosen text size. */
   --writing-measure: 600px;
   --font-size-writing-title: 30px;
   --space-writing-title-top: 44px;

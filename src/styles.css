@@ -1778,6 +1778,15 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor {
+  /* A measure is counted in characters, not pixels: about 68 of them, which
+     is what 34 times the text size comes to for this face. Fixed in pixels
+     it was a different measure at every size -- generous at the smallest,
+     seven words a line at the largest. Declared here rather than with the
+     other tokens because a custom property resolves the var()s inside it
+     where it is declared, and this is the first element that knows the
+     size the writer chose. Capped at the panel so the largest sizes simply
+     fill it. */
+  --writing-measure: min(100%, calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 34));
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -1932,6 +1941,23 @@ input[type="range"]:focus-visible {
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* At full screen the header is a strip the writing has to live under, so
+   it gives back what it can. Panel chrome is sized against the panel, which
+   at full screen is the whole window: the button alone was taller than this
+   whole strip now is. Here it stops growing and the padding closes up, so
+   the writing starts nearer the top. */
+.panel-notes-surface.is-writing-mode {
+  --card-header-button-size: 30px;
+}
+
+.panel-notes-surface.is-writing-mode .card-header {
+  padding-block: calc(var(--card-padding) / 3);
+}
+
+.panel-notes-surface.is-writing-mode .card-title {
+  font-size: var(--type-md);
 }
 
 .writing-title {
