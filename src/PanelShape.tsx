@@ -14,7 +14,7 @@ import { NotesPanel } from './panels/NotesPanel'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeMigrations, panelShapeProps, type PanelShape } from './panelShapeSchema'
 import { createPanelProps, panelFromShape } from './panelStore'
-import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled } from './panelSurface'
+import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled, panelContentSelector } from './panelSurface'
 import { usePanelCommands } from './PanelHeader'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
@@ -174,6 +174,7 @@ function handleNativeWheel(event: WheelEvent) {
   if (event.ctrlKey || event.metaKey) return
   if (!(event.currentTarget instanceof Element) || !(event.target instanceof Node)) return
   const scrollable = findScrollableAncestor(event.target, event.currentTarget)
+    ?? findScrollableInRegion(event.target)
   if (!scrollable) return
   event.preventDefault()
   event.stopPropagation()
@@ -186,13 +187,41 @@ function findScrollableAncestor(start: Node, boundary: Element): HTMLElement | n
   while (node) {
     if (node instanceof HTMLElement) {
       const style = getComputedStyle(node)
-      const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight
-      if (canScrollY) return node
+      if (canScroll(node, style)) return node
     }
     if (node === boundary) break
     node = node.parentNode
   }
   return null
+}
+
+/**
+ * The scrolling part of the content region the pointer is over, for the
+ * places where it is not an ancestor of what the pointer is on.
+ *
+ * A note at full screen is the case this exists for: its title is a field
+ * beside the editor's scroll box rather than inside it, so walking up from
+ * the title finds nothing that scrolls and the wheel fell through to the
+ * canvas -- the panel stayed put and the view slid off it instead, which is
+ * a hard place to come back from.
+ *
+ * Scoped to the one declared region the pointer is in, not to the whole
+ * panel: a region that does not scroll should not borrow the scrolling of
+ * something else on the same panel, which is how the Images panel's strip
+ * would start moving under a pointer resting somewhere else entirely.
+ */
+function findScrollableInRegion(start: Node): HTMLElement | null {
+  const region = start instanceof Element ? start.closest(panelContentSelector) : null
+  if (!region) return null
+  for (const candidate of region.querySelectorAll('*')) {
+    if (!(candidate instanceof HTMLElement)) continue
+    if (canScroll(candidate, getComputedStyle(candidate))) return candidate
+  }
+  return null
+}
+
+function canScroll(node: HTMLElement, style: CSSStyleDeclaration) {
+  return (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight
 }
 
 /**

@@ -1938,7 +1938,7 @@ input[type="range"]:focus-visible {
 .notes-image-handle {
   position: absolute;
   top: 0;
-  right: calc(var(--space-detail-1) * -1);
+  right: 0;
   width: var(--size-image-handle-target);
   height: 100%;
   cursor: ew-resize;
@@ -1946,23 +1946,40 @@ input[type="range"]:focus-visible {
   touch-action: none;
 }
 
+/* A grip, not a hairline. The first version was a 2px rule the colour of
+   the accent, which at a glance was indistinguishable from the edge of the
+   picture; this is a pill with its own edge, sitting half over the picture
+   and half off it, which is what a thing you can take hold of looks like. */
 .notes-image-handle::after {
   content: "";
   position: absolute;
   top: 50%;
-  right: var(--space-detail-1);
-  width: var(--border-width-rich-content);
+  right: 0;
+  width: var(--size-image-handle-grip-width);
   height: var(--size-image-handle-grip);
   transform: translateY(-50%);
-  border-radius: var(--border-width-rich-content);
+  border: var(--border-width-hairline) solid var(--color-panel-border);
+  border-radius: var(--size-image-handle-grip-width);
   background: var(--accent-notes, var(--color-focus-ring));
+  box-shadow: var(--shadow-app-badge);
 }
 
+/* Shown whenever the picture is the thing being dealt with -- pointed at,
+   picked, or being pulled -- rather than only while the pointer is on the
+   few pixels of the handle itself. */
 .notes-image:hover .notes-image-handle,
 .notes-image.is-selected .notes-image-handle,
 .notes-image.is-resizing .notes-image-handle,
 .notes-image-handle:focus-visible {
   opacity: 1;
+}
+
+/* And the picture says it is the one picked, which is also the cue that
+   there is a handle on it. */
+.notes-image.is-selected img,
+.notes-image.is-resizing img {
+  outline: var(--border-width-rich-content) solid var(--accent-notes, var(--color-focus-ring));
+  outline-offset: var(--border-width-hairline);
 }
 
 .notes-image-handle:focus-visible {
@@ -2220,10 +2237,6 @@ input[type="range"]:focus-visible {
  * and the slash menu can do all of this too, but both are gestures a writer
  * has to be told about; this is what makes them optional.
  */
-.notes-writing-toolbar-host {
-  flex: 0 0 auto;
-}
-
 /* Hidden rather than unmounted: the editor draws the tools into this
    element when it starts, so it has to stay where it was put. */
 .notes-writing-toolbar-host.is-hidden {
@@ -2232,19 +2245,59 @@ input[type="range"]:focus-visible {
 
 /*
  * The tools are chrome for the writing, not a strip of application. So they
- * start where the words start -- the same column the text is held to -- and
+ * begin where the words begin -- the same column the text is held to -- and
  * carry no rule under them: a line across the page would cut the note in
  * two above its own title. What separates them from the writing is space.
+ *
+ * The host is the column; the bar inside it is only as wide as the tools,
+ * with a frame to say they are one set. Spreading them across the column
+ * instead made the gaps grow with the text size, which at the larger sizes
+ * left the icons looking scattered rather than placed.
  */
-.notes-writing-toolbar {
+.notes-writing-toolbar-host {
+  flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-detail-1);
   width: 100%;
+  /* Enough room above for the header's own rule not to crowd it, which some
+     themes draw heavily. */
+  padding-block: var(--space-detail-5) var(--space-detail-2);
+}
+
+/* At full screen the writing is held to a column, so the tools begin where
+   the words do. Everywhere else the text fills the panel and there is no
+   such column: held to one there, the tools were centred on a measure
+   nothing else on the panel used, and so lined up with nothing at all. They
+   follow the panel's own edge instead -- the same edge as the note's title
+   field and the editor below it. */
+.panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
   max-width: var(--writing-measure);
   margin-inline: auto;
-  padding: var(--space-detail-2) 0 var(--space-detail-1);
+}
+
+.notes-writing-toolbar {
+  display: flex;
+  /* One row, always. Wrapping put three of the tools on a second line
+     inside the frame the moment the content came within a few pixels of
+     the column, which reads as a mistake rather than as a layout. When
+     there is genuinely not enough room the style menu gives up width
+     instead -- it has a min-width of nothing for exactly that. */
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-detail-1);
+  width: max-content;
+  max-width: 100%;
+  padding: var(--space-detail-1);
+  border: var(--border-width-hairline) solid var(--color-panel-border);
+  border-radius: var(--radius-control);
+}
+
+/* Between what a line is, how its words are marked and what can be put in.
+   Inside a frame the groups need only a wider gap to be read as groups. */
+.notes-writing-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+  margin-left: var(--space-detail-3);
 }
 
 /* The loudest thing on the bar was this control's own box: the app's
@@ -2299,29 +2352,21 @@ input[type="range"]:focus-visible {
    reads as a mistake, and the menu still shows enough of a name to be
    recognised. */
 @container panel-shell (max-width: 520px) {
-  .notes-writing-toolbar {
-    flex-wrap: nowrap;
+  .notes-writing-group {
+    margin-left: var(--space-detail-2);
   }
 }
 
 
 
-/* Between what a line is, how its words are marked, and what can be put in:
-   three jobs on one bar, and the eye needs to be told where one ends. On
-   the floating bar that is a drawn line, which is short and busy enough to
-   need one; on the writing tools it is only space, which is quieter and
-   enough at that length. */
+/* Between what a line is and how its words are marked: two jobs on one
+   short, crowded bar, and the eye needs to be told where one ends. The
+   writing tools say the same thing with distance instead. */
 .notes-formatting-divider {
   align-self: stretch;
   width: var(--border-width-hairline);
   margin: var(--space-detail-2) var(--space-detail-1);
   background: var(--color-app-badge-border);
-}
-
-.notes-writing-toolbar .notes-formatting-divider {
-  width: 0;
-  margin: 0 var(--space-detail-3);
-  background: transparent;
 }
 
 .notes-insert-emoji {

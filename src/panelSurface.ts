@@ -39,7 +39,8 @@ export const PANEL_CONTENT_ATTRIBUTE = 'data-panel-content'
 /** Spread onto the element that bounds a content region. */
 export const panelContentProps = { [PANEL_CONTENT_ATTRIBUTE]: '' } as const
 
-const panelContentSelector = `[${PANEL_CONTENT_ATTRIBUTE}]`
+/** Every declared content region: what a panel hands the pointer back for. */
+export const panelContentSelector = `[${PANEL_CONTENT_ATTRIBUTE}]`
 
 export function isInsidePanelContent(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(panelContentSelector) !== null
@@ -50,10 +51,19 @@ export function isInsidePanelContent(target: EventTarget | null): boolean {
  * field, or any element inside a contenteditable. This is the same test
  * tldraw applies before it claims a key, so the app and the library agree on
  * where typing goes without either keeping a list of editor widgets.
+ *
+ * `isContentEditable` alone does not answer the question it looks like it
+ * answers. An editor marks the parts it draws itself -- a picture, an
+ * embed -- `contenteditable="false"` so the caret cannot be put inside
+ * them, and the flag is then false on everything within. Those are still
+ * the editor's, and a right-click on one belongs to the editor's own menu
+ * rather than to the canvas underneath; without the second test, tldraw
+ * opened its shape menu over a picture in a note.
  */
 export function isTextInputTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false
   if (target instanceof HTMLElement && target.isContentEditable) return true
+  if (target.closest('[contenteditable="true"]')) return true
   const tag = target.tagName.toLowerCase()
   return tag === 'input' || tag === 'textarea' || tag === 'select'
 }

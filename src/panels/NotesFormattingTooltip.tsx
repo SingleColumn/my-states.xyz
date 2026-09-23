@@ -85,6 +85,13 @@ export function NotesFormattingTooltip() {
 
     // The request itself. The browser's menu is given up here, which is the
     // trade this makes.
+    //
+    // In the capture phase, so the editor claims the gesture on the way down
+    // rather than waiting for it to come back up. React attaches its own
+    // listeners to every portal container, and a picture is drawn by a node
+    // view that is a portal -- so the panel's React handler runs *inside*
+    // the editor, and the stopPropagation it makes to keep the canvas menu
+    // away was killing this before it ever fired.
     const editorDom = viewRef.current.dom
     const onContextMenu = (event: Event) => {
       const mouse = event as globalThis.MouseEvent
@@ -96,10 +103,10 @@ export function NotesFormattingTooltip() {
         getBoundingClientRect: () => new DOMRect(point.x, point.y, 0, 0),
       }, viewRef.current)
     }
-    editorDom.addEventListener('contextmenu', onContextMenu)
+    editorDom.addEventListener('contextmenu', onContextMenu, { capture: true })
 
     return () => {
-      editorDom.removeEventListener('contextmenu', onContextMenu)
+      editorDom.removeEventListener('contextmenu', onContextMenu, { capture: true })
       window.removeEventListener('wheel', onWheel, { capture: true })
       window.removeEventListener('pointerdown', onPointerDown, true)
       provider.current?.destroy()

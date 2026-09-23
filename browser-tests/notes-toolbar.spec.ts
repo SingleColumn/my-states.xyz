@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { describeCanvas, noteBodyOf, openApp, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
+import { describeCanvas, dispatch, noteBodyOf, openApp, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
 
 /**
  * The writing tools above the note: asked for from the panel's menu, and
@@ -159,6 +159,33 @@ test.describe('the writing tools', () => {
     await expect.poll(async () => Math.round((await again.locator('.notes-image img').boundingBox())!.width)).toBe(pulled)
   })
 
+  test('a picture belongs to the note, not to the canvas underneath it', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    await body.click()
+    const chooser = page.waitForEvent('filechooser')
+    await bar.getByRole('button', { name: 'Picture' }).click()
+    await (await chooser).setFiles(PNG_FIXTURE)
+    const picture = body.locator('.notes-image img')
+    await expect(picture).toHaveCount(1)
+    const box = (await picture.boundingBox())!
+    const middle = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+
+    // Clicking it picks it, which is also what puts the handle on show: the
+    // handle was all but impossible to find when it appeared only while the
+    // pointer happened to be on the few pixels of it.
+    await page.mouse.click(middle.x, middle.y)
+    await expect(body.locator('.notes-image.is-selected')).toHaveCount(1)
+    await page.mouse.move(20, 20)
+    await expect(body.locator('.notes-image-handle')).toHaveCSS('opacity', '1')
+
+    // Right-clicking it asks the note, not the canvas. A picture is drawn by
+    // the editor with `contenteditable="false"`, so the test for "this is
+    // the editor's" cannot be the editable flag on the element itself.
+    await page.mouse.click(middle.x, middle.y, { button: 'right' })
+    await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
+    await expect(page.locator('.tlui-menu')).toHaveCount(0)
+  })
+
   test('place a picture from a file, which the note then carries itself', async ({ page }) => {
     const { body, bar } = await openWithTools(page)
     await body.click()
@@ -185,6 +212,94 @@ test.describe('the writing tools', () => {
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect(again.locator('img:not(.ProseMirror-separator)')).toHaveCount(1)
+  })
+})
+
+test.describe('the writing tools on the page', () => {
+  test('begin where the words begin and keep one shape at every text size', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 })
+    const { body } = await openWithTools(page)
+    await body.click()
+    await page.keyboard.type('A line of writing to measure the column by.')
+    const shape = await shapeOf(page, (await panelOfType(page, 'notes')).panelId)
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
+    await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
+
+    const shapeOfBar = () => page.evaluate(() => {
+      const bar = document.querySelector('.notes-writing-toolbar')!.getBoundingClientRect()
+      const text = document.querySelector('.notes-editor-content p')!.getBoundingClientRect()
+      const buttons = Array.from(document.querySelectorAll('.notes-writing-toolbar .notes-formatting-button'))
+        .map((button) => button.getBoundingClientRect())
+      return {
+        offsetFromText: Math.round(bar.x) - Math.round(text.x),
+        width: Math.round(bar.width),
+        rows: new Set(buttons.map((button) => Math.round(button.y))).size,
+      }
+    })
+
+    const small = await measured(page, shapeOfBar)
+    await setTextSize(page, shape, 'Extra large')
+    const large = await measured(page, shapeOfBar)
+
+    // The column grows with the text; the tools do not. Spread across it
+    // instead, the gaps between them grew too, which at the larger sizes
+    // left the icons looking scattered rather than placed.
+    expect(small.offsetFromText).toBe(0)
+    expect(large.offsetFromText).toBe(0)
+    expect(large.width).toBe(small.width)
+    // And they stay on one row: three tools dropping to a second line inside
+    // the frame reads as a mistake.
+    expect(small.rows).toBe(1)
+    expect(large.rows).toBe(1)
+  })
+
+  test('follow the panel’s own edge when there is no column to follow', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 })
+    const { body } = await openWithTools(page)
+    const notes = await panelOfType(page, 'notes')
+    await body.click()
+    await page.keyboard.type('A line of writing.')
+    // Larger than its default but not full screen, which is where the tools
+    // were centred on a measure nothing else on the panel used.
+    await dispatch(page, { kind: 'panel.resize', panelId: notes.panelId, w: 820, h: 560 })
+
+    await expect.poll(async () => page.evaluate(() => {
+      const left = (selector: string) => Math.round(document.querySelector(selector)!.getBoundingClientRect().x)
+      return [left('.notes-writing-toolbar') - left('.note-title-input'), left('.notes-writing-toolbar') - left('.notes-editor')]
+    })).toEqual([0, 0])
+  })
+
+  test('a wheel over the note title scrolls the note, not the canvas', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 })
+    const { body } = await openWithTools(page)
+    await body.click()
+    for (let line = 0; line < 50; line++) {
+      await page.keyboard.type(`line ${line}`)
+      await page.keyboard.press('Enter')
+    }
+    const shape = await shapeOf(page, (await panelOfType(page, 'notes')).panelId)
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
+    await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
+
+    const scrollTop = () => page.evaluate(() => Math.round((document.querySelector('.notes-editor .milkdown') as HTMLElement).scrollTop))
+    const camera = () => page.evaluate(() => document.querySelector<HTMLElement>('.tl-html-layer')?.style.transform ?? '')
+
+    // The title is a field beside the editor's scroll box rather than inside
+    // it, so there is nothing scrollable above it to walk up to. Left at
+    // that, the wheel fell through to the canvas and slid the view off the
+    // panel -- which is a hard place to come back from.
+    const title = page.locator('.writing-title')
+    await title.click()
+    const box = (await title.boundingBox())!
+    const before = { scroll: await scrollTop(), camera: await camera() }
+    expect(before.scroll).toBeGreaterThan(0)
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.wheel(0, -200)
+
+    await expect.poll(scrollTop).toBeLessThan(before.scroll)
+    expect(await camera()).toBe(before.camera)
   })
 })
 
@@ -232,6 +347,23 @@ test.describe('a panel left at full screen', () => {
     }).toEqual([Math.round(notes.w), Math.round(notes.h)])
   })
 })
+
+/** Read once the value has stopped changing, so a measurement is of a settled layout. */
+async function measured<T>(page: Page, read: () => Promise<T>): Promise<T> {
+  let last: T | undefined
+  await expect.poll(async () => {
+    const next = await read()
+    const same = JSON.stringify(next) === JSON.stringify(last)
+    last = next
+    return same
+  }).toBe(true)
+  return last!
+}
+
+async function setTextSize(page: Page, shape: Locator, label: string) {
+  await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+  await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click()
+}
 
 /** A note open with the tools showing, which is not where a writer starts. */
 async function openWithTools(page: Page): Promise<{ body: Locator; bar: Locator }> {

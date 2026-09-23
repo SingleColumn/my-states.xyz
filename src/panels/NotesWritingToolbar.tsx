@@ -94,8 +94,7 @@ export function NotesWritingToolbar() {
         ))}
       </select>
 
-      <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
-
+      <span className="notes-writing-group">
       <FormatButton label="Bold" active={isMarkActive(state, marks.strong)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleStrongCommand.key))}>
         <Bold size={16} aria-hidden="true" />
       </FormatButton>
@@ -111,9 +110,9 @@ export function NotesWritingToolbar() {
       <FormatButton label="Link" active={isMarkActive(state, marks.link)} onActivate={toggleLink}>
         <LinkIcon size={16} aria-hidden="true" />
       </FormatButton>
+      </span>
 
-      <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
-
+      <span className="notes-writing-group">
       <FormatButton label="Divider" active={false} onActivate={() => run((ctx) => { insertDivider(ctx); ctx.get(editorViewCtx).focus() })}>
         <Minus size={16} aria-hidden="true" />
       </FormatButton>
@@ -126,6 +125,7 @@ export function NotesWritingToolbar() {
       }))}>
         <ImageIcon size={16} aria-hidden="true" />
       </FormatButton>
+      </span>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Ctx } from '@milkdown/ctx'
 import { imageSchema } from '@milkdown/preset-commonmark'
+import { NodeSelection } from '@milkdown/prose/state'
 import { $remark } from '@milkdown/utils'
 import { useNodeViewContext } from '@prosemirror-adapter/react'
 
@@ -151,7 +152,7 @@ function escapeAttribute(value: string) {
  * thing to undo rather than forty.
  */
 export function NotesImageView() {
-  const { node, setAttrs, selected } = useNodeViewContext()
+  const { node, view, getPos, setAttrs, selected } = useNodeViewContext()
   const imageRef = useRef<HTMLImageElement>(null)
   const startRef = useRef<{ x: number; width: number } | null>(null)
   const [dragging, setDragging] = useState<number | null>(null)
@@ -184,6 +185,22 @@ export function NotesImageView() {
     }
   }, [isDragging, setAttrs])
 
+  /**
+   * A click on the picture picks the picture. Without it the caret simply
+   * lands beside the picture, the node is never selected, and the handle
+   * only ever appears while the pointer happens to be over it -- which is
+   * what made it so hard to find.
+   *
+   * On the click and not the press: the editor sets its own selection from
+   * the pointer as the press completes, so a selection made before that is
+   * thrown away a moment later.
+   */
+  function select() {
+    const at = getPos()
+    if (at === undefined) return
+    view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, at)))
+  }
+
   function startDrag(event: ReactPointerEvent) {
     const measured = imageRef.current?.getBoundingClientRect().width ?? MIN_WIDTH
     startRef.current = { x: event.clientX, width: Math.round(measured) }
@@ -195,6 +212,7 @@ export function NotesImageView() {
   return (
     <span className={`notes-image${selected ? ' is-selected' : ''}${dragging !== null ? ' is-resizing' : ''}`}>
       <img
+        onClick={select}
         ref={imageRef}
         src={node.attrs.src as string}
         alt={node.attrs.alt as string}
