@@ -1,10 +1,10 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { Download, FilePlus2, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
-import { NotesEditor, type NoteStats } from './NotesEditor'
+import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const { notes, panels } = useAppState()
@@ -17,6 +17,15 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
+  const editorHandle = useRef<NotesEditorHandle | null>(null)
+
+  // A title is the first line of writing, not a form field: Enter carries on
+  // into the note, and so does Down, since there is no line below it here.
+  function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter' && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    editorHandle.current?.focusStart()
+  }
   const found = panels.get(panelId)
   const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
   const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
@@ -125,6 +134,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
                 className="note-title-input"
                 value={activeNote?.title ?? ''}
                 onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
+                onKeyDown={handleTitleKeyDown}
                 disabled={!activeNote}
                 aria-label="Note title"
                 placeholder="Name this note"
@@ -144,6 +154,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
                 className="writing-title"
                 value={activeNote.title}
                 onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
+                onKeyDown={handleTitleKeyDown}
                 aria-label="Note title"
                 placeholder="Untitled"
               />
@@ -157,7 +168,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
                 notes.setActiveNoteDocument(document, panelId)
                 setStats(next)
               }}
-              onMarkdownSource={(render) => notes.registerMarkdownSource(panelId, render)}
+              onHandle={(handle) => {
+                editorHandle.current = handle
+                notes.registerMarkdownSource(panelId, handle ? () => handle.getMarkdown() : null)
+              }}
             />
           </div>
         ) : (

@@ -570,6 +570,53 @@ test.describe('deriving the Markdown', () => {
   })
 })
 
+test.describe('the title leads into the note', () => {
+  test('Enter and Down carry the caret from the title into the text', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    const title = shape.getByLabel('Note title')
+
+    // fill, not type: a new note is already called "Untitled note".
+    await title.fill('A title')
+    await page.keyboard.press('Enter')
+    // Straight on into the note, with no click needed.
+    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
+    await page.keyboard.type('The first line.')
+    await expect(body).toHaveText('The first line.')
+    // ...and the Enter did not leave a blank line behind it.
+    await expect(body.locator('p')).toHaveCount(1)
+
+    // Down does the same, and lands at the start rather than wherever the
+    // caret happened to be.
+    await title.click()
+    await page.keyboard.press('ArrowDown')
+    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
+    await page.keyboard.type('Before. ')
+    await expect(body).toHaveText('Before. The first line.')
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: 'A title', content: 'Before. The first line.\n' })
+  })
+
+  test('the same in writing mode', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
+    await expect(shape.locator('.notes-editor.is-writing')).toHaveCount(1)
+
+    await shape.locator('.writing-title').fill('Written large')
+    await page.keyboard.press('Enter')
+    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
+    await page.keyboard.type('And the body.')
+    await expect(noteBodyOf(shape)).toHaveText('And the body.')
+  })
+})
+
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

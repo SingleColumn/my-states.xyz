@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
-import { Editor, EditorStatus, defaultValueCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/core'
+import { Editor, EditorStatus, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
 import { history } from '@milkdown/plugin-history'
 import { clipboard } from '@milkdown/plugin-clipboard'
-import { Plugin, PluginKey } from '@milkdown/prose/state'
+import { Plugin, PluginKey, Selection } from '@milkdown/prose/state'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
 import { $prose, $view, getMarkdown } from '@milkdown/utils'
@@ -22,7 +22,8 @@ import '@milkdown/prose/view/style/prosemirror.css'
  * structured document when the note has one, as Markdown otherwise -- and
  * every edit comes back out through `onChange` as the document, which is
  * what the store keeps. Its Markdown, which the exports and bundles need,
- * is derived through `onMarkdownSource` only when something asks for it.
+ * is derived through the handle given to `onHandle`, only when something
+ * asks for it.
  *
  * The parent keys this component on the note id, so a change of note is a
  * fresh mount rather than a value swap; that keeps the caret and the undo
@@ -61,11 +62,18 @@ interface NotesEditorProps {
   /** Every edit: the document as it now stands, and what the footer counts. */
   onChange: (document: NoteDocument, stats: NoteStats) => void
   /**
-   * Offers the note as Markdown on demand. Called with a function once the
-   * editor is ready and with null as it goes, which is the store's cue to
-   * take the Markdown one last time.
+   * The editor, once it is ready, for the few things the panel around it
+   * has to ask of it. Called with null as the editor goes, which is also
+   * the store's cue to take its Markdown one last time.
    */
-  onMarkdownSource: (render: (() => string) | null) => void
+  onHandle: (handle: NotesEditorHandle | null) => void
+}
+
+export interface NotesEditorHandle {
+  /** The note as Markdown, derived now. */
+  getMarkdown(): string
+  /** Puts the caret at the start of the document -- where the title leads. */
+  focusStart(): void
 }
 
 /** What the panel's footer reports, counted from the document, not its Markdown. */
@@ -94,7 +102,7 @@ function prefersMarkdown() {
   }
 }
 
-function NotesEditorInner({ markdown, document: noteDocument, placeholder, onChange, onMarkdownSource, editorRef, keyHandlers }: NotesEditorProps & {
+function NotesEditorInner({ markdown, document: noteDocument, placeholder, onChange, onHandle, editorRef, keyHandlers }: NotesEditorProps & {
   editorRef: MutableRefObject<Editor | undefined>
   keyHandlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>
 }) {
@@ -105,8 +113,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
   // does not recreate the editor (which would drop the caret mid-sentence).
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
-  const sourceRef = useRef(onMarkdownSource)
-  sourceRef.current = onMarkdownSource
+  const handleRef = useRef(onHandle)
+  handleRef.current = onHandle
 
   useEffect(() => {
     const host = hostRef.current
@@ -154,13 +162,21 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       .use(panelEmbedDrop)
       .use(panelEmbedDropCursor)
 
-    const offerMarkdown = () => {
+    const offerHandle = () => {
       const ready = editorRef.current
-      if (ready?.status === EditorStatus.Created) sourceRef.current(() => ready.action(getMarkdown()))
+      if (ready?.status !== EditorStatus.Created) return
+      handleRef.current({
+        getMarkdown: () => ready.action(getMarkdown()),
+        focusStart: () => ready.action((ctx) => {
+          const view = ctx.get(editorViewCtx)
+          view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)).scrollIntoView())
+          view.focus()
+        }),
+      })
     }
     let editor = make(true)
     editorRef.current = editor
-    void editor.create().then(offerMarkdown).catch(async (error: unknown) => {
+    void editor.create().then(offerHandle).catch(async (error: unknown) => {
       // A stored document the current schema cannot read (a node type gone,
       // an attribute changed) is not the end of the note: the Markdown
       // written beside it is what it looked like, so the note opens from
@@ -171,13 +187,13 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       editor = make(false)
       editorRef.current = editor
       await editor.create()
-      offerMarkdown()
+      offerHandle()
     })
 
     return () => {
       // Withdrawn while the editor can still be asked, so the store can take
       // the Markdown for anything typed since the last save.
-      sourceRef.current(null)
+      handleRef.current(null)
       editorRef.current = undefined
       void editor.destroy()
       mount.remove()
