@@ -750,8 +750,13 @@ test.describe('links and text size', () => {
     // The same modifier is ProseMirror's own gesture for selecting the node
     // under the pointer, which drew a box around whatever was clicked. Here
     // the modifier belongs to links, so nothing is boxed.
+    // Held around the click, not passed to it: page.mouse.click takes no
+    // modifiers and silently ignores one, which made this assertion pass
+    // without Ctrl ever being down.
     const rect = (await body.boundingBox())!
-    await page.mouse.click(rect.x + rect.width - 30, rect.y + 12, { modifiers: ['Control'] })
+    await page.keyboard.down('Control')
+    await page.mouse.click(rect.x + rect.width - 30, rect.y + 12)
+    await page.keyboard.up('Control')
     await expect(body.locator('.ProseMirror-selectednode')).toHaveCount(0)
   })
 
@@ -930,11 +935,7 @@ test.describe('opening a markdown file', () => {
 
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
     await page.getByRole('menuitem', { name: 'Open markdown file' }).click()
-    await shape.locator('input.visually-hidden-file-input').setInputFiles({
-      name: 'Kept from elsewhere.md',
-      mimeType: 'text/markdown',
-      buffer: Buffer.from('# A heading from the file\n\nWith **prose** under it.\n'),
-    })
+    await shape.locator('input.visually-hidden-file-input').setInputFiles(MARKDOWN_FIXTURE)
 
     const opened = noteBodyOf(await shapeOf(page, notes.panelId))
     await expect(opened.locator('h1')).toHaveText('A heading from the file')
@@ -948,6 +949,9 @@ test.describe('opening a markdown file', () => {
       .toEqual(['# A heading from the file\n\nWith **prose** under it.\n', 'Already written here\n'])
   })
 })
+
+/** Read from disk: built in memory it would need a Buffer, and node's types are not in this project. */
+const MARKDOWN_FIXTURE = 'browser-tests/fixtures/Kept from elsewhere.md'
 
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

@@ -28,7 +28,8 @@ test.describe('a panel at full screen', () => {
     expect([full.panelLeft, full.panelWidth, full.panelBottom]).toEqual([0, 1280, 820])
     // And the header's title starts within a pixel of the moment's name
     // above it, so the two bands share a left column.
-    expect(Math.abs(full.momentNameLeft - full.titleLeft)).toBeLessThanOrEqual(1)
+    expect(full.titleLeft).not.toBeNull()
+    expect(Math.abs(full.momentNameLeft - full.titleLeft!)).toBeLessThanOrEqual(1)
 
     // Restoring gives the toolbar its inset back.
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()

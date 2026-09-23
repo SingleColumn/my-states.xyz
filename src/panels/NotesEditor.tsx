@@ -41,17 +41,17 @@ import '@milkdown/prose/view/style/prosemirror.css'
 export function NotesEditor(props: NotesEditorProps) {
   const editorRef = useRef<Editor>()
   const keyHandlers = useRef(new Set<(event: KeyboardEvent) => boolean>())
-  const insertOpeners = useRef(new Set<() => void>())
+  const emojiOpeners = useRef(new Set<() => void>())
   const actions = useMemo<NotesEditorActions>(() => ({
     run: (action) => { editorRef.current?.action(action) },
     addKeyHandler: (handler) => {
       keyHandlers.current.add(handler)
       return () => { keyHandlers.current.delete(handler) }
     },
-    openInsertMenu: () => { for (const open of insertOpeners.current) open() },
-    registerInsertOpener: (open) => {
-      insertOpeners.current.add(open)
-      return () => { insertOpeners.current.delete(open) }
+    openEmojiList: () => { for (const open of emojiOpeners.current) open() },
+    registerEmojiOpener: (open: () => void) => {
+      emojiOpeners.current.add(open)
+      return () => { emojiOpeners.current.delete(open) }
     },
   }), [])
   return (

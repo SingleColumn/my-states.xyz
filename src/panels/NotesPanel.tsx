@@ -14,6 +14,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // untouched so the two treatments can be compared side by side.
   const isWritingMode = commands.isPanelFullScreen(panelId)
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
+  const [showTools, setShowTools] = useState(() => readShowTools())
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
@@ -82,6 +83,20 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         panelType="notes"
         title="Writing"
         menuItems={[
+          {
+            id: 'formatting-tools',
+            label: 'Show formatting tools',
+            icon: <Type size={17} aria-hidden="true" />,
+            checked: showTools,
+            onSelect: () => {
+              setShowTools(!showTools)
+              try {
+                window.localStorage.setItem(showToolsStorageKey, String(!showTools))
+              } catch {
+                // The choice still holds for this session.
+              }
+            },
+          },
           { id: 'new-note', label: 'New note', icon: <FilePlus2 size={17} aria-hidden="true" />, onSelect: () => { void notes.createNote(panelId).catch(() => {}) } },
           {
             id: 'open-markdown',
@@ -159,9 +174,15 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         )}
 
-        {activeNote ? (
-          <div className="notes-writing-toolbar-host" ref={toolbarHostRef} {...panelContentProps} />
-        ) : null}
+        {/* Always rendered, hidden when the writer has not asked for it:
+            the editor draws the tools into this element as it starts, and a
+            host that came and went would leave the drawing with nowhere to
+            go. */}
+        <div
+          className={`notes-writing-toolbar-host${showTools && activeNote ? '' : ' is-hidden'}`}
+          ref={toolbarHostRef}
+          {...panelContentProps}
+        />
 
         {activeNote ? (
           <div
@@ -245,6 +266,21 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
 const newDocumentSelectValue = '__new_document__'
 const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
+const showToolsStorageKey = 'mic:notes-formatting-tools'
+
+/**
+ * Whether the writing tools are on show. Off until asked for: the tools are
+ * a strip across the top of the writing, and a writer who does not want
+ * them should not have to look at them. The `...` menu names them, which is
+ * where the previous editor kept the same switch.
+ */
+function readShowTools() {
+  try {
+    return window.localStorage.getItem(showToolsStorageKey) === 'true'
+  } catch {
+    return false
+  }
+}
 // Four steps for reading at, each with the leading that suits it: tighter
 // where the line is short, looser where it is long. Medium is the default.
 const editorFontSizes = {

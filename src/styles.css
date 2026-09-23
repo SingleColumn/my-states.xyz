@@ -2157,6 +2157,12 @@ input[type="range"]:focus-visible {
   flex: 0 0 auto;
 }
 
+/* Hidden rather than unmounted: the editor draws the tools into this
+   element when it starts, so it has to stay where it was put. */
+.notes-writing-toolbar-host.is-hidden {
+  display: none;
+}
+
 .notes-writing-toolbar {
   display: flex;
   flex-wrap: wrap;

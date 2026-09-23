@@ -64,6 +64,9 @@ const CLOSE = '</u>'
 
 interface MdNode { type: string; children?: MdNode[]; value?: string; [key: string]: unknown }
 
+/** Only what the handler passes on: a node with children to serialise. */
+interface Parent { type: string; children?: unknown[] }
+
 /**
  * Pairs up the scraps. Reading `a <u>b</u> c` remark gives a paragraph of
  * five children -- text, html `<u>`, text, html `</u>`, text -- and the
@@ -107,17 +110,30 @@ function isTag(node: MdNode, tag: string) {
  */
 export function configureUnderlineStringify(ctx: Ctx) {
   const options = ctx.get(remarkStringifyOptionsCtx)
+  // `underline` is not one of mdast's node types, so it is not one of the
+  // handler names remark's own typing knows about -- which is the whole
+  // reason this exists. The cast says that and nothing more: the handler
+  // itself is written against remark's real state object.
+  const underline: UnderlineHandler = (node, _parent, state, info) => {
+    const tracker = state.createTracker(info)
+    let value = tracker.move(OPEN)
+    value += tracker.move(state.containerPhrasing(node, { before: value, after: '<', ...tracker.current() }))
+    value += tracker.move(CLOSE)
+    return value
+  }
   ctx.set(remarkStringifyOptionsCtx, {
     ...options,
-    handlers: {
-      ...options.handlers,
-      underline: (node, _parent, state, info) => {
-        const tracker = state.createTracker(info)
-        let value = tracker.move(OPEN)
-        value += tracker.move(state.containerPhrasing(node as never, { before: value, after: '<', ...tracker.current() }))
-        value += tracker.move(CLOSE)
-        return value
-      },
-    },
+    handlers: { ...options.handlers, underline } as typeof options.handlers,
   })
 }
+
+/** What remark hands a handler, for the one node type it has never heard of. */
+type UnderlineHandler = (
+  node: Parent,
+  parent: unknown,
+  state: {
+    createTracker: (info: unknown) => { move: (value: string) => string; current: () => object }
+    containerPhrasing: (node: Parent, info: object) => string
+  },
+  info: unknown,
+) => string

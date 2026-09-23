@@ -1,7 +1,8 @@
-import { Bold, Code, Italic, Link as LinkIcon, Plus, Underline as UnderlineIcon } from 'lucide-react'
+import { Bold, Code, Image as ImageIcon, Italic, Link as LinkIcon, Minus, Smile, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import type { Ctx } from '@milkdown/ctx'
 import {
+  insertImageCommand,
   liftListItemCommand,
   toggleEmphasisCommand,
   toggleInlineCodeCommand,
@@ -19,6 +20,7 @@ import { usePluginViewContext } from '@prosemirror-adapter/react'
 import { markPointerEventHandled, panelContentProps } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
 import { FormatButton, isMarkActive, linkAddress } from './NotesFormattingTooltip'
+import { insertDivider, pickImageFile } from './NotesInsertMenu'
 import { toggleUnderlineCommand } from './notesUnderline'
 
 /**
@@ -32,6 +34,13 @@ import { toggleUnderlineCommand } from './notesUnderline'
  * hidden routes become what they should have been all along: shortcuts for
  * people who already know them.
  *
+ * Everything it offers is on it. An earlier version put the insertions
+ * behind a plus, which opened a list over the writing -- a bar whose
+ * options are themselves hidden is only the same problem one layer down,
+ * and the list covered the words a writer was looking at while choosing.
+ * The one exception is the emoji, which has to be picked from somewhere;
+ * that list opens at the caret, as it does when `:` is typed.
+ *
  * It is a plugin view rather than an ordinary component so that it re-reads
  * the editor after every keystroke and selection change -- which is what
  * lets the style menu say what the line under the caret currently is, and
@@ -40,7 +49,7 @@ import { toggleUnderlineCommand } from './notesUnderline'
  */
 export function NotesWritingToolbar() {
   const { view } = usePluginViewContext()
-  const { run, openInsertMenu } = useNotesEditorActions()
+  const { run, openEmojiList } = useNotesEditorActions()
   const { state } = view
   const marks = state.schema.marks
   const style = blockStyleOf(state)
@@ -105,8 +114,17 @@ export function NotesWritingToolbar() {
 
       <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
 
-      <FormatButton label="Insert a picture, divider, emoji or panel" active={false} onActivate={openInsertMenu}>
-        <Plus size={16} aria-hidden="true" />
+      <FormatButton label="Divider" active={false} onActivate={() => run((ctx) => { insertDivider(ctx); ctx.get(editorViewCtx).focus() })}>
+        <Minus size={16} aria-hidden="true" />
+      </FormatButton>
+      <FormatButton label="Emoji" active={false} onActivate={openEmojiList}>
+        <Smile size={16} aria-hidden="true" />
+      </FormatButton>
+      <FormatButton label="Picture" active={false} onActivate={() => run((ctx) => pickImageFile((src, alt) => {
+        ctx.get(commandsCtx).call(insertImageCommand.key, { src, alt, title: '' })
+        ctx.get(editorViewCtx).focus()
+      }))}>
+        <ImageIcon size={16} aria-hidden="true" />
       </FormatButton>
     </div>
   )

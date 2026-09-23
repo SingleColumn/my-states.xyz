@@ -13,15 +13,25 @@ import type { Ctx } from '@milkdown/ctx'
  * on the text, so its arrow, Enter and Escape handling has to run before
  * the editor's own keymap turns Enter into a new paragraph. A handler
  * returns true to claim the key. The returned function unregisters it.
+ *
+ * `openEmojiList` is the writing tools' route to the list `:` opens. Every
+ * other tool on that bar acts where the caret is; an emoji has to be chosen
+ * from somewhere first, and the somewhere already exists. The menu
+ * registers what it does through `registerEmojiOpener`, so the button does
+ * not have to know how the list is triggered.
  */
 export interface NotesEditorActions {
   run(action: (ctx: Ctx) => void): void
   addKeyHandler(handler: (event: KeyboardEvent) => boolean): () => void
+  openEmojiList(): void
+  registerEmojiOpener(open: () => void): () => void
 }
 
 export const NotesEditorActionsContext = createContext<NotesEditorActions>({
   run: () => {},
   addKeyHandler: () => () => {},
+  openEmojiList: () => {},
+  registerEmojiOpener: () => () => {},
 })
 
 export function useNotesEditorActions() {

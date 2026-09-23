@@ -71,7 +71,7 @@ export function NotesInsertMenu() {
   const { view, prevState } = usePluginViewContext()
   const viewRef = useRef(view)
   viewRef.current = view
-  const { run, addKeyHandler, registerInsertOpener } = useNotesEditorActions()
+  const { run, addKeyHandler, registerEmojiOpener } = useNotesEditorActions()
   const { panels, slideshow } = useAppState()
   const [activeIndex, setActiveIndex] = useState(0)
   // The query the writer pressed Escape on: the menu stays away until the
@@ -168,7 +168,8 @@ export function NotesInsertMenu() {
     })
   }
 
-  useEffect(() => registerInsertOpener(() => {
+  useEffect(() => registerEmojiOpener(() => {
+    browsingEmoji.current = true
     run((ctx) => {
       const editorView = ctx.get(editorViewCtx)
       const { state } = editorView
@@ -179,13 +180,13 @@ export function NotesInsertMenu() {
       const before = $at.parentOffset > 0 ? $at.parent.textBetween($at.parentOffset - 1, $at.parentOffset) : ''
       // The trigger is only read as one at the start of a line or after a
       // space, so one is supplied when the caret is mid-sentence.
-      const text = before && !/\s/.test(before) ? ' /' : '/'
+      const text = before && !/\s/.test(before) ? ' :' : ':'
       typedToOpen.current = text.length
       editorView.dispatch(state.tr.setSelection(TextSelection.create(state.doc, at)).insertText(text).scrollIntoView())
       editorView.focus()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [registerInsertOpener])
+  }), [registerEmojiOpener])
 
   useEffect(() => addKeyHandler((event) => {
     if (!openRef.current) return false
@@ -368,7 +369,7 @@ function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boo
  * line behind as an empty paragraph, which Markdown has no way to write
  * except as a stray `<br />`.
  */
-function insertDivider(ctx: Ctx) {
+export function insertDivider(ctx: Ctx) {
   const view = ctx.get(editorViewCtx)
   if (view.state.selection.$from.parent.content.size > 0) {
     view.dispatch(view.state.tr.split(view.state.selection.from).scrollIntoView())
@@ -391,7 +392,7 @@ function insertDivider(ctx: Ctx) {
  */
 const IMAGE_FILE_LIMIT_BYTES = 1_500_000
 
-function pickImageFile(place: (src: string, alt: string) => void) {
+export function pickImageFile(place: (src: string, alt: string) => void) {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml'

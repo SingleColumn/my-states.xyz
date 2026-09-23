@@ -1,19 +1,42 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { describeCanvas, noteBodyOf, openApp, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
 
 /**
- * The writing tools above the note. Everything here can also be reached by
- * right-clicking or by typing a slash -- but both of those have to be known
- * about first, and a note is for people who have never heard of Markdown.
- * These specs are about what can be found without being told.
+ * The writing tools above the note: asked for from the panel's menu, and
+ * then showing everything they can do rather than hiding half of it behind
+ * another button. Right-clicking and typing a slash still reach the same
+ * commands; these specs are about the route that needs no telling.
  */
 test.describe('the writing tools', () => {
-  test('say what the line is, and give a way back out of a list', async ({ page }) => {
+  test('are off until the panel menu is asked for them, and stay off after a reload', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const style = page.getByRole('toolbar', { name: 'Writing tools' }).getByRole('combobox', { name: 'Style of this line' })
-    await expect(style).toBeVisible()
+    const shape = await shapeOf(page, notes.panelId)
+    const bar = page.getByRole('toolbar', { name: 'Writing tools' })
+    await expect(bar).toBeHidden()
+
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    const item = page.getByRole('menuitemcheckbox', { name: 'Show formatting tools' })
+    await expect(item).toHaveAttribute('aria-checked', 'false')
+    await item.click()
+    await expect(bar).toBeVisible()
+
+    // The choice is the writer's and it is kept.
+    await page.reload()
+    await waitForCanvas(page)
+    await expect(page.getByRole('toolbar', { name: 'Writing tools' })).toBeVisible()
+
+    const again = await shapeOf(page, notes.panelId)
+    await again.getByRole('button', { name: 'Writing panel actions' }).click()
+    const shown = page.getByRole('menuitemcheckbox', { name: 'Show formatting tools' })
+    await expect(shown).toHaveAttribute('aria-checked', 'true')
+    await shown.click()
+    await expect(page.getByRole('toolbar', { name: 'Writing tools' })).toBeHidden()
+  })
+
+  test('say what the line is, and give a way back out of a list', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    const style = bar.getByRole('combobox', { name: 'Style of this line' })
 
     await body.click()
     await page.keyboard.type('- one')
@@ -40,10 +63,7 @@ test.describe('the writing tools', () => {
   })
 
   test('mark words, and say when a mark is on', async ({ page }) => {
-    await openApp(page)
-    const notes = await panelOfType(page, 'notes')
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const bar = page.getByRole('toolbar', { name: 'Writing tools' })
+    const { body, bar } = await openWithTools(page)
     await body.click()
     await page.keyboard.type('mark these words')
     await page.keyboard.press('Control+a')
@@ -61,65 +81,56 @@ test.describe('the writing tools', () => {
       .toBe('**<u>mark these words</u>**\n')
   })
 
-  test('the plus opens the insert list wherever the caret is, and leaves nothing behind', async ({ page }) => {
-    await openApp(page)
-    const notes = await panelOfType(page, 'notes')
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const insert = page.getByRole('toolbar', { name: 'Writing tools' }).getByRole('button', { name: /^Insert/ })
-    const menu = page.getByRole('listbox', { name: 'Insert' })
-
+  test('place a divider without covering the writing to do it', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
     await body.click()
-    // Mid-sentence, where a typed slash would not have been read as one.
     await page.keyboard.type('Before it')
-    await insert.click()
-    await expect(menu).toBeVisible()
 
-    await menu.getByRole('option', { name: 'Divider' }).click()
+    // Nothing opens: the button does the thing it names.
+    await bar.getByRole('button', { name: 'Divider' }).click()
+    await expect(page.getByRole('listbox', { name: 'Insert' })).toBeHidden()
     await expect(body.locator('hr')).toHaveCount(1)
 
-    // The trigger the button typed is taken back out with it, and the rule
-    // goes between the lines: splitting one would leave the remainder as an
-    // empty paragraph, which Markdown can only write as a stray `<br />`.
+    // The rule goes between the lines: splitting one would leave the
+    // remainder as an empty paragraph, which Markdown can only write as a
+    // stray `<br />`.
     const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
-      .toContain('Before it\n\n***')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('Before it\n\n***')
     expect((await readStorage(page, moment!.id)).notes[0]?.content).not.toContain('<br />')
   })
 
-  test('Escape after the plus takes back the menu it opened', async ({ page }) => {
-    await openApp(page)
-    const notes = await panelOfType(page, 'notes')
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const insert = page.getByRole('toolbar', { name: 'Writing tools' }).getByRole('button', { name: /^Insert/ })
+  test('open the emoji list at the caret, and leave nothing behind on Escape', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
     const menu = page.getByRole('listbox', { name: 'Insert' })
-
     await body.click()
-    await page.keyboard.type('Nothing added')
-    await insert.click()
+    // Mid-sentence, where a typed colon would not have been read as one.
+    await page.keyboard.type('Ready')
+
+    await bar.getByRole('button', { name: 'Emoji' }).click()
     await expect(menu).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
-
     const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Nothing added\n')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready\n')
+
+    // And chosen from, it puts the character in and takes the trigger out --
+    // including the space the button had to type for the trigger to be read
+    // as one, so the emoji lands exactly where the caret was and the button
+    // adds nothing the writer did not ask for.
+    await bar.getByRole('button', { name: 'Emoji' }).click()
+    await expect(menu).toBeVisible()
+    await page.keyboard.type('tick')
+    await menu.getByRole('option', { name: 'Done' }).click()
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready✅\n')
   })
 
-  test('offers emoji and a picture from a file, which the note carries itself', async ({ page }) => {
-    await openApp(page)
-    const notes = await panelOfType(page, 'notes')
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const insert = page.getByRole('toolbar', { name: 'Writing tools' }).getByRole('button', { name: /^Insert/ })
-    const menu = page.getByRole('listbox', { name: 'Insert' })
-
+  test('place a picture from a file, which the note then carries itself', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
     await body.click()
-    await insert.click()
-    // Both of the things a writer had no way of finding are on this list.
-    await expect(menu.getByRole('option', { name: 'Emoji', exact: true })).toBeVisible()
-    await expect(menu.getByRole('option', { name: 'Picture from a file' })).toBeVisible()
 
     const chooser = page.waitForEvent('filechooser')
-    await menu.getByRole('option', { name: 'Picture from a file' }).click()
-    await (await chooser).setFiles({ name: 'dot.png', mimeType: 'image/png', buffer: Buffer.from(PNG_DOT, 'base64') })
+    await bar.getByRole('button', { name: 'Picture' }).click()
+    await (await chooser).setFiles(PNG_FIXTURE)
 
     // Not plain `img`: ProseMirror keeps a separator image of its own beside
     // an inline node, which is none of the note's business.
@@ -173,6 +184,18 @@ test.describe('a panel left at full screen', () => {
   })
 })
 
+/** A note open with the tools showing, which is not where a writer starts. */
+async function openWithTools(page: Page): Promise<{ body: Locator; bar: Locator }> {
+  await openApp(page)
+  const notes = await panelOfType(page, 'notes')
+  const shape = await shapeOf(page, notes.panelId)
+  await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Show formatting tools' }).click()
+  const bar = page.getByRole('toolbar', { name: 'Writing tools' })
+  await expect(bar).toBeVisible()
+  return { body: noteBodyOf(shape), bar }
+}
+
 function look(page: Page) {
   return page.evaluate(() => ({
     expanded: (document.querySelector('.app-root') as HTMLElement).dataset.panelFullScreen ?? null,
@@ -184,5 +207,5 @@ function look(page: Page) {
   }))
 }
 
-/** A 1x1 red dot, small enough to be a literal. */
-const PNG_DOT = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+/** A 1x1 dot on disk: in memory it would need a Buffer, and node's types are not in this project. */
+const PNG_FIXTURE = 'browser-tests/fixtures/dot.png'
