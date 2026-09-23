@@ -92,9 +92,12 @@ export function AppChrome({
   useLayoutEffect(() => {
     const element = rootRef.current
     if (!element) return
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     const measure = () => {
       const rect = element.getBoundingClientRect()
-      element.closest<HTMLElement>('.app-root')?.style.setProperty('--app-chrome-height', `${rect.height}px`)
+      const root = element.closest<HTMLElement>('.app-root')
+      root?.style.setProperty('--app-chrome-height', `${rect.height}px`)
+      root?.style.setProperty('--app-moment-text-left', `${momentTextLeft(element)}px`)
       onMeasure({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height })
     }
     measure()
@@ -194,6 +197,35 @@ export function AppChromeMenuPanel() {
   const props = useContext(AppChromePropsContext)
   if (!props) return null
   return <AppChrome {...props} />
+}
+
+/**
+ * What a browser lays out before a select's text, on top of whatever
+ * padding the stylesheet gives it. The inset is the browser's, not ours, so
+ * it is a measured constant rather than a derived one: 4px in Chromium, and
+ * being a pixel out elsewhere costs a pixel of alignment and nothing more.
+ */
+const SELECT_TEXT_INSET = 4
+
+/**
+ * Where the open moment's name is laid out, measured from the toolbar's own
+ * left edge.
+ *
+ * A panel at full screen puts its title directly beneath this, and two
+ * bands of text stacked on each other have to share a left column or the
+ * seam reads as careless. That column cannot be written in the stylesheet:
+ * it is the toolbar's inset plus the dropdown's border and padding, each of
+ * which a theme may change, plus what the browser adds inside the control.
+ * So it is measured here and handed over as a custom property. Measuring
+ * from the toolbar rather than the window also makes it the same number
+ * before and after the toolbar goes flush to the window edge.
+ */
+function momentTextLeft(chrome: HTMLElement) {
+  const select = chrome.querySelector('.moment-toolbar select')
+  if (!select) return 0
+  const style = getComputedStyle(select)
+  const inset = select.getBoundingClientRect().x - chrome.getBoundingClientRect().x
+  return inset + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) + SELECT_TEXT_INSET
 }
 
 function stopCanvasEvent(event: React.SyntheticEvent) {

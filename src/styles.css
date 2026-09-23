@@ -2134,6 +2134,15 @@ input[type="range"]:focus-visible {
 
 /* An emoji sits in the slot an icon would, drawn a size up so it reads as
    the thing being inserted rather than as decoration beside a word. */
+/* Between what a line is and how its words are marked: two jobs on one
+   bar, and the eye needs to be told where one ends. */
+.notes-formatting-divider {
+  align-self: stretch;
+  width: var(--border-width-hairline);
+  margin: var(--space-detail-2) var(--space-detail-1);
+  background: var(--color-app-badge-border);
+}
+
 .notes-insert-emoji {
   font-size: var(--type-lg);
   line-height: 1;
@@ -2246,38 +2255,46 @@ input[type="range"]:focus-visible {
 }
 
 /*
- * Two treatments of the meeting between a full-screen panel and the top
- * toolbar, side by side so they can be compared in the app (Settings ->
- * Appearance -> Full screen). See src/fullScreenStyle.ts: this is a
- * comparison device, and the losing two should go once one is chosen.
+ * At full screen the panel is the window, so the card it is the rest of the
+ * time gives up the things that only make sense against a canvas: its
+ * rounded corners have nothing behind them at the window edge, and its
+ * border and shadow frame a page no one can see past.
  *
- * Both square the panel, because a rounded corner against the window edge
- * has nothing behind it but canvas. They differ in what happens to the
- * toolbar.
+ * `border-width: 0`, not a transparent colour -- a transparent border is
+ * still a border, and the canvas shows through the 1px band it leaves,
+ * which reads as a gap between the toolbar and the page.
  */
-.app-root[data-full-screen-style='flush'] .canvas-panel-shell.is-full-screen,
-.app-root[data-full-screen-style='overlay'] .canvas-panel-shell.is-full-screen {
-  border-color: transparent;
+.canvas-panel-shell.is-full-screen {
+  border-width: 0;
   border-radius: 0;
   box-shadow: none;
 }
 
-/* Flush: the toolbar stops being a floating pill and becomes a band across
-   the top of the page, holding only its lower edge as a rule. */
-.app-root[data-full-screen-style='flush'][data-panel-full-screen='true'] .app-chrome {
+/* And the toolbar stops floating: it becomes the band across the top of
+   that page, holding only its lower edge as the rule between the two. */
+.app-root[data-panel-full-screen='true'] .app-chrome {
   width: 100%;
   margin: 0;
   border-width: 0 0 var(--border-width-hairline);
   border-radius: 0;
 }
 
-/* Overlay: the page runs to the very top of the window, behind the toolbar,
-   which keeps the shape it has everywhere else and floats on the writing.
-   The panel's own header has to clear it, so the content starts at the
-   toolbar's lower edge -- its measured bottom, which includes the inset it
-   floats by, not just its height. */
-.app-root[data-full-screen-style='overlay'] .canvas-panel-shell.is-full-screen .panel {
-  padding-top: var(--app-chrome-bottom, var(--app-chrome-height));
+/* Two bands of text stacked on each other have to share a left column, or
+   the seam between them reads as careless. The panel's title is moved to
+   where the moment's name is laid out -- measured, because that column is
+   the toolbar's inset plus the dropdown's own border and padding plus what
+   the browser adds inside it, and the first three are the theme's to
+   choose. AppChrome measures it; see --app-moment-text-left there.
+
+   Multiplied by --tl-scale because the two are not in the same units. The
+   toolbar is drawn at screen size, while a panel is drawn inside tldraw's
+   canvas and scaled by the camera, so a padding written here renders at
+   only `zoom` times its value. --tl-scale is 1/zoom, which turns the
+   measured screen pixels back into the panel's own. The fallback is the
+   same column before a theme touches it, for the frame before the toolbar
+   has been measured. */
+.canvas-panel-shell.is-full-screen .card-header {
+  padding-left: calc(var(--app-moment-text-left, 25px) * var(--tl-scale));
 }
 
 @container panel-shell (max-width: 520px) {

@@ -822,6 +822,58 @@ test.describe('underline', () => {
   })
 })
 
+test.describe('what a line is', () => {
+  test('the bar turns a line into a heading and back, and says which it is', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('A line of writing')
+
+    const bar = page.getByRole('toolbar', { name: 'Formatting' })
+    const ask = async () => {
+      const rect = (await body.boundingBox())!
+      await page.mouse.click(rect.x + 30, rect.y + 12, { button: 'right' })
+      await expect(bar).toBeVisible()
+    }
+
+    await ask()
+    // Ordinary writing says so before anything is chosen.
+    await expect(bar.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'true')
+    await bar.getByRole('button', { name: 'Subheading' }).click()
+    await expect(body.locator('h2')).toHaveText('A line of writing')
+
+    await ask()
+    await expect(bar.getByRole('button', { name: 'Subheading' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(bar.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'false')
+
+    // And the way back, which the editor had no route to before.
+    await bar.getByRole('button', { name: 'Text' }).click()
+    await expect(body.locator('h2')).toHaveCount(0)
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('A line of writing\n')
+  })
+
+  test('the insert menu offers the way back too', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('## A subheading')
+    await expect(body.locator('h2')).toHaveText('A subheading')
+
+    // From the start of the line, so the trigger needs no space in front of
+    // it and none is left behind when the item is chosen.
+    await page.keyboard.press('Home')
+    await page.keyboard.type('/text')
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+    await menu.getByRole('option', { name: 'Text', exact: true }).click()
+    await expect(body.locator('h2')).toHaveCount(0)
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('A subheading\n')
+  })
+})
+
 test.describe('emoji', () => {
   test('a colon and a word find one, and Enter puts it in the writing', async ({ page }) => {
     await openApp(page)

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { Bold, Code, Italic, Link as LinkIcon, Underline as UnderlineIcon } from 'lucide-react'
+import { Bold, Code, Heading1, Heading2, Heading3, Italic, Link as LinkIcon, Pilcrow, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { tooltipFactory, TooltipProvider } from '@milkdown/plugin-tooltip'
 import {
@@ -7,6 +7,8 @@ import {
   toggleInlineCodeCommand,
   toggleLinkCommand,
   toggleStrongCommand,
+  turnIntoTextCommand,
+  wrapInHeadingCommand,
 } from '@milkdown/preset-commonmark'
 import type { EditorState } from '@milkdown/prose/state'
 import type { MarkType } from '@milkdown/prose/model'
@@ -16,9 +18,9 @@ import { useNotesEditorActions } from './notesEditorActions'
 import { toggleUnderlineCommand } from './notesUnderline'
 
 /**
- * The contextual formatting bar: the few marks a writer reaches for
- * mid-sentence, asked for by right-clicking rather than offered on every
- * selection. Selecting a phrase to re-read it, or dragging through a line
+ * The contextual formatting bar: what a line is, and the few marks a writer
+ * reaches for mid-sentence, asked for by right-clicking rather than offered
+ * on every selection. Selecting a phrase to re-read it, or dragging through a line
  * to delete it, should not put a row of buttons over the words -- so the
  * bar waits to be called, the way Typora's does.
  *
@@ -118,6 +120,17 @@ export function NotesFormattingTooltip() {
 
   const { state } = view
   const marks = state.schema.marks
+  const block = blockOf(state)
+
+  function setBlock(level: number) {
+    run((ctx) => {
+      const commands = ctx.get(commandsCtx)
+      // Level 0 is the way back: a heading turned into ordinary writing.
+      if (level === 0) commands.call(turnIntoTextCommand.key)
+      else commands.call(wrapInHeadingCommand.key, level)
+      ctx.get(editorViewCtx).focus()
+    })
+  }
 
   function toggleLink() {
     if (isMarkActive(state, marks.link)) {
@@ -148,6 +161,12 @@ export function NotesFormattingTooltip() {
 
   return (
     <div ref={ref} className="notes-formatting-tooltip" role="toolbar" aria-label="Formatting" data-show="false" onKeyDown={handleKeyDown} onPointerDown={markPointerEventHandled}>
+      {blockChoices.map(({ level, label, icon }) => (
+        <FormatButton key={level} label={label} active={block === level} onActivate={() => setBlock(level)}>
+          {icon}
+        </FormatButton>
+      ))}
+      <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
       <FormatButton label="Bold" active={isMarkActive(state, marks.strong)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleStrongCommand.key))}>
         <Bold size={16} aria-hidden="true" />
       </FormatButton>
@@ -165,6 +184,29 @@ export function NotesFormattingTooltip() {
       </FormatButton>
     </div>
   )
+}
+
+/**
+ * What a line can be. Level 0 is ordinary writing; the rest are the three
+ * heading sizes the insert menu offers, so the two routes agree.
+ */
+const blockChoices = [
+  { level: 0, label: 'Text', icon: <Pilcrow size={16} aria-hidden="true" /> },
+  { level: 1, label: 'Heading', icon: <Heading1 size={16} aria-hidden="true" /> },
+  { level: 2, label: 'Subheading', icon: <Heading2 size={16} aria-hidden="true" /> },
+  { level: 3, label: 'Small heading', icon: <Heading3 size={16} aria-hidden="true" /> },
+]
+
+/**
+ * What the line holding the caret is: 0 for a paragraph, the level for a
+ * heading, and -1 for anything else (a list item, a quote, an embed), where
+ * no block button should read as active.
+ */
+function blockOf(state: EditorState) {
+  const parent = state.selection.$from.parent
+  if (parent.type.name === 'paragraph') return 0
+  if (parent.type.name === 'heading') return parent.attrs.level as number
+  return -1
 }
 
 /**

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
-import { Heading1, Heading2, Heading3, Image as ImageIcon, List, ListOrdered, Minus, Quote, Smile } from 'lucide-react'
+import { Heading1, Heading2, Heading3, Image as ImageIcon, List, ListOrdered, Minus, Pilcrow, Quote, Smile } from 'lucide-react'
 import type { Ctx } from '@milkdown/ctx'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { slashFactory, SlashProvider } from '@milkdown/plugin-slash'
 import {
   insertHrCommand,
   insertImageCommand,
+  turnIntoTextCommand,
   wrapInBlockquoteCommand,
   wrapInBulletListCommand,
   wrapInHeadingCommand,
@@ -82,7 +83,7 @@ export function NotesInsertMenu() {
 
   const query = queryOf(view)
   const image = currentPictureOf(panels.all.filter((panel) => panel.type === 'slideshow').map((panel) => panel.id), slideshow)
-  const items = query === null ? [] : filterItems(itemsFor(query, image, browsingEmoji), query.typed)
+  const items = query === null ? [] : filterItems(itemsFor(query, image, browsingEmoji, isHeading(view)), query.typed)
   const isOpen = query !== null && items.length > 0 && dismissed.current !== queryKey(query)
   const active = Math.min(activeIndex, Math.max(items.length - 1, 0))
 
@@ -224,7 +225,10 @@ export function NotesInsertMenu() {
 function queryOf(view: EditorView): Query | null {
   const { selection } = view.state
   const { $from, empty } = selection
-  if (!empty || !$from.parent.isTextblock || $from.parent.type.name !== 'paragraph') return null
+  // A heading counts: turning one back into writing is on this menu, and it
+  // could never be reached from a heading otherwise. A code block does not:
+  // a slash there is a slash.
+  if (!empty || !$from.parent.isTextblock || !TRIGGERS_IN.has($from.parent.type.name)) return null
   const before = $from.parent.textBetween(0, $from.parentOffset, undefined, '\uFFFC')
   const slash = slashPattern.exec(before)
   if (slash) return { trigger: '/', typed: slash[1] }
@@ -232,18 +236,24 @@ function queryOf(view: EditorView): Query | null {
   return emoji ? { trigger: ':', typed: emoji[1] } : null
 }
 
+const TRIGGERS_IN = new Set(['paragraph', 'heading'])
+
 /** One string standing for a query, for the comparisons that need one. */
 function queryKey(query: Query) {
   return query.trigger + query.typed
 }
 
-function itemsFor(query: Query, image: ImageItem | null, browsingEmoji: MutableRefObject<boolean>): InsertItem[] {
+function itemsFor(query: Query, image: ImageItem | null, browsingEmoji: MutableRefObject<boolean>, inHeading: boolean): InsertItem[] {
   if (query.trigger === ':') {
     // A colon is punctuation until a letter follows it; the exception is a
     // list asked for by name from the `/` menu.
     return query.typed.length > 0 || browsingEmoji.current ? emojiItems() : []
   }
-  return buildItems(image, browsingEmoji)
+  return buildItems(image, browsingEmoji, inHeading)
+}
+
+function isHeading(view: EditorView) {
+  return view.state.selection.$from.parent.type.name === 'heading'
 }
 
 function filterItems(items: InsertItem[], typed: string) {
@@ -265,8 +275,11 @@ function emojiItems(): InsertItem[] {
   }))
 }
 
-function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boolean>): InsertItem[] {
+function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boolean>, inHeading: boolean): InsertItem[] {
   return [
+    // Only where it would do something. In ordinary writing "Text" is a
+    // no-op, and a menu whose first entry does nothing teaches nothing.
+    ...(inHeading ? [{ id: 'text', label: 'Text', keywords: 'paragraph plain body normal none heading', icon: <Pilcrow size={16} />, run: (ctx: Ctx) => ctx.get(commandsCtx).call(turnIntoTextCommand.key) }] : []),
     { id: 'h1', label: 'Heading', keywords: 'title h1 large', icon: <Heading1 size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInHeadingCommand.key, 1) },
     { id: 'h2', label: 'Subheading', keywords: 'heading h2 section', icon: <Heading2 size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInHeadingCommand.key, 2) },
     { id: 'h3', label: 'Small heading', keywords: 'heading h3', icon: <Heading3 size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInHeadingCommand.key, 3) },
