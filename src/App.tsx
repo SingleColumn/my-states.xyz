@@ -13,6 +13,7 @@ import { getPanelDefinition } from './panelRegistry'
 import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
+import { getFullScreenStyle, useFullScreenStyle } from './fullScreenStyle'
 import { debounce } from './utils'
 import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
 import { registerHiddenCanvasPersistence } from './canvasPersistence'
@@ -55,6 +56,7 @@ function AppContent() {
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
   const [isCanvasReady, setIsCanvasReady] = useState(false)
   const [chromeHeight, setChromeHeight] = useState(0)
+  const [chromeBottom, setChromeBottom] = useState(0)
   const [architectureReport, setArchitectureReport] = useState<PanelArchitectureReport | null>(null)
   const [isHelpAboutOpen, setIsHelpAboutOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -62,6 +64,7 @@ function AppContent() {
   // this mirrors it purely so the root element re-renders when a panel enters
   // or leaves full screen.
   const [fullScreenPanelId, setFullScreenPanelId] = useState<string | null>(null)
+  const fullScreenStyle = useFullScreenStyle()
   const helpAboutReturnFocusRef = useRef<HTMLElement | null>(null)
   const settingsReturnFocusRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<Editor | null>(null)
@@ -324,6 +327,17 @@ function AppContent() {
     if (selected.length === 1 && isPanelShape(selected[0])) hidePanel(selected[0].props.panelId)
   }, [hidePanel])
 
+  const fullScreenBoundsFor = useCallback((editor: Editor) => {
+    const viewport = editor.getViewportScreenBounds()
+    return getFullScreenPanelLayout(
+      { x: viewport.x, y: viewport.y, w: viewport.w, h: viewport.h },
+      // The overlay treatment puts the page behind the toolbar rather than
+      // below it, so the top of the viewport is what it has to clear.
+      getFullScreenStyle() === 'overlay' ? viewport.y : chromeRectRef.current?.bottom,
+      (point) => editor.screenToPage(point),
+    )
+  }, [])
+
   const togglePanelFullScreen = useCallback((panelId: string) => {
     const editor = editorRef.current
     const shape = editor ? getPanelShape(editor, panelId) : undefined
@@ -337,19 +351,29 @@ function AppContent() {
     }
     previousPanelGeometryRef.current.set(panelId, panelShapeToLayout(shape))
     setFullScreenPanelId(panelId)
-    const viewport = editor.getViewportScreenBounds()
-    const bounds = getFullScreenPanelLayout(
-      { x: viewport.x, y: viewport.y, w: viewport.w, h: viewport.h },
-      chromeRectRef.current?.bottom,
-      (point) => editor.screenToPage(point),
-    )
+    const bounds = fullScreenBoundsFor(editor)
     withPanelEdit(editor, 'expand panel', () => {
       writePanelShape(editor, panelId, { x: bounds.x, y: bounds.y, props: { w: bounds.w, h: bounds.h } })
       // A full-screen panel may overlap existing panels. Keep it above them
       // so the action is immediately useful without a second arrange command.
       editor.bringToFront([shape.id])
     })
-  }, [])
+  }, [fullScreenBoundsFor])
+
+  // Changing the treatment while a panel is already at full screen moves its
+  // top edge -- overlay runs under the toolbar, the other two clear it, and
+  // flush moves the toolbar itself -- so the panel is laid out again rather
+  // than left at the shape the previous treatment gave it. Not a history
+  // step of its own: this corrects the expansion the writer already asked
+  // for, and undo should still take back that one action.
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor || !fullScreenPanelId || !getPanelShape(editor, fullScreenPanelId)) return
+    const bounds = fullScreenBoundsFor(editor)
+    withPanelEdit(editor, 'expand panel', () => {
+      writePanelShape(editor, fullScreenPanelId, { x: bounds.x, y: bounds.y, props: { w: bounds.w, h: bounds.h } })
+    }, { history: 'ignore' })
+  }, [fullScreenStyle, fullScreenPanelId, chromeBottom, fullScreenBoundsFor])
 
   const togglePanelFocusView = useCallback((panelId: string) => {
     const editor = editorRef.current
@@ -507,6 +531,10 @@ function AppContent() {
   const handleChromeMeasure = useCallback((rect: AppChromeRect) => {
     chromeRectRef.current = rect
     setChromeHeight((current) => Math.abs(current - rect.height) < 0.5 ? current : rect.height)
+    // Its lowest edge, not its height: a treatment that moves the toolbar
+    // without resizing it changes where a full-screen panel has to start,
+    // and the panel is laid out from state so that it hears about it.
+    setChromeBottom((current) => Math.abs(current - rect.bottom) < 0.5 ? current : rect.bottom)
   }, [])
 
   // The report reads the moment as last written, not the one in React state,
@@ -642,7 +670,8 @@ function AppContent() {
       ref={appRootRef}
       className="app-root"
       data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
-      style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
+      data-full-screen-style={fullScreenStyle}
+      style={{ '--app-chrome-height': `${chromeHeight}px`, '--app-chrome-bottom': `${chromeBottom}px` } as CSSProperties}
     >
       <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView }}>
         <AppChromePropsProvider value={appChromeProps}>

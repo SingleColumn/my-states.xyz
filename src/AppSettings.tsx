@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { FolderUp, Trash2, X } from 'lucide-react'
 import { useAppState } from './AppState'
 import { isPanelReportEnabled } from './panelReportFeature'
+import { fullScreenStyles, setFullScreenStyle, useFullScreenStyle } from './fullScreenStyle'
 import type { ThemeModePreference } from './themes/types'
 
 interface AppSettingsProps {
@@ -37,6 +38,7 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [section, setSection] = useState<SettingsSection>('appearance')
+  const fullScreenStyle = useFullScreenStyle()
 
   useEffect(() => {
     if (!isOpen) return
@@ -175,6 +177,25 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
                   )
                 })}
                 <p className="app-settings-hint">Showing the <strong>{effective.mode}</strong> mode of {effective.definition.name}.</p>
+              </fieldset>
+
+              <fieldset className="app-settings-field app-settings-modes">
+                <legend>Full screen</legend>
+                {fullScreenStyles.map((style) => (
+                  <label key={style.value} className="app-settings-mode" title={style.hint}>
+                    <input
+                      type="radio"
+                      name="app-settings-full-screen"
+                      value={style.value}
+                      checked={fullScreenStyle === style.value}
+                      onChange={() => setFullScreenStyle(style.value)}
+                    />
+                    <span>{style.label}</span>
+                  </label>
+                ))}
+                <p className="app-settings-hint">
+                  How a panel expanded to full screen meets the toolbar above it. Expand the Writing panel and switch between these to compare them. This is here to be chosen between, not kept.
+                </p>
               </fieldset>
 
               <div className="app-settings-field">

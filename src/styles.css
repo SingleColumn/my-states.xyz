@@ -2245,6 +2245,41 @@ input[type="range"]:focus-visible {
   display: none;
 }
 
+/*
+ * Two treatments of the meeting between a full-screen panel and the top
+ * toolbar, side by side so they can be compared in the app (Settings ->
+ * Appearance -> Full screen). See src/fullScreenStyle.ts: this is a
+ * comparison device, and the losing two should go once one is chosen.
+ *
+ * Both square the panel, because a rounded corner against the window edge
+ * has nothing behind it but canvas. They differ in what happens to the
+ * toolbar.
+ */
+.app-root[data-full-screen-style='flush'] .canvas-panel-shell.is-full-screen,
+.app-root[data-full-screen-style='overlay'] .canvas-panel-shell.is-full-screen {
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Flush: the toolbar stops being a floating pill and becomes a band across
+   the top of the page, holding only its lower edge as a rule. */
+.app-root[data-full-screen-style='flush'][data-panel-full-screen='true'] .app-chrome {
+  width: 100%;
+  margin: 0;
+  border-width: 0 0 var(--border-width-hairline);
+  border-radius: 0;
+}
+
+/* Overlay: the page runs to the very top of the window, behind the toolbar,
+   which keeps the shape it has everywhere else and floats on the writing.
+   The panel's own header has to clear it, so the content starts at the
+   toolbar's lower edge -- its measured bottom, which includes the inset it
+   floats by, not just its height. */
+.app-root[data-full-screen-style='overlay'] .canvas-panel-shell.is-full-screen .panel {
+  padding-top: var(--app-chrome-bottom, var(--app-chrome-height));
+}
+
 @container panel-shell (max-width: 520px) {
   .panel-spotify-surface .panel-body {
     overflow: auto;

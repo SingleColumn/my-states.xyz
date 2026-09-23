@@ -15,6 +15,7 @@ import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeMigrations, panelShapeProps, type PanelShape } from './panelShapeSchema'
 import { createPanelProps, panelFromShape } from './panelStore'
 import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled } from './panelSurface'
+import { usePanelCommands } from './PanelHeader'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 export type { PanelShape } from './panelShapeSchema'
@@ -75,11 +76,15 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
   override component(shape: PanelShape) {
     const editor = useEditor()
     const wheelScopeRef = useNativeWheelScrollScope()
+    // Marked on the shell rather than read from the root, so the treatments
+    // that square a full-screen panel leave the panels behind it alone --
+    // they are visible again the moment the canvas is panned.
+    const commands = usePanelCommands()
     if (!shape.props.visible) return null
 
     return (
       <HTMLContainer
-        className="canvas-panel-shell"
+        className={`canvas-panel-shell${commands.isPanelFullScreen(shape.props.panelId) ? ' is-full-screen' : ''}`}
         onPointerDownCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
         onTouchStartCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
         onPointerDown={claimPointerDownForContent}
