@@ -2081,6 +2081,10 @@ input[type="range"]:focus-visible {
   left: 0;
   z-index: var(--z-editor-float);
   display: grid;
+  /* The emoji list is long enough to need a window onto it; the structure
+     list is shorter than this and so is unaffected. */
+  max-height: var(--size-insert-menu-max-height);
+  overflow-y: auto;
   min-width: var(--size-moment-menu-min-width);
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
@@ -2126,6 +2130,13 @@ input[type="range"]:focus-visible {
   flex-shrink: 0;
   width: var(--size-control-icon);
   justify-content: center;
+}
+
+/* An emoji sits in the slot an icon would, drawn a size up so it reads as
+   the thing being inserted rather than as decoration beside a word. */
+.notes-insert-emoji {
+  font-size: var(--type-lg);
+  line-height: 1;
 }
 
 .notes-insert-label {

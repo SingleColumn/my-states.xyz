@@ -195,7 +195,7 @@ test.describe('insert menu', () => {
 
     await page.keyboard.type('/')
     await expect(menu).toBeVisible()
-    await expect(menu.getByRole('option')).toHaveCount(8)
+    await expect(menu.getByRole('option')).toHaveCount(9)
     await expect(menu.getByRole('option', { name: /^Heading/ })).toHaveAttribute('aria-selected', 'true')
 
     // Narrowing keeps the highlight on the first match; the arrow moves it.
@@ -772,6 +772,126 @@ test.describe('links and text size', () => {
         return [style.fontSize, style.lineHeight]
       })).toEqual([fontSize, lineHeight])
     }
+  })
+})
+
+test.describe('underline', () => {
+  test('is written as HTML in the Markdown and read back from it', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('A firm word')
+    // Back over "word" and underline it.
+    for (let index = 0; index < 4; index++) await page.keyboard.press('Shift+ArrowLeft')
+    await page.keyboard.press('Control+u')
+    await expect(body.locator('u')).toHaveText('word')
+
+    // Markdown has no underline, so the note carries the one thing it does
+    // allow for what it lacks.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('A firm <u>word</u>\n')
+
+    // And the tags come back as the mark, not as four literal characters.
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('u')).toHaveText('word')
+    await expect(again.locator('p')).toHaveText('A firm word')
+  })
+
+  test('the formatting bar offers it, and says when it is on', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    await body.click()
+    await page.keyboard.type('underline me')
+    await page.keyboard.press('Control+a')
+
+    const bar = page.getByRole('toolbar', { name: 'Formatting' })
+    const button = bar.getByRole('button', { name: 'Underline' })
+    await body.click({ button: 'right' })
+    await expect(button).toHaveAttribute('aria-pressed', 'false')
+    await button.click()
+    await expect(body.locator('u')).toHaveText('underline me')
+
+    await body.click({ button: 'right' })
+    await expect(button).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+test.describe('emoji', () => {
+  test('a colon and a word find one, and Enter puts it in the writing', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+
+    // A bare colon is punctuation, not a menu.
+    await page.keyboard.type('Ready ')
+    await page.keyboard.type(':')
+    await expect(menu).toBeHidden()
+
+    await page.keyboard.type('tick')
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('option', { name: 'Done' })).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready ✅\n')
+  })
+
+  test('the insert menu opens the whole list for anyone who has not met the colon', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    const menu = page.getByRole('listbox', { name: 'Insert' })
+
+    await page.keyboard.type('/emoji')
+    await menu.getByRole('option', { name: 'Emoji', exact: true }).click()
+    // The same list typing `:` would have given, and more than a screenful
+    // of it, which is why the menu scrolls.
+    await expect(menu).toBeVisible()
+    expect(await menu.getByRole('option').count()).toBeGreaterThan(50)
+    await menu.getByRole('option', { name: 'Warning' }).click()
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('⚠️\n')
+  })
+})
+
+test.describe('opening a markdown file', () => {
+  test('becomes a new note named after the file, leaving the open one alone', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    await body.click()
+    await page.keyboard.type('Already written here')
+
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Open markdown file' }).click()
+    await shape.locator('input.visually-hidden-file-input').setInputFiles({
+      name: 'Kept from elsewhere.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('# A heading from the file\n\nWith **prose** under it.\n'),
+    })
+
+    const opened = noteBodyOf(await shapeOf(page, notes.panelId))
+    await expect(opened.locator('h1')).toHaveText('A heading from the file')
+    await expect(opened.locator('p strong')).toHaveText('prose')
+    await expect(shape.getByRole('combobox', { name: 'Choose a note' })).toHaveValue(/.+/)
+    await expect(shape.locator('.note-title-input')).toHaveValue('Kept from elsewhere')
+
+    // The note that was open is still there, with its own words.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+      .toEqual(['# A heading from the file\n\nWith **prose** under it.\n', 'Already written here\n'])
   })
 })
 

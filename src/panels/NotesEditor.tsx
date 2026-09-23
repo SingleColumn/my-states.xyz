@@ -14,6 +14,7 @@ import { NotesEditorActionsContext, type NotesEditorActions } from './notesEdito
 import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTooltip'
 import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
+import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
@@ -141,6 +142,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
         // A class, not a title: the mark's own attributes are spread after
         // these and its null title would blank one out.
         ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))
+        configureUnderlineStringify(ctx)
         // The tooltip is rendered on the body (see NotesFormattingTooltip
         // for why), so its React portal goes there too.
         ctx.set(formattingTooltip.key, {
@@ -154,6 +156,10 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       .use(gfm)
       .use(history)
       .use(clipboard)
+      .use(underlineRemark)
+      .use(underlineSchema)
+      .use(toggleUnderlineCommand)
+      .use(underlineKeymap)
       .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))

@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
-import { Download, FilePlus2, Trash2, Type } from 'lucide-react'
+import { Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
@@ -18,6 +18,12 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
   const editorHandle = useRef<NotesEditorHandle | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function openMarkdownFile(file: File) {
+    const content = await file.text()
+    await notes.createNote(panelId, { title: markdownFileTitle(file.name), content })
+  }
 
   // A title is the first line of writing, not a form field: Enter carries on
   // into the note, and so does Down, since there is no line below it here.
@@ -74,6 +80,15 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         title="Writing"
         menuItems={[
           { id: 'new-note', label: 'New note', icon: <FilePlus2 size={17} aria-hidden="true" />, onSelect: () => { void notes.createNote(panelId).catch(() => {}) } },
+          {
+            id: 'open-markdown',
+            label: 'Open markdown file',
+            icon: <FileUp size={17} aria-hidden="true" />,
+            // A new note rather than a replacement for the open one: an
+            // import that overwrote what was on screen would be a way to
+            // lose writing with one wrong click.
+            onSelect: () => fileInputRef.current?.click(),
+          },
           {
             id: 'save-markdown',
             label: 'Save markdown file',
@@ -192,6 +207,18 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         )}
       </div>
 
+      <input
+        ref={fileInputRef}
+        className="visually-hidden-file-input"
+        type="file"
+        accept=".md,.markdown,.txt,text/markdown,text/plain"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void openMarkdownFile(file).catch(() => {})
+          event.currentTarget.value = ''
+        }}
+      />
+
       <footer className="card-footer" {...panelContentProps}>
         <span className="card-footer-meta">
           {activeNote
@@ -223,7 +250,7 @@ const defaultEditorFontSize: EditorFontSize = 'medium'
 
 // The empty page has to carry the discoverability that hidden controls give
 // up, so it names the one route to structure a writer needs to know.
-const editorPlaceholder = 'Start writing, or type / to add a heading, list, quote, divider or picture.'
+const editorPlaceholder = 'Start writing, or type / to add a heading, list, quote, divider, emoji or picture.'
 
 function readEditorFontSize(): EditorFontSize {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)
@@ -257,6 +284,16 @@ function exportMarkdownNote(title: string, markdown: string) {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+}
+
+/**
+ * The file's own name, less its extension, is the note's title. The file
+ * may well open with a heading saying the same thing; that heading is left
+ * where it is rather than lifted out, so what the writer sees in the note
+ * is what the file actually said.
+ */
+function markdownFileTitle(fileName: string) {
+  return fileName.replace(/\.(md|markdown|txt)$/i, '').trim()
 }
 
 function getDisplayNoteTitle(note: Note) {

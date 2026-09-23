@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { Bold, Code, Italic, Link as LinkIcon } from 'lucide-react'
+import { Bold, Code, Italic, Link as LinkIcon, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { tooltipFactory, TooltipProvider } from '@milkdown/plugin-tooltip'
 import {
@@ -13,6 +13,7 @@ import type { MarkType } from '@milkdown/prose/model'
 import { usePluginViewContext } from '@prosemirror-adapter/react'
 import { markPointerEventHandled } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
+import { toggleUnderlineCommand } from './notesUnderline'
 
 /**
  * The contextual formatting bar: the few marks a writer reaches for
@@ -152,6 +153,9 @@ export function NotesFormattingTooltip() {
       </FormatButton>
       <FormatButton label="Italic" active={isMarkActive(state, marks.emphasis)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleEmphasisCommand.key))}>
         <Italic size={16} aria-hidden="true" />
+      </FormatButton>
+      <FormatButton label="Underline" active={isMarkActive(state, marks.underline)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleUnderlineCommand.key))}>
+        <UnderlineIcon size={16} aria-hidden="true" />
       </FormatButton>
       <FormatButton label="Code" active={isMarkActive(state, marks.inlineCode)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleInlineCodeCommand.key))}>
         <Code size={16} aria-hidden="true" />

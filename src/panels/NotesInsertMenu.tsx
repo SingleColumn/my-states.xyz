@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { Heading1, Heading2, Heading3, Image as ImageIcon, List, ListOrdered, Minus, Quote } from 'lucide-react'
+import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
+import { Heading1, Heading2, Heading3, Image as ImageIcon, List, ListOrdered, Minus, Quote, Smile } from 'lucide-react'
 import type { Ctx } from '@milkdown/ctx'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { slashFactory, SlashProvider } from '@milkdown/plugin-slash'
@@ -17,6 +17,7 @@ import { useAppState } from '../AppState'
 import { markPointerEventHandled } from '../panelSurface'
 import type { ImageItem } from '../types'
 import { useNotesEditorActions } from './notesEditorActions'
+import { noteEmoji } from './notesEmoji'
 
 /**
  * The insert menu: type `/` at the start of a line or after a space and a
@@ -25,10 +26,17 @@ import { useNotesEditorActions } from './notesEditorActions'
  * the one route to structure that is not a Markdown shortcut, so it is
  * what a writer who has never seen Markdown will use.
  *
- * Milkdown's slash plugin supplies the trigger detection and the position
- * (floating-ui, below the caret); everything a person sees or presses is
- * here. Like the formatting bar it lives on `document.body`, outside the
- * panel's clipping box and tldraw's scaled layer.
+ * `:` opens the same menu on the emoji list, which is the convention every
+ * chat application has taught: `:think` finds the thinking face. It waits
+ * for a letter before showing anything, because a colon on its own is
+ * ordinary punctuation and a menu over every one would be unusable -- so
+ * the `/` menu carries an Emoji entry too, which opens the full list for
+ * anyone who has not met the `:` convention.
+ *
+ * Milkdown's slash plugin supplies the position (floating-ui, below the
+ * caret); the triggers and everything a person sees or presses are here.
+ * Like the formatting bar it lives on `document.body`, outside the panel's
+ * clipping box and tldraw's scaled layer.
  */
 export const insertMenu = slashFactory('notesInsert')
 
@@ -43,8 +51,17 @@ interface InsertItem {
   run: (ctx: Ctx) => void
 }
 
-/** The `/` and what follows it, when the caret sits at the end of one. */
-const triggerPattern = /(?:^|\s)\/([\w ]{0,30})$/
+/** A trigger character and what has been typed after it. */
+interface Query {
+  trigger: '/' | ':'
+  typed: string
+}
+
+/** The trigger and what follows it, when the caret sits at the end of one. */
+const slashPattern = /(?:^|\s)\/([\w ]{0,30})$/
+// No spaces after a colon: `10: ` in ordinary prose must not read as a
+// trigger with a query.
+const emojiPattern = /(?:^|\s):([\w+-]{0,30})$/
 
 export function NotesInsertMenu() {
   const ref = useRef<HTMLDivElement>(null)
@@ -58,11 +75,15 @@ export function NotesInsertMenu() {
   // The query the writer pressed Escape on: the menu stays away until the
   // text after the slash changes.
   const dismissed = useRef<string | null>(null)
+  // Set when the emoji list was asked for from the `/` menu rather than by
+  // typing `:` and a letter, which is the one case where a bare colon is
+  // allowed to open it.
+  const browsingEmoji = useRef(false)
 
   const query = queryOf(view)
   const image = currentPictureOf(panels.all.filter((panel) => panel.type === 'slideshow').map((panel) => panel.id), slideshow)
-  const items = query === null ? [] : filterItems(buildItems(image), query)
-  const isOpen = query !== null && items.length > 0 && dismissed.current !== query
+  const items = query === null ? [] : filterItems(itemsFor(query, image, browsingEmoji), query.typed)
+  const isOpen = query !== null && items.length > 0 && dismissed.current !== queryKey(query)
   const active = Math.min(activeIndex, Math.max(items.length - 1, 0))
 
   // Refs let the provider's shouldShow and the key handler, both created
@@ -103,24 +124,35 @@ export function NotesInsertMenu() {
   })
 
   // A new query starts the highlight from the top again, and once the
-  // caret has left the slash altogether an earlier Escape is forgotten.
+  // caret has left the trigger altogether an earlier Escape is forgotten --
+  // as is a request to browse the emoji.
   useEffect(() => {
     setActiveIndex(0)
-    if (query === null) dismissed.current = null
-  }, [query])
+    if (query === null) {
+      dismissed.current = null
+      browsingEmoji.current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query && queryKey(query)])
+
+  // A long list (the emoji) scrolls, so the arrow keys have to bring what
+  // they highlight into view.
+  useEffect(() => {
+    ref.current?.querySelector('.notes-insert-item.is-active')?.scrollIntoView({ block: 'nearest' })
+  }, [active])
 
   // Read through the view rather than the render-time `query`: the key
   // handler that calls this was registered once and would see a stale one.
   function choose(item: InsertItem) {
-    const typed = queryOf(viewRef.current)
-    if (item.disabled || typed === null) return
+    const asked = queryOf(viewRef.current)
+    if (item.disabled || asked === null) return
     provider.current?.hide()
     run((ctx) => {
       const editorView = ctx.get(editorViewCtx)
       const { from } = editorView.state.selection
-      // Remove the slash and what was typed after it, then insert into
+      // Remove the trigger and what was typed after it, then insert into
       // the now-empty spot.
-      editorView.dispatch(editorView.state.tr.delete(from - typed.length - 1, from))
+      editorView.dispatch(editorView.state.tr.delete(from - asked.typed.length - 1, from))
       item.run(ctx)
       editorView.focus()
     })
@@ -147,7 +179,11 @@ export function NotesInsertMenu() {
         // With no menu open that is the right thing (Escape leaves the
         // document for the canvas); with one open, Escape closes the menu.
         event.stopPropagation()
-        dismissed.current = queryOf(viewRef.current)
+        {
+          const asked = queryOf(viewRef.current)
+          dismissed.current = asked && queryKey(asked)
+        }
+        browsingEmoji.current = false
         provider.current?.hide()
         return true
       default:
@@ -185,22 +221,51 @@ export function NotesInsertMenu() {
   )
 }
 
-function queryOf(view: EditorView): string | null {
+function queryOf(view: EditorView): Query | null {
   const { selection } = view.state
   const { $from, empty } = selection
   if (!empty || !$from.parent.isTextblock || $from.parent.type.name !== 'paragraph') return null
   const before = $from.parent.textBetween(0, $from.parentOffset, undefined, '\uFFFC')
-  const match = triggerPattern.exec(before)
-  return match ? match[1] : null
+  const slash = slashPattern.exec(before)
+  if (slash) return { trigger: '/', typed: slash[1] }
+  const emoji = emojiPattern.exec(before)
+  return emoji ? { trigger: ':', typed: emoji[1] } : null
 }
 
-function filterItems(items: InsertItem[], query: string) {
-  const needle = query.trim().toLowerCase()
+/** One string standing for a query, for the comparisons that need one. */
+function queryKey(query: Query) {
+  return query.trigger + query.typed
+}
+
+function itemsFor(query: Query, image: ImageItem | null, browsingEmoji: MutableRefObject<boolean>): InsertItem[] {
+  if (query.trigger === ':') {
+    // A colon is punctuation until a letter follows it; the exception is a
+    // list asked for by name from the `/` menu.
+    return query.typed.length > 0 || browsingEmoji.current ? emojiItems() : []
+  }
+  return buildItems(image, browsingEmoji)
+}
+
+function filterItems(items: InsertItem[], typed: string) {
+  const needle = typed.trim().toLowerCase()
   if (!needle) return items
   return items.filter((item) => `${item.label} ${item.keywords}`.toLowerCase().includes(needle))
 }
 
-function buildItems(image: ImageItem | null): InsertItem[] {
+function emojiItems(): InsertItem[] {
+  return noteEmoji.map((emoji) => ({
+    id: `emoji-${emoji.char}`,
+    label: emoji.name,
+    keywords: emoji.keywords,
+    icon: <span className="notes-insert-emoji">{emoji.char}</span>,
+    run: (ctx) => {
+      const view = ctx.get(editorViewCtx)
+      view.dispatch(view.state.tr.insertText(emoji.char))
+    },
+  }))
+}
+
+function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boolean>): InsertItem[] {
   return [
     { id: 'h1', label: 'Heading', keywords: 'title h1 large', icon: <Heading1 size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInHeadingCommand.key, 1) },
     { id: 'h2', label: 'Subheading', keywords: 'heading h2 section', icon: <Heading2 size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInHeadingCommand.key, 2) },
@@ -208,7 +273,21 @@ function buildItems(image: ImageItem | null): InsertItem[] {
     { id: 'quote', label: 'Quote', keywords: 'blockquote citation', icon: <Quote size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInBlockquoteCommand.key) },
     { id: 'bullets', label: 'Bulleted list', keywords: 'list bullets unordered', icon: <List size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInBulletListCommand.key) },
     { id: 'numbers', label: 'Numbered list', keywords: 'list numbers ordered', icon: <ListOrdered size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInOrderedListCommand.key) },
-    { id: 'divider', label: 'Divider', keywords: 'rule line break section hr', icon: <Minus size={16} />, run: (ctx) => ctx.get(commandsCtx).call(insertHrCommand.key) },
+    { id: 'divider', label: 'Divider', keywords: 'horizontal rule line break section separator hr', icon: <Minus size={16} />, run: (ctx) => ctx.get(commandsCtx).call(insertHrCommand.key) },
+    {
+      id: 'emoji',
+      label: 'Emoji',
+      keywords: 'emoji smiley face symbol icon tick arrow',
+      icon: <Smile size={16} />,
+      // Types the trigger the emoji list listens for, rather than opening a
+      // second kind of menu: what a writer sees is the list they would have
+      // got by typing `:` themselves, which teaches the shortcut.
+      run: (ctx) => {
+        browsingEmoji.current = true
+        const view = ctx.get(editorViewCtx)
+        view.dispatch(view.state.tr.insertText(':'))
+      },
+    },
     {
       id: 'image',
       label: 'Picture from the Images panel',

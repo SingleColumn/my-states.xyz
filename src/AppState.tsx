@@ -84,6 +84,12 @@ import {
 
 const supportedImagePattern = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i
 
+/** A note's starting title and Markdown, when it does not start empty. */
+export interface NoteOpening {
+  title: string
+  content: string
+}
+
 interface NotesState {
   notes: Note[]
   error: string | null
@@ -109,7 +115,8 @@ interface NotesState {
   /** The note's Markdown, brought up to date first. */
   getNoteMarkdown(panelId: string): string
   setActiveNoteTitle(title: string, panelId: string): void
-  createNote(panelId: string): Promise<void>
+  /** A blank note, or one opened from a Markdown file the reader chose. */
+  createNote(panelId: string, opening?: NoteOpening): Promise<void>
   selectNote(id: string, panelId: string): Promise<void>
   deleteNote(id: string, panelId: string): Promise<void>
   flush(): Promise<void>
@@ -705,15 +712,17 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     }, 500)
   }, [persistPanelNote])
 
-  const createNote = useCallback((panelId: string) => runNoteOperation(async () => {
+  const createNote = useCallback((panelId: string, opening?: NoteOpening) => runNoteOperation(async () => {
     if (!moment) return
     await flush(panelId)
     const now = Date.now()
     const note: Note = {
       id: createId('note'),
       momentId: moment.id,
-      title: 'Untitled note',
-      content: '',
+      title: opening?.title.trim() || 'Untitled note',
+      // A note opened from a file starts as its Markdown and no document:
+      // the same road an older note takes, which the editor already reads.
+      content: opening?.content ?? '',
       createdAt: now,
       updatedAt: now,
     }
