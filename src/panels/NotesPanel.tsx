@@ -19,6 +19,9 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   const [stats, setStats] = useState<NoteStats | null>(null)
   const editorHandle = useRef<NotesEditorHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // The writing tools are drawn into this by the editor, which is what lets
+  // them read the caret; the panel only decides where they sit.
+  const toolbarHostRef = useRef<HTMLDivElement>(null)
 
   async function openMarkdownFile(file: File) {
     const content = await file.text()
@@ -157,6 +160,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         )}
 
         {activeNote ? (
+          <div className="notes-writing-toolbar-host" ref={toolbarHostRef} {...panelContentProps} />
+        ) : null}
+
+        {activeNote ? (
           <div
             className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
             style={{
@@ -177,6 +184,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             ) : null}
             <NotesEditor
               key={activeNote.id}
+              toolbarHost={toolbarHostRef}
               markdown={activeNote.content}
               document={activeNote.document}
               placeholder={editorPlaceholder}

@@ -12,6 +12,7 @@ import {
   wrapInHeadingCommand,
   wrapInOrderedListCommand,
 } from '@milkdown/preset-commonmark'
+import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 import { usePluginViewContext } from '@prosemirror-adapter/react'
 import { useAppState } from '../AppState'
@@ -70,7 +71,7 @@ export function NotesInsertMenu() {
   const { view, prevState } = usePluginViewContext()
   const viewRef = useRef(view)
   viewRef.current = view
-  const { run, addKeyHandler } = useNotesEditorActions()
+  const { run, addKeyHandler, registerInsertOpener } = useNotesEditorActions()
   const { panels, slideshow } = useAppState()
   const [activeIndex, setActiveIndex] = useState(0)
   // The query the writer pressed Escape on: the menu stays away until the
@@ -80,6 +81,11 @@ export function NotesInsertMenu() {
   // typing `:` and a letter, which is the one case where a bare colon is
   // allowed to open it.
   const browsingEmoji = useRef(false)
+  // How much the button that opened this menu typed to open it, when a
+  // button did: the trigger, and a space before it where the caret was
+  // mid-sentence and the trigger would not have been read as one. Choosing
+  // an item takes it all back out, and so does Escape.
+  const typedToOpen = useRef(0)
 
   const query = queryOf(view)
   const image = currentPictureOf(panels.all.filter((panel) => panel.type === 'slideshow').map((panel) => panel.id), slideshow)
@@ -132,6 +138,7 @@ export function NotesInsertMenu() {
     if (query === null) {
       dismissed.current = null
       browsingEmoji.current = false
+      typedToOpen.current = 0
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query && queryKey(query)])
@@ -152,12 +159,33 @@ export function NotesInsertMenu() {
       const editorView = ctx.get(editorViewCtx)
       const { from } = editorView.state.selection
       // Remove the trigger and what was typed after it, then insert into
-      // the now-empty spot.
-      editorView.dispatch(editorView.state.tr.delete(from - asked.typed.length - 1, from))
+      // the now-empty spot. A trigger the toolbar typed takes its space with
+      // it, so using the button leaves nothing behind that typing `/` would
+      // not have left.
+      editorView.dispatch(editorView.state.tr.delete(from - asked.typed.length - Math.max(typedToOpen.current, 1), from))
       item.run(ctx)
       editorView.focus()
     })
   }
+
+  useEffect(() => registerInsertOpener(() => {
+    run((ctx) => {
+      const editorView = ctx.get(editorViewCtx)
+      const { state } = editorView
+      // A selection would be replaced by the trigger, so the caret goes to
+      // its end first and the words are left alone.
+      const at = state.selection.to
+      const $at = state.doc.resolve(at)
+      const before = $at.parentOffset > 0 ? $at.parent.textBetween($at.parentOffset - 1, $at.parentOffset) : ''
+      // The trigger is only read as one at the start of a line or after a
+      // space, so one is supplied when the caret is mid-sentence.
+      const text = before && !/\s/.test(before) ? ' /' : '/'
+      typedToOpen.current = text.length
+      editorView.dispatch(state.tr.setSelection(TextSelection.create(state.doc, at)).insertText(text).scrollIntoView())
+      editorView.focus()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [registerInsertOpener])
 
   useEffect(() => addKeyHandler((event) => {
     if (!openRef.current) return false
@@ -185,6 +213,18 @@ export function NotesInsertMenu() {
           dismissed.current = asked && queryKey(asked)
         }
         browsingEmoji.current = false
+        // A menu the writer opened with the button is taken back the way it
+        // came: the slash was the button's doing, not theirs.
+        if (typedToOpen.current > 0) {
+          const asked = queryOf(viewRef.current)
+          run((ctx) => {
+            const editorView = ctx.get(editorViewCtx)
+            const { from } = editorView.state.selection
+            editorView.dispatch(editorView.state.tr.delete(from - (asked?.typed.length ?? 0) - typedToOpen.current, from))
+            editorView.focus()
+          })
+          dismissed.current = null
+        }
         provider.current?.hide()
         return true
       default:
@@ -286,7 +326,7 @@ function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boo
     { id: 'quote', label: 'Quote', keywords: 'blockquote citation', icon: <Quote size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInBlockquoteCommand.key) },
     { id: 'bullets', label: 'Bulleted list', keywords: 'list bullets unordered', icon: <List size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInBulletListCommand.key) },
     { id: 'numbers', label: 'Numbered list', keywords: 'list numbers ordered', icon: <ListOrdered size={16} />, run: (ctx) => ctx.get(commandsCtx).call(wrapInOrderedListCommand.key) },
-    { id: 'divider', label: 'Divider', keywords: 'horizontal rule line break section separator hr', icon: <Minus size={16} />, run: (ctx) => ctx.get(commandsCtx).call(insertHrCommand.key) },
+    { id: 'divider', label: 'Divider', keywords: 'horizontal rule line break section separator hr', icon: <Minus size={16} />, run: insertDivider },
     {
       id: 'emoji',
       label: 'Emoji',
@@ -302,6 +342,13 @@ function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boo
       },
     },
     {
+      id: 'image-file',
+      label: 'Picture from a file',
+      keywords: 'image photo picture file open upload',
+      icon: <ImageIcon size={16} />,
+      run: (ctx) => pickImageFile((src, alt) => ctx.get(commandsCtx).call(insertImageCommand.key, { src, alt, title: '' })),
+    },
+    {
       id: 'image',
       label: 'Picture from the Images panel',
       keywords: 'image photo picture',
@@ -313,6 +360,59 @@ function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boo
       run: (ctx) => { if (image) ctx.get(commandsCtx).call(insertImageCommand.key, { src: image.url, alt: image.name, title: '' }) },
     },
   ]
+}
+
+/**
+ * A rule goes between blocks, so it starts a new line first when the caret
+ * is in the middle of one. Without this the command leaves the rest of the
+ * line behind as an empty paragraph, which Markdown has no way to write
+ * except as a stray `<br />`.
+ */
+function insertDivider(ctx: Ctx) {
+  const view = ctx.get(editorViewCtx)
+  if (view.state.selection.$from.parent.content.size > 0) {
+    view.dispatch(view.state.tr.split(view.state.selection.from).scrollIntoView())
+  }
+  ctx.get(commandsCtx).call(insertHrCommand.key)
+}
+
+/**
+ * A picture from the writer's own files, carried inside the note as a data
+ * URL.
+ *
+ * The alternative was an object URL, which is what the Images panel hands
+ * out, and which dies with the page -- a note would show a broken picture
+ * the moment it was reopened. A data URL is the note: it survives a reload,
+ * an export and a move to another machine, and it is ordinary Markdown that
+ * any reader understands. What it costs is size, roughly a third more than
+ * the file itself, stored as text in the note. Hence the limit, which is
+ * about keeping one note from becoming megabytes of base64 rather than
+ * about what the format can carry.
+ */
+const IMAGE_FILE_LIMIT_BYTES = 1_500_000
+
+function pickImageFile(place: (src: string, alt: string) => void) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml'
+  input.className = 'visually-hidden-file-input'
+  document.body.appendChild(input)
+  input.addEventListener('change', () => {
+    const file = input.files?.[0]
+    input.remove()
+    if (!file) return
+    if (file.size > IMAGE_FILE_LIMIT_BYTES) {
+      window.alert(`"${file.name}" is ${Math.round(file.size / 100000) / 10}MB. A picture is kept inside the note itself, so it has to be under ${IMAGE_FILE_LIMIT_BYTES / 1_000_000}MB.`)
+      return
+    }
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') place(reader.result, file.name.replace(/\.[^.]+$/, ''))
+    })
+    reader.addEventListener('error', () => window.alert(`"${file.name}" could not be read.`))
+    reader.readAsDataURL(file)
+  }, { once: true })
+  input.click()
 }
 
 /** The picture the first Images panel that has any is showing right now. */

@@ -56,6 +56,9 @@
   /* About seven rows: enough of the emoji list to choose from without the
      menu covering the writing it is being inserted into. */
   --size-insert-menu-max-height: 248px;
+  /* Fits "Small heading", the longest style name, so the control keeps one
+     width as the caret moves from line to line. */
+  --size-notes-style-select-width: 150px;
   --size-moment-menu-min-width: 190px;
   --size-canvas-menu-min-width: 220px;
   --space-card-eyebrow-bottom: 4px;

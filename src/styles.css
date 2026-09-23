@@ -1716,10 +1716,25 @@ input[type="range"]:focus-visible {
   color: var(--color-text-muted);
 }
 
+/* A column rather than a fixed grid of rows: what the body holds varies --
+   the note controls only outside writing mode, the writing tools only once
+   a note is open -- and a row template has to be rewritten for each of
+   those. Everything above the writing takes its own height; the writing
+   takes what is left. */
 .notes-body {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-notes-gap);
+}
+
+.notes-body > * {
+  flex: 0 0 auto;
+}
+
+.notes-body > .notes-editor,
+.notes-body > .notes-empty-state {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .notes-document-controls {
@@ -1938,7 +1953,6 @@ input[type="range"]:focus-visible {
  * untouched, so the two treatments can be compared side by side.
  */
 .panel-body.notes-body-writing {
-  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   padding: 0;
 }
@@ -2134,6 +2148,51 @@ input[type="range"]:focus-visible {
 
 /* An emoji sits in the slot an icon would, drawn a size up so it reads as
    the thing being inserted rather than as decoration beside a word. */
+/*
+ * The writing tools, above the note and always on show. The right-click bar
+ * and the slash menu can do all of this too, but both are gestures a writer
+ * has to be told about; this is what makes them optional.
+ */
+.notes-writing-toolbar-host {
+  flex: 0 0 auto;
+}
+
+.notes-writing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-detail-1);
+  padding: var(--space-detail-2) var(--space-panel-body-x);
+  border-bottom: var(--border-width-hairline) solid var(--color-panel-border);
+}
+
+.notes-style-select {
+  height: var(--size-top-toolbar-control);
+  min-height: var(--size-top-toolbar-control);
+  /* Wide enough for "Small heading", the longest of them, so the control
+     does not resize as the caret moves between lines. */
+  flex: 0 1 var(--size-notes-style-select-width);
+  min-width: 0;
+  margin-right: var(--space-detail-1);
+}
+
+/* In a panel too narrow for the row, the style menu gives up its width
+   rather than letting the buttons wrap: a lone button on a second line
+   reads as a mistake, and the menu still shows enough of a name to be
+   recognised. */
+@container panel-shell (max-width: 520px) {
+  .notes-writing-toolbar {
+    flex-wrap: nowrap;
+    padding-inline: var(--space-detail-2);
+  }
+}
+
+/* At full screen the tools line up with the writing rather than with the
+   panel edge, so the column the words are read in starts where they do. */
+.panel-notes-surface.is-writing-mode .notes-writing-toolbar {
+  justify-content: center;
+}
+
 /* Between what a line is and how its words are marked: two jobs on one
    bar, and the eye needs to be told where one ends. */
 .notes-formatting-divider {

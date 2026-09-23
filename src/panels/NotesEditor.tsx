@@ -15,6 +15,7 @@ import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTool
 import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
+import { NotesWritingToolbar } from './NotesWritingToolbar'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
@@ -40,11 +41,17 @@ import '@milkdown/prose/view/style/prosemirror.css'
 export function NotesEditor(props: NotesEditorProps) {
   const editorRef = useRef<Editor>()
   const keyHandlers = useRef(new Set<(event: KeyboardEvent) => boolean>())
+  const insertOpeners = useRef(new Set<() => void>())
   const actions = useMemo<NotesEditorActions>(() => ({
     run: (action) => { editorRef.current?.action(action) },
     addKeyHandler: (handler) => {
       keyHandlers.current.add(handler)
       return () => { keyHandlers.current.delete(handler) }
+    },
+    openInsertMenu: () => { for (const open of insertOpeners.current) open() },
+    registerInsertOpener: (open) => {
+      insertOpeners.current.add(open)
+      return () => { insertOpeners.current.delete(open) }
     },
   }), [])
   return (
@@ -60,6 +67,13 @@ interface NotesEditorProps {
   markdown: string
   document: NoteDocument | undefined
   placeholder: string
+  /**
+   * Where the writing tools are drawn. The panel owns the element so the
+   * toolbar can sit above the note's title rather than inside the text, and
+   * the editor fills it with a plugin view so it re-reads the document on
+   * every keystroke.
+   */
+  toolbarHost: MutableRefObject<HTMLElement | null>
   /** Every edit: the document as it now stands, and what the footer counts. */
   onChange: (document: NoteDocument, stats: NoteStats) => void
   /**
@@ -103,7 +117,7 @@ function prefersMarkdown() {
   }
 }
 
-function NotesEditorInner({ markdown, document: noteDocument, placeholder, onChange, onHandle, editorRef, keyHandlers }: NotesEditorProps & {
+function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolbarHost, onChange, onHandle, editorRef, keyHandlers }: NotesEditorProps & {
   editorRef: MutableRefObject<Editor | undefined>
   keyHandlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>
 }) {
@@ -163,6 +177,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
       .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
+      .use(writingToolbar(pluginViewFactory({ component: NotesWritingToolbar, root: () => toolbarHost.current ?? document.body })))
       .use(linkOpener)
       .use(formattingTooltip)
       .use(insertMenu)
@@ -305,6 +320,15 @@ const linkOpener = $prose(() => new Plugin({
     }
   },
 }))
+
+/**
+ * Draws the writing tools into the element the panel set aside for them.
+ * A plugin view rather than a component so the toolbar sees every
+ * transaction, which is what lets it say what the caret is sitting in.
+ */
+function writingToolbar(view: NonNullable<Plugin['spec']['view']>) {
+  return $prose(() => new Plugin({ key: new PluginKey('NOTES_WRITING_TOOLBAR'), view }))
+}
 
 /**
  * Lets floating UI answer a key before the editor's own keymap does. Plugins

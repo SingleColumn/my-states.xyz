@@ -213,7 +213,7 @@ function blockOf(state: EditorState) {
  * The press is swallowed so the editor keeps focus and the selection the
  * command is about to act on; the click that follows is what acts.
  */
-function FormatButton({ label, active, onActivate, children }: {
+export function FormatButton({ label, active, onActivate, children }: {
   label: string
   active: boolean
   onActivate: () => void
@@ -249,7 +249,7 @@ export function linkAddress(typed: string) {
 }
 
 /** Whether every character of the selection carries the mark (or, for a caret, whether typing would). */
-function isMarkActive(state: EditorState, type: MarkType | undefined) {
+export function isMarkActive(state: EditorState, type: MarkType | undefined) {
   if (!type) return false
   const { from, $from, to, empty } = state.selection
   if (empty) return !!type.isInSet(state.storedMarks ?? $from.marks())

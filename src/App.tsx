@@ -13,6 +13,7 @@ import { getPanelDefinition } from './panelRegistry'
 import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
+import { forgetFullScreen, readFullScreen, rememberFullScreen } from './fullScreenMemory'
 import { debounce } from './utils'
 import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
 import { registerHiddenCanvasPersistence } from './canvasPersistence'
@@ -172,7 +173,21 @@ function AppContent() {
     }
     previousPanelGeometryRef.current.clear()
     preFocusPanelGeometryRef.current.clear()
-    setFullScreenPanelId(null)
+    // A moment left with a panel expanded opens with it expanded. The
+    // geometry came back with the document; what did not is that the
+    // geometry is a full-screen one, and every part of the treatment -- the
+    // flush toolbar, the squared corners, the note's title as a line of
+    // writing rather than a form field -- follows from the app knowing it.
+    // The panel is then laid out again for this window, which may not be
+    // the size of the one it was expanded in.
+    const remembered = readFullScreen(moment.id)
+    if (remembered && getPanelShape(editor, remembered.panelId)) {
+      previousPanelGeometryRef.current.set(remembered.panelId, remembered.restore)
+      setFullScreenPanelId(remembered.panelId)
+    } else {
+      if (remembered) forgetFullScreen(moment.id)
+      setFullScreenPanelId(null)
+    }
     // Through the ref, not the value: the panels state is rebuilt whenever a
     // shape changes, and a restore changes every shape. Depending on it here
     // would make the restore re-run itself.
@@ -360,6 +375,22 @@ function AppContent() {
       editor.bringToFront([shape.id])
     })
   }, [fullScreenBoundsFor])
+
+  // What this window remembers about the moment, kept in step with the one
+  // piece of state that says whether a panel is expanded. Written here
+  // rather than at each of the several places that leave full screen --
+  // restoring the size, entering focus view, resetting one panel, resetting
+  // the layout -- so none of them can forget to.
+  useEffect(() => {
+    const momentId = canvasMomentIdRef.current
+    if (!momentId) return
+    if (!fullScreenPanelId) {
+      forgetFullScreen(momentId)
+      return
+    }
+    const restore = previousPanelGeometryRef.current.get(fullScreenPanelId)
+    if (restore) rememberFullScreen(momentId, { panelId: fullScreenPanelId, restore })
+  }, [fullScreenPanelId])
 
   // The toolbar changes shape as a panel expands, and it is measured after
   // the fact, so the page is laid out again once its new lower edge is

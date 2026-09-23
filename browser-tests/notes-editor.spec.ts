@@ -195,7 +195,7 @@ test.describe('insert menu', () => {
 
     await page.keyboard.type('/')
     await expect(menu).toBeVisible()
-    await expect(menu.getByRole('option')).toHaveCount(9)
+    await expect(menu.getByRole('option')).toHaveCount(10)
     await expect(menu.getByRole('option', { name: /^Heading/ })).toHaveAttribute('aria-selected', 'true')
 
     // Narrowing keeps the highlight on the first match; the arrow moves it.
@@ -247,9 +247,12 @@ test.describe('insert menu', () => {
     const menu = page.getByRole('listbox', { name: 'Insert' })
 
     // Nothing loaded yet: the item is there but says why it cannot be used.
+    // Named exactly: a picture can also come from a file, and that one is
+    // never disabled.
+    const fromPanel = menu.getByRole('option', { name: 'Picture from the Images panel' })
     await body.click()
     await page.keyboard.type('/pic')
-    await expect(menu.getByRole('option', { name: /Picture/ })).toHaveAttribute('aria-disabled', 'true')
+    await expect(fromPanel).toHaveAttribute('aria-disabled', 'true')
     await page.keyboard.press('Escape')
     await page.keyboard.press('Control+a')
     await page.keyboard.press('Backspace')
@@ -257,9 +260,8 @@ test.describe('insert menu', () => {
     await loadSampleImages(page, images.panelId)
     await body.click()
     await page.keyboard.type('/pic')
-    const item = menu.getByRole('option', { name: /Picture/ })
-    await expect(item).not.toHaveAttribute('aria-disabled', 'true')
-    await page.keyboard.press('Enter')
+    await expect(fromPanel).not.toHaveAttribute('aria-disabled', 'true')
+    await fromPanel.click()
     // ProseMirror places a zero-size img.ProseMirror-separator beside an
     // inline image for caret placement; the document's own picture is the other one.
     const picture = body.locator('img:not(.ProseMirror-separator)')
