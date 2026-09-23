@@ -4,12 +4,14 @@ import { getPanelFocusViewSize, isPanelInFocusView } from './panelLayout'
 
 describe('panel geometry commands', () => {
   it('derives full-screen geometry from the current screen viewport and converts to page space', () => {
+    // Flush to the viewport on three sides and to the chrome on the fourth:
+    // full screen leaves no band of canvas around the panel.
     const result = getFullScreenPanelLayout(
       { x: 10, y: 20, w: 1200, h: 800 },
       80,
       ({ x, y }) => ({ x: (x - 100) / 2, y: (y - 40) / 2 }),
     )
-    expect(result).toEqual({ x: -37, y: 28, w: 584, h: 354 })
+    expect(result).toEqual({ x: -45, y: 20, w: 600, h: 370 })
   })
 
   it('uses canonical dimensions per panel type while the size-only helper preserves position', () => {

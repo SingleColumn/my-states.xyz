@@ -1832,6 +1832,13 @@ input[type="range"]:focus-visible {
   outline: none;
 }
 
+/* A link is only openable with a modifier held, so that is when it offers
+   itself as one. Without this the only way to learn is to be told. */
+.notes-editor-content.is-link-armed .notes-link {
+  cursor: pointer;
+  text-decoration-thickness: 2px;
+}
+
 /* The hint on an empty note. NotesEditor marks the one empty paragraph with
    the text; drawing it here keeps it out of the document. Floated at zero
    height so the caret sits at the start of the line, over the hint. */

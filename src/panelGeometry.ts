@@ -33,7 +33,9 @@ export function getFullScreenPanelLayout(
   screenRect: ScreenRect,
   chromeBottom: number | null | undefined,
   screenToPage: (point: { x: number; y: number }) => { x: number; y: number },
-  margin = 16,
+  // No margin: at full screen the panel is the window, and a band of canvas
+  // around it is the canvas competing with the writing.
+  margin = 0,
 ): Pick<PanelLayout, 'x' | 'y' | 'w' | 'h'> {
   const left = screenRect.x + margin
   // The measured chrome height is normally supplied by AppChrome. Keep a

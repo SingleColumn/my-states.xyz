@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { Editor, EditorStatus, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/core'
-import { commonmark } from '@milkdown/preset-commonmark'
+import { commonmark, linkAttr } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
 import { history } from '@milkdown/plugin-history'
 import { clipboard } from '@milkdown/plugin-clipboard'
@@ -138,6 +138,9 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, onCha
         // it on the contenteditable itself, so the writing surface is styled
         // like the previous editor's content area was.
         ctx.set(editorViewOptionsCtx, { attributes: { class: 'notes-editor-content' } })
+        // A class, not a title: the mark's own attributes are spread after
+        // these and its null title would blank one out.
+        ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))
         // The tooltip is rendered on the body (see NotesFormattingTooltip
         // for why), so its React portal goes there too.
         ctx.set(formattingTooltip.key, {
@@ -239,23 +242,52 @@ function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
 const NEWLINE = String.fromCharCode(10)
 
 /**
- * Opens a link on Ctrl+click (Cmd on a Mac), as editors that are also
- * writing surfaces do: a plain click has to stay free to put the caret
- * inside the link, or its text could never be edited.
+ * Opens a link when a modifier is held, as editors that are also writing
+ * surfaces do: a plain click has to stay free to put the caret inside the
+ * link, or its text could never be edited.
+ *
+ * Holding the modifier also says so, by putting a class on the editor that
+ * gives links a pointer cursor -- otherwise the only way to learn that a
+ * link can be opened at all is to be told. Shift is included because the
+ * browser opens a link on Shift+click whatever we do, and it is better for
+ * that to arrive here, where it can be opened without an opener, than to
+ * happen behind the editor's back.
  */
 const linkOpener = $prose(() => new Plugin({
   key: new PluginKey('NOTES_LINK_OPENER'),
   props: {
-    handleClick(view, pos, event) {
-      if (!event.ctrlKey && !event.metaKey) return false
-      const link = view.state.doc.nodeAt(pos)?.marks.find((mark) => mark.type.name === 'link')
-      const href = link?.attrs.href as string | undefined
-      if (!href) return false
-      // No opener and no referrer: the note is the writer's, not the
-      // destination's business.
-      window.open(href, '_blank', 'noopener,noreferrer')
-      return true
+    // handleDOMEvents, not handleClick: ProseMirror routes a Shift+click to
+    // extending the selection and never offers it as a click.
+    handleDOMEvents: {
+      click(view, event) {
+        if (!event.ctrlKey && !event.metaKey && !event.shiftKey) return false
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY })
+        const link = at && view.state.doc.nodeAt(at.pos)?.marks.find((mark) => mark.type.name === 'link')
+        const href = link ? link.attrs.href as string : undefined
+        if (!href) return false
+        event.preventDefault()
+        // No opener and no referrer: the note is the writer's, not the
+        // destination's business.
+        window.open(href, '_blank', 'noopener,noreferrer')
+        return true
+      },
     },
+  },
+  view(view) {
+    const armed = (event: KeyboardEvent) => {
+      view.dom.classList.toggle('is-link-armed', event.ctrlKey || event.metaKey || event.shiftKey)
+    }
+    const disarm = () => view.dom.classList.remove('is-link-armed')
+    window.addEventListener('keydown', armed)
+    window.addEventListener('keyup', armed)
+    window.addEventListener('blur', disarm)
+    return {
+      destroy() {
+        window.removeEventListener('keydown', armed)
+        window.removeEventListener('keyup', armed)
+        window.removeEventListener('blur', disarm)
+      },
+    }
   },
 }))
 

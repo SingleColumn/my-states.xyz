@@ -729,10 +729,19 @@ test.describe('links and text size', () => {
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
       .toBe('[Visit the](https://example.com) site now\n')
 
-    // Ctrl+click opens it; a plain click leaves the caret free to edit it.
-    const opened = context.waitForEvent('page')
-    await link.click({ modifiers: ['Control'] })
-    expect((await opened).url()).toContain('example.com')
+    // A held modifier says so before it acts, and opens on either of the two
+    // the browser itself would use.
+    expect(await link.evaluate((el) => getComputedStyle(el).cursor)).toBe('text')
+    await page.keyboard.down('Control')
+    await expect.poll(async () => link.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer')
+    await page.keyboard.up('Control')
+
+    for (const modifier of ['Control', 'Shift'] as const) {
+      const opened = context.waitForEvent('page')
+      await link.click({ modifiers: [modifier] })
+      expect((await opened).url()).toContain('example.com')
+    }
+    // A plain click leaves the caret free to edit the link's words.
     await link.click()
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
   })
