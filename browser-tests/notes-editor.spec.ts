@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addPanelFromToolbar, cameraZoom, describeCanvas, dispatch, dragLocator, expectCanvasSaved, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, selectPanel, shapeOf, titleOf, undo, waitForCanvas } from './helpers'
+import { addPanelFromToolbar, cameraZoom, describeCanvas, dispatch, dragLocator, expectCanvasSaved, geometryOf, loadSampleImages, noteBodyOf, openApp, openWithTools, panelById, panelOfType, readStorage, selectPanel, shapeOf, titleOf, undo, waitForCanvas } from './helpers'
 
 /**
  * The writing surface itself: what a writer types becomes structure, what
@@ -733,10 +733,19 @@ test.describe('links and text size', () => {
       const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
     })
-    // What a writer types is a place, not a URL.
-    await page.evaluate(() => { window.prompt = () => 'example.com' })
+    // A native prompt would show up as a `dialog` event; none should fire.
+    const dialogs: string[] = []
+    page.on('dialog', (dialog) => { dialogs.push(dialog.type()); void dialog.dismiss() })
     await page.mouse.click(selection.x, selection.y, { button: 'right' })
     await page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name: 'Link' }).click()
+
+    // A themed field, not a native prompt.
+    const popover = page.getByRole('group', { name: 'Link' })
+    await expect(popover).toBeVisible()
+    // What a writer types is a place, not a URL.
+    await popover.getByRole('textbox', { name: 'Link address' }).fill('example.com')
+    await page.keyboard.press('Enter')
+    expect(dialogs).toEqual([])
 
     const link = body.locator('a')
     await expect(link).toHaveAttribute('href', 'https://example.com')
@@ -792,6 +801,80 @@ test.describe('links and text size', () => {
         return [style.fontSize, style.lineHeight]
       })).toEqual([fontSize, lineHeight])
     }
+  })
+})
+
+test.describe('the link editor', () => {
+  test('edits an existing link by placing the caret in it, and removes it', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    await body.click()
+    await page.keyboard.type('a link')
+    await page.keyboard.press('Control+a')
+    await bar.getByRole('button', { name: 'Link' }).click()
+    await page.getByRole('group', { name: 'Link' }).getByRole('textbox', { name: 'Link address' }).fill('old.example')
+    await page.keyboard.press('Enter')
+    const link = body.locator('a')
+    await expect(link).toHaveAttribute('href', 'https://old.example')
+
+    // The caret alone, nowhere selected, is enough: the popover already
+    // knows which link that is, and comes back showing its address.
+    const box = (await link.boundingBox())!
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    const linkButton = bar.getByRole('button', { name: 'Link' })
+    await expect(linkButton).toHaveAttribute('aria-pressed', 'true')
+    await linkButton.click()
+    const input = page.getByRole('group', { name: 'Link' }).getByRole('textbox', { name: 'Link address' })
+    await expect(input).toHaveValue('https://old.example')
+    await input.fill('new.example')
+    await page.keyboard.press('Enter')
+    await expect(link).toHaveAttribute('href', 'https://new.example')
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('[a link](https://new.example)\n')
+
+    // Removing goes back to plain words, not an empty bracket.
+    const box2 = (await link.boundingBox())!
+    await page.mouse.click(box2.x + box2.width / 2, box2.y + box2.height / 2)
+    await linkButton.click()
+    await page.getByRole('button', { name: 'Remove link' }).click()
+    await expect(body.locator('a')).toHaveCount(0)
+    await expect(body.locator('p')).toHaveText('a link')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('a link\n')
+  })
+
+  test('Ctrl+K opens the popover, and Escape cancels without changing the document', async ({ page }) => {
+    const { body } = await openWithTools(page)
+    await body.click()
+    await page.keyboard.type('select this phrase please')
+    await page.keyboard.press('Control+Home')
+    for (let i = 0; i < 2; i++) await page.keyboard.press('Shift+Control+ArrowRight')
+
+    await page.keyboard.press('Control+k')
+    const popover = page.getByRole('group', { name: 'Link' })
+    await expect(popover).toBeVisible()
+    await page.keyboard.type('should-not-apply.example')
+    await page.keyboard.press('Escape')
+    await expect(popover).toBeHidden()
+    await expect(body.locator('a')).toHaveCount(0)
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('select this phrase please\n')
+  })
+
+  test('the button is disabled with nothing to act on, on both bars', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    await body.click()
+    await page.keyboard.type('no selection here')
+    await expect(bar.getByRole('button', { name: 'Link' })).toBeDisabled()
+
+    const box = (await body.boundingBox())!
+    await page.mouse.click(box.x + 10, box.y + 10, { button: 'right' })
+    const formatting = page.getByRole('toolbar', { name: 'Formatting' })
+    await expect(formatting).toBeVisible()
+    await expect(formatting.getByRole('button', { name: 'Link' })).toBeDisabled()
   })
 })
 

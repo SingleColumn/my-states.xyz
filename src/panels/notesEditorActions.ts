@@ -19,12 +19,19 @@ import type { Ctx } from '@milkdown/ctx'
  * from somewhere first, and the somewhere already exists. The menu
  * registers what it does through `registerEmojiOpener`, so the button does
  * not have to know how the list is triggered.
+ *
+ * `openLinkEditor` is the same shape of thing for the link popover: two
+ * separate bars need to open it, and it needs to look at the selection to
+ * decide whether it is creating a link or editing one already there, which
+ * is a decision only the popover itself is in a position to make.
  */
 export interface NotesEditorActions {
   run(action: (ctx: Ctx) => void): void
   addKeyHandler(handler: (event: KeyboardEvent) => boolean): () => void
   openEmojiList(): void
   registerEmojiOpener(open: () => void): () => void
+  openLinkEditor(): void
+  registerLinkEditorOpener(open: () => void): () => void
 }
 
 export const NotesEditorActionsContext = createContext<NotesEditorActions>({
@@ -32,6 +39,8 @@ export const NotesEditorActionsContext = createContext<NotesEditorActions>({
   addKeyHandler: () => () => {},
   openEmojiList: () => {},
   registerEmojiOpener: () => () => {},
+  openLinkEditor: () => {},
+  registerLinkEditorOpener: () => () => {},
 })
 
 export function useNotesEditorActions() {

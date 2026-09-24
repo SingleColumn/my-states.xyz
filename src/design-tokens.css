@@ -59,6 +59,8 @@
   /* Fits "Small heading", the longest style name, so the control keeps one
      width as the caret moves from line to line. */
   --size-notes-style-select-width: 150px;
+  /* Wide enough for an ordinary domain without the field feeling cramped. */
+  --size-link-editor-input-width: 220px;
   /* The grab area for a picture's width, and the grip drawn inside it. The
      target is wider than the grip because a 6px target is hard to hit. */
   --size-image-handle-target: 18px;

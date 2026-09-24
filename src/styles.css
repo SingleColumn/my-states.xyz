@@ -2172,8 +2172,16 @@ input[type="range"]:focus-visible {
   cursor: pointer;
 }
 
-.notes-formatting-button:hover {
+.notes-formatting-button:hover:not(:disabled) {
   background: var(--card-button-bg-hover);
+}
+
+/* The Link tool with nothing to act on: a bare caret, no selection and no
+   link under it. Dimmed rather than removed, so the row of tools does not
+   reflow as the caret moves. */
+.notes-formatting-button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 /* The bar floats over the Writing panel, so it takes that panel's accent
@@ -2187,6 +2195,61 @@ input[type="range"]:focus-visible {
 .notes-formatting-button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
+}
+
+/*
+ * The link editor: a small popover that replaces a native `window.prompt`,
+ * asked for by the Link button on either bar, or by Ctrl-K. Same floating
+ * home and tokens as the formatting bar it sits beside -- see
+ * NotesLinkEditor.tsx for why a prompt was not good enough.
+ */
+.notes-link-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-editor-float);
+  display: flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+  padding: var(--space-detail-1);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.notes-link-editor[data-show="false"] {
+  display: none;
+}
+
+.notes-link-editor-input {
+  width: var(--size-link-editor-input-width);
+  height: var(--size-menu-item-height);
+  padding: 0 var(--space-detail-3);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-dropdown);
+}
+
+.notes-link-editor-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.notes-link-editor-input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* Same rule the panel-header menu uses for its own destructive item: only
+   coloured on the hover/focus that means "about to act," not at rest. */
+.notes-link-editor .is-destructive:hover,
+.notes-link-editor .is-destructive:focus-visible {
+  color: var(--color-danger);
 }
 
 /*

@@ -5,7 +5,6 @@ import { tooltipFactory, TooltipProvider } from '@milkdown/plugin-tooltip'
 import {
   toggleEmphasisCommand,
   toggleInlineCodeCommand,
-  toggleLinkCommand,
   toggleStrongCommand,
   turnIntoTextCommand,
   wrapInHeadingCommand,
@@ -17,6 +16,7 @@ import { markPointerEventHandled } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
 import { toggleUnderlineCommand } from './notesUnderline'
 import { toggleHighlightCommand } from './notesHighlight'
+import { canEditLink, isOnLink } from './NotesLinkEditor'
 
 /**
  * The contextual formatting bar: what a line is, and the few marks a writer
@@ -47,7 +47,7 @@ export function NotesFormattingTooltip() {
   const { view, prevState } = usePluginViewContext()
   const viewRef = useRef(view)
   viewRef.current = view
-  const { run } = useNotesEditorActions()
+  const { run, openLinkEditor } = useNotesEditorActions()
   // Where the writer asked for the bar, and whether they have asked at all.
   // A ref rather than state: the provider's shouldShow, made once, reads it.
   const openAt = useRef<{ x: number; y: number } | null>(null)
@@ -140,24 +140,6 @@ export function NotesFormattingTooltip() {
     })
   }
 
-  function toggleLink() {
-    if (isMarkActive(state, marks.link)) {
-      run((ctx) => ctx.get(commandsCtx).call(toggleLinkCommand.key))
-      return
-    }
-    // A stand-in for a link editor. It has to run from the click rather
-    // than the press: a modal opened during mousedown never lets the
-    // matching mouseup reach the page, and the browser goes on believing
-    // the button is held -- which reads as a stuck button and a drag that
-    // will not let go.
-    const typed = window.prompt('Link address')
-    const href = typed ? linkAddress(typed) : ''
-    run((ctx) => {
-      ctx.get(editorViewCtx).focus()
-      if (href) ctx.get(commandsCtx).call(toggleLinkCommand.key, { href })
-    })
-  }
-
   function handleKeyDown(event: KeyboardEvent) {
     if (event.key !== 'Escape') return
     event.preventDefault()
@@ -190,7 +172,7 @@ export function NotesFormattingTooltip() {
       <FormatButton label="Code" active={isMarkActive(state, marks.inlineCode)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleInlineCodeCommand.key))}>
         <Code size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Link" active={isMarkActive(state, marks.link)} onActivate={toggleLink}>
+      <FormatButton label="Link" active={isOnLink(state)} disabled={!canEditLink(state)} onActivate={openLinkEditor}>
         <LinkIcon size={16} aria-hidden="true" />
       </FormatButton>
     </div>
@@ -224,9 +206,11 @@ function blockOf(state: EditorState) {
  * The press is swallowed so the editor keeps focus and the selection the
  * command is about to act on; the click that follows is what acts.
  */
-export function FormatButton({ label, active, onActivate, children }: {
+export function FormatButton({ label, active, disabled, onActivate, children }: {
   label: string
   active: boolean
+  /** For a tool with nothing to act on right now -- Link, on a bare caret. */
+  disabled?: boolean
   onActivate: () => void
   children: ReactNode
 }) {
@@ -237,26 +221,13 @@ export function FormatButton({ label, active, onActivate, children }: {
       title={label}
       aria-label={label}
       aria-pressed={active}
+      disabled={disabled}
       onMouseDown={(event: MouseEvent) => event.preventDefault()}
       onClick={onActivate}
     >
       {children}
     </button>
   )
-}
-
-/**
- * What a writer types is a place, not a URL: `example.com` or an email
- * address, rarely `https://example.com`. Without a scheme the browser reads
- * it as a path on this app and the link goes nowhere, so one is supplied.
- */
-export function linkAddress(typed: string) {
-  const trimmed = typed.trim()
-  if (!trimmed) return ''
-  // Already addressed: a scheme, a path, or an anchor on this page.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('#')) return trimmed
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return `mailto:${trimmed}`
-  return `https://${trimmed}`
 }
 
 /** Whether every character of the selection carries the mark (or, for a caret, whether typing would). */

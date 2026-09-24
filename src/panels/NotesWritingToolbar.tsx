@@ -6,7 +6,6 @@ import {
   liftListItemCommand,
   toggleEmphasisCommand,
   toggleInlineCodeCommand,
-  toggleLinkCommand,
   toggleStrongCommand,
   turnIntoTextCommand,
   wrapInBlockquoteCommand,
@@ -19,7 +18,8 @@ import type { EditorState } from '@milkdown/prose/state'
 import { usePluginViewContext } from '@prosemirror-adapter/react'
 import { markPointerEventHandled, panelContentProps } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
-import { FormatButton, isMarkActive, linkAddress } from './NotesFormattingTooltip'
+import { FormatButton, isMarkActive } from './NotesFormattingTooltip'
+import { canEditLink, isOnLink } from './NotesLinkEditor'
 import { insertDivider, pickImageFile } from './NotesInsertMenu'
 import { toggleUnderlineCommand } from './notesUnderline'
 import { toggleHighlightCommand } from './notesHighlight'
@@ -50,7 +50,7 @@ import { toggleHighlightCommand } from './notesHighlight'
  */
 export function NotesWritingToolbar() {
   const { view } = usePluginViewContext()
-  const { run, openEmojiList } = useNotesEditorActions()
+  const { run, openEmojiList, openLinkEditor } = useNotesEditorActions()
   const { state } = view
   const marks = state.schema.marks
   const style = blockStyleOf(state)
@@ -59,22 +59,6 @@ export function NotesWritingToolbar() {
     run((ctx) => {
       setBlockStyle(ctx, next)
       ctx.get(editorViewCtx).focus()
-    })
-  }
-
-  function toggleLink() {
-    if (isMarkActive(state, marks.link)) {
-      run((ctx) => ctx.get(commandsCtx).call(toggleLinkCommand.key))
-      return
-    }
-    // From the click and not the press: a prompt opened during mousedown
-    // never lets the matching mouseup reach the page (see the note on the
-    // same handler in NotesFormattingTooltip).
-    const typed = window.prompt('Link address')
-    const href = typed ? linkAddress(typed) : ''
-    run((ctx) => {
-      ctx.get(editorViewCtx).focus()
-      if (href) ctx.get(commandsCtx).call(toggleLinkCommand.key, { href })
     })
   }
 
@@ -111,7 +95,7 @@ export function NotesWritingToolbar() {
       <FormatButton label="Code" active={isMarkActive(state, marks.inlineCode)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleInlineCodeCommand.key))}>
         <Code size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Link" active={isMarkActive(state, marks.link)} onActivate={toggleLink}>
+      <FormatButton label="Link" active={isOnLink(state)} disabled={!canEditLink(state)} onActivate={openLinkEditor}>
         <LinkIcon size={16} aria-hidden="true" />
       </FormatButton>
       </span>

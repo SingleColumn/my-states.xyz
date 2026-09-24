@@ -12,6 +12,7 @@ import { ProsemirrorAdapterProvider, useNodeViewFactory, usePluginViewFactory } 
 import type { NoteDocument } from '../types'
 import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
 import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTooltip'
+import { linkEditorTooltip, NotesLinkEditor, removeLinkCommand } from './NotesLinkEditor'
 import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
@@ -44,6 +45,7 @@ export function NotesEditor(props: NotesEditorProps) {
   const editorRef = useRef<Editor>()
   const keyHandlers = useRef(new Set<(event: KeyboardEvent) => boolean>())
   const emojiOpeners = useRef(new Set<() => void>())
+  const linkEditorOpeners = useRef(new Set<() => void>())
   const actions = useMemo<NotesEditorActions>(() => ({
     run: (action) => { editorRef.current?.action(action) },
     addKeyHandler: (handler) => {
@@ -54,6 +56,11 @@ export function NotesEditor(props: NotesEditorProps) {
     registerEmojiOpener: (open: () => void) => {
       emojiOpeners.current.add(open)
       return () => { emojiOpeners.current.delete(open) }
+    },
+    openLinkEditor: () => { for (const open of linkEditorOpeners.current) open() },
+    registerLinkEditorOpener: (open: () => void) => {
+      linkEditorOpeners.current.add(open)
+      return () => { linkEditorOpeners.current.delete(open) }
     },
   }), [])
   return (
@@ -169,6 +176,9 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         ctx.set(insertMenu.key, {
           view: pluginViewFactory({ component: NotesInsertMenu, root: () => document.body }),
         })
+        ctx.set(linkEditorTooltip.key, {
+          view: pluginViewFactory({ component: NotesLinkEditor, root: () => document.body }),
+        })
       })
       .use(commonmark)
       .use(gfm)
@@ -190,7 +200,9 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       .use(floatingKeys(keyHandlers))
       .use(writingToolbar(pluginViewFactory({ component: NotesWritingToolbar, root: () => toolbarHost.current ?? document.body })))
       .use(linkOpener)
+      .use(removeLinkCommand)
       .use(formattingTooltip)
+      .use(linkEditorTooltip)
       .use(insertMenu)
       .use(panelEmbedRemark)
       .use(panelEmbed)
