@@ -1,9 +1,10 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
-import { Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
+import { nextDuplicateName } from '../utils'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
-import { panelContentProps } from '../panelSurface'
+import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
@@ -38,7 +39,24 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   }
   const found = panels.get(panelId)
   const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
-  const activeNote = notes.notes.find(note => note.id === activeNoteId) ?? null
+  // A note is written by one panel at a time. This one may be holding a
+  // reference to a note another panel already has open -- which is what a
+  // duplicated Writing panel starts life with -- and if it opened it too,
+  // whichever was typed in last would write the whole note over the other.
+  const heldBy = activeNoteId ? notes.noteOpenElsewhere(activeNoteId, panelId) : null
+  const namedNote = notes.notes.find(note => note.id === activeNoteId) ?? null
+  const activeNote = heldBy === null ? namedNote : null
+
+  async function copyNoteHere() {
+    if (!namedNote || heldBy === null) return
+    // Asked of the panel holding it, so the copy is what is on that screen
+    // rather than what was last written to storage.
+    const content = notes.getNoteMarkdown(heldBy)
+    await notes.createNote(panelId, {
+      title: nextDuplicateName(getDisplayNoteTitle(namedNote), notes.notes.map(getDisplayNoteTitle)),
+      content,
+    })
+  }
 
   async function handleDocumentSelection(documentId: string) {
     if (documentId === newDocumentSelectValue) {
@@ -68,11 +86,17 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           Select existing note
         </option>
       )}
-      {notes.notes.map((note) => (
-        <option key={note.id} value={note.id}>
-          {getDisplayNoteTitle(note)}
-        </option>
-      ))}
+      {notes.notes.map((note) => {
+        // Shown but not choosable: a note missing from the list is one the
+        // writer goes looking for, where one that says where it is answers
+        // the question instead.
+        const elsewhere = notes.noteOpenElsewhere(note.id, panelId) !== null
+        return (
+          <option key={note.id} value={note.id} disabled={elsewhere}>
+            {getDisplayNoteTitle(note)}{elsewhere ? ' — open in another Writing panel' : ''}
+          </option>
+        )
+      })}
     </select>
   ) : null
 
@@ -197,6 +221,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           <div
             className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
             {...panelContentProps}
+            // What the wheel scrolls when it lands somewhere with nothing
+            // scrollable above it -- the note's title, which sits beside the
+            // editor's scroll box rather than inside it.
+            {...panelScrollProps}
           >
             {isWritingMode ? (
               <input
@@ -223,6 +251,22 @@ export function NotesPanel({ panelId }: { panelId: string }) {
                 notes.registerMarkdownSource(panelId, handle ? () => handle.getMarkdown() : null)
               }}
             />
+          </div>
+        ) : heldBy !== null ? (
+          <div className="notes-empty-state" {...panelContentProps}>
+            <h3>Open in another Writing panel</h3>
+            <p className="notes-empty-hint">
+              A note is written in one panel at a time, so that two panels cannot
+              write over each other.
+            </p>
+            <button
+              className="card-icon-button is-primary is-wide empty-note-button"
+              type="button"
+              onClick={() => { void copyNoteHere().catch(() => {}) }}
+            >
+              <CopyPlus size={18} />
+              Make a copy here
+            </button>
           </div>
         ) : (
           <div className="notes-empty-state" {...panelContentProps}>

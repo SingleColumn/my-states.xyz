@@ -114,6 +114,17 @@ interface NotesState {
   registerMarkdownSource(panelId: string, render: (() => string) | null): void
   /** The note's Markdown, brought up to date first. */
   getNoteMarkdown(panelId: string): string
+  /**
+   * The panel a note is open in, when that is not this one.
+   *
+   * A note is written by one panel at a time. Each editor takes the note as
+   * it mounts and owns it from then on, so two panels on the same note each
+   * hold their own copy of it and whichever is typed in last writes the
+   * whole thing over the other -- silently, and with no way back. Rather
+   * than make one document two panels can share, which is a different piece
+   * of work altogether, the second panel does not open it.
+   */
+  noteOpenElsewhere(noteId: string, panelId: string): string | null
   setActiveNoteTitle(title: string, panelId: string): void
   /** A blank note, or one opened from a Markdown file the reader chose. */
   createNote(panelId: string, opening?: NoteOpening): Promise<void>
@@ -712,6 +723,24 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     }, 500)
   }, [persistPanelNote])
 
+  /**
+   * Which panel owns a note: the one that opened it first, which is the one
+   * with the lowest id, since an id carries the moment it was made in.
+   *
+   * Deliberately not the first in `panels.all`: that is stacking order, and
+   * it changes when a panel is brought to the front -- expanding one to full
+   * screen does exactly that -- so the note would change hands for reasons
+   * that have nothing to do with the note.
+   */
+  const noteOpenElsewhere = useCallback((noteId: string, panelId: string) => {
+    let owner: string | null = null
+    for (const panel of panels.all) {
+      if (panel.type !== 'notes' || panel.config.activeNoteId !== noteId) continue
+      if (owner === null || panel.id < owner) owner = panel.id
+    }
+    return owner === null || owner === panelId ? null : owner
+  }, [panels])
+
   const createNote = useCallback((panelId: string, opening?: NoteOpening) => runNoteOperation(async () => {
     if (!moment) return
     await flush(panelId)
@@ -745,12 +774,19 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     // forgetting: a caller through the command surface (canvasApi.ts) needs
     // its await to mean the selection has actually landed, and its
     // rejection to actually reach the caller.
+    // Refused rather than allowed and then repaired: opening it here would
+    // put two editors on one note, and the one that loses is the one whose
+    // writing goes.
+    if (noteOpenElsewhere(id, panelId)) {
+      setError('That note is open in another Writing panel. Close it there, or make a copy of it here.')
+      return Promise.reject(new Error('That note is open in another Writing panel.'))
+    }
     return runNoteOperation(async () => {
       await flush(panelId)
       getNotesPanelRuntimeState(panelId).activeNote = next
       panels.updateConfig<'notes'>(panelId, { activeNoteId: next.id })
     })
-  }, [flush, loadKey, notes, panels, runNoteOperation])
+  }, [flush, loadKey, noteOpenElsewhere, notes, panels, runNoteOperation])
 
   const deleteNote = useCallback((id: string, panelId: string) => runNoteOperation(async () => {
     // deleteStoredNote deletes by id alone, with no moment to scope it to.
@@ -834,7 +870,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     scheduleSave(panelId)
   }, [scheduleSave])
 
-  return { notes, error, setActiveNoteContent, setActiveNoteDocument, registerMarkdownSource, getNoteMarkdown, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
+  return { notes, error, setActiveNoteContent, setActiveNoteDocument, registerMarkdownSource, getNoteMarkdown, noteOpenElsewhere, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {

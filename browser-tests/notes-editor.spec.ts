@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addPanelFromToolbar, cameraZoom, describeCanvas, dispatch, dragLocator, expectCanvasSaved, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, shapeOf, titleOf, undo, waitForCanvas } from './helpers'
+import { addPanelFromToolbar, cameraZoom, describeCanvas, dispatch, dragLocator, expectCanvasSaved, geometryOf, loadSampleImages, noteBodyOf, openApp, panelById, panelOfType, readStorage, selectPanel, shapeOf, titleOf, undo, waitForCanvas } from './helpers'
 
 /**
  * The writing surface itself: what a writer types becomes structure, what
@@ -384,7 +384,12 @@ test.describe('writing mode', () => {
     await page.keyboard.press('Enter')
     await page.keyboard.type('A paragraph long enough to run past a comfortable reading measure on a full-screen panel, which is the whole point of the measure.')
     const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('A heading')
+    // Waited for the last word of the paragraph, not the first of the
+    // heading: the note is saved a moment after it is typed, and taking
+    // "before" while that was still in flight compared a half-written note
+    // with a whole one.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toContain('the whole point of the measure.')
     const before = (await readStorage(page, moment!.id)).notes[0]!.content
 
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
@@ -465,17 +470,7 @@ test.describe('two Notes panels', () => {
     await expect(noteBodyOf(await shapeOf(page, second.panelId))).toHaveText('The second note.')
   })
 
-  /**
-   * Known gap, not a regression: an editor takes the note as it mounts and
-   * owns it from then on, so two panels showing the *same* note (what a
-   * duplicated Notes panel gets: see duplicateConfig in panelRegistry.ts)
-   * each hold their own copy, and whichever is typed in last writes the
-   * whole note. The previous editor behaved identically -- it captured its
-   * `markdown` prop in a ref at mount -- so nothing here made it worse.
-   * The fix is one shared document per note with the panels as views onto
-   * it, which is library-neutral work well beyond this prototype.
-   */
-  test.fixme('two panels on the same note do not overwrite each other', async ({ page }) => {
+  test('a note is written in one panel at a time, and the second offers a copy', async ({ page }) => {
     await openApp(page)
     const first = await panelOfType(page, 'notes')
     const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
@@ -483,45 +478,63 @@ test.describe('two Notes panels', () => {
     await page.keyboard.type('Written in the first panel.')
     const { moment } = await describeCanvas(page)
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('first panel')
-    const noteId = (await panelById(page, first.panelId)).config as { activeNoteId: string }
+    const noteId = ((await panelById(page, first.panelId)).config as { activeNoteId: string }).activeNoteId
 
-    const { panel: second, body: secondBody } = await addSecondNotesPanel(page)
-    await dispatch(page, { kind: 'note.select', panelId: second.panelId, noteId: noteId.activeNoteId })
-    await secondBody.click()
-    await page.keyboard.press('End')
-    await page.keyboard.type(' Added in the second panel.')
+    // A second panel cannot be pointed at the same note: an editor takes the
+    // note as it mounts and owns it from then on, so two of them would each
+    // hold their own copy and whichever was typed in last would write the
+    // whole note over the other.
+    const { panel: second, shape: secondShape } = await addSecondNotesPanel(page)
+    await expect(dispatch(page, { kind: 'note.select', panelId: second.panelId, noteId })).rejects.toThrow(/another Writing panel/)
 
-    // Back to the first panel: its editor never heard about the addition.
-    await firstBody.click()
-    await page.keyboard.press('End')
-    await page.keyboard.type(' And back in the first.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
-      .toBe('Written in the first panel. Added in the second panel. And back in the first.\n')
+    // And the picker says so rather than hiding it.
+    const heldOption = secondShape.getByRole('combobox', { name: 'Choose a note' })
+      .locator('option', { hasText: 'open in another Writing panel' })
+    await expect(heldOption).toHaveCount(1)
+    // The property rather than toBeDisabled(), which does not read an
+    // <option> the way it reads the controls around it.
+    await expect(heldOption).toHaveJSProperty('disabled', true)
+
+    // And the first panel's note is untouched by any of it. Read from
+    // storage rather than typed into again: by now the second panel sits
+    // over the first, and this is about the note, not the layout.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content))
+      .toContain('Written in the first panel.\n')
   })
 
-  test('the formatting bar and insert menu belong to the panel being written in', async ({ page }) => {
+  test('a duplicated panel holds the same note, shows why, and can take a copy', async ({ page }) => {
     await openApp(page)
     const first = await panelOfType(page, 'notes')
-    const { body: secondBody } = await addSecondNotesPanel(page)
-
-    await secondBody.click()
-    await page.keyboard.type('Second panel words')
-    await page.keyboard.press('Shift+Control+ArrowLeft')
-    const selection = await page.evaluate(() => {
-      const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-    })
-    await page.mouse.click(selection.x, selection.y, { button: 'right' })
-    // Only the editor that was asked has a bar; the other panel's is quiet.
-    await expect(page.getByRole('toolbar', { name: 'Formatting' })).toHaveCount(1)
-    await page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name: 'Bold' }).click()
-    await expect(secondBody.locator('strong')).toHaveText('words')
-
-    // The other panel's note is untouched by any of it.
-    await expect(noteBodyOf(await shapeOf(page, first.panelId)).locator('strong')).toHaveCount(0)
+    const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
+    await firstBody.click()
+    await page.keyboard.type('The original note.')
     const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('The original note.')
+
+    // Ctrl+D copies the panel, and a copied Writing panel names the note the
+    // original was showing.
+    await selectPanel(page, first.panelId)
+    await page.keyboard.press('Control+d')
+    await expect.poll(async () => (await describeCanvas(page)).panels.filter((panel) => panel.type === 'notes')).toHaveLength(2)
+    const copy = (await describeCanvas(page)).panels.find((panel) => panel.type === 'notes' && panel.panelId !== first.panelId)!
+    const copyShape = await shapeOf(page, copy.panelId)
+
+    // It does not open it. It says where the note is, and offers the only
+    // safe way on.
+    await expect(copyShape.getByRole('heading', { name: 'Open in another Writing panel' })).toBeVisible()
+    await expect(noteBodyOf(copyShape)).toHaveCount(0)
+    await copyShape.getByRole('button', { name: 'Make a copy here' }).click()
+
+    // Two notes now, the copy named after the original, and the original
+    // untouched.
+    await expect(noteBodyOf(copyShape)).toHaveText('The original note.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+      .toEqual(['Untitled note', 'Untitled note (copy)'])
+    await firstBody.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' Edited after the copy.')
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
-      .toEqual(['', 'Second panel **words**\n'])
+      .toEqual(['The original note.\n', 'The original note. Edited after the copy.\n'])
   })
 })
 

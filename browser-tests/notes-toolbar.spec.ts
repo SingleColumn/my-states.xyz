@@ -270,38 +270,78 @@ test.describe('the writing tools on the page', () => {
     })).toEqual([0, 0])
   })
 
-  test('a wheel over the note title scrolls the note, not the canvas', async ({ page }) => {
+  test('a wheel over the note title scrolls the note in an ordinary panel', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 820 })
-    const { body } = await openWithTools(page)
-    await body.click()
-    for (let line = 0; line < 50; line++) {
-      await page.keyboard.type(`line ${line}`)
-      await page.keyboard.press('Enter')
-    }
-    const shape = await shapeOf(page, (await panelOfType(page, 'notes')).panelId)
+    const notes = await aNoteWorthScrolling(page)
+
+    // Big enough to write in, but an ordinary panel. Here the title is not
+    // even in the same content region as the editor, so the fallback cannot
+    // be "something scrollable near the pointer": the panel says where it
+    // scrolls, and that is what moves.
+    await dispatch(page, { kind: 'panel.resize', panelId: notes.panelId, w: 820, h: 560 })
+    await wheelOverTitle(page, '.note-title-input')
+  })
+
+  test('a wheel over the note title scrolls the note at full screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 })
+    const notes = await aNoteWorthScrolling(page)
+    const shape = await shapeOf(page, notes.panelId)
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
     await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
     await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
 
-    const scrollTop = () => page.evaluate(() => Math.round((document.querySelector('.notes-editor .milkdown') as HTMLElement).scrollTop))
-    const camera = () => page.evaluate(() => document.querySelector<HTMLElement>('.tl-html-layer')?.style.transform ?? '')
+    // The same title, which at full screen is a line of writing rather than
+    // a form field, and still beside the scroll box rather than inside it.
+    await wheelOverTitle(page, '.writing-title')
+  })
 
-    // The title is a field beside the editor's scroll box rather than inside
-    // it, so there is nothing scrollable above it to walk up to. Left at
-    // that, the wheel fell through to the canvas and slid the view off the
-    // panel -- which is a hard place to come back from.
-    const title = page.locator('.writing-title')
-    await title.click()
-    const box = (await title.boundingBox())!
-    const before = { scroll: await scrollTop(), camera: await camera() }
-    expect(before.scroll).toBeGreaterThan(0)
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  test('a wheel on the panel frame is still the canvas’s', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 })
+    const notes = await aNoteWorthScrolling(page)
+    const shape = await shapeOf(page, notes.panelId)
+
+    // The header is frame, not content: a drag there moves the panel and a
+    // wheel there belongs to the canvas, the same as before.
+    const header = (await shape.locator('.card-header').boundingBox())!
+    const before = { scroll: await noteScrollTop(page), camera: await cameraOf(page) }
+    await page.mouse.move(header.x + header.width / 2, header.y + header.height / 2)
     await page.mouse.wheel(0, -200)
-
-    await expect.poll(scrollTop).toBeLessThan(before.scroll)
-    expect(await camera()).toBe(before.camera)
+    await expect.poll(() => cameraOf(page)).not.toBe(before.camera)
+    expect(await noteScrollTop(page)).toBe(before.scroll)
   })
 })
+
+/** A note long enough that there is something to scroll, with the tools on. */
+async function aNoteWorthScrolling(page: Page) {
+  const { body } = await openWithTools(page)
+  const notes = await panelOfType(page, 'notes')
+  await body.click()
+  for (let line = 0; line < 50; line++) {
+    await page.keyboard.type(`line ${line}`)
+    await page.keyboard.press('Enter')
+  }
+  return notes
+}
+
+async function wheelOverTitle(page: Page, selector: string) {
+  const title = page.locator(selector)
+  await expect(title).toBeVisible()
+  const box = (await title.boundingBox())!
+  const before = { scroll: await noteScrollTop(page), camera: await cameraOf(page) }
+  expect(before.scroll).toBeGreaterThan(0)
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.wheel(0, -200)
+  await expect.poll(() => noteScrollTop(page)).toBeLessThan(before.scroll)
+  expect(await cameraOf(page)).toBe(before.camera)
+}
+
+function noteScrollTop(page: Page) {
+  return page.evaluate(() => Math.round((document.querySelector('.notes-editor .milkdown') as HTMLElement).scrollTop))
+}
+
+function cameraOf(page: Page) {
+  return page.evaluate(() => document.querySelector<HTMLElement>('.tl-html-layer')?.style.transform ?? '')
+}
 
 test.describe('the empty note', () => {
   test('names where the tools are, since they are not on show', async ({ page }) => {

@@ -47,6 +47,28 @@ export function isInsidePanelContent(target: EventTarget | null): boolean {
 }
 
 /**
+ * Where a panel scrolls, when the wheel lands somewhere that cannot say for
+ * itself.
+ *
+ * The usual answer is read from the pointer: whatever it is over, the
+ * nearest scrolling ancestor is the thing to move. That fails for a control
+ * beside the scrolling part rather than inside it -- a note's title field is
+ * the case in hand -- where there is no scrolling ancestor to find and the
+ * wheel fell through to the canvas, sliding the view off the panel.
+ *
+ * A panel names the region instead of the app guessing at one. Guessing was
+ * the alternative and a bad one: the nearest scrollable thing anywhere on
+ * the panel would have the Images panel's thumbnail strip moving under a
+ * pointer resting on its transport row.
+ */
+export const PANEL_SCROLL_ATTRIBUTE = 'data-panel-scroll'
+
+/** Spread onto the element that holds what the panel scrolls. */
+export const panelScrollProps = { [PANEL_SCROLL_ATTRIBUTE]: '' } as const
+
+export const panelScrollSelector = `[${PANEL_SCROLL_ATTRIBUTE}]`
+
+/**
  * Whether a press or a key landed on something that takes text: a form
  * field, or any element inside a contenteditable. This is the same test
  * tldraw applies before it claims a key, so the app and the library agree on

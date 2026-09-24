@@ -2016,6 +2016,16 @@ input[type="range"]:focus-visible {
   text-align: center;
 }
 
+/* The line under an empty state's heading: why there is nothing here, when
+   that is not obvious from the heading alone. */
+.notes-empty-hint {
+  max-width: var(--size-moment-error-max-width);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+  line-height: var(--line-height-hint);
+}
+
 .notes-empty-state h3 {
   margin: 0;
   font-size: var(--type-md);
