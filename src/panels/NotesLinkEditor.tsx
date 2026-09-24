@@ -118,13 +118,15 @@ export function NotesLinkEditor() {
     provider.current?.show({
       getBoundingClientRect: () => posToDOMRect(currentView, anchor.from, anchor.to),
     }, currentView)
-    // The popover is still display:none in this same tick -- the show()
-    // call above is what changes that -- so focus has to wait one frame for
-    // the browser to have somewhere to put it.
-    requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    })
+    // Focused in this same tick, not a frame later. `show()` clears the
+    // `data-show="false"` that was hiding the field as its first statement,
+    // so there is somewhere to put focus right now -- and a frame's delay is
+    // long enough for the next keystroke to reach the editor instead, where
+    // it would replace the very words being linked.
+    inputRef.current?.focus()
+    // The value is React state set just above, so the field still shows the
+    // previous address until that render lands; selecting it is what waits.
+    requestAnimationFrame(() => inputRef.current?.select())
   }
 
   useEffect(() => registerLinkEditorOpener(open), [registerLinkEditorOpener])

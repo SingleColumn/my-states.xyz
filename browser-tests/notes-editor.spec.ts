@@ -851,7 +851,15 @@ test.describe('the link editor', () => {
     await page.keyboard.press('Control+Home')
     for (let i = 0; i < 2; i++) await page.keyboard.press('Shift+Control+ArrowRight')
 
-    await page.keyboard.press('Control+k')
+    // The shortcut and the question "where is focus now?" in one evaluation,
+    // so nothing can run in between: focus has to land in the same tick the
+    // shortcut is handled. A frame's delay would send the first characters
+    // of the address into the note, replacing the selected words.
+    expect(await page.evaluate(() => {
+      document.querySelector('.notes-editor-content')!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true }))
+      return document.activeElement?.getAttribute('aria-label')
+    })).toBe('Link address')
     const popover = page.getByRole('group', { name: 'Link' })
     await expect(popover).toBeVisible()
     await page.keyboard.type('should-not-apply.example')
