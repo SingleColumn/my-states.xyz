@@ -26,7 +26,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   const toolbarHostRef = useRef<HTMLDivElement>(null)
 
   async function openMarkdownFile(file: File) {
-    const content = await file.text()
+    // Every Markdown this app writes uses \n alone -- every toMarkdown
+    // runner does -- so a file carrying \r\n or a lone \r (Windows editors,
+    // some exports) is normalised on the way in. Without this the note's
+    // stored content kept the file's own line endings verbatim until an
+    // edit next settled it, which is one string for a note that had never
+    // been touched and a different one, silently, the moment it was.
+    const content = (await file.text()).replace(/\r\n?/g, '\n')
     await notes.createNote(panelId, { title: markdownFileTitle(file.name), content })
   }
 
