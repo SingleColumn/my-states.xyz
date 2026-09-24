@@ -193,6 +193,18 @@ export function noteBodyOf(shape: Locator): Locator {
   return shape.locator('.notes-editor-content[contenteditable="true"]')
 }
 
+/** A note open with the writing tools showing, which is not where a writer starts. */
+export async function openWithTools(page: Page): Promise<{ body: Locator; bar: Locator }> {
+  await openApp(page)
+  const notes = await panelOfType(page, 'notes')
+  const shape = await shapeOf(page, notes.panelId)
+  await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Show formatting tools' }).click()
+  const bar = page.getByRole('toolbar', { name: 'Writing tools' })
+  await expect(bar).toBeVisible()
+  return { body: noteBodyOf(shape), bar }
+}
+
 export async function undo(page: Page) {
   await page.keyboard.press('Control+z')
 }

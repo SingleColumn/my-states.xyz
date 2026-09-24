@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { describeCanvas, dispatch, noteBodyOf, openApp, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
+import { describeCanvas, dispatch, noteBodyOf, openApp, openWithTools, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
 
 /**
  * The writing tools above the note: asked for from the panel's menu, and
@@ -403,18 +403,6 @@ async function measured<T>(page: Page, read: () => Promise<T>): Promise<T> {
 async function setTextSize(page: Page, shape: Locator, label: string) {
   await shape.getByRole('button', { name: 'Writing panel actions' }).click()
   await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click()
-}
-
-/** A note open with the tools showing, which is not where a writer starts. */
-async function openWithTools(page: Page): Promise<{ body: Locator; bar: Locator }> {
-  await openApp(page)
-  const notes = await panelOfType(page, 'notes')
-  const shape = await shapeOf(page, notes.panelId)
-  await shape.getByRole('button', { name: 'Writing panel actions' }).click()
-  await page.getByRole('menuitemcheckbox', { name: 'Show formatting tools' }).click()
-  const bar = page.getByRole('toolbar', { name: 'Writing tools' })
-  await expect(bar).toBeVisible()
-  return { body: noteBodyOf(shape), bar }
 }
 
 function look(page: Page) {
