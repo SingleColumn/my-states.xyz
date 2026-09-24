@@ -1,4 +1,4 @@
-import { Bold, Code, Image as ImageIcon, Italic, Link as LinkIcon, Minus, Smile, Underline as UnderlineIcon } from 'lucide-react'
+import { Bold, Code, Highlighter, Image as ImageIcon, Italic, Link as LinkIcon, Minus, Smile, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import type { Ctx } from '@milkdown/ctx'
 import {
@@ -22,6 +22,7 @@ import { useNotesEditorActions } from './notesEditorActions'
 import { FormatButton, isMarkActive, linkAddress } from './NotesFormattingTooltip'
 import { insertDivider, pickImageFile } from './NotesInsertMenu'
 import { toggleUnderlineCommand } from './notesUnderline'
+import { toggleHighlightCommand } from './notesHighlight'
 
 /**
  * The writing tools, always on show above the note.
@@ -103,6 +104,9 @@ export function NotesWritingToolbar() {
       </FormatButton>
       <FormatButton label="Underline" active={isMarkActive(state, marks.underline)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleUnderlineCommand.key))}>
         <UnderlineIcon size={16} aria-hidden="true" />
+      </FormatButton>
+      <FormatButton label="Highlight" active={isMarkActive(state, marks.highlight)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleHighlightCommand.key))}>
+        <Highlighter size={16} aria-hidden="true" />
       </FormatButton>
       <FormatButton label="Code" active={isMarkActive(state, marks.inlineCode)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleInlineCodeCommand.key))}>
         <Code size={16} aria-hidden="true" />

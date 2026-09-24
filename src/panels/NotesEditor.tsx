@@ -15,6 +15,7 @@ import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTool
 import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
+import { configureHighlightStringify, highlightInputRule, highlightKeymap, highlightRemark, highlightSchema, toggleHighlightCommand } from './notesHighlight'
 import { NotesWritingToolbar } from './NotesWritingToolbar'
 import { configureImageSize, imageSizeRemark, NotesImageView } from './notesImage'
 import '@milkdown/prose/view/style/prosemirror.css'
@@ -158,6 +159,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         // these and its null title would blank one out.
         ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))
         configureUnderlineStringify(ctx)
+        configureHighlightStringify(ctx)
         configureImageSize(ctx)
         // The tooltip is rendered on the body (see NotesFormattingTooltip
         // for why), so its React portal goes there too.
@@ -178,6 +180,11 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       .use(underlineSchema)
       .use(toggleUnderlineCommand)
       .use(underlineKeymap)
+      .use(highlightRemark)
+      .use(highlightSchema)
+      .use(toggleHighlightCommand)
+      .use(highlightKeymap)
+      .use(highlightInputRule)
       .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))

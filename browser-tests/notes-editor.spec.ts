@@ -894,6 +894,92 @@ test.describe('what a line is', () => {
   })
 })
 
+test.describe('highlight', () => {
+  test('is typed, shortcut or chosen, and written as the convention rather than a tag', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+
+    // Typed, the way `*` makes an emphasis.
+    await page.keyboard.type('Mark ==these words== as typed')
+    await expect(body.locator('mark')).toHaveText('these words')
+
+    // And by shortcut, on a selection.
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('And a second line')
+    await page.keyboard.press('Shift+Home')
+    await page.keyboard.press('Control+Shift+h')
+    await expect(body.locator('mark')).toHaveCount(2)
+
+    // Written as the convention every reader of it knows, not as a tag: a
+    // note that uses a highlight is still Markdown rather than Markdown
+    // with HTML in it.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('Mark ==these words== as typed\n\n==And a second line==\n')
+
+    // And read back as the mark, not as four equals signs in the prose.
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('mark')).toHaveCount(2)
+    await expect(again.locator('p').first()).toHaveText('Mark these words as typed')
+  })
+
+  test('the tools offer it, and say when it is on', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    await body.click()
+    await page.keyboard.type('worth coming back to')
+    await page.keyboard.press('Control+a')
+
+    const bar = page.getByRole('toolbar', { name: 'Formatting' })
+    await body.click({ button: 'right' })
+    const button = bar.getByRole('button', { name: 'Highlight' })
+    await expect(button).toHaveAttribute('aria-pressed', 'false')
+    await button.click()
+    await expect(body.locator('mark')).toHaveText('worth coming back to')
+
+    await body.click({ button: 'right' })
+    await expect(bar.getByRole('button', { name: 'Highlight' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('leaves an equals sign alone where it is arithmetic', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    // A space against a marker is not a highlight, which is the rule every
+    // reader of this convention applies. Without it, any later pair on the
+    // line closed a highlight over everything between the two.
+    await page.keyboard.type('a == b and c == d')
+    await expect(body.locator('mark')).toHaveCount(0)
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('a == b and c == d\n')
+  })
+
+  test('leaves the markers alone inside code, where they are characters', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Open markdown file' }).click()
+    await shape.locator('input.visually-hidden-file-input').setInputFiles(EQUALS_FIXTURE)
+
+    // Code is a node of its own, carrying a value rather than text children,
+    // so the split never reaches inside it.
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await expect(body.locator('code')).toHaveText('x ==y== z')
+    await expect(body.locator('mark')).toHaveCount(1)
+    await expect(body.locator('mark')).toHaveText('this one')
+  })
+})
+
 test.describe('emoji', () => {
   test('a colon and a word find one, and Enter puts it in the writing', async ({ page }) => {
     await openApp(page)
@@ -965,6 +1051,7 @@ test.describe('opening a markdown file', () => {
 
 /** Read from disk: built in memory it would need a Buffer, and node's types are not in this project. */
 const MARKDOWN_FIXTURE = 'browser-tests/fixtures/Kept from elsewhere.md'
+const EQUALS_FIXTURE = 'browser-tests/fixtures/equals.md'
 
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

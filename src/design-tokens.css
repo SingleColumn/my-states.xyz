@@ -76,6 +76,10 @@
   --size-slideshow-thumbnail: 112px;
   --radius-slideshow-thumbnail: calc(var(--radius-small) + 1px);
   --size-slideshow-controls-max-height: 320px;
+  /* The wash behind highlighted words. Mixed from the writing panel's own
+     accent so it follows a theme without each one having to name it, and
+     kept faint enough that body text reads through it unchanged. */
+  --color-note-highlight: color-mix(in srgb, var(--accent-notes, var(--color-focus-ring)) 30%, transparent);
   --space-rich-content-block: 12px;
   --space-rich-content-inset: 12px;
   --border-width-rich-content: 2px;

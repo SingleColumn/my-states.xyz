@@ -1992,6 +1992,17 @@ input[type="range"]:focus-visible {
   user-select: none;
 }
 
+/* A wash rather than a colour of its own: mixed from the panel's accent, so
+   every theme gets a highlight that belongs to it and none of them need a
+   token of their own. The words keep the text colour they had, which is
+   what keeps them legible under it. */
+.notes-editor-content mark {
+  padding: 0 var(--space-detail-1);
+  border-radius: var(--radius-small);
+  background: var(--color-note-highlight);
+  color: inherit;
+}
+
 .notes-editor-content code,
 .notes-editor-content pre {
   font-family: var(--font-family-code);
