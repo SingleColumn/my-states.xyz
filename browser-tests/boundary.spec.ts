@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   cameraTransform,
+  choosePanelMenuItem,
   clickAt,
   dragLocator,
   expectArchitectureReportPass,
@@ -57,15 +58,26 @@ test.describe('content: the widget owns it', () => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')
     const shape = await shapeOf(page, images.panelId)
-    const pickerButton = shape.getByRole('button', { name: 'Load a sample collection' })
 
-    // A press that wanders a little before release, as real clicks do: the
-    // popover still opens and the panel has not moved.
-    await dragLocator(page, pickerButton, { dx: 3, dy: 2 })
+    // The picker sits behind the panel's ... menu now (PanelHeader.tsx,
+    // cab8c98), but the trigger, the menu and the popover are all declared
+    // content (card-header-actions carries data-panel-content), so a press
+    // that wanders a little before release, as real presses do, resolves
+    // as an ordinary click at every step rather than the start of a drag.
+    const trigger = shape.getByRole('button', { name: /panel actions$/ })
+    await dragLocator(page, trigger, { dx: 3, dy: 2 })
+    const item = page.getByRole('menuitemcheckbox', { name: 'Load a sample collection' })
+    await expect(item).toBeVisible()
+    expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
+
+    await dragLocator(page, item, { dx: 3, dy: 2 })
     await expect(shape.locator('#sample-collection-picker')).toBeVisible()
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
 
-    await dragLocator(page, pickerButton, { dx: 60, dy: 40 })
+    // And a much larger wander back on the trigger -- reopening the menu --
+    // still never reads as a drag: the boundary is decided by where the
+    // press started, not by how far the pointer travels afterwards.
+    await dragLocator(page, trigger, { dx: 60, dy: 40 })
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
   })
 
@@ -161,7 +173,7 @@ test.describe('Images focus view', () => {
     await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
 
-    await shape.getByRole('button', { name: 'Reduce panel to focus view' }).click()
+    await choosePanelMenuItem(shape, 'Reduce panel to focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
     const before = geometryOf(await panelById(page, images.panelId))
     const picture = shape.locator('img.slideshow-image-layer')

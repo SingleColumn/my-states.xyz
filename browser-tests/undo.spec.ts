@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import {
+  choosePanelMenuItem,
   createMomentFromToolbar,
   describeCanvas,
   dragLocator,
@@ -152,11 +153,16 @@ test.describe('focus view and undo', () => {
     const images = await panelOfType(page, 'slideshow')
     await loadSampleImages(page, images.panelId)
     // A move first, so a single undo that also reverted the move would show.
-    await dragLocator(page, await titleOf(page, images.panelId), { dx: 90, dy: 50 })
+    // Kept well under the ~40px the canonical layout leaves between this
+    // panel and Notes beside it: a bigger move drags the header's own ...
+    // button under Notes, where a real overlap correctly blocks the click
+    // that follows -- a click blocked by whatever panel is actually on top
+    // there is the app working as intended, not a reason to force one.
+    await dragLocator(page, await titleOf(page, images.panelId), { dx: 20, dy: 50 })
     const moved = geometryOf(await panelById(page, images.panelId))
     expect(moved).not.toEqual(geometryOf(images))
 
-    await (await shapeOf(page, images.panelId)).getByRole('button', { name: 'Reduce panel to focus view' }).click()
+    await choosePanelMenuItem(await shapeOf(page, images.panelId), 'Reduce panel to focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
 
     await page.mouse.click(720, 860)
