@@ -1140,6 +1140,92 @@ test.describe('opening a markdown file', () => {
   })
 })
 
+test.describe('a note from before the structured document existed', () => {
+  /**
+   * Every note currently stored by any user of this app was written before
+   * `document` existed on a Note: `content` (Markdown) alone, with no
+   * structured document beside it. NotesEditor.tsx is written to fall back to
+   * the Markdown in exactly that case, but nothing had exercised the path --
+   * this is the shape every real note is in, not a hypothetical one.
+   */
+  test('opens intact from its Markdown alone', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('placeholder')
+
+    // The app saves a moment after the edit. Rewriting the stored record
+    // before that lands would just have the app's own save overwrite it, so
+    // this waits for the placeholder to be the settled content first.
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('placeholder\n')
+
+    // Rewritten from outside the app's own code, the way an old record
+    // actually looks: `content` only, no `document` key at all.
+    const rewritten = await page.evaluate(async (markdown) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('my-states')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const all = await new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
+        const request = db.transaction('notes').objectStore('notes').getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const note = all[0]
+      delete note.document
+      note.content = markdown
+      await new Promise<void>((resolve, reject) => {
+        const request = db.transaction('notes', 'readwrite').objectStore('notes').put(note)
+        request.onsuccess = () => resolve()
+        request.onerror = () => reject(request.error)
+      })
+      db.close()
+      return { hasDocument: 'document' in note }
+    }, LEGACY_MARKDOWN)
+    expect(rewritten.hasDocument).toBe(false)
+
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+
+    await expect(again.locator('h1')).toHaveText('A heading from before')
+    await expect(again.locator('strong')).toHaveText('bold')
+    await expect(again.locator('em')).toHaveText('italic')
+    await expect(again.locator('a')).toHaveAttribute('href', 'https://example.com')
+    await expect(again.locator('blockquote')).toContainText('A quotation')
+    await expect(again.locator('ul li')).toHaveCount(2)
+    await expect(again.locator('ol li')).toHaveCount(2)
+    await expect(again.locator('code')).toHaveText('code')
+    await expect(again.locator('hr')).toHaveCount(1)
+    await expect(again.locator('p').last()).toHaveText('The last paragraph.')
+  })
+})
+
+const LEGACY_MARKDOWN = [
+  '# A heading from before',
+  '',
+  'Some **bold** and *italic* prose with a [link](https://example.com) in it.',
+  '',
+  '> A quotation',
+  '',
+  '* first',
+  '* second',
+  '',
+  '1. one',
+  '2. two',
+  '',
+  'Inline `code` and a rule:',
+  '',
+  '***',
+  '',
+  'The last paragraph.',
+  '',
+].join('\n')
+
 /** Read from disk: built in memory it would need a Buffer, and node's types are not in this project. */
 const MARKDOWN_FIXTURE = 'browser-tests/fixtures/Kept from elsewhere.md'
 const EQUALS_FIXTURE = 'browser-tests/fixtures/equals.md'
