@@ -1,5 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { PostHogProvider } from '@posthog/react'
+import type { PostHogInterface } from 'posthog-js'
 import { Analytics } from '@vercel/analytics/react'
 import { DesktopOnlyNotice } from './DesktopOnlyNotice'
 import { currentDeviceHints, isMobileDevice } from './deviceSupport'
@@ -15,6 +17,17 @@ import './design-tokens.css'
 import './theme.css'
 import './styles.css'
 
+const posthogOptions = {
+  api_host: import.meta.env.VITE_POSTHOG_HOST,
+  defaults: '2026-05-30',
+  loaded: (posthog: PostHogInterface) => {
+    if (import.meta.env.VITE_POSTHOG_INTERNAL_TESTER === 'true') {
+      posthog.register({ internal_tester: true })
+    }
+    if (import.meta.env.DEV) posthog.debug(true)
+  },
+} as const
+
 const root = ReactDOM.createRoot(document.getElementById('root')!)
 
 if (isMobileDevice(currentDeviceHints())) {
@@ -22,7 +35,12 @@ if (isMobileDevice(currentDeviceHints())) {
   // large and would only render a UI that cannot be operated by touch.
   root.render(
     <React.StrictMode>
-      <DesktopOnlyNotice />
+      <PostHogProvider
+        apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
+        options={posthogOptions}
+      >
+        <DesktopOnlyNotice />
+      </PostHogProvider>
     </React.StrictMode>,
   )
 } else {
@@ -30,8 +48,13 @@ if (isMobileDevice(currentDeviceHints())) {
   import('./App').then(({ default: App }) => {
     root.render(
       <React.StrictMode>
-        <App />
-        <Analytics />
+        <PostHogProvider
+          apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
+          options={posthogOptions}
+        >
+          <App />
+          <Analytics />
+        </PostHogProvider>
       </React.StrictMode>,
     )
   })

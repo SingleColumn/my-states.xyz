@@ -1,4 +1,5 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { usePostHog } from '@posthog/react'
 import { CopyPlus, Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
@@ -8,6 +9,7 @@ import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
+  const posthog = usePostHog()
   const { notes, panels } = useAppState()
   const commands = usePanelCommands()
   // Full screen is treated as the writing state: the panel sheds its form
@@ -24,6 +26,19 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
   const toolbarHostRef = useRef<HTMLDivElement>(null)
+  const writingCaptureTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (writingCaptureTimeoutRef.current !== null) window.clearTimeout(writingCaptureTimeoutRef.current)
+  }, [])
+
+  function captureWriting() {
+    if (writingCaptureTimeoutRef.current !== null) window.clearTimeout(writingCaptureTimeoutRef.current)
+    writingCaptureTimeoutRef.current = window.setTimeout(() => {
+      posthog.capture('text_editor_written')
+      writingCaptureTimeoutRef.current = null
+    }, 2000)
+  }
 
   async function openMarkdownFile(file: File) {
     // Every Markdown this app writes uses \n alone -- every toMarkdown
@@ -251,6 +266,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               onChange={(document, next) => {
                 notes.setActiveNoteDocument(document, panelId)
                 setStats(next)
+                captureWriting()
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle

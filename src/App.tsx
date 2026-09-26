@@ -1,4 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePostHog } from '@posthog/react'
 import { createTLSchemaFromUtils, defaultBindingUtils, defaultShapeUtils, Editor, Tldraw, TLShape, getSnapshot, loadSnapshot, type TLUiOverrides } from 'tldraw'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { AppChromeMenuPanel, AppChromePropsProvider, type AppChromeRect } from './AppChrome'
@@ -48,6 +49,7 @@ export default function App() {
 }
 
 function AppContent() {
+  const posthog = usePostHog()
   const appState = useAppState()
   const { spotify, moments, panels, appearance } = appState
   const [callbackStatus, setCallbackStatus] = useState<string | null>(null)
@@ -132,11 +134,12 @@ function AppContent() {
       .handleCallback(code, state)
       .then(() => {
         setCallbackStatus(null)
+        posthog.capture('spotify_login_completed')
       })
       .catch((caught) => {
         setCallbackStatus(caught instanceof Error ? caught.message : 'Spotify callback failed.')
       })
-  }, [spotify])
+  }, [posthog, spotify])
 
   /**
    * Puts a moment on the canvas. Every moment has its document from
@@ -585,14 +588,16 @@ function AppContent() {
   const openHelpAbout = useCallback(() => {
     helpAboutReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setIsHelpAboutOpen(true)
-  }, [])
+    posthog.capture('about_opened')
+  }, [posthog])
 
   const closeHelpAbout = useCallback(() => setIsHelpAboutOpen(false), [])
 
   const openSettings = useCallback(() => {
     settingsReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setIsSettingsOpen(true)
-  }, [])
+    posthog.capture('settings_opened')
+  }, [posthog])
 
   const closeSettings = useCallback(() => setIsSettingsOpen(false), [])
 

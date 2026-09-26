@@ -1,5 +1,6 @@
 import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
@@ -25,6 +26,7 @@ const focusViewStack: string[] = []
  * -- is declared with `panelContentProps`, and nothing else is.
  */
 export function SlideshowPanel({ panelId }: { panelId: string }) {
+  const posthog = usePostHog()
   const { slideshow, panels } = useAppState()
   const commands = usePanelCommands()
   const found = panels.get(panelId)
@@ -130,6 +132,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   async function chooseSample(collectionId: string) {
     setIsSamplePickerOpen(false)
     await slideshow.selectBundledCollection(collectionId, panelId)
+    posthog.capture('image_collection_selected')
   }
 
   return (

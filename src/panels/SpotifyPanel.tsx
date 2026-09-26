@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { usePostHog } from '@posthog/react'
 import {
   ChevronsDownUp,
   ChevronsUpDown,
@@ -21,6 +22,7 @@ import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
+  const posthog = usePostHog()
   const { spotify, moments, panels } = useAppState()
   const commands = usePanelCommands()
   const found = panels.get(panelId)
@@ -216,7 +218,14 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                   className="input-row spotify-search-row"
                   onSubmit={(event) => {
                     event.preventDefault()
-                    void run(() => searchType === 'tracks' ? spotify.searchTracks(query) : spotify.searchPlaylists(query))
+                    void run(async () => {
+                      if (searchType === 'tracks') {
+                        await spotify.searchTracks(query)
+                        return
+                      }
+                      await spotify.searchPlaylists(query)
+                      posthog.capture('spotify_playlist_searched')
+                    })
                   }}
                 >
                   <select className="app-dropdown" aria-label="Search type" value={searchType} onChange={(event) => setSearchType(event.target.value as 'tracks' | 'playlists')}>
@@ -253,7 +262,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                         className="playlist-option"
                         type="button"
                         key={playlist.id}
-                        onClick={() => void run(() => spotify.playPlaylist(playlist, panelId))}
+                        onClick={() => void run(async () => {
+                          await spotify.playPlaylist(playlist, panelId)
+                          posthog.capture('spotify_playlist_played')
+                        })}
                       >
                         {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
                         <span>
