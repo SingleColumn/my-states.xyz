@@ -26,19 +26,15 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
   const toolbarHostRef = useRef<HTMLDivElement>(null)
-  const writingCaptureTimeoutRef = useRef<number | null>(null)
+  const writingMilestonesRef = useRef({ noteId: null as string | null, started: false, fiftyWords: false, twoHundredWords: false })
+  const wasInWritingModeRef = useRef(isWritingMode)
 
-  useEffect(() => () => {
-    if (writingCaptureTimeoutRef.current !== null) window.clearTimeout(writingCaptureTimeoutRef.current)
-  }, [])
-
-  function captureWriting() {
-    if (writingCaptureTimeoutRef.current !== null) window.clearTimeout(writingCaptureTimeoutRef.current)
-    writingCaptureTimeoutRef.current = window.setTimeout(() => {
-      posthog.capture('text_editor_written')
-      writingCaptureTimeoutRef.current = null
-    }, 2000)
-  }
+  useEffect(() => {
+    if (isWritingMode && !wasInWritingModeRef.current) {
+      posthog.capture('writing_mode_entered', { writing_mode: true, panel_id: panelId })
+    }
+    wasInWritingModeRef.current = isWritingMode
+  }, [isWritingMode, panelId, posthog])
 
   async function openMarkdownFile(file: File) {
     // Every Markdown this app writes uses \n alone -- every toMarkdown
@@ -67,6 +63,30 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   const heldBy = activeNoteId ? notes.noteOpenElsewhere(activeNoteId, panelId) : null
   const namedNote = notes.notes.find(note => note.id === activeNoteId) ?? null
   const activeNote = heldBy === null ? namedNote : null
+
+  function captureWritingProgress(words: number) {
+    const noteId = activeNote?.id
+    if (!noteId) return
+
+    if (writingMilestonesRef.current.noteId !== noteId) {
+      writingMilestonesRef.current = { noteId, started: false, fiftyWords: false, twoHundredWords: false }
+    }
+
+    const milestones = writingMilestonesRef.current
+    const writingContext = { writing_mode: isWritingMode, panel_id: panelId }
+    if (words > 0 && !milestones.started) {
+      posthog.capture('writing_started', writingContext)
+      milestones.started = true
+    }
+    if (words >= 50 && !milestones.fiftyWords) {
+      posthog.capture('writing_50_words', writingContext)
+      milestones.fiftyWords = true
+    }
+    if (words >= 200 && !milestones.twoHundredWords) {
+      posthog.capture('writing_200_words', writingContext)
+      milestones.twoHundredWords = true
+    }
+  }
 
   async function copyNoteHere() {
     if (!namedNote || heldBy === null) return
@@ -216,7 +236,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             <label className="note-control-field">
               <span>Note title</span>
               <input
-                className="note-title-input"
+                className="note-title-input ph-mask"
                 value={activeNote?.title ?? ''}
                 onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
                 onKeyDown={handleTitleKeyDown}
@@ -240,7 +260,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
         {activeNote ? (
           <div
-            className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
+            className={['notes-editor', 'card-content', 'ph-mask', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
             {...panelContentProps}
             // What the wheel scrolls when it lands somewhere with nothing
             // scrollable above it -- the note's title, which sits beside the
@@ -249,7 +269,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           >
             {isWritingMode ? (
               <input
-                className="writing-title"
+                className="writing-title ph-mask"
                 value={activeNote.title}
                 onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
                 onKeyDown={handleTitleKeyDown}
@@ -266,7 +286,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               onChange={(document, next) => {
                 notes.setActiveNoteDocument(document, panelId)
                 setStats(next)
-                captureWriting()
+                captureWritingProgress(next.words)
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle

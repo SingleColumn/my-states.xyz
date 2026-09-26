@@ -20,6 +20,12 @@ import './styles.css'
 const posthogOptions = {
   api_host: import.meta.env.VITE_POSTHOG_HOST,
   defaults: '2026-05-30',
+  autocapture: false,
+  // Keep the writing experience observable in replays without ever uploading its text.
+  session_recording: {
+    maskAllInputs: true,
+    maskTextSelector: '.ph-mask',
+  },
   loaded: (posthog: PostHogInterface) => {
     if (import.meta.env.VITE_POSTHOG_INTERNAL_TESTER === 'true') {
       posthog.register({ internal_tester: true })

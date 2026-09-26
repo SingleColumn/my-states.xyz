@@ -1,5 +1,17 @@
+import { useEffect, useRef } from 'react'
+import { usePostHog } from '@posthog/react'
+
 // Shown in place of the whole app on phones and tablets.
 export function DesktopOnlyNotice() {
+  const posthog = usePostHog()
+  const hasCapturedView = useRef(false)
+
+  useEffect(() => {
+    if (hasCapturedView.current) return
+    hasCapturedView.current = true
+    posthog.capture('mobile_unsupported_shown')
+  }, [posthog])
+
   return (
     <main className="desktop-only-notice">
       <h1>Please open this on a computer</h1>

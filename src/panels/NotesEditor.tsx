@@ -161,7 +161,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         // The class the theme's prose rules already target; ProseMirror puts
         // it on the contenteditable itself, so the writing surface is styled
         // like the previous editor's content area was.
-        ctx.set(editorViewOptionsCtx, { attributes: { class: 'notes-editor-content' } })
+        ctx.set(editorViewOptionsCtx, { attributes: { class: 'notes-editor-content ph-mask' } })
         // A class, not a title: the mark's own attributes are spread after
         // these and its null title would blank one out.
         ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))
