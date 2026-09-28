@@ -212,6 +212,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       .use(highlightKeymap)
       .use(highlightInputRule)
       .use(changeReporter((doc, stats, title) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats, title)))
+      .use(titleFirstLine())
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
       .use(writingToolbar(pluginViewFactory({ component: NotesWritingToolbar, root: () => toolbarHost.current ?? document.body })))
@@ -230,7 +231,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       const ready = editorRef.current
       if (ready?.status !== EditorStatus.Created) return
       handleRef.current({
-        getMarkdown: () => ready.action(getMarkdown()),
+        getMarkdown: () => withoutEmptyFirstLine(ready.action(getMarkdown())),
         focusStart: () => ready.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)).scrollIntoView())
@@ -384,6 +385,65 @@ function floatingKeys(handlers: MutableRefObject<Set<(event: KeyboardEvent) => b
         }
         return false
       },
+    },
+  }))
+}
+
+/**
+ * Takes the empty naming line off the front of a note's Markdown.
+ *
+ * `titleFirstLine` puts an empty line above a note that starts with a list,
+ * a quotation or an embed, so the note has somewhere to be named. Markdown
+ * has no way to write an empty paragraph, and remark falls back to `<br />`
+ * -- which would put a line of HTML at the top of every such note, in the
+ * file an export saves, in the moment bundle and in the archive.
+ *
+ * So the document keeps the line and the Markdown does not mention it. A
+ * note read back from that Markdown starts with its list again and is given
+ * the line again on load, which is the state it was in when it was written:
+ * the round trip holds.
+ */
+function withoutEmptyFirstLine(markdown: string) {
+  return markdown.replace(/^<br \/>\n\n/, '')
+}
+
+/**
+ * The block types that can name a note: the ones made of a line of text.
+ * A heading is here because the writer can make the first line one, and
+ * because that is what a note migrated from a title of its own carries.
+ */
+const CAN_NAME_A_NOTE = new Set(['paragraph', 'heading'])
+
+/**
+ * Keeps the note's first line a line of text.
+ *
+ * The note is named by its first line, so the name is only as good as what
+ * that line can hold. A bullet, a quote, a table or an embedded panel at
+ * the top leaves the note with a name made of nothing -- in the picker, in
+ * the file name an export is saved under and in the path an archive stores
+ * it at. It is also where the title styling lands, so a first line that is
+ * a list draws a bulleted title.
+ *
+ * Anything else is moved down rather than changed: an empty line is put
+ * above it, the writing is untouched, and the note has somewhere to be
+ * named. Nothing is destroyed to satisfy this, which is why the fix is an
+ * insertion and never a conversion -- a picture or an embed turned into a
+ * paragraph would be a way to lose work by dropping something in the wrong
+ * place.
+ *
+ * Marks are left alone. A writer who bolds half the title has a title that
+ * still reads as one and still names the note; taking the bold away again
+ * would be editing their writing to no end.
+ */
+function titleFirstLine() {
+  return $prose(() => new Plugin({
+    key: new PluginKey('NOTES_TITLE_FIRST_LINE'),
+    appendTransaction: (_transactions, _oldState, newState) => {
+      const first = newState.doc.firstChild
+      if (first && CAN_NAME_A_NOTE.has(first.type.name)) return null
+      // The inserted line becomes the first child, so the next pass finds a
+      // paragraph and this appends nothing: no loop.
+      return newState.tr.insert(0, newState.schema.nodes.paragraph.create())
     },
   }))
 }

@@ -659,6 +659,48 @@ test.describe('the first line names the note', () => {
     expect(drawn[0]!.weight).toBeGreaterThan(drawn[1]!.weight)
   })
 
+  test('a list on the first line is moved down, leaving a line to be named on', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('- Buy milk')
+
+    // The list is kept, whole, with an empty line above it: a name made of a
+    // bullet would be no name at all, in the picker or in an export's file
+    // name, and the title styling would draw a bulleted title.
+    await expect(body.locator('ul li')).toHaveCount(1)
+    await expect(body.locator('ul li')).toHaveText('Buy milk')
+    expect(await body.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'UL'])
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('')
+
+    // The empty line is the document's business and nothing the Markdown
+    // needs to carry: Markdown cannot write an empty paragraph, and the
+    // `<br />` remark reaches for instead would be a line of HTML at the top
+    // of the exported file.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+
+    // And the line above is a real one: the note is named by typing in it.
+    await body.locator('p').first().click()
+    await page.keyboard.type('The shopping')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('The shopping')
+  })
+
+  test('a quotation at the top is moved down the same way', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+
+    await body.click()
+    await page.keyboard.type('> a quotation')
+
+    await expect(body.locator('blockquote')).toHaveText('a quotation')
+    expect(await body.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'BLOCKQUOTE'])
+  })
+
   test('a heading names it by its words, without the hashes', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
