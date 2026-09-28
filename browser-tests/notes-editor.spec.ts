@@ -500,6 +500,30 @@ test.describe('two Notes panels', () => {
       .toContain('Written in the first panel.\n')
   })
 
+  test('copying a note that opens with a list names the copy without touching the list', async ({ page }) => {
+    await openApp(page)
+    const first = await panelOfType(page, 'notes')
+    const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
+    await firstBody.click()
+    await page.keyboard.type('- Buy milk')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+
+    await selectPanel(page, first.panelId)
+    await page.keyboard.press('Control+d')
+    await expect.poll(async () => (await describeCanvas(page)).panels.filter((panel) => panel.type === 'notes')).toHaveLength(2)
+    const copy = (await describeCanvas(page)).panels.find((panel) => panel.type === 'notes' && panel.panelId !== first.panelId)!
+    const copyShape = await shapeOf(page, copy.panelId)
+    await copyShape.getByRole('button', { name: 'Make a copy here' }).click()
+
+    // The bullet is the writing, not the name. Reading it as the name put
+    // "(copy)" inside the list item and left the copy called nothing.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+      .toEqual(['* Buy milk\n', 'Untitled note (copy)\n\n* Buy milk\n'])
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+      .toEqual(['', 'Untitled note (copy)'])
+  })
+
   test('a duplicated panel holds the same note, shows why, and can take a copy', async ({ page }) => {
     await openApp(page)
     const first = await panelOfType(page, 'notes')
@@ -743,6 +767,85 @@ test.describe('the first line names the note', () => {
     expect(await again.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'UL'])
   })
 
+  test('a name in a script with no ascii in it is still migrated', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('犬')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('犬')
+
+    // A note named the old way: a title of its own that its writing does not
+    // say. Comparing names by their ascii letters alone left both sides of
+    // this empty, so every such pair matched and the note was read as one
+    // that already named itself.
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('my-states')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      const store = db.transaction('notes', 'readwrite').objectStore('notes')
+      const all = await new Promise<{ id: string, title: string, content: string }[]>((resolve, reject) => {
+        const request = store.getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const note = all[0]!
+      store.put({ ...note, title: '猫', content: '犬\n', document: undefined })
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+
+    // The old name is kept, written in where a name now lives.
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('h1')).toHaveText('猫')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('猫')
+  })
+
+  test('a note left on the old placeholder name takes the name its writing gives', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('Shopping list')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Shopping list\n')
+
+    // A note from when every unnamed note wore "Untitled note".
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('my-states')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      const store = db.transaction('notes', 'readwrite').objectStore('notes')
+      const all = await new Promise<{ id: string, title: string, content: string }[]>((resolve, reject) => {
+        const request = store.getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const note = all[0]!
+      store.put({ ...note, title: 'Untitled note', content: 'Shopping list\n', document: undefined })
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+
+    // The placeholder is not written into the writing, and the record stops
+    // saying it: an already-nameable first line causes no edit, so a stale
+    // name left here would have stood in the picker and in the name an
+    // export saves under until some unrelated keystroke replaced it.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Shopping list')
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('h1')).toHaveCount(0)
+    await expect(again.locator('p')).toHaveText('Shopping list')
+  })
+
   test('a quotation at the top is moved down the same way', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
@@ -791,6 +894,37 @@ test.describe('the first line names the note', () => {
     await page.keyboard.type(' And more.')
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
       .toMatchObject({ title: 'Second name', content: 'Second name\n\nThe body of it. And more.\n' })
+  })
+
+  test('a rename dispatched the moment the panel changes note lands on the right one', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('The first note')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('The first note\n')
+
+    const firstId = (await describeCanvas(page)).panels.find((panel) => panel.panelId === notes.panelId)!.note!.id
+
+    await dispatch(page, { kind: 'note.create', panelId: notes.panelId })
+    await noteBodyOf(await shapeOf(page, notes.panelId)).click()
+    await page.keyboard.type('The second note')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.length).toBe(2)
+
+    // Back to back, the way a script would. The panel is pointed at the
+    // first note and renamed in the same breath, while the editor standing
+    // in it is still the second note's.
+    await dispatch(page, { kind: 'note.select', panelId: notes.panelId, noteId: firstId })
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'Renamed by a script' })
+
+    // The rename reaches the note it named, and no other note is touched by
+    // it: renaming through whichever editor happened to be standing there
+    // would have written this name into the note being left.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+      .toEqual(['Renamed by a script', 'The second note'])
+    await expect(noteBodyOf(await shapeOf(page, notes.panelId)).locator('p').first()).toHaveText('Renamed by a script')
   })
 
   test('the same in writing mode, where there is no title field either', async ({ page }) => {

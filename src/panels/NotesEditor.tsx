@@ -272,6 +272,10 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
      * named on, until some later keystroke inserted one and moved the name
      * out from under the writer.
      *
+     * Runs before the handle is offered, so a rename waiting on this editor
+     * lands on a line that can hold a name rather than on the list that was
+     * standing first.
+     *
      * Dispatched rather than patched in place, so the change reporter hears
      * it: the note's name and its stored document come right in the same
      * moment the document does.
@@ -288,7 +292,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
     }
     let editor = make(true)
     editorRef.current = editor
-    void editor.create().then(() => { offerHandle(); settleFirstLine() }).catch(async (error: unknown) => {
+    void editor.create().then(() => { settleFirstLine(); offerHandle() }).catch(async (error: unknown) => {
       // A stored document the current schema cannot read (a node type gone,
       // an attribute changed) is not the end of the note: the Markdown
       // written beside it is what it looked like, so the note opens from
@@ -299,8 +303,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       editor = make(false)
       editorRef.current = editor
       await editor.create()
-      offerHandle()
       settleFirstLine()
+      offerHandle()
     })
 
     return () => {

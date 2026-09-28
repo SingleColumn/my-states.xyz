@@ -113,7 +113,7 @@ interface NotesState {
    * the note's Markdown one last time, since nothing can derive it
    * afterwards.
    */
-  registerEditor(panelId: string, editor: NotesEditorHandle | null): void
+  registerEditor(panelId: string, editor: NotesEditorHandle | null, noteId: string): void
   /**
    * Renames a note by rewriting its first line, which is what names it.
    * For the command surface; the editor's own reading of that line comes
@@ -612,7 +612,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const current = state.activeNote
     if (!current) return null
     if (!state.markdownStale || !state.editor) return current
-    const next: Note = { ...current, content: state.editor.getMarkdown(), updatedAt: Date.now() }
+    const next: Note = { ...current, content: state.editor.handle.getMarkdown(), updatedAt: Date.now() }
     state.markdownStale = false
     state.activeNote = next
     setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
@@ -863,10 +863,15 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     scheduleSave(panelId)
   }, [scheduleSave])
 
-  const registerEditor = useCallback((panelId: string, editor: NotesEditorHandle | null) => {
+  const registerEditor = useCallback((panelId: string, editor: NotesEditorHandle | null, noteId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
     if (editor) {
-      state.editor = editor
+      state.editor = { noteId, handle: editor }
+      // A rename that arrived while this editor was still mounting. Applied
+      // only if it named the note this editor actually holds.
+      const waiting = state.pendingRename
+      state.pendingRename = null
+      if (waiting && waiting.noteId === noteId) editor.setTitle(waiting.title)
       return
     }
     settleMarkdown(panelId)
@@ -887,7 +892,23 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
    * it is not showing the note being renamed.
    */
   const renameNote = useCallback((title: string, panelId: string) => {
-    getNotesPanelRuntimeState(panelId).editor?.setTitle(title)
+    const state = getNotesPanelRuntimeState(panelId)
+    const open = state.activeNote
+    if (!open) return
+    // Only this note's own editor. A panel just pointed at another note
+    // still has the outgoing note's editor standing for a moment, and
+    // renaming through that would write this name into the note being left.
+    if (state.editor && state.editor.noteId === open.id) {
+      state.editor.handle.setTitle(title)
+      return
+    }
+    // The editor mounts a moment after the note is opened, and a command can
+    // land inside that moment -- a script renaming a note it has just made,
+    // whose await returned before any editor existed. The rename waits for
+    // the editor instead of being dropped on the floor while the command
+    // reports success. Tied to the note it was meant for, so a rename cannot
+    // come down on a different note opened in the meantime.
+    state.pendingRename = { noteId: open.id, title }
   }, [])
 
   const getNoteMarkdown = useCallback((panelId: string) => {
@@ -923,28 +944,42 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
  * name, and the note is handed back untouched on every later load.
  */
 async function withNameAsFirstLine(note: Note): Promise<Note> {
-  const name = note.title.trim()
-  const firstLine = firstLineAsText(note.content)
-  if (namesMatch(firstLine, name)) return note
+  const stored = note.title.trim()
+  // What the note will call itself the moment it is opened. A first line
+  // that starts a list or a quotation names nothing -- the editor puts an
+  // empty line above it -- so the name is empty rather than that block's
+  // words.
+  const derived = firstLineCanName(note.content) ? firstLineAsText(note.content) : ''
+  if (namesMatch(derived, stored)) return note
 
-  // A note that already opens with a heading is already naming itself, and
-  // its heading wins: putting the old title above it would leave the note
-  // wearing two titles, one of which the writer never asked for. The name
-  // in the store is brought into line with the document instead, which is
-  // the only place a name now lives.
-  if (/^#{1,6}\s+/.test(note.content)) {
-    const adopted: Note = { ...note, title: firstLine }
+  // The record is behind the writing rather than the other way about, so the
+  // record is brought into line. That covers a note whose name was the
+  // placeholder every unnamed note used to wear -- left alone, it would have
+  // gone on saying "Untitled note" in the picker and in the name an export
+  // saves under until some edit silently replaced it -- and a note already
+  // opening with a heading, whose heading wins, since writing the old title
+  // above it would leave it wearing two.
+  if (!stored || stored === 'Untitled note' || /^#{1,6}\s+/.test(note.content)) {
+    const adopted: Note = { ...note, title: derived }
     await saveNote(adopted)
     return adopted
   }
 
-  // "Untitled note" was the placeholder a note wore when it had never been
-  // named, so writing it in would put a title on notes that never had one.
-  if (!name || name === 'Untitled note') return note
-
-  const named: Note = { ...note, content: `# ${name}\n\n${note.content}`, document: undefined }
+  const named: Note = { ...note, content: `# ${stored}\n\n${note.content}`, document: undefined }
   await saveNote(named)
   return named
+}
+
+/**
+ * Whether a note's Markdown opens with a line that can carry its name: any
+ * line that is not the start of a list, a quotation, a table, a rule, a
+ * fenced block or an embed. Those are the blocks the editor moves down to
+ * make room for a naming line, so the name they would appear to give is a
+ * name the note does not have.
+ */
+function firstLineCanName(markdown: string) {
+  const firstLine = markdown.split('\n', 1)[0] ?? ''
+  return !/^\s*([-*+]\s|\d+[.)]\s|>|```|~~~|\||:{3}|(-\s*){3,}$|(\*\s*){3,}$|(_\s*){3,}$)/.test(firstLine)
 }
 
 /**
@@ -978,7 +1013,12 @@ function firstLineAsText(markdown: string) {
  * doubt is resolved towards leaving the writing alone.
  */
 function namesMatch(a: string, b: string) {
-  const bare = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  // Letters and numbers in any script, not just the Latin ones. Keeping only
+  // a-z threw away every character of a name written in Japanese, Arabic or
+  // Cyrillic, so any two such names came out equal -- and a note whose name
+  // and first line were both non-Latin was read as already named whatever
+  // either of them said.
+  const bare = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
   return bare(a) === bare(b)
 }
 
@@ -1565,8 +1605,14 @@ interface NotesPanelRuntimeState {
   saveTimer: number | null
   /** The note's `content` is behind its `document` and must be derived again. */
   markdownStale: boolean
-  /** The panel's mounted editor; null when none is. */
-  editor: NotesEditorHandle | null
+  /**
+   * The panel's mounted editor and the note it holds. The note matters: for
+   * a moment after the panel is pointed at a different note, the editor
+   * still standing here is the one for the note being left.
+   */
+  editor: { noteId: string, handle: NotesEditorHandle } | null
+  /** A rename that arrived before the editor mounted, and the note it named. */
+  pendingRename: { noteId: string; title: string } | null
 }
 
 interface SlideshowPanelRuntimeState {
@@ -1585,7 +1631,7 @@ const slideshowPanelRuntimeStates = new Map<string, SlideshowPanelRuntimeState>(
 function getNotesPanelRuntimeState(panelId: string): NotesPanelRuntimeState {
   const existing = notesPanelRuntimeStates.get(panelId)
   if (existing) return existing
-  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null, markdownStale: false, editor: null }
+  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null, markdownStale: false, editor: null, pendingRename: null }
   notesPanelRuntimeStates.set(panelId, created)
   return created
 }

@@ -267,7 +267,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle
-                notes.registerEditor(panelId, handle)
+                notes.registerEditor(panelId, handle, activeNote.id)
               }}
             />
           </div>
@@ -422,8 +422,23 @@ function getDisplayNoteTitle(note: Note) {
 function namedAsCopy(content: string, taken: string[]) {
   const [firstLine = '', ...rest] = content.split('\n')
   const marker = /^#{1,6}\s+/.exec(firstLine)?.[0] ?? ''
+
+  // A first line that starts a list, a quotation or a table is not the note's
+  // name -- the editor keeps an empty naming line above it -- so the copy is
+  // given a name of its own on a new line. Rewriting that line instead put
+  // "(copy)" inside the writing: a note whose first bullet said "Buy milk"
+  // came back saying "Buy milk (copy)", and was still called nothing.
+  if (!marker && startsABlockThatCannotBeNamed(firstLine)) {
+    return [nextDuplicateName('Untitled note', taken), '', firstLine, ...rest].join('\n')
+  }
+
   const named = nextDuplicateName(firstLine.slice(marker.length).trim() || 'Untitled note', taken)
   return [`${marker}${named}`, ...rest].join('\n')
+}
+
+/** The Markdown block starters the writing panel keeps out of a first line. */
+function startsABlockThatCannotBeNamed(firstLine: string) {
+  return /^\s*([-*+]\s|\d+[.)]\s|>|```|~~~|\||:{3}|(-\s*){3,}$|(\*\s*){3,}$|(_\s*){3,}$)/.test(firstLine)
 }
 
 function sanitizeMarkdownFileName(title: string) {
