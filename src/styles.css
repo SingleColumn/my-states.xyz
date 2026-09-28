@@ -511,7 +511,14 @@ button {
 .panel-spotify-surface .panel-body {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* The results are snapped to fit the room left over, so this column has
+     nothing to scroll and shows no bar of its own — the list keeps the only
+     one. It stays "auto" rather than "hidden" for the case the snapping
+     cannot reach: a panel too short even for the controls and the fields
+     around them, where clipping would put the playback controls somewhere
+     nobody could get to. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .panel-slideshow-surface {
@@ -1059,27 +1066,31 @@ input[type="range"]:focus-visible {
   line-height: var(--line-height-body);
 }
 
-/* The playlist that is loaded, with its cover, so it stays visible after the
-   search results are cleared and in the focus view. */
+/* Which playlist is loaded: a label, not a card. One line and no cover, the
+   same in every view, so putting the search away leaves these words where
+   they were. With a cover it was the size and shape of a result row and read
+   as one more of them; stacked, the eyebrow and the name spent a line of the
+   panel saying one thing. */
 .loaded-playlist {
   display: grid;
-  grid-template-columns: var(--size-loaded-playlist-art) minmax(0, 1fr);
-  gap: var(--space-playlist-image-gap);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   min-width: 0;
   margin-bottom: var(--space-now-playing-bottom);
 }
 
-.loaded-playlist img,
-.loaded-playlist-art-empty {
-  width: var(--size-loaded-playlist-art);
-  height: var(--size-loaded-playlist-art);
-  border-radius: var(--radius-playlist-art);
-  background: var(--color-control);
-  object-fit: cover;
+.loaded-playlist span {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-control-inner-gap);
+  min-width: 0;
 }
 
-.loaded-playlist span {
+.loaded-playlist small {
+  flex: 0 0 auto;
+}
+
+.loaded-playlist strong {
   min-width: 0;
 }
 
@@ -1244,6 +1255,10 @@ input[type="range"]:focus-visible {
   padding: 0 var(--size-input-padding-x);
 }
 
+.input-row input::placeholder {
+  color: var(--color-input-placeholder);
+}
+
 .input-row select {
   flex: 0 0 var(--size-form-select);
   width: var(--size-form-select);
@@ -1257,12 +1272,96 @@ input[type="range"]:focus-visible {
 
 .playlist-list {
   display: grid;
+  /* Rows keep their own height instead of sharing out the list's. Stretched,
+     a lone result became a card the height of the panel, and the height the
+     panel measures per row along with it. */
+  align-content: start;
   flex: 1 1 0;
   min-height: 0;
   gap: var(--space-playlist-gap);
   margin-top: var(--space-playlist-top);
+  /* The results stop short of the playback section rather than running into
+     it: without this the list grows until the two touch, and the panel reads
+     as one crowded column instead of two parts. */
+  margin-bottom: var(--space-playlist-bottom);
   overflow: auto;
   padding-right: var(--space-playlist-padding-inline-end);
+}
+
+/* Two equal halves, so neither action looks like the more important one. */
+.spotify-search-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-row-gap);
+  margin-top: var(--space-input-row-top);
+}
+
+/* These two tidy up after a search; the field starts one. At the wide
+   button's height and bold weight they were the loudest thing on an empty
+   panel, drawing the eye past the box someone is meant to type in. They take
+   the field's height and weight so the field leads. */
+.spotify-search-actions .card-icon-button {
+  height: var(--size-input-height);
+  /* The field's corner, not the button's. At the same height but a tighter
+     radius these read as boxier, and so as taller, than the field above. */
+  border-radius: var(--radius-control);
+  color: var(--color-input-placeholder);
+  font-weight: var(--font-weight-regular);
+}
+
+/* The select ends where the Reset button's midpoint falls, so the field starts
+   on a line the row below explains rather than at an arbitrary offset. Two
+   equal buttons put that midpoint at a quarter of the row. */
+.spotify-search-row select {
+  flex: 0 0 max(var(--size-form-select-min), calc((100% - var(--space-row-gap)) / 4));
+  width: auto;
+  min-width: 0;
+  /* Beats .app-dropdown's !important, so the four controls in these two rows
+     share one corner instead of the select keeping the dropdown's. */
+  border-radius: var(--radius-control) !important;
+}
+
+.spotify-search-actions .spotify-reset-button {
+  margin-top: 0;
+}
+
+/* With the search put away the artwork takes the room the results had, so the
+   panel fills from the top instead of stranding everything against the header
+   above an empty half. */
+.panel-spotify-surface.is-search-hidden .album-frame {
+  flex: 1 1 0;
+  min-height: 0;
+  width: auto;
+  max-width: none;
+  aspect-ratio: auto;
+  display: grid;
+  place-items: center;
+  /* The frame is only a place to centre the cover in now, so the card border
+     and fill come off and the cover carries its own edge. */
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+.panel-spotify-surface.is-search-hidden .album-frame img {
+  width: auto;
+  height: auto;
+  max-width: min(100%, var(--size-album-frame-max-open));
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--content-radius);
+  box-shadow: var(--shadow-album-art);
+}
+
+.panel-spotify-surface.is-search-hidden .album-frame-empty {
+  width: min(100%, var(--size-album-frame-max));
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: var(--content-radius);
+}
+
+.spotify-show-search {
+  margin-bottom: var(--space-playlist-top);
 }
 
 .playlist-option {
@@ -1282,6 +1381,38 @@ input[type="range"]:focus-visible {
 
 .playlist-option:hover {
   background: var(--color-card-bg-hover);
+}
+
+/* The one that is playing, marked the way a current image is in the Images
+   panel, so a click that landed leaves something behind to show for it. */
+.playlist-option.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* A second click while the first is still reaching Spotify starts playback
+   twice, so the whole list waits for the answer. */
+.playlist-option:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.playlist-option:disabled:hover {
+  background: var(--color-card-bg);
+}
+
+/* Sits with the results rather than below the list, so it scrolls in at the
+   end of what is there instead of pinning a control under the panel. */
+.playlist-list-more {
+  margin-top: var(--space-playlist-gap);
+}
+
+.playlist-list-note {
+  margin: 0;
+  padding: var(--space-playlist-padding) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-playlist-meta);
+  text-wrap: balance;
 }
 
 .playlist-option img,
@@ -2608,10 +2739,6 @@ input[type="range"]:focus-visible {
 }
 
 @container panel-shell (max-width: 520px) {
-  .panel-spotify-surface .panel-body {
-    overflow: auto;
-  }
-
   .panel-spotify-surface .transport-row {
     flex-wrap: wrap;
   }
@@ -2620,18 +2747,14 @@ input[type="range"]:focus-visible {
     flex-basis: 100%;
   }
 
-  .spotify-search-row {
-    flex-wrap: wrap;
-  }
-
-  .spotify-search-row select {
-    flex: 1 1 100%;
-    width: 100%;
-  }
-
+  /* One scroller, not two. The body stays clipped (as it is at every wider
+     size) and the results take the space left over, so the list scrolls and
+     nothing scrolls behind it. */
+  /* Results sit above the playback controls now, so they take the room that
+     is left rather than stopping at a cap and leaving a gap under themselves. */
   .panel-spotify-surface .playlist-list {
-    flex: 0 0 auto;
-    max-height: var(--size-playlist-height-default);
+    flex: 1 1 0;
+    min-height: var(--size-playlist-height-min);
   }
 
   .notes-document-controls {
@@ -2668,17 +2791,15 @@ input[type="range"]:focus-visible {
     --size-album-frame-max: clamp(64px, 14cqmin, 100px);
   }
 
-  .panel-spotify-surface .panel-body {
-    overflow: auto;
-  }
-
   .panel-spotify-surface .track-meta {
     -webkit-line-clamp: 1;
   }
 
+  /* A short panel gives the results whatever the controls do not need, down
+     to a floor low enough that the controls are never pushed out of sight. */
   .panel-spotify-surface .playlist-list {
-    flex: 0 0 auto;
-    max-height: var(--size-playlist-height-compact);
+    flex: 1 1 0;
+    min-height: var(--size-playlist-height-short);
   }
 
   .slideshow-controls {
@@ -2841,7 +2962,27 @@ input[type="range"]:focus-visible {
   box-shadow: var(--shadow-panel);
 }
 
-.sample-collection-heading {
+/* Hangs off the header like the slideshow's sample collections, so the panel
+   body keeps one way in and the link stays a step someone chooses to take. */
+.spotify-link-popover {
+  position: absolute;
+  top: calc(100% + var(--space-popover-offset));
+  right: var(--card-padding);
+  z-index: 3;
+  width: min(360px, calc(100cqw - (var(--card-padding) * 2)));
+  padding: clamp(10px, 2cqi, 14px);
+  border: var(--card-border);
+  border-radius: var(--content-radius);
+  background: var(--card-bg-gradient);
+  box-shadow: var(--shadow-panel);
+}
+
+.spotify-link-popover .input-row {
+  margin-top: 0;
+}
+
+.sample-collection-heading,
+.spotify-link-heading {
   display: block;
   margin-bottom: 8px;
   color: color-mix(in srgb, var(--accent) 55%, var(--accent-lift));

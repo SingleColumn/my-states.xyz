@@ -614,6 +614,12 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "Field text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "placeholder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Prompt text in an empty field, and anything else meant to read as quietly as one. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     }
                   }
                 },
@@ -1470,6 +1476,12 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "Field text. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "placeholder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Prompt text in an empty field, and anything else meant to read as quietly as one. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     }
                   }
                 },

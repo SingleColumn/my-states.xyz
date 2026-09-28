@@ -26,7 +26,19 @@
   --space-app-chrome-compact-gap: 10px;
   --space-divider-inset: 7px;
   --size-playlist-height-compact: clamp(96px, 28cqb, 150px);
-  --size-playlist-height-default: clamp(110px, 28cqb, 260px);
+  /* Results are what a narrow panel is mostly for once someone is looking for
+     something to play, so they get the room the playlist-URL row used to take
+     and then some: about five rows rather than two. */
+  --size-playlist-height-default: clamp(200px, 45cqb, 460px);
+  /* A floor, so the results keep a usable window even in a short panel where
+     the flex space left over would otherwise collapse them to nothing. */
+  --size-playlist-height-min: 132px;
+  --size-playlist-height-short: 84px;
+  /* Breathing room between the results and the playback section below them. */
+  --space-playlist-bottom: 16px;
+  /* How large the cover may grow once the search is put away and it has the
+     top of the panel to itself. */
+  --size-album-frame-max-open: 320px;
   --size-notes-toolbar-height-compact: 38cqb;
   --size-playlist-height-large: 180px;
   --size-slideshow-controls-height-large: 340px;
@@ -71,6 +83,9 @@
   --space-card-eyebrow-bottom: 4px;
   --space-card-footer-padding-y: 12px;
   --size-form-select: 160px;
+  /* Enough to hold "Playlist" and its arrow once the select is sized by the
+     button below it rather than by this width. */
+  --size-form-select-min: 96px;
   --space-slideshow-picker-padding: var(--space-detail-5);
   --space-slideshow-picker-heading-bottom: var(--space-detail-2);
   --space-slideshow-picker-gap: var(--space-detail-4);
@@ -217,7 +232,6 @@
   --size-album-art: 92px;
   --size-album-frame-max: 220px;
   --size-playlist-art: 42px;
-  --size-loaded-playlist-art: 36px;
   --size-note-title-height: 30px;
   --size-note-title-max-width: 290px;
   --size-empty-file-input: 1px;
@@ -383,6 +397,8 @@
   --space-track-title-bottom: clamp(4px, min(1.2cqi, 1cqb), 48px);
   --space-playlist-gap: clamp(6px, min(1.6cqi, 1.3cqb), 64px);
   --space-playlist-top: clamp(8px, min(2cqi, 1.6cqb), 80px);
+  --space-playlist-bottom: clamp(12px, min(3cqi, 2.4cqb), 96px);
+  --size-album-frame-max-open: clamp(140px, min(58cqi, 40cqb), 900px);
   --space-playlist-padding: clamp(6px, min(1.5cqi, 1.2cqb), 60px);
   --space-playlist-image-gap: clamp(7px, min(1.8cqi, 1.45cqb), 72px);
   --space-slideshow-controls-top: clamp(10px, min(2.5cqi, 2cqb), 100px);
@@ -393,7 +409,6 @@
 
   --size-album-frame-max: clamp(85px, min(20cqi, 17cqb), 900px);
   --size-playlist-art: clamp(38px, min(9cqi, 7cqb), 320px);
-  --size-loaded-playlist-art: clamp(32px, min(7.5cqi, 6cqb), 280px);
   --size-volume-min: clamp(90px, 18cqi, 720px);
   --size-primary-button-min: clamp(100px, 24cqi, 900px);
   --size-primary-button-padding-x: clamp(11px, min(3cqi, 2.4cqb), 120px);

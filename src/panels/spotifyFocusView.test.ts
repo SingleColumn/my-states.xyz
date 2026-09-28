@@ -73,10 +73,19 @@ function renderMusicPanel(focusView: boolean) {
 }
 
 describe('Music panel focus view', () => {
-  it('shows the loaded playlist and its cover in both views, so it survives Reset fields', () => {
+  it('names the loaded playlist in both views, so it survives Reset fields', () => {
     for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
       expect(markup).toContain('Deep Focus')
-      expect(markup).toContain('https://example.test/deep-focus.jpg')
+    }
+  })
+
+  // The row names the playlist and nothing more, the same in every view, so
+  // that putting the search away does not move the words that say what is
+  // playing. Its cover is what made it a card the size of a result row.
+  it('names the loaded playlist without its cover, in every view', () => {
+    for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
+      expect(markup).toContain('Deep Focus')
+      expect(markup).not.toContain('https://example.test/deep-focus.jpg')
     }
   })
 
@@ -90,19 +99,28 @@ describe('Music panel focus view', () => {
     expect(markup).toContain('aria-label="Volume"')
   })
 
-  it('drops the playlist URL, the search, and the results from the focus view', () => {
+  it('drops the search, the results, and the link option from the focus view', () => {
     const focused = renderMusicPanel(true)
-    expect(focused).not.toContain('Spotify playlist URL')
-    expect(focused).not.toContain('Search songs')
+    expect(focused).not.toContain('Play from a Spotify link')
+    expect(focused).not.toContain('Search playlists')
     expect(focused).not.toContain('Reset fields')
-    expect(focused).not.toContain('Track search results')
+    expect(focused).not.toContain('Playlist search results')
 
     const full = renderMusicPanel(false)
     expect(full).not.toContain('is-focus-view')
-    expect(full).toContain('Spotify playlist URL')
-    expect(full).toContain('Search songs')
+    expect(full).toContain('Play from a Spotify link')
+    expect(full).toContain('Search playlists')
     expect(full).toContain('Reset fields')
-    expect(full).toContain('Track search results')
+    expect(full).toContain('Playlist search results')
+  })
+
+  // The body offers one way in. The link field is a step someone opens from
+  // the panel menu, so it is absent until they ask for it.
+  it('keeps the playlist link field out of the body until it is opened', () => {
+    const full = renderMusicPanel(false)
+    expect(full).toContain('Play from a Spotify link')
+    expect(full).not.toContain('Spotify playlist URL')
+    expect(full.indexOf('Search playlists')).toBeGreaterThan(full.indexOf('panel-body'))
   })
 
   it('offers the focus view toggle from the panel header, before the hide button', () => {
