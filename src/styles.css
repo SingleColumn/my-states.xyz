@@ -1877,6 +1877,34 @@ input[type="range"]:focus-visible {
   font-size: var(--font-size-notes-heading-3);
 }
 
+/* The first line is the note's name, so it is drawn as one -- whatever it is
+   made of. Nothing in the document marks a title: the line is an ordinary
+   paragraph until the writer makes it a heading, and the name is taken from
+   it either way. So the styling follows position, and a plain first line
+   reads at the same size and weight a heading would.
+
+   This is the only thing saying the first line names the note. Without it a
+   writer has a title and no way to know it, which is what the form field
+   this replaced said out loud. Declared after the heading rules because it
+   matches them for specificity and has to win when the first line is one. */
+.notes-editor-content > :first-child {
+  margin: 0 0 var(--space-rich-content-block);
+  color: var(--color-note-title);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-notes-heading-1);
+  font-weight: var(--font-weight-note-title);
+  line-height: var(--line-height-tight);
+}
+
+/* The hint on an empty note is a sentence about the editor, not a name, so
+   it stays at reading size however large the line carrying it is drawn. */
+.notes-editor-content > :first-child.is-empty::before {
+  font-family: var(--font-family-ui);
+  font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-rich-content);
+}
+
 .notes-editor-content blockquote {
   padding-left: var(--space-rich-content-inset);
   border-left: var(--border-width-rich-content) solid var(--color-control-border-hover);

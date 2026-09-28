@@ -636,6 +636,29 @@ test.describe('the first line names the note', () => {
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('A title, renamed')
   })
 
+  test('the first line is drawn as a name, so the writer can see it is one', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+
+    await body.click()
+    await page.keyboard.type('A name for it')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('And an ordinary line under it.')
+    await expect(body.locator('p')).toHaveCount(2)
+
+    // Both are plain paragraphs -- nothing in the document marks a title --
+    // so the only thing telling the writer the first line names the note is
+    // that it is drawn larger and heavier than the line below it.
+    const drawn = await body.locator('p').evaluateAll((lines) => lines.map((line) => {
+      const style = getComputedStyle(line)
+      return { size: parseFloat(style.fontSize), weight: Number(style.fontWeight) }
+    }))
+    expect(drawn[0]!.size).toBeGreaterThan(drawn[1]!.size)
+    expect(drawn[0]!.weight).toBeGreaterThan(drawn[1]!.weight)
+  })
+
   test('a heading names it by its words, without the hashes', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')

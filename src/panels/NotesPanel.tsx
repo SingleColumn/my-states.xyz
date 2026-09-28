@@ -363,7 +363,7 @@ const defaultEditorFontSize: EditorFontSize = 'medium'
 // The empty page has to carry the discoverability that hidden controls give
 // up. The writing tools are off until asked for, so it names where they are
 // as well as the shortcut for anyone who would rather type.
-const editorPlaceholder = 'Start writing. For headings, lists, pictures and emoji, open the ··· menu and choose Show formatting tools — or type / here.'
+const editorPlaceholder = 'The first line names this note. For headings, lists, pictures and emoji, open the ··· menu and choose Show formatting tools — or type / here.'
 
 function readEditorFontSize(): EditorFontSize {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)

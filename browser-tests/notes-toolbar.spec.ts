@@ -330,6 +330,9 @@ test.describe('the empty note', () => {
     expect(hint).toContain('···')
     expect(hint).toContain('Show formatting tools')
     expect(hint).toContain('/')
+    // ...and that the first line is the note's name, which nothing else on
+    // an empty page says: there is no title field left to say it.
+    expect(hint).toContain('first line names this note')
   })
 })
 
