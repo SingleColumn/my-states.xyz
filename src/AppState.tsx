@@ -1211,7 +1211,12 @@ interface SpotifyPlaylistSearchPage {
   playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> }
 }
 
-function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifyState {
+/**
+ * Exported for its tests. The sequence guard below decides which reply to a
+ * search is still wanted, and that is only observable from inside this hook —
+ * the panel sees the answer, never the race that chose it.
+ */
+export function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifyState {
   const [tokens, setTokens] = useState<SpotifyTokens | null>(loadSpotifyTokens)
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
