@@ -922,9 +922,16 @@ async function withNameAsFirstLine(note: Note): Promise<Note> {
   return named
 }
 
-/** A Markdown first line as it reads, with any heading marker taken off. */
+/**
+ * A Markdown first line as it reads: the heading marker taken off, and the
+ * backslash remark writes before a character that would otherwise be read as
+ * Markdown. Without that second step a note whose first line simply starts
+ * with a `#` never matches the name taken from the document, where the same
+ * line has no backslash in it, and the load would keep finding a note that
+ * needed naming.
+ */
 function firstLineText(markdown: string) {
-  return (markdown.split('\n', 1)[0] ?? '').replace(/^#{1,6}\s+/, '').trim()
+  return (markdown.split('\n', 1)[0] ?? '').replace(/^#{1,6}\s+/, '').replace(/^\\/, '').trim()
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
