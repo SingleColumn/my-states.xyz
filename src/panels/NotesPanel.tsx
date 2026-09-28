@@ -267,7 +267,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle
-                notes.registerMarkdownSource(panelId, handle ? () => handle.getMarkdown() : null)
+                notes.registerEditor(panelId, handle)
               }}
             />
           </div>

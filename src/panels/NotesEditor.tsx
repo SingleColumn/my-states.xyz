@@ -101,6 +101,13 @@ export interface NotesEditorHandle {
   getMarkdown(): string
   /** Puts the caret at the start of the document -- where the title leads. */
   focusStart(): void
+  /**
+   * Renames the note by rewriting its first line, which is what names it.
+   * A rename is an edit to the writing now, not a change to a record beside
+   * it: a name written only to the record would last until the next
+   * keystroke, when it is derived from that line again.
+   */
+  setTitle(title: string): void
 }
 
 /** What the panel's footer reports, counted from the document, not its Markdown. */
@@ -237,11 +244,51 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
           view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)).scrollIntoView())
           view.focus()
         }),
+        setTitle: (title) => ready.action((ctx) => {
+          const view = ctx.get(editorViewCtx)
+          const { state } = view
+          const first = state.doc.firstChild
+          if (!first || !first.isTextblock) return
+          // The first block's content, between its own open and close.
+          const from = 1
+          const to = first.nodeSize - 1
+          const named = title.trim()
+          view.dispatch(named
+            ? state.tr.replaceWith(from, to, state.schema.text(named))
+            : state.tr.delete(from, to))
+        }),
+      })
+    }
+
+    /**
+     * Puts the note's naming line in place as it opens.
+     *
+     * `titleFirstLine` repairs the document through `appendTransaction`,
+     * which runs on transactions and not on the state the editor is built
+     * with. A note stored with a list, a quotation or an embed at the top --
+     * which is how such a note is stored, since its empty naming line is not
+     * written to the Markdown -- would therefore open with that block first:
+     * drawn as the title by the `:first-child` styling, with no line to be
+     * named on, until some later keystroke inserted one and moved the name
+     * out from under the writer.
+     *
+     * Dispatched rather than patched in place, so the change reporter hears
+     * it: the note's name and its stored document come right in the same
+     * moment the document does.
+     */
+    const settleFirstLine = () => {
+      const ready = editorRef.current
+      if (ready?.status !== EditorStatus.Created) return
+      ready.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const first = view.state.doc.firstChild
+        if (first && CAN_NAME_A_NOTE.has(first.type.name)) return
+        view.dispatch(view.state.tr.insert(0, view.state.schema.nodes.paragraph.create()))
       })
     }
     let editor = make(true)
     editorRef.current = editor
-    void editor.create().then(offerHandle).catch(async (error: unknown) => {
+    void editor.create().then(() => { offerHandle(); settleFirstLine() }).catch(async (error: unknown) => {
       // A stored document the current schema cannot read (a node type gone,
       // an attribute changed) is not the end of the note: the Markdown
       // written beside it is what it looked like, so the note opens from
@@ -253,6 +300,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       editorRef.current = editor
       await editor.create()
       offerHandle()
+      settleFirstLine()
     })
 
     return () => {

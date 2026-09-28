@@ -48,6 +48,7 @@ import { persistNoteSnapshot } from './notePersistence'
 import { MomentOperation } from './momentOperation'
 import { withRestoreWriteAccess } from './canvasRestore'
 import { createImageItemsFromBundledCollection } from './imageCollections'
+import type { NotesEditorHandle } from './panels/NotesEditor'
 import { getPanelDefinition } from './panelRegistry'
 import {
   createPanelShape,
@@ -103,15 +104,22 @@ interface NotesState {
    * Only the document is taken here: deriving its Markdown costs tens of
    * milliseconds on a long note, far too much to spend on every keystroke,
    * so it is left until something asks -- a save, an export, the editor
-   * going away. See `registerMarkdownSource`.
+   * going away. See `registerEditor`.
    */
   setActiveNoteDocument(document: NoteDocument, panelId: string): void
   /**
-   * How the panel's editor offers its Markdown on demand. Registering null
-   * (as the editor goes) settles the note's Markdown one last time, since
-   * nothing can derive it afterwards.
+   * The panel's mounted editor: what offers the note's Markdown on demand
+   * and what a rename edits. Registering null (as the editor goes) settles
+   * the note's Markdown one last time, since nothing can derive it
+   * afterwards.
    */
-  registerMarkdownSource(panelId: string, render: (() => string) | null): void
+  registerEditor(panelId: string, editor: NotesEditorHandle | null): void
+  /**
+   * Renames a note by rewriting its first line, which is what names it.
+   * For the command surface; the editor's own reading of that line comes
+   * back through `setActiveNoteTitle` instead.
+   */
+  renameNote(title: string, panelId: string): void
   /** The note's Markdown, brought up to date first. */
   getNoteMarkdown(panelId: string): string
   /**
@@ -603,8 +611,8 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const state = getNotesPanelRuntimeState(panelId)
     const current = state.activeNote
     if (!current) return null
-    if (!state.markdownStale || !state.renderMarkdown) return current
-    const next: Note = { ...current, content: state.renderMarkdown(), updatedAt: Date.now() }
+    if (!state.markdownStale || !state.editor) return current
+    const next: Note = { ...current, content: state.editor.getMarkdown(), updatedAt: Date.now() }
     state.markdownStale = false
     state.activeNote = next
     setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
@@ -757,7 +765,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       // its own first line where it has one, and falls back to the file
       // name, which the next edit replaces with whatever the top of the
       // note then says.
-      title: opening ? firstLineText(opening.content) || opening.title.trim() : '',
+      title: opening ? firstLineAsText(opening.content) || opening.title.trim() : '',
       // A note opened from a file starts as its Markdown and no document:
       // the same road an older note takes, which the editor already reads.
       content: opening?.content ?? '',
@@ -855,15 +863,32 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     scheduleSave(panelId)
   }, [scheduleSave])
 
-  const registerMarkdownSource = useCallback((panelId: string, render: (() => string) | null) => {
+  const registerEditor = useCallback((panelId: string, editor: NotesEditorHandle | null) => {
     const state = getNotesPanelRuntimeState(panelId)
-    if (render) {
-      state.renderMarkdown = render
+    if (editor) {
+      state.editor = editor
       return
     }
     settleMarkdown(panelId)
-    state.renderMarkdown = null
+    state.editor = null
   }, [settleMarkdown])
+
+  /**
+   * Renames a note through the command surface, by writing the new name into
+   * the first line -- which is what names a note.
+   *
+   * Not `setActiveNoteTitle`: that is fed *by* the editor's reading of the
+   * first line, so a name written there alone survives until the next
+   * keystroke and no longer. Worse, a note reloaded before that keystroke
+   * looks like one whose name is missing from its writing, and is given the
+   * requested name a second time as a heading above what it already said.
+   *
+   * Does nothing when the panel has no editor mounted, which is to say when
+   * it is not showing the note being renamed.
+   */
+  const renameNote = useCallback((title: string, panelId: string) => {
+    getNotesPanelRuntimeState(panelId).editor?.setTitle(title)
+  }, [])
 
   const getNoteMarkdown = useCallback((panelId: string) => {
     return settleMarkdown(panelId)?.content ?? ''
@@ -879,7 +904,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     scheduleSave(panelId)
   }, [scheduleSave])
 
-  return { notes, error, setActiveNoteContent, setActiveNoteDocument, registerMarkdownSource, getNoteMarkdown, noteOpenElsewhere, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
+  return { notes, error, setActiveNoteContent, setActiveNoteDocument, registerEditor, renameNote, getNoteMarkdown, noteOpenElsewhere, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
 }
 
 /**
@@ -899,8 +924,8 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
  */
 async function withNameAsFirstLine(note: Note): Promise<Note> {
   const name = note.title.trim()
-  const firstLine = firstLineText(note.content)
-  if (firstLine === name) return note
+  const firstLine = firstLineAsText(note.content)
+  if (namesMatch(firstLine, name)) return note
 
   // A note that already opens with a heading is already naming itself, and
   // its heading wins: putting the old title above it would leave the note
@@ -923,15 +948,38 @@ async function withNameAsFirstLine(note: Note): Promise<Note> {
 }
 
 /**
- * A Markdown first line as it reads: the heading marker taken off, and the
- * backslash remark writes before a character that would otherwise be read as
- * Markdown. Without that second step a note whose first line simply starts
- * with a `#` never matches the name taken from the document, where the same
- * line has no backslash in it, and the load would keep finding a note that
- * needed naming.
+ * A Markdown first line as it reads rather than as it is written: the heading
+ * marker, the escapes remark adds, and the punctuation that carries inline
+ * formatting all come off, so `# **Foo**` and `[Foo](x)` both read "Foo".
+ *
+ * This is compared against a name taken from the editor's document, which is
+ * plain text. Comparing it against Markdown source instead meant the two were
+ * written in different alphabets: a note whose first line was bold never
+ * matched its own name, was taken for a note that had never been named, and
+ * had a second title written above it the next time it was opened.
  */
-function firstLineText(markdown: string) {
-  return (markdown.split('\n', 1)[0] ?? '').replace(/^#{1,6}\s+/, '').replace(/^\\/, '').trim()
+function firstLineAsText(markdown: string) {
+  return (markdown.split('\n', 1)[0] ?? '')
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^>\s*/, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_~`=]/g, '')
+    .replace(/\\(.)/g, '$1')
+    .trim()
+}
+
+/**
+ * Whether two names are the same name, ignoring the punctuation and spacing
+ * that survive the reading above.
+ *
+ * Deliberately generous. Reading them as different is what writes a second
+ * title into somebody's note; reading them as the same only leaves a note
+ * named by its own first line, which is what a note is named by now. So the
+ * doubt is resolved towards leaving the writing alone.
+ */
+function namesMatch(a: string, b: string) {
+  const bare = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return bare(a) === bare(b)
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
@@ -1517,8 +1565,8 @@ interface NotesPanelRuntimeState {
   saveTimer: number | null
   /** The note's `content` is behind its `document` and must be derived again. */
   markdownStale: boolean
-  /** The panel's editor, offering the note as Markdown; null when none is mounted. */
-  renderMarkdown: (() => string) | null
+  /** The panel's mounted editor; null when none is. */
+  editor: NotesEditorHandle | null
 }
 
 interface SlideshowPanelRuntimeState {
@@ -1537,7 +1585,7 @@ const slideshowPanelRuntimeStates = new Map<string, SlideshowPanelRuntimeState>(
 function getNotesPanelRuntimeState(panelId: string): NotesPanelRuntimeState {
   const existing = notesPanelRuntimeStates.get(panelId)
   if (existing) return existing
-  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null, markdownStale: false, renderMarkdown: null }
+  const created: NotesPanelRuntimeState = { activeNote: null, dirty: false, saveTimer: null, markdownStale: false, editor: null }
   notesPanelRuntimeStates.set(panelId, created)
   return created
 }
