@@ -7,6 +7,11 @@
 // replies open until a later request or a cleared box has overtaken them.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
+// Imported statically, not from inside a test: this module pulls in tldraw
+// and is slow to load, and awaited in the test body that cost lands inside
+// the test's own timeout, where a loaded parallel run can exhaust it.
+// vi.mock is hoisted above this, so the mocks below still apply.
+import { useSpotifyState } from './AppState'
 import type { PanelsState } from './AppState'
 
 const tokens = { accessToken: 'test-token', refreshToken: 'refresh', expiresAt: Date.now() + 600_000 }
@@ -64,8 +69,7 @@ function playlistPage(names: string[]) {
   }
 }
 
-async function mountSpotifyState() {
-  const { useSpotifyState } = await import('./AppState')
+function mountSpotifyState() {
   return renderHook(() => useSpotifyState(null, panels))
 }
 
@@ -82,7 +86,7 @@ describe('Spotify search, when answers arrive out of order', () => {
       .mockReturnValueOnce(slow.promise)
       .mockResolvedValueOnce(playlistPage(['Jazz Classics']))
 
-    const { result } = await mountSpotifyState()
+    const { result } = mountSpotifyState()
 
     let firstSearch!: Promise<void>
     await act(async () => { firstSearch = result.current.searchPlaylists('jaz') })
@@ -106,7 +110,7 @@ describe('Spotify search, when answers arrive out of order', () => {
     const slow = deferred<unknown>()
     fetchMock.spotifyFetch.mockReturnValueOnce(slow.promise)
 
-    const { result } = await mountSpotifyState()
+    const { result } = mountSpotifyState()
 
     let search!: Promise<void>
     await act(async () => { search = result.current.searchPlaylists('jazz') })
@@ -127,7 +131,7 @@ describe('Spotify search, when answers arrive out of order', () => {
       .mockReturnValueOnce(slow.promise)
       .mockResolvedValueOnce(playlistPage(['Playlist Wins']))
 
-    const { result } = await mountSpotifyState()
+    const { result } = mountSpotifyState()
 
     let trackSearch!: Promise<void>
     await act(async () => { trackSearch = result.current.searchTracks('aphex') })
