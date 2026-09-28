@@ -109,6 +109,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     return () => window.removeEventListener('keydown', handleVolumeKey)
   }, [spotify.tokens])
 
+  useEffect(() => {
+    if (!spotify.tokens) setIsLinkFieldOpen(false)
+  }, [spotify.tokens])
+
   // Searching while someone types removes the separate "now search" step that
   // a submit button asks for. The debounce keeps a typed word to one request;
   // the sequence guard inside the search calls drops any reply that a later
@@ -154,6 +158,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // Focus view is the panel at its smallest, so it implies the search is put
   // away rather than being a second control that does the same thing.
   const searchHidden = focusView || searchCollapsed
+  // The menu entry that opens the link field is absent in the focus view and
+  // when logged out, so the popover it opens goes with it rather than
+  // outliving the only way back to it.
+  const linkFieldOpen = isLinkFieldOpen && Boolean(spotify.tokens) && !focusView
   const results = searchType === 'tracks' ? spotify.tracks : spotify.playlists
   const searchState: SearchState = query.trim().length < minSearchLength
     ? 'waiting'
@@ -278,7 +286,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             id: 'playlist-link',
             label: 'Play from a Spotify link',
             icon: <Link2 size={17} aria-hidden="true" />,
-            checked: isLinkFieldOpen,
+            checked: linkFieldOpen,
             onSelect: () => setIsLinkFieldOpen((current) => !current),
           }] : []),
           {
@@ -292,7 +300,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           { id: 'log-out', label: 'Log out', icon: <LogOut size={17} aria-hidden="true" />, onSelect: () => spotify.logout() },
         ] : undefined}
       >
-        {isLinkFieldOpen ? (
+        {linkFieldOpen ? (
           <section className="spotify-link-popover" id="spotify-link-field" aria-label="Play from a Spotify link" {...panelContentProps}>
             <span className="spotify-link-heading">Play from a Spotify link</span>
             <form

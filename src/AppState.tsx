@@ -1388,6 +1388,11 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
 
   const login = useCallback(async () => startSpotifyLogin(), [])
   const clearSearchResults = useCallback(() => {
+    // A search already on its way still carries the current sequence number,
+    // and would pass its own guard and refill the list it was just cleared
+    // from — under a box someone has emptied, beside the prompt to type in it.
+    // Moving the sequence on is what makes that reply stale.
+    searchSequenceRef.current += 1
     setPlaylists([])
     setTracks([])
     setPlaylistsHaveMore(false)
