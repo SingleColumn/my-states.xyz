@@ -266,35 +266,23 @@ test.describe('the writing tools on the page', () => {
 
     await expect.poll(async () => page.evaluate(() => {
       const left = (selector: string) => Math.round(document.querySelector(selector)!.getBoundingClientRect().x)
-      return [left('.notes-writing-toolbar') - left('.note-title-input'), left('.notes-writing-toolbar') - left('.notes-editor')]
-    })).toEqual([0, 0])
+      return [left('.notes-writing-toolbar') - left('.notes-editor')]
+    })).toEqual([0])
   })
 
-  test('a wheel over the note title scrolls the note in an ordinary panel', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 820 })
-    const notes = await aNoteWorthScrolling(page)
-
-    // Big enough to write in, but an ordinary panel. Here the title is not
-    // even in the same content region as the editor, so the fallback cannot
-    // be "something scrollable near the pointer": the panel says where it
-    // scrolls, and that is what moves.
-    await dispatch(page, { kind: 'panel.resize', panelId: notes.panelId, w: 820, h: 560 })
-    await wheelOverTitle(page, '.note-title-input')
-  })
-
-  test('a wheel over the note title scrolls the note at full screen', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 820 })
-    const notes = await aNoteWorthScrolling(page)
-    const shape = await shapeOf(page, notes.panelId)
-    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
-    await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
-    await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
-
-    // The same title, which at full screen is a line of writing rather than
-    // a form field, and still beside the scroll box rather than inside it.
-    await wheelOverTitle(page, '.writing-title')
-  })
-
+  /*
+   * Two tests stood here, for a wheel over the note's title scrolling the
+   * note: one in an ordinary panel, one at full screen. The title was the
+   * only thing sitting beside the editor's scroll box rather than inside
+   * it, and it is now the note's first line, inside the box like every
+   * other line. There is no longer a region for the wheel to land on that
+   * the tests could cover, so they are gone rather than retargeted at
+   * something they were not about.
+   *
+   * The panel's scroll fallback itself is untouched. Whether it still earns
+   * its place with no title beside the editor is worth settling when the
+   * first line becomes a constrained title block.
+   */
   test('a wheel on the panel frame is still the canvas’s', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 820 })
     const notes = await aNoteWorthScrolling(page)
@@ -321,18 +309,6 @@ async function aNoteWorthScrolling(page: Page) {
     await page.keyboard.press('Enter')
   }
   return notes
-}
-
-async function wheelOverTitle(page: Page, selector: string) {
-  const title = page.locator(selector)
-  await expect(title).toBeVisible()
-  const box = (await title.boundingBox())!
-  const before = { scroll: await noteScrollTop(page), camera: await cameraOf(page) }
-  expect(before.scroll).toBeGreaterThan(0)
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.wheel(0, -200)
-  await expect.poll(() => noteScrollTop(page)).toBeLessThan(before.scroll)
-  expect(await cameraOf(page)).toBe(before.camera)
 }
 
 function noteScrollTop(page: Page) {
@@ -408,10 +384,9 @@ async function setTextSize(page: Page, shape: Locator, label: string) {
 function look(page: Page) {
   return page.evaluate(() => ({
     expanded: (document.querySelector('.app-root') as HTMLElement).dataset.panelFullScreen ?? null,
-    // The note's title is a line of writing at full screen and a form field
-    // outside it, which is the tell the user reported.
-    writingTitle: !!document.querySelector('.writing-title'),
-    titleField: !!document.querySelector('.note-title-input'),
+    // The form controls stand outside writing mode and step aside inside
+    // it, which is the tell the user reported.
+    documentControls: !!document.querySelector('.notes-document-controls'),
     chromeLeft: Math.round(document.querySelector('.app-chrome')!.getBoundingClientRect().x),
   }))
 }

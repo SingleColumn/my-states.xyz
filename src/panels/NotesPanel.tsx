@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
 import { CopyPlus, Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
@@ -47,13 +47,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     await notes.createNote(panelId, { title: markdownFileTitle(file.name), content })
   }
 
-  // A title is the first line of writing, not a form field: Enter carries on
-  // into the note, and so does Down, since there is no line below it here.
-  function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== 'Enter' && event.key !== 'ArrowDown') return
-    event.preventDefault()
-    editorHandle.current?.focusStart()
-  }
   const found = panels.get(panelId)
   const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
   // A note is written by one panel at a time. This one may be holding a
@@ -94,8 +87,8 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     // rather than what was last written to storage.
     const content = notes.getNoteMarkdown(heldBy)
     await notes.createNote(panelId, {
-      title: nextDuplicateName(getDisplayNoteTitle(namedNote), notes.notes.map(getDisplayNoteTitle)),
-      content,
+      title: '',
+      content: namedAsCopy(content, notes.notes.map(getDisplayNoteTitle)),
     })
   }
 
@@ -224,26 +217,14 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
         } as CSSProperties}
       >
-        {isWritingMode ? null : (
+        {/* No title field in either treatment: the note is named by its
+            first line, so the name is written where it is read. What is
+            left here is the choice of note, and only when there is one. */}
+        {isWritingMode || !hasNotes ? null : (
           <div className="notes-document-controls" {...panelContentProps}>
-            {hasNotes ? (
-              <label className="note-control-field">
-                <span>Choose a note</span>
-                {noteSelect}
-              </label>
-            ) : null}
-
             <label className="note-control-field">
-              <span>Note title</span>
-              <input
-                className="note-title-input ph-mask"
-                value={activeNote?.title ?? ''}
-                onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
-                onKeyDown={handleTitleKeyDown}
-                disabled={!activeNote}
-                aria-label="Note title"
-                placeholder="Name this note"
-              />
+              <span>Choose a note</span>
+              {noteSelect}
             </label>
           </div>
         )}
@@ -267,24 +248,20 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             // editor's scroll box rather than inside it.
             {...panelScrollProps}
           >
-            {isWritingMode ? (
-              <input
-                className="writing-title ph-mask"
-                value={activeNote.title}
-                onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
-                onKeyDown={handleTitleKeyDown}
-                aria-label="Note title"
-                placeholder="Untitled"
-              />
-            ) : null}
             <NotesEditor
               key={activeNote.id}
               toolbarHost={toolbarHostRef}
               markdown={activeNote.content}
               document={activeNote.document}
               placeholder={editorPlaceholder}
-              onChange={(document, next) => {
+              onChange={(document, next, title) => {
                 notes.setActiveNoteDocument(document, panelId)
+                // Only when the first line's words actually change. The
+                // document is kept out of React state on purpose (see
+                // NotesEditor), but the name is in it -- every note list in
+                // the app reads it -- so writing it on every keystroke
+                // would re-render all of them for a note being typed into.
+                if (title !== activeNote.title) notes.setActiveNoteTitle(title, panelId)
                 setStats(next)
                 captureWritingProgress(next.words)
               }}
@@ -434,6 +411,19 @@ function markdownFileTitle(fileName: string) {
 
 function getDisplayNoteTitle(note: Note) {
   return note.title.trim() || 'Untitled note'
+}
+
+/**
+ * The copy's name, written where a name now lives: into its first line. Kept
+ * in a title of its own it would last exactly one keystroke, since the first
+ * line is what names a note. Any heading marker on that line is left in
+ * place, so a note titled with a heading is copied as one.
+ */
+function namedAsCopy(content: string, taken: string[]) {
+  const [firstLine = '', ...rest] = content.split('\n')
+  const marker = /^#{1,6}\s+/.exec(firstLine)?.[0] ?? ''
+  const named = nextDuplicateName(firstLine.slice(marker.length).trim() || 'Untitled note', taken)
+  return [`${marker}${named}`, ...rest].join('\n')
 }
 
 function sanitizeMarkdownFileName(title: string) {

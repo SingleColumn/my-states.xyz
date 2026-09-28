@@ -83,8 +83,11 @@ interface NotesEditorProps {
    * every keystroke.
    */
   toolbarHost: MutableRefObject<HTMLElement | null>
-  /** Every edit: the document as it now stands, and what the footer counts. */
-  onChange: (document: NoteDocument, stats: NoteStats) => void
+  /**
+   * Every edit: the document as it now stands, what the footer counts, and
+   * the note's name, which is the text of its first line.
+   */
+  onChange: (document: NoteDocument, stats: NoteStats, title: string) => void
   /**
    * The editor, once it is ready, for the few things the panel around it
    * has to ask of it. Called with null as the editor goes, which is also
@@ -104,6 +107,19 @@ export interface NotesEditorHandle {
 export interface NoteStats {
   characters: number
   words: number
+}
+
+/**
+ * The note's name: the text of its first line, which is what the writer put
+ * at the top of the page. A first line that is a heading gives its words
+ * without the `#`, since the name is the writing, not its Markdown.
+ *
+ * An empty first line -- a note not started yet, or one that opens with a
+ * picture -- leaves the name empty, and whatever shows it says "Untitled
+ * note" in its place.
+ */
+export function noteTitleFromDoc(doc: ProseNode) {
+  return doc.firstChild?.textContent.trim() ?? ''
 }
 
 /**
@@ -195,7 +211,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       .use(toggleHighlightCommand)
       .use(highlightKeymap)
       .use(highlightInputRule)
-      .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
+      .use(changeReporter((doc, stats, title) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats, title)))
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
       .use(writingToolbar(pluginViewFactory({ component: NotesWritingToolbar, root: () => toolbarHost.current ?? document.body })))
@@ -267,7 +283,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
  * for the counts on a 20,000-word note. Its Markdown is not -- around 80ms
  * on the same note -- so that is left until something asks for it.
  */
-function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
+function changeReporter(report: (doc: ProseNode, stats: NoteStats, title: string) => void) {
   return $prose(() => new Plugin({
     key: new PluginKey('NOTES_CHANGE_REPORTER'),
     view: () => ({
@@ -277,7 +293,7 @@ function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
         // Counting the prose rather than the Markdown source also drops the
         // old count's habit of inflating itself with syntax.
         const text = doc.textBetween(0, doc.content.size, NEWLINE, ' ')
-        report(doc, { characters: text.length, words: text.match(/\S+/g)?.length ?? 0 })
+        report(doc, { characters: text.length, words: text.match(/\S+/g)?.length ?? 0 }, noteTitleFromDoc(doc))
       },
     }),
   }))

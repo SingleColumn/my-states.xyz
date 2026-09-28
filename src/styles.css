@@ -1698,24 +1698,6 @@ input[type="range"]:focus-visible {
   margin-bottom: 0;
 }
 
-.note-title-input {
-  font-family: var(--font-family-display);
-  width: 100%;
-  max-width: var(--size-note-title-max-width);
-  height: calc(var(--size-note-title-height) + 6px);
-  padding: 0 var(--space-menu-item-padding-x);
-  border: var(--border-width-hairline) solid var(--color-control-border);
-  border-radius: var(--radius-control);
-  background: var(--color-note-control-bg);
-  color: var(--color-note-title);
-  font-size: var(--font-size-note-title);
-  font-weight: var(--font-weight-note-title);
-}
-
-.note-title-input::placeholder {
-  color: var(--color-text-muted);
-}
-
 /* A column rather than a fixed grid of rows: what the body holds varies --
    the note controls only outside writing mode, the writing tools only once
    a note is open -- and a row template has to be rewritten for each of
@@ -1746,9 +1728,11 @@ input[type="range"]:focus-visible {
   min-height: 0;
 }
 
+/* One column: the note's name moved into its first line, so the choice of
+   note is the only control left standing here. */
 .notes-document-controls {
   display: grid;
-  grid-template-columns: minmax(140px, 0.9fr) minmax(160px, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-control-gap);
   align-items: end;
   min-width: 0;
@@ -1763,28 +1747,11 @@ input[type="range"]:focus-visible {
   font-weight: var(--font-weight-semibold);
 }
 
-.notes-document-controls .note-title-input {
-  max-width: none;
-  height: var(--size-input-height);
-  font-size: var(--font-size-notes-control);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-control);
-}
-
-.notes-document-controls .note-title-input::placeholder {
-  font-size: var(--font-size-notes-control);
-  line-height: var(--line-height-control);
-}
-
 .note-select {
   width: 100%;
   height: var(--size-input-height);
   padding: 0 var(--size-input-padding-x);
   line-height: var(--line-height-control);
-}
-
-.note-title-input:hover {
-  background: var(--color-note-control-bg-hover);
 }
 
 .cm-editor {
@@ -2084,29 +2051,6 @@ input[type="range"]:focus-visible {
 
 .panel-notes-surface.is-writing-mode .card-title {
   font-size: var(--type-md);
-}
-
-.writing-title {
-  font-family: var(--font-family-display);
-  width: 100%;
-  max-width: var(--writing-measure);
-  margin: var(--space-writing-title-top) auto var(--space-writing-title-bottom);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--color-note-title);
-  font-family: inherit;
-  font-size: var(--font-size-writing-title);
-  font-weight: var(--font-weight-note-title);
-  line-height: var(--line-height-panel-title);
-}
-
-.writing-title:focus {
-  outline: none;
-}
-
-.writing-title::placeholder {
-  color: var(--color-text-muted);
 }
 
 /* Reserving the scrollbar on both edges keeps the centred text column on the
@@ -2634,9 +2578,6 @@ input[type="range"]:focus-visible {
     max-height: var(--size-playlist-height-default);
   }
 
-  .notes-document-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Stacking every slider onto its own row costs about 80px of panel height, so

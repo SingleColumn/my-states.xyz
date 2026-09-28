@@ -668,7 +668,10 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       // making the writer click through an empty state to start one.
       if (storedNotes.length === 0 && notePanels.length > 0) {
         const now = Date.now()
-        const blank: Note = { id: createId('note'), momentId, title: 'Untitled note', content: '', createdAt: now, updatedAt: now }
+        // No name: a note is named by its first line, and nothing has been
+        // written at the top of this one yet. Every list that shows it says
+        // "Untitled note" in place of the empty name.
+        const blank: Note = { id: createId('note'), momentId, title: '', content: '', createdAt: now, updatedAt: now }
         await saveNote(blank)
         if (cancelled) return
         setNotes([blank])
@@ -679,10 +682,12 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
         }
         return
       }
-      setNotes(storedNotes)
+      const openedNotes = await Promise.all(storedNotes.map(withNameAsFirstLine))
+      if (cancelled) return
+      setNotes(openedNotes)
       notesLoadedForRef.current = momentId
       for (const panel of notePanels) {
-        const selected = storedNotes.find((note) => note.id === panel.config.activeNoteId) ?? storedNotes[0] ?? null
+        const selected = openedNotes.find((note) => note.id === panel.config.activeNoteId) ?? openedNotes[0] ?? null
         getNotesPanelRuntimeState(panel.id).activeNote = selected
       }
     }
@@ -748,7 +753,11 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const note: Note = {
       id: createId('note'),
       momentId: moment.id,
-      title: opening?.title.trim() || 'Untitled note',
+      // The first line names the note. A file opened into one is named by
+      // its own first line where it has one, and falls back to the file
+      // name, which the next edit replaces with whatever the top of the
+      // note then says.
+      title: opening ? firstLineText(opening.content) || opening.title.trim() : '',
       // A note opened from a file starts as its Markdown and no document:
       // the same road an older note takes, which the editor already reads.
       content: opening?.content ?? '',
@@ -871,6 +880,51 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   }, [scheduleSave])
 
   return { notes, error, setActiveNoteContent, setActiveNoteDocument, registerMarkdownSource, getNoteMarkdown, noteOpenElsewhere, setActiveNoteTitle, createNote, selectNote, deleteNote, flush }
+}
+
+/**
+ * Brings a note written when the title was a field of its own onto the
+ * footing the writing panel now works on, where a note is named by its
+ * first line: the name it was given is written in as a heading at the top,
+ * so the note still answers to it and the writer still sees it.
+ *
+ * The stored document is dropped with it. That document was built from
+ * content with no title line in it and is preferred over the Markdown on
+ * load, so keeping it would mean the heading was written and then never
+ * shown. With no document the editor reads the Markdown, and the first
+ * edit writes a fresh document beside it.
+ *
+ * Idempotent: once the heading is there the first line already says the
+ * name, and the note is handed back untouched on every later load.
+ */
+async function withNameAsFirstLine(note: Note): Promise<Note> {
+  const name = note.title.trim()
+  const firstLine = firstLineText(note.content)
+  if (firstLine === name) return note
+
+  // A note that already opens with a heading is already naming itself, and
+  // its heading wins: putting the old title above it would leave the note
+  // wearing two titles, one of which the writer never asked for. The name
+  // in the store is brought into line with the document instead, which is
+  // the only place a name now lives.
+  if (/^#{1,6}\s+/.test(note.content)) {
+    const adopted: Note = { ...note, title: firstLine }
+    await saveNote(adopted)
+    return adopted
+  }
+
+  // "Untitled note" was the placeholder a note wore when it had never been
+  // named, so writing it in would put a title on notes that never had one.
+  if (!name || name === 'Untitled note') return note
+
+  const named: Note = { ...note, content: `# ${name}\n\n${note.content}`, document: undefined }
+  await saveNote(named)
+  return named
+}
+
+/** A Markdown first line as it reads, with any heading marker taken off. */
+function firstLineText(markdown: string) {
+  return (markdown.split('\n', 1)[0] ?? '').replace(/^#{1,6}\s+/, '').trim()
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
