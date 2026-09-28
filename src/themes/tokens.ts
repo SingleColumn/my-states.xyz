@@ -162,6 +162,7 @@ export const componentsSpec: GroupSpec = {
       fields: {
         background: color('Field background.', { token: '--color-input-bg', derive: mixS('surfacePrimary', 24) }),
         foreground: color('Field text.', { token: '--color-input-text', derive: s('textPrimary') }),
+        placeholder: color('Prompt text in an empty field, and anything else meant to read as quietly as one.', { token: '--color-input-placeholder', derive: mixS('textPrimary', 45) }),
       },
     },
     menu: {

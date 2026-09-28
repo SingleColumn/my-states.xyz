@@ -166,6 +166,8 @@ interface SpotifyState {
   logout(): void
   clearSearchResults(): void
   handleCallback(code: string, state: string | null): Promise<void>
+  playlistsHaveMore: boolean
+  loadMorePlaylists(): Promise<void>
   searchPlaylists(query: string): Promise<void>
   searchTracks(query: string): Promise<void>
   loadPlaylistFromUrl(url: string, panelId?: string): Promise<void>
@@ -1187,6 +1189,28 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
   }
 }
 
+// One page of results, so a search is one request. Paging further used to
+// collect fifty playlists over five sequential requests, which nothing showed
+// until the last of them returned — too slow to sit behind every keystroke,
+// and more than anyone scrolls through to pick something to put on.
+//
+// Ten, and ten is not a preference: a playlist search takes no other page
+// size. Measured against the live endpoint on 2026-09-27 — 10 answers 200,
+// and 11, 12, 15, 20, 30 and 50 all answer 400 "Invalid limit", whatever the
+// documented 0-50 range says. The paging this replaced asked for ten a page
+// for that reason, not out of caution. More than ten playlists therefore
+// means more requests; it cannot mean a bigger one.
+const searchResultLimit = 10
+
+// Below this many real playlists on the first page, fetch one more page before
+// showing anything. Eight fills the visible list without a second request in
+// the common case.
+const minFirstPageResults = 8
+
+interface SpotifyPlaylistSearchPage {
+  playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> }
+}
+
 function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifyState {
   const [tokens, setTokens] = useState<SpotifyTokens | null>(loadSpotifyTokens)
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
@@ -1198,9 +1222,38 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
   const [error, setError] = useState<string | null>(null)
   const playerRef = useRef<Spotify.Player | null>(null)
   const tokensRef = useRef(tokens)
+  // The panel searches as someone types, so a reply for "jaz" can land after
+  // the reply for "jazz". Tracks and playlists share one counter because
+  // switching the search type mid-flight can cross them too: only the most
+  // recent request of either kind is allowed to set results.
+  const searchSequenceRef = useRef(0)
+  const positionBaseRef = useRef<{ positionMs: number; at: number; paused: boolean } | null>(null)
+  const [playlistsHaveMore, setPlaylistsHaveMore] = useState(false)
+  const playlistCursorRef = useRef<{ query: string; offset: number } | null>(null)
 
   useEffect(() => {
     tokensRef.current = tokens
+  }, [tokens])
+
+  // The Web Playback SDK reports state on events — a play, a pause, a track
+  // change — and not while a track simply runs on. Read literally, that leaves
+  // the progress bar sitting at whatever second the last event happened to
+  // land on, for as long as nothing else occurs. So the bar keeps its own
+  // clock between reports, and every report resets it to the truth.
+  useEffect(() => {
+    if (!tokens) return
+    const intervalId = window.setInterval(() => {
+      const base = positionBaseRef.current
+      if (!base || base.paused) return
+      setTrack((current) => {
+        if (!current || current.paused) return current
+        const next = Math.min(base.positionMs + (Date.now() - base.at), current.durationMs)
+        // Below a quarter second the bar cannot show the difference, and the
+        // render would cost more than it tells anyone.
+        return Math.abs(next - current.positionMs) < 250 ? current : { ...current, positionMs: next }
+      })
+    }, 500)
+    return () => window.clearInterval(intervalId)
   }, [tokens])
 
   useEffect(() => {
@@ -1271,6 +1324,9 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
         player.addListener('player_state_changed', (state) => {
           if (!state) return
           const current = state.track_window.current_track
+          // Where playback truly was, and when we heard it. The clock below
+          // counts on from here until the next report corrects it.
+          positionBaseRef.current = { positionMs: state.position, at: Date.now(), paused: state.paused }
           setTrack({ title: current.name, artist: current.artists.map((artist) => artist.name).join(', '), album: current.album.name, albumArt: current.album.images[0]?.url ?? null, url: spotifyUrlFromUri(current.uri), durationMs: state.duration, positionMs: state.position, paused: state.paused })
         })
         const handleError = (event: Spotify.WebPlaybackError) => {
@@ -1334,6 +1390,8 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
   const clearSearchResults = useCallback(() => {
     setPlaylists([])
     setTracks([])
+    setPlaylistsHaveMore(false)
+    playlistCursorRef.current = null
   }, [])
   const logout = useCallback(() => {
     playerRef.current?.disconnect()
@@ -1350,26 +1408,65 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
     setError(null)
   }, [])
 
+  const fetchPlaylistPage = useCallback(async (query: string, offset: number, accessToken: string) => {
+    const params = new URLSearchParams({ q: query, type: 'playlist', limit: String(searchResultLimit), offset: String(offset) })
+    return requestSpotify(() => spotifyFetch<SpotifyPlaylistSearchPage>(`/search?${params.toString()}`, accessToken))
+  }, [requestSpotify])
+
   const searchPlaylists = useCallback(async (query: string) => {
-    const fresh = await ensureFreshTokens()
-    if (!query.trim()) {
+    const sequence = ++searchSequenceRef.current
+    const trimmed = query.trim()
+    if (!trimmed) {
       setPlaylists([])
+      setPlaylistsHaveMore(false)
+      playlistCursorRef.current = null
       return
     }
-    const result = await requestSpotify(() => spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: '0' }).toString()}`, fresh.accessToken))
-    const items = [...result.playlists.items]
-    let next = result.playlists.next
-    for (let offset = 10; next && offset < 50; offset += 10) {
-      const page = await requestSpotify(() => spotifyFetch<{ playlists: { next: string | null; items: Array<SpotifyPlaylistApiItem | null> } }>(`/search?${new URLSearchParams({ q: query, type: 'playlist', limit: '10', offset: String(offset) }).toString()}`, fresh.accessToken))
-      items.push(...page.playlists.items)
-      next = page.playlists.next
+    const fresh = await ensureFreshTokens()
+    const first = await fetchPlaylistPage(trimmed, 0, fresh.accessToken)
+    if (sequence !== searchSequenceRef.current) return
+
+    let items = [...first.playlists.items]
+    let offset = searchResultLimit
+    let next = first.playlists.next
+
+    // Spotify blanks entries in playlist search results: a full page of ten
+    // came back carrying six real playlists for "dark techno" (measured
+    // 2026-09-27). A thin first page is the one case worth a second request
+    // straight away, so a search does not open on a near-empty list.
+    if (next && items.filter(isSpotifyPlaylistApiItem).length < minFirstPageResults) {
+      const second = await fetchPlaylistPage(trimmed, offset, fresh.accessToken)
+      if (sequence !== searchSequenceRef.current) return
+      items = items.concat(second.playlists.items)
+      offset += searchResultLimit
+      next = second.playlists.next
     }
+
     const mapped = items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist)
     setPlaylists([...new Map(mapped.map((item) => [item.id, item])).values()])
+    playlistCursorRef.current = { query: trimmed, offset }
+    setPlaylistsHaveMore(Boolean(next))
     setError(null)
-  }, [ensureFreshTokens, requestSpotify])
+  }, [ensureFreshTokens, fetchPlaylistPage])
+
+  // Asked for by the person reading the list, so it appends rather than
+  // replacing, and a search started in the meantime cancels it.
+  const loadMorePlaylists = useCallback(async () => {
+    const cursor = playlistCursorRef.current
+    if (!cursor) return
+    const sequence = searchSequenceRef.current
+    const fresh = await ensureFreshTokens()
+    const page = await fetchPlaylistPage(cursor.query, cursor.offset, fresh.accessToken)
+    if (sequence !== searchSequenceRef.current || playlistCursorRef.current?.query !== cursor.query) return
+    const mapped = page.playlists.items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist)
+    setPlaylists((current) => [...new Map([...current, ...mapped].map((item) => [item.id, item])).values()])
+    playlistCursorRef.current = { query: cursor.query, offset: cursor.offset + searchResultLimit }
+    setPlaylistsHaveMore(Boolean(page.playlists.next))
+    setError(null)
+  }, [ensureFreshTokens, fetchPlaylistPage])
 
   const searchTracks = useCallback(async (query: string) => {
+    const sequence = ++searchSequenceRef.current
     const trimmed = query.trim()
     if (!trimmed) {
       setTracks([])
@@ -1377,9 +1474,10 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
     }
     const fresh = await ensureFreshTokens()
     const result = await requestSpotify(() => spotifyFetch<{ tracks: { items: Array<SpotifyTrackApiItem | null> } }>(
-      `/search?${new URLSearchParams({ q: buildTrackSearchQuery(trimmed), type: 'track', limit: '10' }).toString()}`,
+      `/search?${new URLSearchParams({ q: buildTrackSearchQuery(trimmed), type: 'track', limit: String(searchResultLimit) }).toString()}`,
       fresh.accessToken,
     ))
+    if (sequence !== searchSequenceRef.current) return
     const mapped = result.tracks.items.filter(isSpotifyTrackApiItem).map(mapTrack)
     setTracks(rankTracks(mapped, trimmed))
     setError(null)
@@ -1442,6 +1540,7 @@ function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifySta
 
   return {
     tokens, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
+    playlistsHaveMore, loadMorePlaylists,
     togglePlay,
     previousTrack: async () => playerRef.current?.previousTrack(),
     nextTrack: async () => playerRef.current?.nextTrack(),
