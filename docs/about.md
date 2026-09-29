@@ -60,7 +60,7 @@ The right-hand end of each panel's header carries the same three buttons:
 
 ### Music
 
-Select **Log in** to connect to Spotify. After logging in, search for songs or playlists, or paste a Spotify playlist URL or URI and load it. Select a search result to play it. When a track is playing, use the previous, play/pause, next, seek, and volume controls. **Reset fields** clears the search and URL fields. Spotify playback requires an eligible Spotify Premium account. Select **Log out** to disconnect.
+Search Spotify for playlists or songs straight away: no Spotify account is needed to look, and the panel also suggests a few playlists to start from. Select a result or a suggestion to choose it. Playing it is the step that needs Spotify, so select **Connect Spotify** and you are brought back to what you chose. Once connected you can also paste a Spotify playlist URL or URI and load it, and use the previous, play/pause, next, seek, and volume controls while a track is playing. **Reset fields** clears the search and URL fields. Spotify playback requires an eligible Spotify Premium account. Select **Log out** to disconnect.
 
 The panel shows the playlist that is loaded, with its cover. To keep only the playlist, the current track, and the playback controls while you work elsewhere, select **Reduce panel to focus view** in the panel header; the panel becomes smaller and stays that way until you select **Expand panel to full view** in the same place.
 
@@ -98,7 +98,7 @@ Use **Export moment** to download a portable `.moment.zip` archive, and **Import
 
 **Themes** change how everything looks: the canvas, the toolbar, the panels and their menus. Open **Settings** (the gear button at the top right) and choose a theme under **Appearance**; every moment follows that choice unless it picks its own from the **Theme** list in the moment toolbar, where **Global (…)** means "follow Settings". Settings also has a light/dark mode preference, an **Import theme…** button for `.theme.json` files, and a **Reset appearance** button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a moment that used a deleted theme falls back to the global one.
 
-Moments live in your browser's storage, not on a server. The browser keeps the moments themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a moment when you need a backup.
+Moments live in your browser's storage, not on a server. The browser keeps the moments themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Searching Spotify before you connect goes through this site rather than your browser, so that the app can ask Spotify on its own behalf; it asks only about the public catalogue, and nothing about you is sent or kept. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a moment when you need a backup.
 
 ## Licence
 

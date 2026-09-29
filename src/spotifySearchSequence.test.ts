@@ -5,7 +5,7 @@
 // decided inside useSpotifyState and nowhere else: the panel sees the answer,
 // never the race that chose it. So these drive the hook directly, holding
 // replies open until a later request or a cleared box has overtaken them.
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
 import type { PanelsState } from './AppState'
 
@@ -68,6 +68,14 @@ async function mountSpotifyState() {
   const { useSpotifyState } = await import('./AppState')
   return renderHook(() => useSpotifyState(null, panels))
 }
+
+// Loading the app module pulls in tldraw, which under a full parallel run can
+// take longer than a single test is allowed. Without this the first test to
+// run pays for the load inside its own clock, times out, and every hook it
+// would have returned is null. Loaded once, before any test's clock starts.
+beforeAll(async () => {
+  await import('./AppState')
+}, 120_000)
 
 beforeEach(() => {
   fetchMock.spotifyFetch.mockReset()

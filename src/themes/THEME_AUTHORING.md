@@ -63,7 +63,7 @@ A theme is complete when each of these has been *looked at*, not when the file v
 - **Menus** and **dropdown lists**: `menu.surface` (popover) and `menu.background` (the opaque `<select>` list — must be opaque).
 - **Toasts** and **dialogs**: `toast.*`, `dialog.*` (the dialog is where the theme is chosen, so it must be usable under the theme).
 - **Notes editor**: `editor.background/border/toolbarBackground` (the formatting bar is sticky over text; keep it opaque).
-- **Music panel**: `spotify.accent/panelBackground`, artwork shadow and placeholder, playlist rows.
+- **Music panel**: `spotify.accent/panelBackground`, artwork shadow and placeholder, playlist rows. The suggestion cards shown before a search, the Connect Spotify button and the marking on a chosen playlist all read from these same tokens -- `playlistRowBackground`/`playlistRowBackgroundHover` for a card, `artworkPlaceholder` for a card with no cover, and `accent` for the one that is chosen -- so there is nothing extra to set for them. Check a card with no cover: it is the placeholder colour at the size of a thumbnail.
 - **Images panel**: `images.accent/panelBackground`, `frameBorder` (a matte), `frameShadow`, `edge`. A matte the same colour as `panelBackground` is invisible; a torn edge needs contrast between the picture and what is behind it.
 - **Notes panel**: `notes.accent/panelBackground/titleForeground/controlBackground/controlBackgroundHover`.
 - **Type scale**: `typography.scale`. Leave it `standard` unless the idea specifically calls for denser or airier text — it changes every panel at once, so try `compact`/`spacious` on the app's narrowest panel width before committing, since a fixed-width panel can start wrapping labels it didn't before.

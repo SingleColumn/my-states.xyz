@@ -1,5 +1,24 @@
 import type { SpotifyTokens } from './types'
 
+// The catalog DTOs and their mappers live in a module that carries no browser
+// globals, because the server functions under api/ parse the same JSON. They
+// are re-exported here so every existing `from './spotify'` import still
+// reads the way it did.
+export {
+  isSpotifyPlaylistApiItem,
+  isSpotifyTrackApiItem,
+  mapPlaylist,
+  mapTrack,
+} from './spotifyCatalogTypes'
+export type {
+  SpotifyPlaylistApiItem,
+  SpotifyPlaylistSearchResult,
+  SpotifyPlaylistSummary,
+  SpotifyTrackApiItem,
+  SpotifyTrackSearchResult,
+  SpotifyTrackSummary,
+} from './spotifyCatalogTypes'
+
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize'
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 const PKCE_VERIFIER_KEY = 'mic:spotify-code-verifier'
@@ -21,27 +40,6 @@ export const spotifyScopes = [
   'playlist-read-private',
   'playlist-read-collaborative',
 ]
-
-export interface SpotifyPlaylistSummary {
-  id: string
-  name: string
-  uri: string
-  url: string
-  image: string | null
-  owner: string
-  trackCount: number
-}
-
-export interface SpotifyTrackSummary {
-  id: string
-  name: string
-  uri: string
-  url: string
-  image: string | null
-  artists: string
-  album: string
-  durationMs: number
-}
 
 export type SpotifyPlaybackAction = 'toggle-current' | 'load-saved-playlist' | 'missing-playlist'
 
@@ -237,55 +235,6 @@ export async function spotifyFetch<T>(path: string, accessToken: string, init?: 
   }
 
   return response.json() as Promise<T>
-}
-
-export interface SpotifyPlaylistApiItem {
-  id: string
-  name: string
-  uri: string
-  external_urls?: { spotify?: string }
-  images?: Array<{ url: string }>
-  owner?: { display_name?: string } | null
-  tracks?: { total?: number } | null
-  items?: { total?: number } | null
-}
-
-export interface SpotifyTrackApiItem {
-  id: string
-  name: string
-  uri: string
-  external_urls?: { spotify?: string }
-  album?: {
-    name?: string
-    images?: Array<{ url: string }>
-  } | null
-  artists?: Array<{ name?: string }> | null
-  duration_ms?: number
-}
-
-export function mapPlaylist(item: SpotifyPlaylistApiItem): SpotifyPlaylistSummary {
-  return {
-    id: item.id,
-    name: item.name,
-    uri: item.uri,
-    url: item.external_urls?.spotify ?? '',
-    image: item.images?.[0]?.url ?? null,
-    owner: item.owner?.display_name ?? 'Spotify',
-    trackCount: item.items?.total ?? item.tracks?.total ?? 0,
-  }
-}
-
-export function mapTrack(item: SpotifyTrackApiItem): SpotifyTrackSummary {
-  return {
-    id: item.id,
-    name: item.name,
-    uri: item.uri,
-    url: item.external_urls?.spotify ?? '',
-    image: item.album?.images?.[0]?.url ?? null,
-    artists: item.artists?.map((artist) => artist.name).filter((name): name is string => Boolean(name)).join(', ') || 'Unknown artist',
-    album: item.album?.name ?? 'Unknown album',
-    durationMs: item.duration_ms ?? 0,
-  }
 }
 
 async function readSpotifyErrorMessage(response: Response) {
