@@ -250,4 +250,41 @@ describe('Choosing a playlist', () => {
     act(() => { result.current.selectTrack(null) })
     expect(result.current.selectedTrack).toBeNull()
   })
+
+  // Found in review: a song chosen first outranks the panel's playlist wherever
+  // the panel decides what is chosen. Left in place, the panel kept describing
+  // the song after a playlist was picked, and after connecting Play started the
+  // old song instead of the playlist chosen most recently.
+  it('lets the most recent choice win: a playlist chosen after a song replaces it', async () => {
+    const { panels, updateConfig } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+    const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
+
+    act(() => { result.current.selectTrack(song) })
+    expect(result.current.selectedTrack).toEqual(song)
+
+    act(() => {
+      result.current.selectPlaylist({
+        id: 'p1', name: 'Rain on Glass', uri: 'spotify:playlist:p1', url: '', image: null, owner: 'Someone', trackCount: 40,
+      }, 'panel_music')
+    })
+
+    expect(result.current.selectedTrack).toBeNull()
+    expect(updateConfig).toHaveBeenCalledWith('panel_music', expect.objectContaining({ playlist: expect.objectContaining({ id: 'p1' }) }), undefined)
+  })
+
+  it('lets a song chosen after a playlist take over, as it always did', async () => {
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+    const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
+
+    act(() => {
+      result.current.selectPlaylist({
+        id: 'p1', name: 'Rain on Glass', uri: 'spotify:playlist:p1', url: '', image: null, owner: 'Someone', trackCount: 40,
+      }, 'panel_music')
+    })
+    act(() => { result.current.selectTrack(song) })
+
+    expect(result.current.selectedTrack).toEqual(song)
+  })
 })

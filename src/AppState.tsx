@@ -1567,6 +1567,11 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
    */
   const selectPlaylist = useCallback((summary: SpotifyPlaylistSummary, panelId?: string) => {
     setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, panelId)
+    // The newest choice is the one that counts. A song chosen earlier outranks
+    // the panel's playlist wherever the panel decides what is chosen, so it has
+    // to go, or the panel keeps describing — and, after connecting, plays — the
+    // song instead of the playlist that was just picked.
+    setSelectedTrack(null)
     setStatus(`${summary.name} is ready.`)
     setError(null)
   }, [setMomentPlaylist])
