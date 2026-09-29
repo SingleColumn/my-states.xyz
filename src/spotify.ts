@@ -9,7 +9,7 @@ export {
   isSpotifyTrackApiItem,
   mapPlaylist,
   mapTrack,
-} from './spotifyCatalogTypes'
+} from '../api/_lib/spotifyCatalogTypes'
 export type {
   SpotifyPlaylistApiItem,
   SpotifyPlaylistSearchResult,
@@ -17,7 +17,7 @@ export type {
   SpotifyTrackApiItem,
   SpotifyTrackSearchResult,
   SpotifyTrackSummary,
-} from './spotifyCatalogTypes'
+} from '../api/_lib/spotifyCatalogTypes'
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize'
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'

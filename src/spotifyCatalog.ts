@@ -11,7 +11,7 @@ import type {
   SpotifyPlaylistSearchResult,
   SpotifyPlaylistSummary,
   SpotifyTrackSearchResult,
-} from './spotifyCatalogTypes'
+} from '../api/_lib/spotifyCatalogTypes'
 
 const catalogBasePath = '/api/spotify'
 

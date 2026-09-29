@@ -9,8 +9,8 @@
  * which its documentation lists for every framework and for none. Anything
  * but a GET is refused inside serveGet.
  */
-import { serveGet, serverDeps } from '../_lib/httpAdapter'
-import { handleCuratedPlaylists } from '../_lib/spotifyCatalog'
+import { serveGet, serverDeps } from '../_lib/httpAdapter.js'
+import { handleCuratedPlaylists } from '../_lib/spotifyCatalog.js'
 
 export default {
   async fetch(request: Request): Promise<Response> {

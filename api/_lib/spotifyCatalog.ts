@@ -20,7 +20,7 @@ import {
   type SpotifyPlaylistSearchResult,
   type SpotifyTrackApiItem,
   type SpotifyTrackSearchResult,
-} from '../../src/spotifyCatalogTypes'
+} from './spotifyCatalogTypes.js'
 import {
   getSpotifyAppToken,
   invalidateAppToken,
@@ -29,7 +29,7 @@ import {
   SpotifyConfigurationError,
   SpotifyUpstreamError,
   type AppTokenDeps,
-} from './spotifyAppToken'
+} from './spotifyAppToken.js'
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1'
 

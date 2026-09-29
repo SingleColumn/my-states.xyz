@@ -3,9 +3,16 @@
  * app reduces them to.
  *
  * This module is deliberately neutral: it is the one piece of Spotify code
- * that runs in both the browser bundle and the server functions under
- * `api/`, so it must not touch `window`, `localStorage` or `import.meta.env`.
- * Anything that does belongs in spotify.ts (browser) or api/_lib (server).
+ * that runs in both the browser bundle and the server functions, so it must
+ * not touch `window`, `localStorage` or `import.meta.env`. Anything that does
+ * belongs in src/spotify.ts (browser) or elsewhere in api/_lib (server).
+ *
+ * It lives in api/_lib, and the browser imports it from there, and not the
+ * other way round, because the server is the side with a constraint: a
+ * deployed function is loaded as a plain ES module, and everything it imports
+ * has to be found beside it. Keeping the server code inside api/ means it can
+ * be packaged and loaded on its own; the browser's bundler can read from
+ * anywhere.
  *
  * Having one copy of the parsing is the point. The catalog answer for a
  * search reaches the panel either from Spotify directly (with the visitor's

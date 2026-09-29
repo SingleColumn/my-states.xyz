@@ -2,7 +2,7 @@
  * The join between a handler's plain `{ status, body, headers }` answer and
  * whatever is asking for it: a Vercel function, or the Vite dev server.
  */
-import type { CatalogDeps, HandlerResult } from './spotifyCatalog'
+import type { CatalogDeps, HandlerResult } from './spotifyCatalog.js'
 
 export function jsonResponse(result: HandlerResult): Response {
   return new Response(JSON.stringify(result.body), {
