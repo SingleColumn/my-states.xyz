@@ -5,11 +5,16 @@
  * so a visitor can browse before connecting their Spotify account. Nothing
  * user-specific is reachable this way, and nothing about the application's
  * credentials is returned.
+ *
+ * Exported as the default `{ fetch }` object, Vercel's Web Standard handler,
+ * which its documentation lists for every framework and for none. Anything
+ * but a GET is refused inside serveGet.
  */
-import { jsonResponse, serverDeps } from '../_lib/httpAdapter'
+import { serveGet, serverDeps } from '../_lib/httpAdapter'
 import { handleCatalogSearch } from '../_lib/spotifyCatalog'
 
-export async function GET(request: Request): Promise<Response> {
-  const { searchParams } = new URL(request.url)
-  return jsonResponse(await handleCatalogSearch(searchParams, serverDeps()))
+export default {
+  async fetch(request: Request): Promise<Response> {
+    return serveGet(request, (params) => handleCatalogSearch(params, serverDeps()))
+  },
 }

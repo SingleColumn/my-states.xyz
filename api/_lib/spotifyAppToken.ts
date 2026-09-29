@@ -30,14 +30,23 @@ export class SpotifyConfigurationError extends Error {
 
 /** Raised when Spotify itself answered with something other than success. */
 export class SpotifyUpstreamError extends Error {
+  /** What this app answers with: 429 for a rate limit, otherwise 502. */
   readonly status: number
   readonly retryAfterSeconds: number | null
+  /**
+   * What Spotify itself answered, for a call about one resource. It is what
+   * tells "this playlist is not available" (404) from "Spotify is unwell"
+   * (500), which `status` deliberately flattens. Null when there was no such
+   * answer: the token request, or Spotify not being reached at all.
+   */
+  readonly spotifyStatus: number | null
 
-  constructor(status: number, message: string, retryAfterSeconds: number | null = null) {
+  constructor(status: number, message: string, retryAfterSeconds: number | null = null, spotifyStatus: number | null = null) {
     super(message)
     this.name = 'SpotifyUpstreamError'
     this.status = status
     this.retryAfterSeconds = retryAfterSeconds
+    this.spotifyStatus = spotifyStatus
   }
 }
 

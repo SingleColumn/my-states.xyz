@@ -103,10 +103,16 @@ export async function handleCatalogSearch(params: URLSearchParams, deps: Catalog
  * GET /api/spotify/playlists?ids=a,b,c — the display metadata for curated
  * suggestions, looked up from their ids so the source file holds ids alone.
  *
- * A playlist that cannot be read is left out rather than failing the lot:
- * one id that has been deleted, made private, or is one of the Spotify-owned
- * editorial playlists the Web API no longer serves must not empty the whole
- * suggestion area.
+ * A playlist Spotify will not describe is left out rather than failing the
+ * lot: one id that has been deleted, made private, or is one of the
+ * Spotify-owned editorial playlists the Web API no longer serves must not
+ * empty the whole suggestion area.
+ *
+ * That is all that is left out. Anything else that goes wrong — no
+ * credentials, a token Spotify refuses, a rate limit, Spotify being down — is
+ * about this deployment or about every playlist at once, and answering "no
+ * playlists" with a 200 would make a broken deployment look like an empty
+ * list, with nothing in any log to say why.
  */
 export async function handleCuratedPlaylists(params: URLSearchParams, deps: CatalogDeps): Promise<HandlerResult> {
   let ids: string[]
@@ -121,14 +127,24 @@ export async function handleCuratedPlaylists(params: URLSearchParams, deps: Cata
       try {
         return mapPlaylist(await spotifyAppFetch<SpotifyPlaylistApiItem>(`/playlists/${encodeURIComponent(id)}`, deps))
       } catch (caught) {
-        // A rate limit is about us, not about this playlist, so it is the one
-        // failure worth reporting rather than quietly dropping.
-        if (caught instanceof SpotifyUpstreamError && caught.status === 429) throw caught
-        return null
+        if (isPlaylistUnavailable(caught)) return null
+        throw caught
       }
     }))
     return { status: 200, body: { items: found.filter(isPresent) }, headers: cacheFor(3600) }
   })
+}
+
+/**
+ * What Spotify says when it will not describe one playlist: not found, not
+ * allowed (private, or one of its own editorial playlists), or not a valid id.
+ */
+const unavailablePlaylistStatuses = new Set([400, 403, 404])
+
+function isPlaylistUnavailable(caught: unknown) {
+  return caught instanceof SpotifyUpstreamError
+    && caught.spotifyStatus !== null
+    && unavailablePlaylistStatuses.has(caught.spotifyStatus)
 }
 
 interface SpotifySearchPage {
@@ -165,6 +181,7 @@ async function spotifyAppFetch<T>(path: string, deps: CatalogDeps, isRetry = fal
       response.status === 429 ? 429 : 502,
       `Spotify answered ${response.status}.`,
       readRetryAfter(response),
+      response.status,
     )
   }
 

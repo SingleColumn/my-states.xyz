@@ -254,6 +254,46 @@ describe('When something goes wrong', () => {
     expect(stub.calls.filter((url) => url.startsWith('https://api.spotify.com/'))).toHaveLength(1)
   })
 
+  // Found by testing the deployed functions directly: the per-playlist catch
+  // meant to skip one unavailable playlist also swallowed "no credentials", so
+  // a misconfigured deployment answered 200 with an empty list and logged
+  // nothing. An empty list is a real answer; a broken deployment is not one.
+  it('says the deployment is unavailable when there are no credentials, rather than an empty list', async () => {
+    const stub = spotifyStub()
+    const result = await handleCuratedPlaylists(params({ ids: 'p1,p2' }), { env: {}, fetch: stub.fetch })
+
+    expect(result.status).toBe(503)
+    expect(result.body).toEqual({ error: discoveryUnavailableMessage })
+    expect(stub.calls).toEqual([])
+    // And it is written down for whoever reads the log, naming what is missing.
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('SPOTIFY_CLIENT_ID'))
+  })
+
+  it('says so when Spotify refuses the application credentials, rather than an empty list', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"error":"invalid_client"}', { status: 400 }))
+    const result = await handleCuratedPlaylists(params({ ids: 'p1' }), { env, fetch: fetchMock as unknown as typeof fetch })
+
+    expect(result.status).toBe(502)
+    expect(result.body).toEqual({ error: discoveryUnavailableMessage })
+  })
+
+  it('says so when Spotify itself is failing, rather than treating every playlist as gone', async () => {
+    const stub = spotifyStub(new Response('{}', { status: 500 }), new Response('{}', { status: 500 }))
+    const result = await handleCuratedPlaylists(params({ ids: 'p1,p2' }), { env, fetch: stub.fetch })
+
+    expect(result.status).toBe(502)
+    expect(result.body).toEqual({ error: discoveryUnavailableMessage })
+  })
+
+  // The three answers Spotify gives about one playlist it will not describe.
+  it.each([400, 403, 404])('still leaves out a single playlist Spotify answers %i for', async (status) => {
+    const stub = spotifyStub(new Response('{}', { status }), json(playlistItem))
+    const result = await handleCuratedPlaylists(params({ ids: 'gone,p1' }), { env, fetch: stub.fetch })
+
+    expect(result.status).toBe(200)
+    expect((result.body as { items: Array<{ id: string }> }).items.map((item) => item.id)).toEqual(['p1'])
+  })
+
   it('reports a rate limit during a curated lookup rather than answering with nothing', async () => {
     const stub = spotifyStub(new Response('{}', { status: 429 }))
     const result = await handleCuratedPlaylists(params({ ids: 'p1' }), { env, fetch: stub.fetch })
