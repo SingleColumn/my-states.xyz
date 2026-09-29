@@ -1829,39 +1829,20 @@ input[type="range"]:focus-visible {
   margin-bottom: 0;
 }
 
-.note-title-input {
-  font-family: var(--font-family-display);
-  width: 100%;
-  max-width: var(--size-note-title-max-width);
-  height: calc(var(--size-note-title-height) + 6px);
-  padding: 0 var(--space-menu-item-padding-x);
-  border: var(--border-width-hairline) solid var(--color-control-border);
-  border-radius: var(--radius-control);
-  background: var(--color-note-control-bg);
-  color: var(--color-note-title);
-  font-size: var(--font-size-note-title);
-  font-weight: var(--font-weight-note-title);
-}
-
-.note-title-input::placeholder {
-  color: var(--color-text-muted);
-}
-
 /* A column rather than a fixed grid of rows: what the body holds varies --
    the note controls only outside writing mode, the writing tools only once
    a note is open -- and a row template has to be rewritten for each of
    those. Everything above the writing takes its own height; the writing
    takes what is left. */
 .notes-body {
-  /* A measure is counted in characters, not pixels: about 68 of them, which
-     is what 34 times the text size comes to for this face. Fixed in pixels
-     it was a different measure at every size -- generous at the smallest,
-     seven words a line at the largest. Declared here rather than with the
-     other tokens because a custom property resolves the var()s inside it
-     where it is declared, and this is the first element that knows the size
-     the writer chose. Capped at the panel so the largest sizes simply fill
-     it. */
-  --writing-measure: min(100%, calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 34));
+  /* Scale the reading measure with the writer's chosen text size rather than
+     fixing it in pixels. The wider 68em surface gives long-form prose room
+     to breathe while remaining capped by the panel on smaller screens. */
+  /* The paper width is a user choice and stays fixed when text size changes.
+     The prose column remains inset so the frame reads as a sheet, not a box
+     fitted tightly around the text. */
+  --writing-paper-width: min(100%, var(--notes-paper-width, 794px));
+  --writing-measure: min(100%, calc(var(--writing-paper-width) - 160px));
   display: flex;
   flex-direction: column;
   gap: var(--space-notes-gap);
@@ -1877,9 +1858,11 @@ input[type="range"]:focus-visible {
   min-height: 0;
 }
 
+/* One column: the note's name moved into its first line, so the choice of
+   note is the only control left standing here. */
 .notes-document-controls {
   display: grid;
-  grid-template-columns: minmax(140px, 0.9fr) minmax(160px, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-control-gap);
   align-items: end;
   min-width: 0;
@@ -1894,28 +1877,11 @@ input[type="range"]:focus-visible {
   font-weight: var(--font-weight-semibold);
 }
 
-.notes-document-controls .note-title-input {
-  max-width: none;
-  height: var(--size-input-height);
-  font-size: var(--font-size-notes-control);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-control);
-}
-
-.notes-document-controls .note-title-input::placeholder {
-  font-size: var(--font-size-notes-control);
-  line-height: var(--line-height-control);
-}
-
 .note-select {
   width: 100%;
   height: var(--size-input-height);
   padding: 0 var(--size-input-padding-x);
   line-height: var(--line-height-control);
-}
-
-.note-title-input:hover {
-  background: var(--color-note-control-bg-hover);
 }
 
 .cm-editor {
@@ -2039,6 +2005,34 @@ input[type="range"]:focus-visible {
 
 .notes-editor-content h3 {
   font-size: var(--font-size-notes-heading-3);
+}
+
+/* The first line is the note's name, so it is drawn as one -- whatever it is
+   made of. Nothing in the document marks a title: the line is an ordinary
+   paragraph until the writer makes it a heading, and the name is taken from
+   it either way. So the styling follows position, and a plain first line
+   reads at the same size and weight a heading would.
+
+   This is the only thing saying the first line names the note. Without it a
+   writer has a title and no way to know it, which is what the form field
+   this replaced said out loud. Declared after the heading rules because it
+   matches them for specificity and has to win when the first line is one. */
+.notes-editor-content > :first-child {
+  margin: 0 0 var(--space-rich-content-block);
+  color: var(--color-note-title);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-notes-heading-1);
+  font-weight: var(--font-weight-note-title);
+  line-height: var(--line-height-tight);
+}
+
+/* The hint on an empty note is a sentence about the editor, not a name, so
+   it stays at reading size however large the line carrying it is drawn. */
+.notes-editor-content > :first-child.is-empty::before {
+  font-family: var(--font-family-ui);
+  font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-rich-content);
 }
 
 .notes-editor-content blockquote {
@@ -2198,13 +2192,13 @@ input[type="range"]:focus-visible {
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow: auto;
 }
 
 /* At full screen the header is a strip the writing has to live under, so
    it gives back what it can. Panel chrome is sized against the panel, which
    at full screen is the whole window: the button alone was taller than this
-   whole strip now is. Here it stops growing and the padding closes up, so
-   the writing starts nearer the top. */
+   whole strip now is. */
 .panel-notes-surface.is-writing-mode {
   --card-header-button-size: 30px;
 }
@@ -2217,33 +2211,12 @@ input[type="range"]:focus-visible {
   font-size: var(--type-md);
 }
 
-.writing-title {
-  font-family: var(--font-family-display);
-  width: 100%;
-  max-width: var(--writing-measure);
-  margin: var(--space-writing-title-top) auto var(--space-writing-title-bottom);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--color-note-title);
-  font-family: inherit;
-  font-size: var(--font-size-writing-title);
-  font-weight: var(--font-weight-note-title);
-  line-height: var(--line-height-panel-title);
-}
-
-.writing-title:focus {
-  outline: none;
-}
-
-.writing-title::placeholder {
-  color: var(--color-text-muted);
-}
-
 /* Reserving the scrollbar on both edges keeps the centred text column on the
    same axis as the title above it once the note grows past one screen. */
 .notes-editor.is-writing .milkdown {
   scrollbar-gutter: stable both-edges;
+  overflow: visible;
+  flex: 0 0 auto;
 }
 
 /* The contenteditable stays full width so clicking anywhere still places the
@@ -2254,7 +2227,17 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor.is-writing .notes-editor-content {
-  padding-block: 0 var(--space-writing-bottom);
+  /* Keep the first-line title from touching the editor's top edge after the
+     writing surface sheds its normal card padding. */
+  box-sizing: border-box;
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  min-height: max(100%, calc(var(--writing-paper-width) * 1.414));
+  margin-inline: auto;
+  padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom);
+  /* The surrounding surface keeps its existing colour; this line is the
+     only visual cue that marks the paper boundary. */
+  border: var(--border-width-hairline) solid color-mix(in srgb, var(--color-editor-border) 72%, transparent);
+  border-radius: var(--radius-editor);
 }
 
 /* Flattening the editor wrapper makes the scroll box a sibling of the title,
@@ -2485,7 +2468,8 @@ input[type="range"]:focus-visible {
    follow the panel's own edge instead -- the same edge as the note's title
    field and the editor below it. */
 .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
-  max-width: var(--writing-measure);
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  max-width: var(--writing-paper-width);
   margin-inline: auto;
 }
 
@@ -2501,6 +2485,7 @@ input[type="range"]:focus-visible {
   gap: var(--space-detail-1);
   width: max-content;
   max-width: 100%;
+  margin-inline: auto;
   padding: var(--space-detail-1);
   border: var(--border-width-hairline) solid var(--color-panel-border);
   border-radius: var(--radius-control);
@@ -2757,9 +2742,6 @@ input[type="range"]:focus-visible {
     min-height: var(--size-playlist-height-min);
   }
 
-  .notes-document-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Stacking every slider onto its own row costs about 80px of panel height, so

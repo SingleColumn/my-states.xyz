@@ -396,16 +396,16 @@ test.describe('writing mode', () => {
     await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
     await expect(shape.locator('.notes-editor.is-writing')).toHaveCount(1)
 
-    // The form controls step aside and the title joins the text column.
+    // The form controls step aside and the writing holds one column.
     await expect(shape.locator('.notes-document-controls')).toHaveCount(0)
-    const title = await shape.locator('.writing-title').boundingBox()
     const paragraph = await shape.locator('.notes-editor-content > p').first().boundingBox()
     const heading = await shape.locator('.notes-editor-content > h1').boundingBox()
-    expect(Math.abs(title!.x - paragraph!.x)).toBeLessThan(2)
     expect(Math.abs(heading!.x - paragraph!.x)).toBeLessThan(2)
     // Held to a measure, not the width of a full-screen panel.
     const surface = await shape.locator('.notes-editor-content').boundingBox()
-    expect(paragraph!.width).toBeLessThan(surface!.width * 0.75)
+    const editor = await shape.locator('.notes-editor').boundingBox()
+    expect(surface!.width).toBeLessThan(editor!.width * 0.9)
+    expect(paragraph!.width).toBeLessThan(surface!.width)
     // The surface itself stays full width, so a click anywhere still writes.
     await shape.locator('.notes-editor-content').click({ position: { x: 20, y: 30 } })
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
@@ -502,6 +502,30 @@ test.describe('two Notes panels', () => {
       .toContain('Written in the first panel.\n')
   })
 
+  test('copying a note that opens with a list names the copy without touching the list', async ({ page }) => {
+    await openApp(page)
+    const first = await panelOfType(page, 'notes')
+    const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
+    await firstBody.click()
+    await page.keyboard.type('- Buy milk')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+
+    await selectPanel(page, first.panelId)
+    await page.keyboard.press('Control+d')
+    await expect.poll(async () => (await describeCanvas(page)).panels.filter((panel) => panel.type === 'notes')).toHaveLength(2)
+    const copy = (await describeCanvas(page)).panels.find((panel) => panel.type === 'notes' && panel.panelId !== first.panelId)!
+    const copyShape = await shapeOf(page, copy.panelId)
+    await copyShape.getByRole('button', { name: 'Make a copy here' }).click()
+
+    // The bullet is the writing, not the name. Reading it as the name put
+    // "(copy)" inside the list item and left the copy called nothing.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+      .toEqual(['* Buy milk\n', 'Untitled note (copy)\n\n* Buy milk\n'])
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+      .toEqual(['', 'Untitled note (copy)'])
+  })
+
   test('a duplicated panel holds the same note, shows why, and can take a copy', async ({ page }) => {
     await openApp(page)
     const first = await panelOfType(page, 'notes')
@@ -525,16 +549,16 @@ test.describe('two Notes panels', () => {
     await expect(noteBodyOf(copyShape)).toHaveCount(0)
     await copyShape.getByRole('button', { name: 'Make a copy here' }).click()
 
-    // Two notes now, the copy named after the original, and the original
-    // untouched.
-    await expect(noteBodyOf(copyShape)).toHaveText('The original note.')
+    // Two notes now, and the copy says in its own first line that it is one
+    // -- which is where its name lives, so the name survives being typed in.
+    await expect(noteBodyOf(copyShape)).toHaveText('The original note. (copy)')
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
-      .toEqual(['Untitled note', 'Untitled note (copy)'])
+      .toEqual(['The original note.', 'The original note. (copy)'])
     await firstBody.click()
     await page.keyboard.press('End')
     await page.keyboard.type(' Edited after the copy.')
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
-      .toEqual(['The original note.\n', 'The original note. Edited after the copy.\n'])
+      .toEqual(['The original note. (copy)\n', 'The original note. Edited after the copy.\n'])
   })
 })
 
@@ -609,50 +633,450 @@ test.describe('deriving the Markdown', () => {
   })
 })
 
-test.describe('the title leads into the note', () => {
-  test('Enter and Down carry the caret from the title into the text', async ({ page }) => {
+test.describe('the first line names the note', () => {
+  test('note.setContent replaces the mounted writing and its derived name immediately', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('The old name')
+    await dispatch(page, {
+      kind: 'note.setContent',
+      panelId: notes.panelId,
+      content: 'The new name\n\nThe new body.\n',
+    })
+
+    await expect(body).toHaveText('The new nameThe new body.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: 'The new name', content: 'The new name\n\nThe new body.\n' })
+
+    await body.locator('p').last().click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' Still current.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('The new name\n\nThe new body. Still current.\n')
+  })
+
+  test('note.setTitle keeps an image that is the first thing in the note', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
     const body = noteBodyOf(shape)
-    const title = shape.getByLabel('Note title')
-
-    // fill, not type: a new note is already called "Untitled note".
-    await title.fill('A title')
-    await page.keyboard.press('Enter')
-    // Straight on into the note, with no click needed.
-    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
-    await page.keyboard.type('The first line.')
-    await expect(body).toHaveText('The first line.')
-    // ...and the Enter did not leave a blank line behind it.
-    await expect(body.locator('p')).toHaveCount(1)
-
-    // Down does the same, and lands at the start rather than wherever the
-    // caret happened to be.
-    await title.click()
-    await page.keyboard.press('ArrowDown')
-    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
-    await page.keyboard.type('Before. ')
-    await expect(body).toHaveText('Before. The first line.')
-
     const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
-      .toMatchObject({ title: 'A title', content: 'Before. The first line.\n' })
+
+    await dispatch(page, {
+      kind: 'note.setContent',
+      panelId: notes.panelId,
+      content: '![A photograph](https://example.com/photo.png)\n\nThe body.\n',
+    })
+    await expect(body.locator('img')).toHaveCount(1)
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'A safe name' })
+
+    await expect(body.locator('img')).toHaveCount(1)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('A safe name\n\n![A photograph](https://example.com/photo.png)\n\nThe body.\n')
   })
 
-  test('the same in writing mode', async ({ page }) => {
+  test('note.setTitle keeps Markdown punctuation as literal name text', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: '2 * 3' })
+    await expect(body.locator('p').first()).toHaveText('2 * 3')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: '2 * 3', content: '2 \\* 3\n' })
+  })
+
+  test('what is written at the top is what the note is called', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    const { moment } = await describeCanvas(page)
+
+    // No field to name it in: there is one writing surface and the name is
+    // the first thing written on it.
+    await expect(shape.getByLabel('Note title')).toHaveCount(0)
+
+    await body.click()
+    await page.keyboard.type('A title')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('A title')
+
+    // A second line is the note, not its name.
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('The body of it.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: 'A title', content: 'A title\n\nThe body of it.\n' })
+
+    // Rewriting the first line renames the note, with nothing else to do.
+    await body.locator('p').first().click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(', renamed')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('A title, renamed')
+  })
+
+  test('the first line is drawn as a name, so the writer can see it is one', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+
+    await body.click()
+    await page.keyboard.type('A name for it')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('And an ordinary line under it.')
+    await expect(body.locator('p')).toHaveCount(2)
+
+    // Both are plain paragraphs -- nothing in the document marks a title --
+    // so the only thing telling the writer the first line names the note is
+    // that it is drawn larger and heavier than the line below it.
+    const drawn = await body.locator('p').evaluateAll((lines) => lines.map((line) => {
+      const style = getComputedStyle(line)
+      return { size: parseFloat(style.fontSize), weight: Number(style.fontWeight) }
+    }))
+    expect(drawn[0]!.size).toBeGreaterThan(drawn[1]!.size)
+    expect(drawn[0]!.weight).toBeGreaterThan(drawn[1]!.weight)
+  })
+
+  test('a list on the first line is moved down, leaving a line to be named on', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('- Buy milk')
+
+    // The list is kept, whole, with an empty line above it: a name made of a
+    // bullet would be no name at all, in the picker or in an export's file
+    // name, and the title styling would draw a bulleted title.
+    await expect(body.locator('ul li')).toHaveCount(1)
+    await expect(body.locator('ul li')).toHaveText('Buy milk')
+    expect(await body.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'UL'])
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('')
+
+    // The empty line is the document's business and nothing the Markdown
+    // needs to carry: Markdown cannot write an empty paragraph, and the
+    // `<br />` remark reaches for instead would be a line of HTML at the top
+    // of the exported file.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+
+    // And the line above is a real one: the note is named by typing in it.
+    await body.locator('p').first().click()
+    await page.keyboard.type('The shopping')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('The shopping')
+  })
+
+  test('a name written in bold is not given a second title when the note is reopened', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('**Notes** from the harbour')
+    await expect(body.locator('strong')).toHaveText('Notes')
+    // The name is the line as it reads, so the Markdown that carries the
+    // bold is not part of it.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Notes from the harbour')
+    const written = (await readStorage(page, moment!.id)).notes[0]!.content
+
+    await page.reload()
+    await waitForCanvas(page)
+
+    // Opening a note is not an edit to it. The name and the first line were
+    // once compared in different alphabets -- one read from the document,
+    // one from the Markdown source -- so a note whose first line carried any
+    // formatting never matched its own name and had a second title written
+    // in above it, by nothing more than being looked at.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe(written)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('h1')).toHaveCount(0)
+    await expect(again.locator('p')).toHaveCount(1)
+  })
+
+  test('a note stored with a list at the top opens with its naming line already there', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('- Buy milk')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+
+    // Read back from the Markdown alone, which is what a moment bundle
+    // carries and what the record says: the empty naming line is the
+    // document's business and is not written to it.
+    await page.addInitScript(() => window.localStorage.setItem('mic:notes-load-from-markdown', 'true'))
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('ul li')).toHaveText('Buy milk')
+
+    // Before a single keystroke. The repair runs on transactions, and the
+    // state the editor is built with is not one, so the list used to stand
+    // first until some later edit moved it -- drawn as the title meanwhile,
+    // and taking the note's name out from under the writer when it went.
+    expect(await again.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'UL'])
+  })
+
+  test('a name in a script with no ascii in it is still migrated', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('犬')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('犬')
+
+    // A note named the old way: a title of its own that its writing does not
+    // say. Comparing names by their ascii letters alone left both sides of
+    // this empty, so every such pair matched and the note was read as one
+    // that already named itself.
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('my-states')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      const store = db.transaction('notes', 'readwrite').objectStore('notes')
+      const all = await new Promise<{ id: string, title: string, content: string }[]>((resolve, reject) => {
+        const request = store.getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const note = all[0]!
+      store.put({ ...note, title: '猫', content: '犬\n', document: undefined })
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+
+    // The old name is kept, written in where a name now lives.
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('h1')).toHaveText('猫')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('猫')
+  })
+
+  test('legacy names that differ only by punctuation are not treated as equal', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('# C# Guide')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('# C# Guide\n')
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('my-states')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      const store = db.transaction('notes', 'readwrite').objectStore('notes')
+      const all = await new Promise<{ id: string, title: string, content: string }[]>((resolve, reject) => {
+        const request = store.getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      store.put({ ...all[0]!, title: 'C++ Guide', document: undefined })
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, notes.panelId))
+    await expect(again.locator('h1')).toHaveText(['C++ Guide', 'C# Guide'])
+  })
+
+  test('a rename queued for one note survives another editor finishing its mount', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+    await body.click()
+    await page.keyboard.type('The first note')
+    const firstId = (await describeCanvas(page)).panels.find((panel) => panel.panelId === notes.panelId)!.note!.id
+
+    // No rendering pause between these commands: the second note's editor
+    // may finish mounting after the panel has already returned to the first.
+    await dispatch(page, { kind: 'note.create', panelId: notes.panelId })
+    await dispatch(page, { kind: 'note.select', panelId: notes.panelId, noteId: firstId })
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'The queued name' })
+
+    await expect(noteBodyOf(await shapeOf(page, notes.panelId)).locator('p').first()).toHaveText('The queued name')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title))
+      .toContain('The queued name')
+  })
+
+  test('a deliberate blank first line survives Markdown serialization', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('A paragraph')
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Enter')
+
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('<br />\n\nA paragraph\n')
+  })
+
+  test('undo after the editor creates a naming line is not consumed by that repair', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+
+    await body.click()
+    await page.keyboard.type('- Buy milk')
+    await expect(body.locator('ul li')).toHaveText('Buy milk')
+    await undo(page)
+
+    expect(await body.textContent()).not.toBe('Buy milk')
+  })
+
+  test('a note left on the old placeholder name takes the name its writing gives', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('Shopping list')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Shopping list\n')
+
+    // A note from when every unnamed note wore "Untitled note".
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('my-states')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      const store = db.transaction('notes', 'readwrite').objectStore('notes')
+      const all = await new Promise<{ id: string, title: string, content: string }[]>((resolve, reject) => {
+        const request = store.getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const note = all[0]!
+      store.put({ ...note, title: 'Untitled note', content: 'Shopping list\n', document: undefined })
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+
+    // The placeholder is not written into the writing, and the record stops
+    // saying it: an already-nameable first line causes no edit, so a stale
+    // name left here would have stood in the picker and in the name an
+    // export saves under until some unrelated keystroke replaced it.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Shopping list')
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('h1')).toHaveCount(0)
+    await expect(again.locator('p')).toHaveText('Shopping list')
+  })
+
+  test('a quotation at the top is moved down the same way', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+
+    await body.click()
+    await page.keyboard.type('> a quotation')
+
+    await expect(body.locator('blockquote')).toHaveText('a quotation')
+    expect(await body.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'BLOCKQUOTE'])
+  })
+
+  test('a heading names it by its words, without the hashes', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const { moment } = await describeCanvas(page)
+
+    await noteBodyOf(shape).click()
+    await page.keyboard.type('# Written as a heading')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Written as a heading')
+  })
+
+  test('the note.setTitle command renames by rewriting the first line', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('First name')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('The body of it.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('First name')
+
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'Second name' })
+
+    // The writing says the new name, because that is where a name lives.
+    await expect(body.locator('p').first()).toHaveText('Second name')
+
+    // ...so the next keystroke does not take it back. Renaming through the
+    // record alone lasted exactly one transaction, after which the name was
+    // read off the untouched first line again and the rename was gone.
+    await body.locator('p').last().click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' And more.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: 'Second name', content: 'Second name\n\nThe body of it. And more.\n' })
+  })
+
+  test('a rename dispatched the moment the panel changes note lands on the right one', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('The first note')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('The first note\n')
+
+    const firstId = (await describeCanvas(page)).panels.find((panel) => panel.panelId === notes.panelId)!.note!.id
+
+    await dispatch(page, { kind: 'note.create', panelId: notes.panelId })
+    await noteBodyOf(await shapeOf(page, notes.panelId)).click()
+    await page.keyboard.type('The second note')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.length).toBe(2)
+
+    // Back to back, the way a script would. The panel is pointed at the
+    // first note and renamed in the same breath, while the editor standing
+    // in it is still the second note's.
+    await dispatch(page, { kind: 'note.select', panelId: notes.panelId, noteId: firstId })
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'Renamed by a script' })
+
+    // The rename reaches the note it named, and no other note is touched by
+    // it: renaming through whichever editor happened to be standing there
+    // would have written this name into the note being left.
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+      .toEqual(['Renamed by a script', 'The second note'])
+    await expect(noteBodyOf(await shapeOf(page, notes.panelId)).locator('p').first()).toHaveText('Renamed by a script')
+  })
+
+  test('the same in writing mode, where there is no title field either', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
     await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
     await expect(shape.locator('.notes-editor.is-writing')).toHaveCount(1)
+    await expect(shape.getByLabel('Note title')).toHaveCount(0)
 
-    await shape.locator('.writing-title').fill('Written large')
-    await page.keyboard.press('Enter')
-    expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
-    await page.keyboard.type('And the body.')
-    await expect(noteBodyOf(shape)).toHaveText('And the body.')
+    await noteBodyOf(shape).click()
+    await page.keyboard.type('Written large')
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Written large')
   })
 })
 
@@ -788,10 +1212,10 @@ test.describe('links and text size', () => {
     const shape = await shapeOf(page, notes.panelId)
     await expect(noteBodyOf(shape)).toBeVisible()
     const ladder = [
-      ['Small', '14px', '21px'],
-      ['Large', '18px', '29px'],
-      ['Extra large', '21px', '34px'],
-      ['Medium', '16px', '26px'],
+      ['Small', '16px', '25px'],
+      ['Large', '20px', '34px'],
+      ['Extra large', '23px', '40px'],
+      ['Medium', '18px', '30px'],
     ]
     for (const [label, fontSize, lineHeight] of ladder) {
       await shape.getByRole('button', { name: 'Writing panel actions' }).click()
@@ -1115,7 +1539,7 @@ test.describe('emoji', () => {
 })
 
 test.describe('opening a markdown file', () => {
-  test('becomes a new note named after the file, leaving the open one alone', async ({ page }) => {
+  test('becomes a new note named by its first line, leaving the open one alone', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
@@ -1131,7 +1555,12 @@ test.describe('opening a markdown file', () => {
     await expect(opened.locator('h1')).toHaveText('A heading from the file')
     await expect(opened.locator('p strong')).toHaveText('prose')
     await expect(shape.getByRole('combobox', { name: 'Choose a note' })).toHaveValue(/.+/)
-    await expect(shape.locator('.note-title-input')).toHaveValue('Kept from elsewhere')
+    // Named by the heading the file opens with, not by the file's own name:
+    // the first line names the note, and the file brought one with it.
+    await expect.poll(async () => {
+      const { moment } = await describeCanvas(page)
+      return (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort()
+    }).toEqual(['A heading from the file', 'Already written here'])
 
     // The note that was open is still there, with its own words.
     const { moment } = await describeCanvas(page)
