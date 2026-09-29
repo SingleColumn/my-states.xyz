@@ -170,6 +170,19 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 
 The first two are browser configuration and are compiled into the bundle. The last two are server-only, are read by the functions in `api/`, and must never be given a `VITE_` prefix.
 
+In the Vercel dashboard, choose the variable type like this (Vercel's **Config** values stay readable after saving; **Secret** values cannot be viewed again once saved):
+
+| Variable | Type | Why |
+| --- | --- | --- |
+| `SPOTIFY_CLIENT_SECRET` | **Secret** | The only real credential. Nobody needs to read it back. |
+| `SPOTIFY_CLIENT_ID` | Config | Already public: the browser sends it to Spotify in the login link. |
+| `VITE_SPOTIFY_CLIENT_ID` | Config | Every `VITE_` variable is compiled into the JavaScript visitors download. |
+| `VITE_SPOTIFY_REDIRECT_URI` | Config | Same, and it is only a URL. |
+
+The same applies to the other `VITE_` variables (the tldraw licence key and the PostHog values): they are already public in the bundle, so marking them Secret would add nothing.
+
+The Secret type controls who on your team can read a value back. It does not decide whether the browser can see it: that is settled by the missing `VITE_` prefix, which keeps the client secret out of the bundle. Keep the client secret somewhere you can find it again, because Vercel will not show it after you save it. Set the server-only variables for **Production**, and for **Preview** as well if you use preview deployments, or discovery will be unavailable there. Local development reads your `.env` file rather than Vercel's Development environment. Redeploy after changing any variable so the new value takes effect.
+
 Use [VERCEL_DEPLOYMENT_CHECKLIST.md](VERCEL_DEPLOYMENT_CHECKLIST.md) for the complete DNS, OAuth, deployment, and hosted-browser verification steps.
 
 ## Using the workspace
