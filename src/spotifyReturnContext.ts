@@ -68,6 +68,20 @@ export function takeReturnContext(storage: Storage | null = sessionStorageOrNull
   }
 }
 
+/**
+ * Throws away whatever an earlier attempt left. A visit that has nothing to
+ * come back to must not inherit one that was abandoned — a cancelled sign-in
+ * at Spotify never comes back to read its context, and it would otherwise be
+ * waiting for the next login, however unrelated.
+ */
+export function forgetReturnContext(storage: Storage | null = sessionStorageOrNull()) {
+  try {
+    storage?.removeItem(returnContextKey)
+  } catch {
+    // Nothing to do: a value that cannot be removed is one that cannot be read either.
+  }
+}
+
 function readChoice(value: unknown): SpotifyReturnContext['choice'] {
   if (!value || typeof value !== 'object') return null
   const { kind, spotifyId } = value as { kind?: unknown; spotifyId?: unknown }

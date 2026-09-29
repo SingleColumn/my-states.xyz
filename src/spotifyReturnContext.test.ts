@@ -2,7 +2,7 @@
 // It is read from sessionStorage that a visitor's own browser can edit, so
 // most of these are about what happens when what comes back is not what went.
 import { describe, expect, it } from 'vitest'
-import { rememberReturnContext, takeReturnContext, type SpotifyReturnContext } from './spotifyReturnContext'
+import { forgetReturnContext, rememberReturnContext, takeReturnContext, type SpotifyReturnContext } from './spotifyReturnContext'
 
 class MemorySessionStorage implements Storage {
   #values = new Map<string, string>()
@@ -115,5 +115,34 @@ describe('The return context', () => {
     const written = storage.getItem(key) ?? ''
     expect(written).not.toContain('secret')
     expect(Object.keys(JSON.parse(written)).sort()).toEqual(['choice', 'panelId', 'query', 'searchType'])
+  })
+})
+
+// A sign-in that is cancelled at Spotify, or whose callback fails, never comes
+// back to read what it left. Whatever visit comes next must not inherit it.
+describe('Forgetting the return context', () => {
+  it('removes what an earlier attempt left, so the next login finds nothing', () => {
+    const storage = new MemorySessionStorage()
+    rememberReturnContext(context, storage)
+
+    forgetReturnContext(storage)
+
+    expect(storage.getItem(key)).toBeNull()
+    expect(takeReturnContext(storage)).toBeNull()
+  })
+
+  it('is harmless when there is nothing to forget, or nowhere to keep it', () => {
+    expect(() => forgetReturnContext(new MemorySessionStorage())).not.toThrow()
+    expect(() => forgetReturnContext(null)).not.toThrow()
+  })
+
+  it('leaves everything else in the storage alone', () => {
+    const storage = new MemorySessionStorage()
+    storage.setItem('mic:spotify-suggestions', '["a"]')
+    rememberReturnContext(context, storage)
+
+    forgetReturnContext(storage)
+
+    expect(storage.getItem('mic:spotify-suggestions')).toBe('["a"]')
   })
 })

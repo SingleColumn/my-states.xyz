@@ -1243,6 +1243,16 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
   const [track, setTrack] = useState<SpotifyTrackState | null>(null)
   const [selectedTrack, setSelectedTrack] = useState<SpotifyTrackSummary | null>(null)
+  // Counts every deliberate change to the held song: chosen, cleared, or
+  // superseded by playing something. A lookup still in flight when that
+  // happens is answering a question about an earlier state — the visitor may
+  // have opened another moment, cleared the search or picked something else —
+  // and must not put its answer back.
+  const selectedTrackEpochRef = useRef(0)
+  const changeSelectedTrack = useCallback((next: SpotifyTrackSummary | null) => {
+    selectedTrackEpochRef.current += 1
+    setSelectedTrack(next)
+  }, [])
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
   // Only the connected panel shows this line, and it shows it before the
@@ -1290,8 +1300,8 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     setPlaylists([])
     setTracks([])
     setTrack(null)
-    setSelectedTrack(null)
-  }, [moment?.id])
+    changeSelectedTrack(null)
+  }, [moment?.id, changeSelectedTrack])
 
   useEffect(() => {
     saveSpotifyTokens(tokens)
@@ -1571,7 +1581,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     // Playback has been accepted, so whatever song was being held for Play is
     // superseded. The player only reports what is playing some moments later,
     // and until it does the held song would still outrank this in the panel.
-    setSelectedTrack(null)
+    changeSelectedTrack(null)
     setMomentPlaylist(selected, panelId)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
     setStatus(`Playing ${summary.name}.`)
@@ -1590,20 +1600,24 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     // the panel's playlist wherever the panel decides what is chosen, so it has
     // to go, or the panel keeps describing — and, after connecting, plays — the
     // song instead of the playlist that was just picked.
-    setSelectedTrack(null)
+    changeSelectedTrack(null)
     setStatus(`${summary.name} is ready.`)
     setError(null)
   }, [setMomentPlaylist])
 
   const selectTrack = useCallback((summary: SpotifyTrackSummary | null) => {
-    setSelectedTrack(summary)
+    changeSelectedTrack(summary)
     if (summary) setError(null)
   }, [])
 
   const lookupTrack = useCallback(async (trackId: string) => {
     if (!tokens) return
+    // What the held song was when this was asked. If it has been changed by
+    // the time the answer arrives, the answer is stale and is dropped.
+    const epoch = selectedTrackEpochRef.current
     const fresh = await ensureFreshTokens()
     const item = await requestSpotify(() => spotifyFetch<SpotifyTrackApiItem>(`/tracks/${encodeURIComponent(trackId)}`, fresh.accessToken))
+    if (selectedTrackEpochRef.current !== epoch) return
     setSelectedTrack(mapTrack(item))
   }, [ensureFreshTokens, requestSpotify, tokens])
 
@@ -1618,7 +1632,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     // Playback has been accepted, so whatever song was being held for Play is
     // superseded. The player only reports what is playing some moments later,
     // and until it does the held song would still outrank this in the panel.
-    setSelectedTrack(null)
+    changeSelectedTrack(null)
     setMomentPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
@@ -1632,7 +1646,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     // Playback has been accepted, so whatever song was being held for Play is
     // superseded. The player only reports what is playing some moments later,
     // and until it does the held song would still outrank this in the panel.
-    setSelectedTrack(null)
+    changeSelectedTrack(null)
     setStatus(`Playing ${summary.name} by ${summary.artists}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify])

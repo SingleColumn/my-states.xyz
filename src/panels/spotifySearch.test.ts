@@ -598,6 +598,46 @@ describe('Music panel before Spotify is connected', () => {
     })
   })
 
+  // Found in review: a sign-in cancelled at Spotify never reads its context. If
+  // the visitor then clears everything and connects again, the old context
+  // must not wait for that login and restore a song they had cleared.
+  it('throws away a context left by an abandoned attempt when there is nothing to come back to', () => {
+    window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({
+      panelId: 'panel_music',
+      choice: { kind: 'track', spotifyId: 't-stale' },
+      query: 'stale search',
+      searchType: 'tracks',
+    }))
+    panel.playlist = { ...nothingChosen }
+    const { login } = mountAnonymousPanel()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+
+    expect(login).toHaveBeenCalled()
+    expect(window.sessionStorage.getItem('mic:spotify-return-context')).toBeNull()
+  })
+
+  it('replaces a context left by an abandoned attempt with the current one', () => {
+    window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({
+      panelId: 'panel_music',
+      choice: { kind: 'track', spotifyId: 't-stale' },
+      query: 'stale search',
+      searchType: 'tracks',
+    }))
+    panel.playlist = { ...nothingChosen }
+    mountAnonymousPanel()
+    typeSearch('rain')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+
+    expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
+      panelId: 'panel_music',
+      choice: null,
+      query: 'rain',
+      searchType: 'playlists',
+    })
+  })
+
   it('leaves nothing behind when there is nothing to come back to', () => {
     panel.playlist = { ...nothingChosen }
     mountAnonymousPanel()

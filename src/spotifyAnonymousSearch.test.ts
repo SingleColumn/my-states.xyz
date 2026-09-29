@@ -446,3 +446,80 @@ describe('A song held for Play, when something else is played', () => {
     expect(result.current.selectedTrack).toEqual(song)
   })
 })
+
+// Coming back from Spotify with a song chosen, the panel looks the song up by its
+// id. That is a request, and requests can be overtaken: the visitor may open
+// another moment, clear the search or pick something else before it answers.
+// Its answer describes an earlier state and must not be put back. Found in review.
+describe('A song lookup that is overtaken', () => {
+  const trackItem = {
+    id: 't1',
+    name: 'Xtal',
+    uri: 'spotify:track:t1',
+    external_urls: { spotify: 'https://open.spotify.com/track/t1' },
+    artists: [{ name: 'Aphex Twin' }],
+    album: { name: 'SAW 85-92', images: [] },
+    duration_ms: 1000,
+  }
+  const otherSong = { id: 't2', name: 'Another', uri: 'spotify:track:t2', url: '', image: null, artists: 'Someone', album: 'Elsewhere', durationMs: 2000 }
+
+  /** Connected, with the lookup for t1 started and held open. */
+  async function lookupStarted() {
+    session.tokens = userTokens
+    const slow = deferred<unknown>()
+    spotifyApi.spotifyFetch.mockImplementation((path: string) => (path.startsWith('/tracks/') ? slow.promise : Promise.resolve(undefined)))
+    const { panels } = panelsStub()
+    const { useSpotifyState } = await import('./AppState')
+    const view = renderHook(({ momentId }: { momentId: string }) => useSpotifyState({ id: momentId } as never, panels), { initialProps: { momentId: 'm1' } })
+    let lookup!: Promise<void>
+    await act(async () => { lookup = view.result.current.lookupTrack('t1') })
+    const finish = async () => { await act(async () => { slow.release(trackItem); await lookup }) }
+    return { ...view, finish }
+  }
+
+  it('is kept when nothing has changed', async () => {
+    const { result, finish } = await lookupStarted()
+    await finish()
+    expect(result.current.selectedTrack).toMatchObject({ id: 't1', name: 'Xtal' })
+  })
+
+  it('is dropped when another moment was opened meanwhile', async () => {
+    const { result, rerender, finish } = await lookupStarted()
+
+    rerender({ momentId: 'm2' })
+    await finish()
+
+    expect(result.current.selectedTrack).toBeNull()
+  })
+
+  it('is dropped when the search was cleared meanwhile', async () => {
+    const { result, finish } = await lookupStarted()
+
+    act(() => { result.current.selectTrack(null) })
+    await finish()
+
+    expect(result.current.selectedTrack).toBeNull()
+  })
+
+  it('is dropped when something else was chosen meanwhile', async () => {
+    const { result, finish } = await lookupStarted()
+
+    act(() => { result.current.selectTrack(otherSong) })
+    await finish()
+
+    expect(result.current.selectedTrack).toEqual(otherSong)
+  })
+
+  it('is dropped when a playlist was chosen meanwhile', async () => {
+    const { result, finish } = await lookupStarted()
+
+    act(() => {
+      result.current.selectPlaylist({
+        id: 'p1', name: 'Rain on Glass', uri: 'spotify:playlist:p1', url: '', image: null, owner: 'Someone', trackCount: 40,
+      }, 'panel_music')
+    })
+    await finish()
+
+    expect(result.current.selectedTrack).toBeNull()
+  })
+})

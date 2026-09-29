@@ -28,7 +28,7 @@ import type { SpotifyPlaylistSummary, SpotifyTrackSummary } from '../spotify'
 import { fetchCuratedPlaylists } from '../spotifyCatalog'
 import type { CuratedSpotifyPlaylist } from '../config/spotifyCuratedPlaylists'
 import { getSessionSuggestions, shuffleSessionSuggestions } from '../spotifySuggestions'
-import { rememberReturnContext, takeReturnContext } from '../spotifyReturnContext'
+import { forgetReturnContext, rememberReturnContext, takeReturnContext } from '../spotifyReturnContext'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
 
@@ -437,6 +437,12 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         query,
         searchType,
       })
+    } else {
+      // Nothing to come back to, so nothing may be left over from an earlier
+      // attempt: a sign-in that was cancelled or failed never read its context,
+      // and it would be restored after this one, complete with a song the
+      // visitor has since cleared.
+      forgetReturnContext()
     }
     void run(spotify.login)
   }
