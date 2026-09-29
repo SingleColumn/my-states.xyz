@@ -7,7 +7,7 @@ import { clipboard } from '@milkdown/plugin-clipboard'
 import { Plugin, PluginKey, Selection } from '@milkdown/prose/state'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
-import { $prose, $view, getMarkdown } from '@milkdown/utils'
+import { $prose, $view, getMarkdown, replaceAll } from '@milkdown/utils'
 import { ProsemirrorAdapterProvider, useNodeViewFactory, usePluginViewFactory } from '@prosemirror-adapter/react'
 import type { NoteDocument } from '../types'
 import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
@@ -108,6 +108,8 @@ export interface NotesEditorHandle {
    * keystroke, when it is derived from that line again.
    */
   setTitle(title: string): void
+  /** Replaces the document when the command surface supplies new Markdown. */
+  setMarkdown(markdown: string): void
 }
 
 /** What the panel's footer reports, counted from the document, not its Markdown. */
@@ -126,7 +128,8 @@ export interface NoteStats {
  * note" in its place.
  */
 export function noteTitleFromDoc(doc: ProseNode) {
-  return doc.firstChild?.textContent.trim() ?? ''
+  const first = doc.firstChild
+  return first && firstBlockCanName(first) ? first.textContent.trim() : ''
 }
 
 /**
@@ -238,7 +241,10 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       const ready = editorRef.current
       if (ready?.status !== EditorStatus.Created) return
       handleRef.current({
-        getMarkdown: () => withoutEmptyFirstLine(ready.action(getMarkdown())),
+        getMarkdown: () => ready.action((ctx) => {
+          const doc = ctx.get(editorViewCtx).state.doc
+          return withoutSyntheticNamingLine(getMarkdown()(ctx), doc)
+        }),
         focusStart: () => ready.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)).scrollIntoView())
@@ -247,16 +253,21 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         setTitle: (title) => ready.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           const { state } = view
-          const first = state.doc.firstChild
-          if (!first || !first.isTextblock) return
+          let first = state.doc.firstChild
+          let transaction = state.tr
+          if (!first || !firstBlockCanName(first)) {
+            first = state.schema.nodes.paragraph.create()
+            transaction = transaction.insert(0, first)
+          }
           // The first block's content, between its own open and close.
           const from = 1
           const to = first.nodeSize - 1
           const named = title.trim()
           view.dispatch(named
-            ? state.tr.replaceWith(from, to, state.schema.text(named))
-            : state.tr.delete(from, to))
+            ? transaction.replaceWith(from, to, state.schema.text(named))
+            : transaction.delete(from, to))
         }),
+        setMarkdown: (nextMarkdown) => ready.action(replaceAll(nextMarkdown)),
       })
     }
 
@@ -286,8 +297,10 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       ready.action((ctx) => {
         const view = ctx.get(editorViewCtx)
         const first = view.state.doc.firstChild
-        if (first && CAN_NAME_A_NOTE.has(first.type.name)) return
-        view.dispatch(view.state.tr.insert(0, view.state.schema.nodes.paragraph.create()))
+        if (first && firstBlockCanName(first)) return
+        view.dispatch(view.state.tr
+          .insert(0, view.state.schema.nodes.paragraph.create())
+          .setMeta('addToHistory', false))
       })
     }
     let editor = make(true)
@@ -455,7 +468,10 @@ function floatingKeys(handlers: MutableRefObject<Set<(event: KeyboardEvent) => b
  * the line again on load, which is the state it was in when it was written:
  * the round trip holds.
  */
-function withoutEmptyFirstLine(markdown: string) {
+function withoutSyntheticNamingLine(markdown: string, doc: ProseNode) {
+  const first = doc.firstChild
+  const second = doc.childCount > 1 ? doc.child(1) : null
+  if (!first || first.content.size > 0 || !second || firstBlockCanName(second)) return markdown
   return markdown.replace(/^<br \/>\n\n/, '')
 }
 
@@ -465,6 +481,16 @@ function withoutEmptyFirstLine(markdown: string) {
  * because that is what a note migrated from a title of its own carries.
  */
 const CAN_NAME_A_NOTE = new Set(['paragraph', 'heading'])
+
+/**
+ * A text block can name the note when it is empty (the reserved naming line)
+ * or contains actual text. An image-only paragraph is a text block in the
+ * schema, but replacing its content would delete the image.
+ */
+function firstBlockCanName(block: ProseNode) {
+  if (!CAN_NAME_A_NOTE.has(block.type.name)) return false
+  return block.content.size === 0 || block.textContent.trim() !== ''
+}
 
 /**
  * Keeps the note's first line a line of text.
@@ -492,10 +518,12 @@ function titleFirstLine() {
     key: new PluginKey('NOTES_TITLE_FIRST_LINE'),
     appendTransaction: (_transactions, _oldState, newState) => {
       const first = newState.doc.firstChild
-      if (first && CAN_NAME_A_NOTE.has(first.type.name)) return null
+      if (first && firstBlockCanName(first)) return null
       // The inserted line becomes the first child, so the next pass finds a
       // paragraph and this appends nothing: no loop.
-      return newState.tr.insert(0, newState.schema.nodes.paragraph.create())
+      return newState.tr
+        .insert(0, newState.schema.nodes.paragraph.create())
+        .setMeta('addToHistory', false)
     },
   }))
 }

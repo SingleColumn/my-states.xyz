@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
-import { CopyPlus, Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
-import { nextDuplicateName } from '../utils'
+import { markdownNamedAsCopy } from '../noteTitle'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
@@ -17,6 +17,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // untouched so the two treatments can be compared side by side.
   const isWritingMode = commands.isPanelFullScreen(panelId)
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
+  const [paperWidth, setPaperWidth] = useState(() => readPaperWidth())
   const [showTools, setShowTools] = useState(() => readShowTools())
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
@@ -88,7 +89,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     const content = notes.getNoteMarkdown(heldBy)
     await notes.createNote(panelId, {
       title: '',
-      content: namedAsCopy(content, notes.notes.map(getDisplayNoteTitle)),
+      content: markdownNamedAsCopy(content, notes.notes.map(getDisplayNoteTitle)),
     })
   }
 
@@ -188,16 +189,28 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ]}
-        trailingMenuItems={Object.entries(editorFontSizes).map(([size, { label }]) => ({
-          id: `text-size-${size}`,
-          label,
-          icon: <Type size={17} aria-hidden="true" />,
-          checked: size === fontSize,
-          onSelect: () => {
-            setFontSize(size as EditorFontSize)
-            window.localStorage.setItem(editorFontSizeStorageKey, size)
-          },
-        }))}
+        trailingMenuItems={[
+          ...Object.entries(editorFontSizes).map(([size, { label }]) => ({
+            id: `text-size-${size}`,
+            label,
+            icon: <Type size={17} aria-hidden="true" />,
+            checked: size === fontSize,
+            onSelect: () => {
+              setFontSize(size as EditorFontSize)
+              window.localStorage.setItem(editorFontSizeStorageKey, size)
+            },
+          })),
+          ...Object.entries(paperWidths).map(([width, { label }]) => ({
+            id: `paper-width-${width}`,
+            label: `Paper: ${label}`,
+            icon: <Ruler size={17} aria-hidden="true" />,
+            checked: width === paperWidth,
+            onSelect: () => {
+              setPaperWidth(width as PaperWidth)
+              window.localStorage.setItem(paperWidthStorageKey, width)
+            },
+          })),
+        ]}
       >
         {isWritingMode && hasNotes ? (
           <label className="writing-note-picker">
@@ -215,6 +228,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         style={{
           '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
           '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
+          '--notes-paper-width': paperWidths[paperWidth].width,
         } as CSSProperties}
       >
         {/* No title field in either treatment: the note is named by its
@@ -255,13 +269,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               document={activeNote.document}
               placeholder={editorPlaceholder}
               onChange={(document, next, title) => {
-                notes.setActiveNoteDocument(document, panelId)
+                notes.setActiveNoteDocument(document, panelId, activeNote.id)
                 // Only when the first line's words actually change. The
                 // document is kept out of React state on purpose (see
                 // NotesEditor), but the name is in it -- every note list in
                 // the app reads it -- so writing it on every keystroke
                 // would re-render all of them for a note being typed into.
-                if (title !== activeNote.title) notes.setActiveNoteTitle(title, panelId)
+                if (title !== activeNote.title) notes.setActiveNoteTitle(title, panelId, activeNote.id)
                 setStats(next)
                 captureWritingProgress(next.words)
               }}
@@ -334,6 +348,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
 const newDocumentSelectValue = '__new_document__'
 const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
+const paperWidthStorageKey = 'mic:notes-paper-width'
 const showToolsStorageKey = 'mic:notes-formatting-tools'
 
 /**
@@ -349,13 +364,31 @@ function readShowTools() {
     return false
   }
 }
+
+const paperWidths = {
+  narrow: { label: 'Narrow', width: '680px' },
+  standard: { label: 'A4', width: '794px' },
+  wide: { label: 'Wide', width: '960px' },
+} as const
+type PaperWidth = keyof typeof paperWidths
+const defaultPaperWidth: PaperWidth = 'standard'
+
+function readPaperWidth(): PaperWidth {
+  try {
+    const stored = window.localStorage.getItem(paperWidthStorageKey)
+    return stored && stored in paperWidths ? stored as PaperWidth : defaultPaperWidth
+  } catch {
+    return defaultPaperWidth
+  }
+}
+
 // Four steps for reading at, each with the leading that suits it: tighter
 // where the line is short, looser where it is long. Medium is the default.
 const editorFontSizes = {
-  small: { label: 'Small', fontSize: '14px', lineHeight: '21px' },
-  medium: { label: 'Medium', fontSize: '16px', lineHeight: '26px' },
-  large: { label: 'Large', fontSize: '18px', lineHeight: '29px' },
-  xlarge: { label: 'Extra large', fontSize: '21px', lineHeight: '34px' },
+  small: { label: 'Small', fontSize: '16px', lineHeight: '25px' },
+  medium: { label: 'Medium', fontSize: '18px', lineHeight: '30px' },
+  large: { label: 'Large', fontSize: '20px', lineHeight: '34px' },
+  xlarge: { label: 'Extra large', fontSize: '23px', lineHeight: '40px' },
 } as const
 type EditorFontSize = keyof typeof editorFontSizes
 const defaultEditorFontSize: EditorFontSize = 'medium'
@@ -411,34 +444,6 @@ function markdownFileTitle(fileName: string) {
 
 function getDisplayNoteTitle(note: Note) {
   return note.title.trim() || 'Untitled note'
-}
-
-/**
- * The copy's name, written where a name now lives: into its first line. Kept
- * in a title of its own it would last exactly one keystroke, since the first
- * line is what names a note. Any heading marker on that line is left in
- * place, so a note titled with a heading is copied as one.
- */
-function namedAsCopy(content: string, taken: string[]) {
-  const [firstLine = '', ...rest] = content.split('\n')
-  const marker = /^#{1,6}\s+/.exec(firstLine)?.[0] ?? ''
-
-  // A first line that starts a list, a quotation or a table is not the note's
-  // name -- the editor keeps an empty naming line above it -- so the copy is
-  // given a name of its own on a new line. Rewriting that line instead put
-  // "(copy)" inside the writing: a note whose first bullet said "Buy milk"
-  // came back saying "Buy milk (copy)", and was still called nothing.
-  if (!marker && startsABlockThatCannotBeNamed(firstLine)) {
-    return [nextDuplicateName('Untitled note', taken), '', firstLine, ...rest].join('\n')
-  }
-
-  const named = nextDuplicateName(firstLine.slice(marker.length).trim() || 'Untitled note', taken)
-  return [`${marker}${named}`, ...rest].join('\n')
-}
-
-/** The Markdown block starters the writing panel keeps out of a first line. */
-function startsABlockThatCannotBeNamed(firstLine: string) {
-  return /^\s*([-*+]\s|\d+[.)]\s|>|```|~~~|\||:{3}|(-\s*){3,}$|(\*\s*){3,}$|(_\s*){3,}$)/.test(firstLine)
 }
 
 function sanitizeMarkdownFileName(title: string) {

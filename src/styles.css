@@ -1704,15 +1704,14 @@ input[type="range"]:focus-visible {
    those. Everything above the writing takes its own height; the writing
    takes what is left. */
 .notes-body {
-  /* A measure is counted in characters, not pixels: about 68 of them, which
-     is what 34 times the text size comes to for this face. Fixed in pixels
-     it was a different measure at every size -- generous at the smallest,
-     seven words a line at the largest. Declared here rather than with the
-     other tokens because a custom property resolves the var()s inside it
-     where it is declared, and this is the first element that knows the size
-     the writer chose. Capped at the panel so the largest sizes simply fill
-     it. */
-  --writing-measure: min(100%, calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 34));
+  /* Scale the reading measure with the writer's chosen text size rather than
+     fixing it in pixels. The wider 68em surface gives long-form prose room
+     to breathe while remaining capped by the panel on smaller screens. */
+  /* The paper width is a user choice and stays fixed when text size changes.
+     The prose column remains inset so the frame reads as a sheet, not a box
+     fitted tightly around the text. */
+  --writing-paper-width: min(100%, var(--notes-paper-width, 794px));
+  --writing-measure: min(100%, calc(var(--writing-paper-width) - 160px));
   display: flex;
   flex-direction: column;
   gap: var(--space-notes-gap);
@@ -2062,13 +2061,13 @@ input[type="range"]:focus-visible {
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow: auto;
 }
 
 /* At full screen the header is a strip the writing has to live under, so
    it gives back what it can. Panel chrome is sized against the panel, which
    at full screen is the whole window: the button alone was taller than this
-   whole strip now is. Here it stops growing and the padding closes up, so
-   the writing starts nearer the top. */
+   whole strip now is. */
 .panel-notes-surface.is-writing-mode {
   --card-header-button-size: 30px;
 }
@@ -2085,6 +2084,8 @@ input[type="range"]:focus-visible {
    same axis as the title above it once the note grows past one screen. */
 .notes-editor.is-writing .milkdown {
   scrollbar-gutter: stable both-edges;
+  overflow: visible;
+  flex: 0 0 auto;
 }
 
 /* The contenteditable stays full width so clicking anywhere still places the
@@ -2095,7 +2096,17 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor.is-writing .notes-editor-content {
-  padding-block: 0 var(--space-writing-bottom);
+  /* Keep the first-line title from touching the editor's top edge after the
+     writing surface sheds its normal card padding. */
+  box-sizing: border-box;
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  min-height: max(100%, calc(var(--writing-paper-width) * 1.414));
+  margin-inline: auto;
+  padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom);
+  /* The surrounding surface keeps its existing colour; this line is the
+     only visual cue that marks the paper boundary. */
+  border: var(--border-width-hairline) solid color-mix(in srgb, var(--color-editor-border) 72%, transparent);
+  border-radius: var(--radius-editor);
 }
 
 /* Flattening the editor wrapper makes the scroll box a sibling of the title,
@@ -2326,7 +2337,8 @@ input[type="range"]:focus-visible {
    follow the panel's own edge instead -- the same edge as the note's title
    field and the editor below it. */
 .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
-  max-width: var(--writing-measure);
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  max-width: var(--writing-paper-width);
   margin-inline: auto;
 }
 
@@ -2342,6 +2354,7 @@ input[type="range"]:focus-visible {
   gap: var(--space-detail-1);
   width: max-content;
   max-width: 100%;
+  margin-inline: auto;
   padding: var(--space-detail-1);
   border: var(--border-width-hairline) solid var(--color-panel-border);
   border-radius: var(--radius-control);

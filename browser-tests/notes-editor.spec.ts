@@ -403,7 +403,9 @@ test.describe('writing mode', () => {
     expect(Math.abs(heading!.x - paragraph!.x)).toBeLessThan(2)
     // Held to a measure, not the width of a full-screen panel.
     const surface = await shape.locator('.notes-editor-content').boundingBox()
-    expect(paragraph!.width).toBeLessThan(surface!.width * 0.75)
+    const editor = await shape.locator('.notes-editor').boundingBox()
+    expect(surface!.width).toBeLessThan(editor!.width * 0.9)
+    expect(paragraph!.width).toBeLessThan(surface!.width)
     // The surface itself stays full width, so a click anywhere still writes.
     await shape.locator('.notes-editor-content').click({ position: { x: 20, y: 30 } })
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
@@ -632,6 +634,63 @@ test.describe('deriving the Markdown', () => {
 })
 
 test.describe('the first line names the note', () => {
+  test('note.setContent replaces the mounted writing and its derived name immediately', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('The old name')
+    await dispatch(page, {
+      kind: 'note.setContent',
+      panelId: notes.panelId,
+      content: 'The new name\n\nThe new body.\n',
+    })
+
+    await expect(body).toHaveText('The new nameThe new body.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: 'The new name', content: 'The new name\n\nThe new body.\n' })
+
+    await body.locator('p').last().click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' Still current.')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('The new name\n\nThe new body. Still current.\n')
+  })
+
+  test('note.setTitle keeps an image that is the first thing in the note', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    const body = noteBodyOf(shape)
+    const { moment } = await describeCanvas(page)
+
+    await dispatch(page, {
+      kind: 'note.setContent',
+      panelId: notes.panelId,
+      content: '![A photograph](https://example.com/photo.png)\n\nThe body.\n',
+    })
+    await expect(body.locator('img')).toHaveCount(1)
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'A safe name' })
+
+    await expect(body.locator('img')).toHaveCount(1)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('A safe name\n\n![A photograph](https://example.com/photo.png)\n\nThe body.\n')
+  })
+
+  test('note.setTitle keeps Markdown punctuation as literal name text', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: '2 * 3' })
+    await expect(body.locator('p').first()).toHaveText('2 * 3')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+      .toMatchObject({ title: '2 * 3', content: '2 \\* 3\n' })
+  })
+
   test('what is written at the top is what the note is called', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
@@ -804,6 +863,84 @@ test.describe('the first line names the note', () => {
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect(again.locator('h1')).toHaveText('猫')
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('猫')
+  })
+
+  test('legacy names that differ only by punctuation are not treated as equal', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('# C# Guide')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('# C# Guide\n')
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('my-states')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      const store = db.transaction('notes', 'readwrite').objectStore('notes')
+      const all = await new Promise<{ id: string, title: string, content: string }[]>((resolve, reject) => {
+        const request = store.getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      store.put({ ...all[0]!, title: 'C++ Guide', document: undefined })
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, notes.panelId))
+    await expect(again.locator('h1')).toHaveText(['C++ Guide', 'C# Guide'])
+  })
+
+  test('a rename queued for one note survives another editor finishing its mount', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+    await body.click()
+    await page.keyboard.type('The first note')
+    const firstId = (await describeCanvas(page)).panels.find((panel) => panel.panelId === notes.panelId)!.note!.id
+
+    // No rendering pause between these commands: the second note's editor
+    // may finish mounting after the panel has already returned to the first.
+    await dispatch(page, { kind: 'note.create', panelId: notes.panelId })
+    await dispatch(page, { kind: 'note.select', panelId: notes.panelId, noteId: firstId })
+    await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'The queued name' })
+
+    await expect(noteBodyOf(await shapeOf(page, notes.panelId)).locator('p').first()).toHaveText('The queued name')
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title))
+      .toContain('The queued name')
+  })
+
+  test('a deliberate blank first line survives Markdown serialization', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const { moment } = await describeCanvas(page)
+
+    await body.click()
+    await page.keyboard.type('A paragraph')
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Enter')
+
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+      .toBe('<br />\n\nA paragraph\n')
+  })
+
+  test('undo after the editor creates a naming line is not consumed by that repair', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+
+    await body.click()
+    await page.keyboard.type('- Buy milk')
+    await expect(body.locator('ul li')).toHaveText('Buy milk')
+    await undo(page)
+
+    expect(await body.textContent()).not.toBe('Buy milk')
   })
 
   test('a note left on the old placeholder name takes the name its writing gives', async ({ page }) => {
@@ -1075,10 +1212,10 @@ test.describe('links and text size', () => {
     const shape = await shapeOf(page, notes.panelId)
     await expect(noteBodyOf(shape)).toBeVisible()
     const ladder = [
-      ['Small', '14px', '21px'],
-      ['Large', '18px', '29px'],
-      ['Extra large', '21px', '34px'],
-      ['Medium', '16px', '26px'],
+      ['Small', '16px', '25px'],
+      ['Large', '20px', '34px'],
+      ['Extra large', '23px', '40px'],
+      ['Medium', '18px', '30px'],
     ]
     for (const [label, fontSize, lineHeight] of ladder) {
       await shape.getByRole('button', { name: 'Writing panel actions' }).click()

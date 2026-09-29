@@ -50,6 +50,7 @@ import { withRestoreWriteAccess } from './canvasRestore'
 import { createImageItemsFromBundledCollection } from './imageCollections'
 import type { NotesEditorHandle } from './panels/NotesEditor'
 import { getPanelDefinition } from './panelRegistry'
+import { markdownHeadingForText, noteTitleFromMarkdown } from './noteTitle'
 import {
   createPanelShape,
   getPanel as getPanelFromEditor,
@@ -106,7 +107,7 @@ interface NotesState {
    * so it is left until something asks -- a save, an export, the editor
    * going away. See `registerEditor`.
    */
-  setActiveNoteDocument(document: NoteDocument, panelId: string): void
+  setActiveNoteDocument(document: NoteDocument, panelId: string, noteId: string): void
   /**
    * The panel's mounted editor: what offers the note's Markdown on demand
    * and what a rename edits. Registering null (as the editor goes) settles
@@ -133,7 +134,7 @@ interface NotesState {
    * of work altogether, the second panel does not open it.
    */
   noteOpenElsewhere(noteId: string, panelId: string): string | null
-  setActiveNoteTitle(title: string, panelId: string): void
+  setActiveNoteTitle(title: string, panelId: string, noteId: string): void
   /** A blank note, or one opened from a Markdown file the reader chose. */
   createNote(panelId: string, opening?: NoteOpening): Promise<void>
   selectNote(id: string, panelId: string): Promise<void>
@@ -611,7 +612,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const state = getNotesPanelRuntimeState(panelId)
     const current = state.activeNote
     if (!current) return null
-    if (!state.markdownStale || !state.editor) return current
+    if (!state.markdownStale || !state.editor || state.editor.noteId !== current.id) return current
     const next: Note = { ...current, content: state.editor.handle.getMarkdown(), updatedAt: Date.now() }
     state.markdownStale = false
     state.activeNote = next
@@ -758,17 +759,19 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     if (!moment) return
     await flush(panelId)
     const now = Date.now()
+    const openingTitle = opening ? noteTitleFromMarkdown(opening.content) : ''
+    const fallbackHeading = opening && !openingTitle ? markdownHeadingForText(opening.title) : ''
+    const content = fallbackHeading ? `${fallbackHeading}\n\n${opening!.content}` : opening?.content ?? ''
     const note: Note = {
       id: createId('note'),
       momentId: moment.id,
-      // The first line names the note. A file opened into one is named by
-      // its own first line where it has one, and falls back to the file
-      // name, which the next edit replaces with whatever the top of the
-      // note then says.
-      title: opening ? firstLineAsText(opening.content) || opening.title.trim() : '',
+      // The first line names the note. A file that starts with a text line
+      // uses it; otherwise its file name is written in as a heading so the
+      // stored name and the writing never begin life in disagreement.
+      title: openingTitle || opening?.title.trim() || '',
       // A note opened from a file starts as its Markdown and no document:
       // the same road an older note takes, which the editor already reads.
-      content: opening?.content ?? '',
+      content,
       createdAt: now,
       updatedAt: now,
     }
@@ -845,17 +848,21 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const current = state.activeNote
     if (!current) return
     const { document: _dropped, ...rest } = current
-    const next: Note = { ...rest, content, updatedAt: Date.now() }
+    const next: Note = { ...rest, title: noteTitleFromMarkdown(content), content, updatedAt: Date.now() }
     state.activeNote = next
     state.markdownStale = false
     setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
     scheduleSave(panelId)
+    // Markdown commands are document producers too. Keep the mounted editor
+    // on the same truth immediately; otherwise its next keystroke serialises
+    // the old document back over the command's content.
+    if (state.editor?.noteId === next.id) state.editor.handle.setMarkdown(content)
   }, [scheduleSave])
 
-  const setActiveNoteDocument = useCallback((document: NoteDocument, panelId: string) => {
+  const setActiveNoteDocument = useCallback((document: NoteDocument, panelId: string, noteId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
     const current = state.activeNote
-    if (!current) return
+    if (!current || current.id !== noteId) return
     // Kept off React state: like the Markdown, the document is read from the
     // note only when an editor opens it, and settling writes both back.
     state.activeNote = { ...current, document }
@@ -866,16 +873,24 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   const registerEditor = useCallback((panelId: string, editor: NotesEditorHandle | null, noteId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
     if (editor) {
+      // An async mount can finish after the panel has moved on. It must not
+      // become the handle for the newly active note or report into it.
+      if (state.activeNote?.id !== noteId) return
       state.editor = { noteId, handle: editor }
       // A rename that arrived while this editor was still mounting. Applied
       // only if it named the note this editor actually holds.
       const waiting = state.pendingRename
-      state.pendingRename = null
-      if (waiting && waiting.noteId === noteId) editor.setTitle(waiting.title)
+      if (waiting && waiting.noteId === noteId) {
+        state.pendingRename = null
+        editor.setTitle(waiting.title)
+      }
       return
     }
-    settleMarkdown(panelId)
-    state.editor = null
+    // A stale editor's teardown must not withdraw the current editor.
+    if (state.editor?.noteId === noteId) {
+      settleMarkdown(panelId)
+      state.editor = null
+    }
   }, [settleMarkdown])
 
   /**
@@ -915,10 +930,10 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     return settleMarkdown(panelId)?.content ?? ''
   }, [settleMarkdown])
 
-  const setActiveNoteTitle = useCallback((title: string, panelId: string) => {
+  const setActiveNoteTitle = useCallback((title: string, panelId: string, noteId: string) => {
     const state = getNotesPanelRuntimeState(panelId)
     const current = state.activeNote
-    if (!current) return
+    if (!current || current.id !== noteId) return
     const next = { ...current, title, updatedAt: Date.now() }
     state.activeNote = next
     setNotes((currentNotes) => currentNotes.map((note) => note.id === next.id ? next : note))
@@ -949,77 +964,26 @@ async function withNameAsFirstLine(note: Note): Promise<Note> {
   // that starts a list or a quotation names nothing -- the editor puts an
   // empty line above it -- so the name is empty rather than that block's
   // words.
-  const derived = firstLineCanName(note.content) ? firstLineAsText(note.content) : ''
-  if (namesMatch(derived, stored)) return note
+  const derived = noteTitleFromMarkdown(note.content)
+  if (derived === stored) return note
 
   // The record is behind the writing rather than the other way about, so the
   // record is brought into line. That covers a note whose name was the
   // placeholder every unnamed note used to wear -- left alone, it would have
   // gone on saying "Untitled note" in the picker and in the name an export
-  // saves under until some edit silently replaced it -- and a note already
-  // opening with a heading, whose heading wins, since writing the old title
-  // above it would leave it wearing two.
-  if (!stored || stored === 'Untitled note' || /^#{1,6}\s+/.test(note.content)) {
+  // saves under until some edit silently replaced it. A real stored name is
+  // never discarded merely because the writing begins with a heading: that
+  // is exactly how an older note with a separate title and a headed body was
+  // represented, and preserving both is the safe migration.
+  if (!stored || stored === 'Untitled note') {
     const adopted: Note = { ...note, title: derived }
     await saveNote(adopted)
     return adopted
   }
 
-  const named: Note = { ...note, content: `# ${stored}\n\n${note.content}`, document: undefined }
+  const named: Note = { ...note, content: `${markdownHeadingForText(stored)}\n\n${note.content}`, document: undefined }
   await saveNote(named)
   return named
-}
-
-/**
- * Whether a note's Markdown opens with a line that can carry its name: any
- * line that is not the start of a list, a quotation, a table, a rule, a
- * fenced block or an embed. Those are the blocks the editor moves down to
- * make room for a naming line, so the name they would appear to give is a
- * name the note does not have.
- */
-function firstLineCanName(markdown: string) {
-  const firstLine = markdown.split('\n', 1)[0] ?? ''
-  return !/^\s*([-*+]\s|\d+[.)]\s|>|```|~~~|\||:{3}|(-\s*){3,}$|(\*\s*){3,}$|(_\s*){3,}$)/.test(firstLine)
-}
-
-/**
- * A Markdown first line as it reads rather than as it is written: the heading
- * marker, the escapes remark adds, and the punctuation that carries inline
- * formatting all come off, so `# **Foo**` and `[Foo](x)` both read "Foo".
- *
- * This is compared against a name taken from the editor's document, which is
- * plain text. Comparing it against Markdown source instead meant the two were
- * written in different alphabets: a note whose first line was bold never
- * matched its own name, was taken for a note that had never been named, and
- * had a second title written above it the next time it was opened.
- */
-function firstLineAsText(markdown: string) {
-  return (markdown.split('\n', 1)[0] ?? '')
-    .replace(/^#{1,6}\s+/, '')
-    .replace(/^>\s*/, '')
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[*_~`=]/g, '')
-    .replace(/\\(.)/g, '$1')
-    .trim()
-}
-
-/**
- * Whether two names are the same name, ignoring the punctuation and spacing
- * that survive the reading above.
- *
- * Deliberately generous. Reading them as different is what writes a second
- * title into somebody's note; reading them as the same only leaves a note
- * named by its own first line, which is what a note is named by now. So the
- * doubt is resolved towards leaving the writing alone.
- */
-function namesMatch(a: string, b: string) {
-  // Letters and numbers in any script, not just the Latin ones. Keeping only
-  // a-z threw away every character of a name written in Japanese, Arabic or
-  // Cyrillic, so any two such names came out equal -- and a note whose name
-  // and first line were both non-Latin was read as already named whatever
-  // either of them said.
-  const bare = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
-  return bare(a) === bare(b)
 }
 
 function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
