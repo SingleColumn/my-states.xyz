@@ -1396,12 +1396,19 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   // panel can still show which playlist is loaded.
   const savedPlaylist = spotifyPanel?.config.playlist
   const playlistMissingArtwork = savedPlaylist?.id && !savedPlaylist.image ? savedPlaylist.id : null
+  // What has been asked about, and by which way of asking. "Once" means once
+  // per playlist per way: the app can only describe a public playlist, so
+  // "nothing found" before connecting says nothing about what the visitor's own
+  // account can see, and must not stop the lookup being made with it later.
   const artworkLookupsRef = useRef(new Set<string>())
 
   useEffect(() => {
-    if (!playlistMissingArtwork || artworkLookupsRef.current.has(playlistMissingArtwork)) return
-    artworkLookupsRef.current.add(playlistMissingArtwork)
+    if (!playlistMissingArtwork) return
+    const lookupKey = `${playlistMissingArtwork}:${tokens ? 'user' : 'app'}`
+    if (artworkLookupsRef.current.has(lookupKey)) return
+    artworkLookupsRef.current.add(lookupKey)
     let cancelled = false
+    let answered = false
     void (async () => {
       try {
         // Artwork is public, so this works before anyone connects too: the
@@ -1410,14 +1417,22 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
         const summary = tokens
           ? mapPlaylist(await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${playlistMissingArtwork}`, (await ensureFreshTokens()).accessToken))
           : (await fetchCuratedPlaylists([playlistMissingArtwork]))[0]
+        answered = true
         if (cancelled || !summary?.image) return
         setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, undefined, { history: 'ignore' })
       } catch {
         // Artwork is decoration: a failed lookup must not interrupt playback.
+        // Nor is it final. Forgetting the attempt lets the next thing that
+        // changes — connecting Spotify, most likely — try again.
+        if (!cancelled) artworkLookupsRef.current.delete(lookupKey)
       }
     })()
     return () => {
       cancelled = true
+      // Cut off before it could say anything (the visitor finished connecting
+      // while it was in flight): the attempt did not happen, so the run that
+      // replaces this one must be free to make it.
+      if (!answered) artworkLookupsRef.current.delete(lookupKey)
     }
   }, [ensureFreshTokens, playlistMissingArtwork, setMomentPlaylist, tokens])
 
@@ -1553,6 +1568,10 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
+    // Playback has been accepted, so whatever song was being held for Play is
+    // superseded. The player only reports what is playing some moments later,
+    // and until it does the held song would still outrank this in the panel.
+    setSelectedTrack(null)
     setMomentPlaylist(selected, panelId)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
     setStatus(`Playing ${summary.name}.`)
@@ -1596,6 +1615,10 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
+    // Playback has been accepted, so whatever song was being held for Play is
+    // superseded. The player only reports what is playing some moments later,
+    // and until it does the held song would still outrank this in the panel.
+    setSelectedTrack(null)
     setMomentPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
@@ -1606,6 +1629,10 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) }))
+    // Playback has been accepted, so whatever song was being held for Play is
+    // superseded. The player only reports what is playing some moments later,
+    // and until it does the held song would still outrank this in the panel.
+    setSelectedTrack(null)
     setStatus(`Playing ${summary.name} by ${summary.artists}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify])

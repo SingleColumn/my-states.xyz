@@ -361,3 +361,40 @@ test.describe('the Music panel, coming back from connecting Spotify', () => {
     expect(await page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
   })
 })
+
+// `npm run dev` serves /api/spotify/* from the same handlers Vercel runs, so
+// local development has to refuse a method the way the deployed function does:
+// with a 405 and an Allow header, not with whatever Vite would do next. These go
+// to the real dev server; no browser page is involved.
+test.describe("the dev server's copy of the Spotify API", () => {
+  const methods = ['POST', 'PUT', 'PATCH', 'DELETE'] as const
+  const routes = ['/api/spotify/search?q=rain', '/api/spotify/playlists?ids=abc123'] as const
+
+  for (const method of methods) {
+    test(`refuses ${method} with a 405, as the deployed function does`, async ({ request }) => {
+      for (const route of routes) {
+        const response = await request.fetch(route, { method })
+
+        expect(response.status()).toBe(405)
+        expect(response.headers().allow).toBe('GET')
+        expect(response.headers()['content-type']).toContain('application/json')
+        expect(await response.json()).toEqual({ error: 'This endpoint only answers GET requests.' })
+      }
+    })
+  }
+
+  test("still answers a GET with its own JSON rather than the app's page", async ({ request }) => {
+    const response = await request.get('/api/spotify/search?q=a')
+
+    // Too short a search: refused by the handler itself, which is the point --
+    // this is the handler answering, not Vite's fallback.
+    expect(response.status()).toBe(400)
+    expect(response.headers()['content-type']).toContain('application/json')
+  })
+
+  test('leaves a path that is not ours to Vite, so nothing else is swallowed', async ({ request }) => {
+    const response = await request.fetch('/api/spotify/nothing-here', { method: 'POST' })
+
+    expect(response.status()).not.toBe(405)
+  })
+})

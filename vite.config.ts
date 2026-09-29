@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { notGetResult } from './api/_lib/httpAdapter'
 import { handleCatalogSearch, handleCuratedPlaylists, type CatalogDeps } from './api/_lib/spotifyCatalog'
 
 /**
@@ -30,19 +31,30 @@ function spotifyCatalogDevApi(env: Record<string, string | undefined>): Plugin {
       server.middlewares.use((request, response, next) => {
         const url = new URL(request.url ?? '/', 'http://127.0.0.1')
         const handler = routes[url.pathname]
-        // GET only, because the deployed functions export GET and nothing
-        // else: local development should refuse exactly what production
-        // refuses rather than being quietly more permissive.
-        if (!handler || (request.method ?? 'GET') !== 'GET') {
+        // Not one of ours: Vite carries on as it always did.
+        if (!handler) {
           next()
           return
         }
-        void (async () => {
-          const result = await handler(url.searchParams, { env, fetch: globalThis.fetch })
+
+        const send = (result: { status: number; body: unknown; headers?: Record<string, string> }) => {
           response.statusCode = result.status
           response.setHeader('Content-Type', 'application/json; charset=utf-8')
           for (const [name, value] of Object.entries(result.headers ?? {})) response.setHeader(name, value)
           response.end(JSON.stringify(result.body))
+        }
+
+        // One of ours, asked the wrong way. The deployed functions answer that
+        // with a 405, so this does too — the same one, from the same place —
+        // rather than handing it to Vite's fallback and getting a 404 or a page
+        // of HTML that production would never give.
+        if ((request.method ?? 'GET') !== 'GET') {
+          send(notGetResult)
+          return
+        }
+
+        void (async () => {
+          send(await handler(url.searchParams, { env, fetch: globalThis.fetch }))
         })()
       })
     },

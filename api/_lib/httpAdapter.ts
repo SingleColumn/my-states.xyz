@@ -17,24 +17,29 @@ export function serverDeps(): CatalogDeps {
 }
 
 /**
+ * What anything but a GET is answered with, by the deployed functions and by
+ * the dev server alike. One definition, so local development refuses a method
+ * in exactly the words and with exactly the headers production does. The
+ * refusal names what is allowed, as a well-behaved 405 does.
+ */
+export const notGetResult: HandlerResult = {
+  status: 405,
+  body: { error: 'This endpoint only answers GET requests.' },
+  headers: { Allow: 'GET' },
+}
+
+/**
  * Answers a request the way every function here should: GET and nothing else.
  *
  * The functions are exported as `{ fetch }`, Vercel's Web Standard handler,
  * which is handed every HTTP method. These endpoints only ever read, so
- * anything but a GET is refused here rather than reaching the catalog code —
- * and the refusal names what is allowed, as a well-behaved 405 does.
+ * anything but a GET is refused here rather than reaching the catalog code.
  */
 export async function serveGet(
   request: Request,
   run: (params: URLSearchParams) => Promise<HandlerResult>,
 ): Promise<Response> {
-  if (request.method !== 'GET') {
-    return jsonResponse({
-      status: 405,
-      body: { error: 'This endpoint only answers GET requests.' },
-      headers: { Allow: 'GET' },
-    })
-  }
+  if (request.method !== 'GET') return jsonResponse(notGetResult)
   const { searchParams } = new URL(request.url)
   return jsonResponse(await run(searchParams))
 }
