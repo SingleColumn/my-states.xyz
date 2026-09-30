@@ -73,11 +73,15 @@ export function mapPlaylist(item: SpotifyPlaylistApiItem): SpotifyPlaylistSummar
     url: item.external_urls?.spotify ?? '',
     image: item.images?.[0]?.url ?? null,
     owner: item.owner?.display_name ?? 'Spotify',
-    // Playlist-detail responses use `tracks.total`. Some Spotify responses
-    // also expose an `items.total` compatibility field, which can be zero even
-    // when the canonical tracks count is populated, so prefer tracks first.
-    trackCount: item.tracks?.total ?? item.items?.total ?? 0,
+    // Spotify renamed `tracks` to `items` in February 2026. During the
+    // transition either compatibility field may be present as a zero
+    // placeholder, so use the first positive count and prefer `items`.
+    trackCount: positiveCount(item.items?.total) ?? positiveCount(item.tracks?.total) ?? 0,
   }
+}
+
+function positiveCount(value: number | undefined) {
+  return value !== undefined && value > 0 ? value : undefined
 }
 
 export function mapTrack(item: SpotifyTrackApiItem): SpotifyTrackSummary {

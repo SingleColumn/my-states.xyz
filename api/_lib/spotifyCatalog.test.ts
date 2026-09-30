@@ -189,14 +189,18 @@ describe('Curated playlist lookup', () => {
     expect((result.body as { items: Array<{ trackCount: number }> }).items[0]?.trackCount).toBe(42)
   })
 
-  it('fills a zero playlist-detail count from the tracks endpoint', async () => {
+  it('fills a zero playlist-detail count from the matching search result', async () => {
     const detail = { ...playlistItem, tracks: { total: 0 } }
-    const stub = spotifyStub(json(detail), json({ total: 245, items: [] }))
+    const similarlyNamed = { ...playlistItem, id: 'other', items: { total: 999 }, tracks: undefined }
+    const match = { ...playlistItem, items: { total: 245 }, tracks: { total: 0 } }
+    const stub = spotifyStub(json(detail), json({ playlists: { items: [similarlyNamed, match] } }))
     const result = await handleCuratedPlaylists(params({ ids: 'p1' }), { env, fetch: stub.fetch })
 
     expect(result.status).toBe(200)
     expect((result.body as { items: Array<{ trackCount: number }> }).items[0]?.trackCount).toBe(245)
-    expect(stub.calls.at(-1)).toContain('/playlists/p1/tracks?limit=1')
+    expect(stub.calls.at(-1)).toContain('/search?')
+    expect(stub.calls.at(-1)).toContain('q=Rain+on+Glass')
+    expect(stub.calls.at(-1)).toContain('type=playlist')
   })
 
   it('reads each id and keeps the order it was asked in', async () => {

@@ -128,15 +128,18 @@ export async function handleCuratedPlaylists(params: URLSearchParams, deps: Cata
         const playlist = mapPlaylist(await spotifyAppFetch<SpotifyPlaylistApiItem>(`/playlists/${encodeURIComponent(id)}`, deps))
         if (playlist.trackCount > 0) return playlist
 
-        // Some playlist-detail responses expose a zero/placeholder count.
-        // The tracks endpoint carries the authoritative total, without
-        // downloading any track items when limit=1.
+        // Since Spotify's February 2026 API changes, public playlists that do
+        // not belong to the current user expose metadata but not their items.
+        // Search results still include the public summary count, so look up
+        // the title and accept only the result with this exact Spotify id.
         try {
-          const tracks = await spotifyAppFetch<SpotifyPlaylistTracksPage>(`/playlists/${encodeURIComponent(id)}/tracks?limit=1`, deps)
-          return { ...playlist, trackCount: tracks.total ?? playlist.trackCount }
+          const search = new URLSearchParams({ q: playlist.name, type: 'playlist', limit: String(maxSearchLimit) })
+          const page = await spotifyAppFetch<SpotifySearchPage>(`/search?${search.toString()}`, deps)
+          const match = (page.playlists?.items ?? []).find((item) => item?.id === id)
+          return match ? { ...playlist, trackCount: mapPlaylist(match).trackCount } : playlist
         } catch {
-          // Keep valid playlist metadata if Spotify does not allow the tracks
-          // subresource for this playlist.
+          // The count is supplementary. Keep valid playlist metadata if the
+          // recovery search is unavailable or rate-limited.
           return playlist
         }
       } catch (caught) {
@@ -146,10 +149,6 @@ export async function handleCuratedPlaylists(params: URLSearchParams, deps: Cata
     }))
     return { status: 200, body: { items: found.filter(isPresent) }, headers: cacheFor(3600) }
   })
-}
-
-interface SpotifyPlaylistTracksPage {
-  total?: number
 }
 
 /**
