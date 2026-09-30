@@ -5,8 +5,13 @@
 // decided inside useSpotifyState and nowhere else: the panel sees the answer,
 // never the race that chose it. So these drive the hook directly, holding
 // replies open until a later request or a cleared box has overtaken them.
-import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
+// Imported statically, not from inside a test: this module pulls in tldraw
+// and is slow to load, and awaited in the test body that cost lands inside
+// the test's own timeout, where a loaded parallel run can exhaust it.
+// vi.mock is hoisted above this, so the mocks below still apply.
+import { useSpotifyState } from './AppState'
 import type { PanelsState } from './AppState'
 
 const tokens = { accessToken: 'test-token', refreshToken: 'refresh', expiresAt: Date.now() + 600_000 }
@@ -64,18 +69,9 @@ function playlistPage(names: string[]) {
   }
 }
 
-async function mountSpotifyState() {
-  const { useSpotifyState } = await import('./AppState')
+function mountSpotifyState() {
   return renderHook(() => useSpotifyState(null, panels))
 }
-
-// Loading the app module pulls in tldraw, which under a full parallel run can
-// take longer than a single test is allowed. Without this the first test to
-// run pays for the load inside its own clock, times out, and every hook it
-// would have returned is null. Loaded once, before any test's clock starts.
-beforeAll(async () => {
-  await import('./AppState')
-}, 120_000)
 
 beforeEach(() => {
   fetchMock.spotifyFetch.mockReset()
@@ -90,7 +86,7 @@ describe('Spotify search, when answers arrive out of order', () => {
       .mockReturnValueOnce(slow.promise)
       .mockResolvedValueOnce(playlistPage(['Jazz Classics']))
 
-    const { result } = await mountSpotifyState()
+    const { result } = mountSpotifyState()
 
     let firstSearch!: Promise<void>
     await act(async () => { firstSearch = result.current.searchPlaylists('jaz') })
@@ -114,7 +110,7 @@ describe('Spotify search, when answers arrive out of order', () => {
     const slow = deferred<unknown>()
     fetchMock.spotifyFetch.mockReturnValueOnce(slow.promise)
 
-    const { result } = await mountSpotifyState()
+    const { result } = mountSpotifyState()
 
     let search!: Promise<void>
     await act(async () => { search = result.current.searchPlaylists('jazz') })
@@ -135,7 +131,7 @@ describe('Spotify search, when answers arrive out of order', () => {
       .mockReturnValueOnce(slow.promise)
       .mockResolvedValueOnce(playlistPage(['Playlist Wins']))
 
-    const { result } = await mountSpotifyState()
+    const { result } = mountSpotifyState()
 
     let trackSearch!: Promise<void>
     await act(async () => { trackSearch = result.current.searchTracks('aphex') })

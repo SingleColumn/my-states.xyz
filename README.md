@@ -12,7 +12,7 @@ The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other 
 - Search Spotify playlists and songs, and browse a rotating set of curated suggestions, without connecting a Spotify account.
 - Connect Spotify with OAuth PKCE when you want playback, and control it in the panel.
 - Load a playlist from a Spotify playlist URL or URI.
-- Select a local image folder or one of three bundled sample collections and browse it as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
+- Browse bundled image collections one cover at a time, or select a local folder from the Images panel menu, then play the images as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
 - Import a directory through the browser's file picker when direct folder access is unavailable.
 - Create, select, rename, edit, autosave, delete, and download Markdown notes.
 - Use a rich Markdown editor with formatting, lists, links, tables, quotes, code blocks, and source/preview modes.
@@ -192,7 +192,7 @@ On first launch, the app creates a moment with its three panels. Use the moment 
 | Panel | How to use it |
 | --- | --- |
 | Music | Search Spotify, or pick one of the suggested playlists, straight away -- no Spotify account is needed to look. Connect Spotify to play what you have chosen, or to paste a Spotify playlist URL/URI. Playback requires Spotify Premium. |
-| Images | Choose a local folder or a sample collection from the header or empty state. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active moment; bundled samples remain static app assets. |
+| Images | Browse and select a bundled collection from the collection browser, or choose a local folder from the panel menu. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active moment; bundled samples remain static app assets. |
 | Markdown Text Editor | Create a document, give it a name, and write with the toolbar. Notes autosave; use the download button to export the active note as `.md`. |
 
 Drag a panel by its frame and use its resize handles to change its size. Use the usual canvas gestures to pan and zoom. Canvas interactions are isolated from each panel's internal controls.

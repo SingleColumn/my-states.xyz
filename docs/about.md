@@ -66,9 +66,9 @@ The panel shows the playlist that is loaded, with its cover. To keep only the pl
 
 ### Images
 
-An empty Images panel offers two ways in: **Choose a folder** to load supported images from a folder on your computer, or one of the sample collection tiles. Where the browser cannot open a folder directly, the file picker is used instead.
+An empty Images panel browses the image collections that come with the app, one cover at a time. Use the arrows to browse, or wait for the cover to change, then select the cover or **Use this collection**. To load supported images from your computer instead, open the panel menu (**…**) and select **Choose a local folder**. Where the browser cannot open a folder directly, the file picker is used instead.
 
-The panel header has the same choices and two more: **Choose a local folder**, **Load a sample collection**, **Show loaded images**, which opens a list of thumbnails you can pick from, and **Clear images**, which removes the loaded images from the panel.
+The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and **Clear images**, which removes the loaded images from the panel. After images are loaded, **Choose another collection** returns to the collection browser without clearing the current images until you make a new choice.
 
 Below the picture, use **Previous image**, **Start slideshow** (which becomes **Pause slideshow**), **Next image**, **Stop slideshow** and **Shuffle images** to control the slideshow. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
 

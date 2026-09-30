@@ -29,8 +29,8 @@ vi.mock('../AppState', () => ({
       errorFor: () => null,
       isPlayingFor: () => true,
       updateSettings: () => {},
-      selectFolder: async () => true,
-      selectBundledCollection: async () => {},
+      selectFolder: async () => 'selected' as const,
+      selectBundledCollection: async () => true,
       importFiles: async () => {},
       resetFolder: async () => {},
       setIsPlaying: () => {},
@@ -118,9 +118,10 @@ describe('Images panel focus view', () => {
     const markup = renderImagesPanel(false)
     expect(markup).not.toContain('slideshow-source-row')
     expect(markup).toContain('aria-label="Images panel actions"')
-    for (const label of ['Show loaded images', 'Choose a local folder', 'Load a sample collection', 'Clear images']) {
+    for (const label of ['Show loaded images', 'Choose a local folder', 'Choose another collection', 'Clear images']) {
       // In the header menu means before the shared panel controls, and well
       // before the transport row down in the body.
+      expect(markup).toContain(`>${label}<`)
       expect(markup.indexOf(`>${label}<`)).toBeLessThan(markup.indexOf('>Hide panel<'))
       expect(markup.indexOf(`>${label}<`)).toBeLessThan(markup.indexOf('aria-label="Previous image"'))
     }

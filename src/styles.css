@@ -534,6 +534,19 @@ button {
   grid-template-rows: minmax(0, 1fr);
 }
 
+.panel-slideshow-surface.is-collection-browser {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.panel-slideshow-surface.is-collection-browser .slideshow-stage {
+  align-self: stretch;
+  justify-self: stretch;
+  width: calc(100% - (var(--image-panel-stage-inset-x) * 2));
+  height: auto;
+  aspect-ratio: auto;
+  max-height: none;
+}
+
 .panel-slideshow-surface.is-focus-view .slideshow-stage {
   width: 100%;
   height: 100%;
@@ -833,8 +846,7 @@ button {
   height: var(--size-control-icon);
 }
 
-.card-icon-button.is-large svg,
-.empty-stage-button svg {
+.card-icon-button.is-large svg {
   width: var(--size-primary-icon);
   height: var(--size-primary-icon);
 }
@@ -1876,47 +1888,187 @@ input[type="range"]:focus-visible {
   font-size: var(--card-footer-meta-size);
 }
 
-.empty-stage {
+.slideshow-source-status {
   display: grid;
-  /* One bounded column rather than place-items: center. Centring makes every
-     child shrink to its own content, so percentage widths inside resolve
-     against nothing and the whole block stays narrow however large the stage
-     grows. A real column lets the actions fill the width they are given. */
-  grid-template-columns: min(100%, var(--empty-stage-content-max));
-  justify-content: center;
-  /* `safe` matters once the stage carries six samples: in a short panel the
-     centred block overflows both edges, and the part above the top is scrolled
-     past already at scrollTop 0, so the first heading could never be reached.
-     Safe centring drops back to start-alignment exactly in that case. */
-  align-content: center;
-  align-content: safe center;
-  gap: var(--empty-stage-option-gap);
+  place-items: center;
   height: 100%;
+  padding: var(--card-padding);
+  color: var(--color-text-muted);
+  font-size: var(--image-panel-status-size);
+  text-align: center;
+}
+
+.collection-browser {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(8px, 2cqb, 18px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: clamp(12px, min(3cqi, 2.5cqb), 28px);
+  overflow: auto;
+}
+
+.collection-browser-heading {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-label);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.collection-browser-stage {
+  display: grid;
+  grid-template-rows: minmax(100px, 1fr) auto auto;
+  gap: clamp(8px, 1.8cqb, 16px);
+  min-height: 0;
+}
+
+.collection-browser-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: min(100%, 720px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--content-radius);
+  background: var(--card-content-bg);
+  color: var(--card-primary-icon);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), filter var(--transition-fast);
+}
+
+.collection-browser-cover:hover {
+  border-color: var(--card-button-active-border);
+  filter: brightness(1.05);
+}
+
+.collection-browser-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.collection-browser-cover-visual {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--card-content-bg);
+}
+
+.collection-browser-cover-visual.is-outgoing {
+  z-index: 1;
+  animation: collection-browser-cover-out var(--collection-cover-transition-duration) ease both;
+}
+
+.collection-browser-cover-visual.is-incoming {
+  z-index: 2;
+  animation: collection-browser-cover-in var(--collection-cover-transition-duration) ease both;
+}
+
+.collection-browser-cover-fallback {
+  width: min(30%, 96px);
+  height: min(30%, 96px);
+}
+
+@keyframes collection-browser-cover-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes collection-browser-cover-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.collection-browser-caption {
+  display: flex;
+  gap: var(--space-control-gap);
+  align-items: baseline;
+  justify-content: center;
+  min-width: 0;
   color: var(--color-text-muted);
   text-align: center;
 }
 
-.empty-stage p {
-  max-width: var(--size-empty-stage-copy-max);
+.collection-browser-caption h3 {
+  min-width: 0;
   margin: 0;
-  font-size: var(--image-panel-status-size);
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: var(--type-lg);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
 }
 
-.empty-stage-button {
-  display: inline-flex;
+.collection-browser-caption span {
+  flex: 0 0 auto;
+  font-size: var(--type-sm);
+}
+
+.collection-browser-navigation {
+  display: grid;
+  grid-template-columns: auto minmax(0, auto) auto;
+  gap: clamp(8px, 2cqi, 14px);
   align-items: center;
   justify-content: center;
-  width: var(--size-empty-stage-button);
-  height: var(--size-empty-stage-button);
-  border: var(--border-width-hairline) solid var(--color-control-border);
-  border-radius: var(--radius-empty-stage-button);
-  background: var(--color-empty-control);
-  color: var(--color-input-text);
-  cursor: pointer;
 }
 
-.empty-stage-button:hover {
-  background: var(--color-empty-control-hover);
+.collection-browser-select {
+  min-height: var(--size-input-height);
+  padding: 0 var(--size-primary-button-padding-x);
+  border: var(--border-width-hairline) solid var(--card-primary-border);
+  border-radius: var(--radius-control);
+  background: var(--card-primary-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-control);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.collection-browser-select:hover {
+  border-color: var(--card-button-active-border);
+  background: var(--card-button-bg-hover);
+}
+
+.collection-browser-message {
+  place-self: center;
+  max-width: var(--size-empty-stage-copy-max);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--image-panel-status-size);
+  line-height: var(--line-height-body);
+  text-align: center;
+}
+
+.collection-browser-message.is-error {
+  color: var(--color-danger);
+}
+
+@container panel-shell (max-height: 420px) {
+  .collection-browser {
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .collection-browser-stage {
+    grid-template-rows: minmax(72px, 1fr) auto auto;
+    gap: 7px;
+  }
+
+  .collection-browser-caption h3 {
+    font-size: var(--type-md);
+  }
 }
 
 .slideshow-controls {
@@ -2021,39 +2173,20 @@ input[type="range"]:focus-visible {
   margin-bottom: 0;
 }
 
-.note-title-input {
-  font-family: var(--font-family-display);
-  width: 100%;
-  max-width: var(--size-note-title-max-width);
-  height: calc(var(--size-note-title-height) + 6px);
-  padding: 0 var(--space-menu-item-padding-x);
-  border: var(--border-width-hairline) solid var(--color-control-border);
-  border-radius: var(--radius-control);
-  background: var(--color-note-control-bg);
-  color: var(--color-note-title);
-  font-size: var(--font-size-note-title);
-  font-weight: var(--font-weight-note-title);
-}
-
-.note-title-input::placeholder {
-  color: var(--color-text-muted);
-}
-
 /* A column rather than a fixed grid of rows: what the body holds varies --
    the note controls only outside writing mode, the writing tools only once
    a note is open -- and a row template has to be rewritten for each of
    those. Everything above the writing takes its own height; the writing
    takes what is left. */
 .notes-body {
-  /* A measure is counted in characters, not pixels: about 68 of them, which
-     is what 34 times the text size comes to for this face. Fixed in pixels
-     it was a different measure at every size -- generous at the smallest,
-     seven words a line at the largest. Declared here rather than with the
-     other tokens because a custom property resolves the var()s inside it
-     where it is declared, and this is the first element that knows the size
-     the writer chose. Capped at the panel so the largest sizes simply fill
-     it. */
-  --writing-measure: min(100%, calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 34));
+  /* Scale the reading measure with the writer's chosen text size rather than
+     fixing it in pixels. The wider 68em surface gives long-form prose room
+     to breathe while remaining capped by the panel on smaller screens. */
+  /* The paper width is a user choice and stays fixed when text size changes.
+     The prose column remains inset so the frame reads as a sheet, not a box
+     fitted tightly around the text. */
+  --writing-paper-width: min(100%, var(--notes-paper-width, 794px));
+  --writing-measure: min(100%, calc(var(--writing-paper-width) - 160px));
   display: flex;
   flex-direction: column;
   gap: var(--space-notes-gap);
@@ -2069,9 +2202,11 @@ input[type="range"]:focus-visible {
   min-height: 0;
 }
 
+/* One column: the note's name moved into its first line, so the choice of
+   note is the only control left standing here. */
 .notes-document-controls {
   display: grid;
-  grid-template-columns: minmax(140px, 0.9fr) minmax(160px, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-control-gap);
   align-items: end;
   min-width: 0;
@@ -2086,28 +2221,11 @@ input[type="range"]:focus-visible {
   font-weight: var(--font-weight-semibold);
 }
 
-.notes-document-controls .note-title-input {
-  max-width: none;
-  height: var(--size-input-height);
-  font-size: var(--font-size-notes-control);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-control);
-}
-
-.notes-document-controls .note-title-input::placeholder {
-  font-size: var(--font-size-notes-control);
-  line-height: var(--line-height-control);
-}
-
 .note-select {
   width: 100%;
   height: var(--size-input-height);
   padding: 0 var(--size-input-padding-x);
   line-height: var(--line-height-control);
-}
-
-.note-title-input:hover {
-  background: var(--color-note-control-bg-hover);
 }
 
 .cm-editor {
@@ -2231,6 +2349,34 @@ input[type="range"]:focus-visible {
 
 .notes-editor-content h3 {
   font-size: var(--font-size-notes-heading-3);
+}
+
+/* The first line is the note's name, so it is drawn as one -- whatever it is
+   made of. Nothing in the document marks a title: the line is an ordinary
+   paragraph until the writer makes it a heading, and the name is taken from
+   it either way. So the styling follows position, and a plain first line
+   reads at the same size and weight a heading would.
+
+   This is the only thing saying the first line names the note. Without it a
+   writer has a title and no way to know it, which is what the form field
+   this replaced said out loud. Declared after the heading rules because it
+   matches them for specificity and has to win when the first line is one. */
+.notes-editor-content > :first-child {
+  margin: 0 0 var(--space-rich-content-block);
+  color: var(--color-note-title);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-notes-heading-1);
+  font-weight: var(--font-weight-note-title);
+  line-height: var(--line-height-tight);
+}
+
+/* The hint on an empty note is a sentence about the editor, not a name, so
+   it stays at reading size however large the line carrying it is drawn. */
+.notes-editor-content > :first-child.is-empty::before {
+  font-family: var(--font-family-ui);
+  font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-rich-content);
 }
 
 .notes-editor-content blockquote {
@@ -2390,13 +2536,13 @@ input[type="range"]:focus-visible {
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow: auto;
 }
 
 /* At full screen the header is a strip the writing has to live under, so
    it gives back what it can. Panel chrome is sized against the panel, which
    at full screen is the whole window: the button alone was taller than this
-   whole strip now is. Here it stops growing and the padding closes up, so
-   the writing starts nearer the top. */
+   whole strip now is. */
 .panel-notes-surface.is-writing-mode {
   --card-header-button-size: 30px;
 }
@@ -2409,33 +2555,12 @@ input[type="range"]:focus-visible {
   font-size: var(--type-md);
 }
 
-.writing-title {
-  font-family: var(--font-family-display);
-  width: 100%;
-  max-width: var(--writing-measure);
-  margin: var(--space-writing-title-top) auto var(--space-writing-title-bottom);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--color-note-title);
-  font-family: inherit;
-  font-size: var(--font-size-writing-title);
-  font-weight: var(--font-weight-note-title);
-  line-height: var(--line-height-panel-title);
-}
-
-.writing-title:focus {
-  outline: none;
-}
-
-.writing-title::placeholder {
-  color: var(--color-text-muted);
-}
-
 /* Reserving the scrollbar on both edges keeps the centred text column on the
    same axis as the title above it once the note grows past one screen. */
 .notes-editor.is-writing .milkdown {
   scrollbar-gutter: stable both-edges;
+  overflow: visible;
+  flex: 0 0 auto;
 }
 
 /* The contenteditable stays full width so clicking anywhere still places the
@@ -2446,7 +2571,17 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor.is-writing .notes-editor-content {
-  padding-block: 0 var(--space-writing-bottom);
+  /* Keep the first-line title from touching the editor's top edge after the
+     writing surface sheds its normal card padding. */
+  box-sizing: border-box;
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  min-height: max(100%, calc(var(--writing-paper-width) * 1.414));
+  margin-inline: auto;
+  padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom);
+  /* The surrounding surface keeps its existing colour; this line is the
+     only visual cue that marks the paper boundary. */
+  border: var(--border-width-hairline) solid color-mix(in srgb, var(--color-editor-border) 72%, transparent);
+  border-radius: var(--radius-editor);
 }
 
 /* Flattening the editor wrapper makes the scroll box a sibling of the title,
@@ -2677,7 +2812,8 @@ input[type="range"]:focus-visible {
    follow the panel's own edge instead -- the same edge as the note's title
    field and the editor below it. */
 .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
-  max-width: var(--writing-measure);
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  max-width: var(--writing-paper-width);
   margin-inline: auto;
 }
 
@@ -2693,6 +2829,7 @@ input[type="range"]:focus-visible {
   gap: var(--space-detail-1);
   width: max-content;
   max-width: 100%;
+  margin-inline: auto;
   padding: var(--space-detail-1);
   border: var(--border-width-hairline) solid var(--color-panel-border);
   border-radius: var(--radius-control);
@@ -2949,9 +3086,6 @@ input[type="range"]:focus-visible {
     min-height: var(--size-playlist-height-min);
   }
 
-  .notes-document-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Stacking every slider onto its own row costs about 80px of panel height, so
@@ -3140,22 +3274,8 @@ input[type="range"]:focus-visible {
   }
 }
 
-/* Sample collections share the Images card's responsive, token-driven controls. */
-.sample-collection-popover {
-  position: absolute;
-  top: calc(100% + var(--space-popover-offset));
-  right: var(--card-padding);
-  z-index: 3;
-  width: min(360px, calc(100cqw - (var(--card-padding) * 2)));
-  padding: clamp(10px, 2cqi, 14px);
-  border: var(--card-border);
-  border-radius: var(--content-radius);
-  background: var(--card-bg-gradient);
-  box-shadow: var(--shadow-panel);
-}
-
-/* Hangs off the header like the slideshow's sample collections, so the panel
-   body keeps one way in and the link stays a step someone chooses to take. */
+/* Hangs off the header so the panel body keeps one way in and the link stays
+   a step someone chooses to take. */
 .spotify-link-popover {
   position: absolute;
   top: calc(100% + var(--space-popover-offset));
@@ -3173,7 +3293,6 @@ input[type="range"]:focus-visible {
   margin-top: 0;
 }
 
-.sample-collection-heading,
 .spotify-link-heading {
   display: block;
   margin-bottom: 8px;
@@ -3182,263 +3301,6 @@ input[type="range"]:focus-visible {
   font-weight: var(--font-weight-emphasis);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-}
-
-.sample-collection-list {
-  display: grid;
-  gap: clamp(6px, 1.5cqi, 10px);
-}
-
-/* A cover image says what a folder name cannot, so the name is free to stay
-   exactly as it is: the creator's profile, shown as the credit it is. */
-.sample-collection-card {
-  display: grid;
-  min-width: 0;
-  padding: 0;
-  /* The global reset zeroes button borders but not backgrounds, and only the
-     row variant paints a surface now, so the tiles would otherwise sit on the
-     browser's default button grey. */
-  background: none;
-  color: var(--color-input-text);
-  cursor: pointer;
-  text-align: left;
-}
-
-/* The plate belongs to the picker's rows, not to the onboarding tiles. A row is
-   a line of text and needs a surface to sit on; a tile already has one in its
-   cover, and six bordered boxes made the empty stage read as chrome first and
-   artwork second. Secondary treatment either way, shared with the folder button
-   in the empty stage, so the two ways into the panel stay peers. */
-.sample-collection-card.is-row {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--sample-card-gap);
-  padding: var(--sample-card-padding);
-  overflow: hidden;
-  border: var(--border-width-hairline) solid var(--card-button-border);
-  border-radius: var(--content-radius);
-  background: var(--card-button-bg);
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.sample-collection-card.is-row:hover {
-  border-color: var(--card-button-active-border);
-  background: var(--card-button-bg-hover);
-}
-
-/* The caption sits under the artwork at the distance the plate's padding used
-   to hold it, and centres because everything else in the stage does. */
-.sample-collection-card.is-tile {
-  gap: var(--sample-card-padding);
-  text-align: center;
-}
-
-/* With no plate left to tint, the artwork itself answers the pointer. */
-.sample-collection-card.is-tile:hover .sample-collection-cover {
-  filter: brightness(var(--sample-card-cover-hover-brightness));
-}
-
-.sample-collection-cover {
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background: var(--color-control);
-}
-
-.sample-collection-cover img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.sample-collection-cover-fallback {
-  width: 40%;
-  height: 40%;
-  color: color-mix(in srgb, var(--accent) 60%, var(--accent-lift));
-}
-
-/* Square by default, but never taller than a share of the panel: a wide, short
-   panel would otherwise grow the covers until the stage had to scroll. */
-.sample-collection-card.is-tile .sample-collection-cover {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  max-height: var(--sample-card-cover-tile-max);
-  border-radius: var(--content-radius);
-  transition: filter var(--transition-fast);
-}
-
-.sample-collection-card.is-row .sample-collection-cover {
-  width: var(--sample-card-cover-row);
-  height: var(--sample-card-cover-row);
-  border-radius: var(--radius-slideshow-thumbnail);
-}
-
-.sample-collection-text {
-  display: grid;
-  min-width: 0;
-}
-
-.sample-collection-name {
-  color: var(--color-input-text);
-  font-size: var(--sample-card-name-size);
-  /* Regular, not smaller: --type-sm is already the smallest body step and these
-     are people's handles, some of which wrap to a second line. Weight is the
-     lever that quietens them without costing legibility. */
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-control);
-  /* A handle is someone's name: it may wrap at a separator, but it is never
-     truncated. As a grid item it would otherwise hold its min-content width and
-     spill past the card's hidden overflow, clipping the tail of a long handle;
-     min-width lets it shrink so the wrap below can happen instead. */
-  min-width: 0;
-  overflow-wrap: break-word;
-}
-
-/* Two lines are reserved so one wrapped handle does not leave the other cards
-   in the row looking short. */
-.sample-collection-card.is-tile .sample-collection-name {
-  min-height: calc(var(--line-height-control) * 2em);
-}
-
-.empty-stage {
-  overflow: auto;
-  padding: clamp(12px, 3cqi, 28px);
-}
-
-/* Both onboarding labels are h3s and share every one of these values: matching
-   size, weight and colour is what makes the two options read as equal choices. */
-.empty-stage h3 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--type-md);
-  font-weight: var(--font-weight-medium);
-  /* Wraps onto an even second line in a narrow panel rather than being clipped. */
-  text-wrap: balance;
-}
-
-/* A heading and its control travel together, tighter than the gap between the
-   two options, so the stage reads as two blocks rather than four loose rows. */
-.empty-stage-option {
-  display: grid;
-  justify-items: center;
-  gap: var(--empty-stage-block-gap);
-}
-
-/* Sizing and weight come from `card-icon-button is-wide`. The accent fill is
-   deliberately absent: this button and the sample cards below it are the same
-   offer made twice, so they wear the same quiet surface. The icon colour that
-   surface normally carries is too dim for a label, hence the text colour the
-   sample collection names use. */
-.empty-stage-folder-button {
-  color: var(--color-input-text);
-  white-space: nowrap;
-}
-
-.empty-stage-collections {
-  display: grid;
-  /* Six samples, so auto-fit is the wrong tool: at middling widths it fits four
-     and leaves a ragged pair on the last row. One column or all three, switched
-     on the panel's own width, so the grid is always evenly filled. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--empty-stage-block-gap);
-  width: 100%;
-}
-
-/* Three across only once each tile is wide enough to hold the longest handle,
-   which with six collections lands them as two full rows of three; below that
-   the tiles turn into rows so the covers stay small and the names keep a full
-   line to themselves. */
-@container panel-shell (min-width: 440px) {
-  .empty-stage-collections {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@container panel-shell (max-width: 439px) {
-  /* Down here a tile is a row, so it takes the row's plate and alignment back:
-     a bare cover beside a bare name has nothing holding the pair together, and
-     a centred caption next to a 40px thumbnail reads as a mistake. */
-  .sample-collection-card.is-tile {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: var(--sample-card-gap);
-    padding: var(--sample-card-padding);
-    overflow: hidden;
-    border: var(--border-width-hairline) solid var(--card-button-border);
-    border-radius: var(--content-radius);
-    background: var(--card-button-bg);
-    text-align: left;
-    transition: background var(--transition-fast), border-color var(--transition-fast);
-  }
-
-  .sample-collection-card.is-tile:hover {
-    border-color: var(--card-button-active-border);
-    background: var(--card-button-bg-hover);
-  }
-
-  /* The plate answers the pointer again, so the cover should not do it twice. */
-  .sample-collection-card.is-tile:hover .sample-collection-cover {
-    filter: none;
-  }
-
-  .sample-collection-card.is-tile .sample-collection-cover {
-    width: var(--sample-card-cover-row);
-    height: var(--sample-card-cover-row);
-    aspect-ratio: auto;
-    border-radius: var(--radius-slideshow-thumbnail);
-  }
-
-  .sample-collection-card.is-tile .sample-collection-name {
-    min-height: 0;
-  }
-}
-
-.empty-stage p.empty-stage-status {
-  max-width: min(100%, 520px);
-  color: var(--color-text-soft);
-  font-size: var(--type-sm);
-  line-height: var(--line-height-body);
-}
-
-/* Colour now comes from .panel, which re-anchors the whole subtree off tldraw's
-   light-theme text colour; only the type scale is set here. */
-.panel-slideshow-surface .empty-stage h3 {
-  font-size: var(--empty-stage-title-size);
-  /* Medium, deliberately lighter than the Music and Notes empty-state headings.
-     Those announce one outcome above one action; these two label a choice, and
-     boldface claimed an importance the sentences do not need. */
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-control);
-}
-
-.panel-slideshow-surface .sample-collection-name {
-  color: var(--color-input-text) !important;
-}
-
-/* Keep the empty state centered, while giving its controls comfortable rhythm.
-   Safe centring for the same reason as the base rule: never clip the top of the
-   stack out of reach in a panel too short to hold it. */
-.panel-slideshow-surface .empty-stage {
-  align-content: center;
-  align-content: safe center;
-  gap: var(--empty-stage-option-gap);
-  padding: clamp(20px, 4cqi, 36px) clamp(16px, 5cqi, 44px);
-}
-
-.panel-slideshow-surface .empty-stage h3 {
-  margin: 0;
-}
-
-/* The collections sit side by side and wrap only when the panel is too narrow
-   to hold them, instead of always stacking into a single 340px column. */
-.panel-slideshow-surface .empty-stage-collections {
-  gap: var(--empty-stage-block-gap);
-  width: 100%;
-}
-
-.panel-slideshow-surface .sample-collection-popover {
-  width: min(420px, calc(100cqw - (var(--card-padding) * 2)));
 }
 
 .architecture-report-backdrop {
@@ -3754,15 +3616,4 @@ input[type="range"]:focus-visible {
   width: var(--size-top-toolbar-control);
   justify-content: center;
   padding: 0;
-}
-
-
-/* Small canvas cards cannot fit the complete onboarding stack at once.
-   Start the scroll area at the heading so no action is hidden above the fold. */
-@container panel-shell (max-height: 640px) {
-  .panel-slideshow-surface .empty-stage {
-    align-content: start;
-    gap: var(--space-slideshow-picker-gap);
-    padding: 14px;
-  }
 }

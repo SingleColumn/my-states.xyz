@@ -4,11 +4,13 @@ import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
-import { SampleCollectionCard, useBundledCollections } from './SampleCollectionCard'
+import { useFeaturedBundledCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { panelContentProps } from '../panelSurface'
 import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
+import { CollectionBrowser } from './CollectionBrowser'
+import { selectImageCollection } from './collectionSelection'
 
 const minSlideshowInterval = 250
 const maxSlideshowInterval = 12000
@@ -36,7 +38,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // Focus view leaves the picture alone on the panel: every control is dropped,
   // including the header, so Escape is the only way back out.
   const focusView = panel?.focusView === true
-  const collections = useBundledCollections()
+  const collectionSource = useFeaturedBundledCollections()
   const panelImages = slideshow.imagesFor(panelId)
   const panelStatus = slideshow.statusFor(panelId)
   const panelError = slideshow.errorFor(panelId)
@@ -44,7 +46,14 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const currentImage = panelImages[currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
-  const [isSamplePickerOpen, setIsSamplePickerOpen] = useState(false)
+  const [panelView, setPanelView] = useState<'slideshow' | 'browse-collections'>(() => (
+    panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
+  ))
+  const sourceKey = panelSettings.imageSource.type === 'bundled'
+    ? `bundled:${panelSettings.imageSource.collectionId}`
+    : panelSettings.imageSource.type
+  const previousSourceKeyRef = useRef(sourceKey)
+  const isBrowsingCollections = panelView === 'browse-collections' || panelSettings.imageSource.type === 'none'
   const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
   const attribution = currentImage?.attribution ?? null
   const [isFocusHintVisible, setIsFocusHintVisible] = useState(false)
@@ -55,11 +64,19 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // content), which would otherwise dismiss the hint before anyone reads it.
   const focusHintIsEntryRef = useRef(false)
 
-  // The stage is content whenever it holds something to operate: the empty
-  // state's buttons, or a picture a click must not drag. In focus view the
+  // The stage is content whenever it holds something to operate: the collection
+  // browser, or a picture a click must not drag. In focus view the
   // header that normally drags the panel is gone, so the picture becomes
   // frame and the whole panel can be moved by it.
-  const stageIsContent = !(focusView && currentImage)
+  const stageIsContent = isBrowsingCollections || !(focusView && currentImage)
+
+  // A source chosen through either the collection browser or the folder picker
+  // closes browsing. Merely opening the browser leaves the source untouched.
+  useEffect(() => {
+    if (sourceKey === previousSourceKeyRef.current) return
+    previousSourceKeyRef.current = sourceKey
+    if (panelSettings.imageSource.type !== 'none') setPanelView('slideshow')
+  }, [panelSettings.imageSource.type, sourceKey])
 
   function showFocusHint(onEntry: boolean) {
     if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
@@ -121,23 +138,39 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   }, [focusView])
 
   async function chooseFolder() {
-    setIsSamplePickerOpen(false)
     if (window.showDirectoryPicker) {
-      const selected = await slideshow.selectFolder(panelId)
-      if (selected) return
+      const result = await slideshow.selectFolder(panelId)
+      if (result === 'selected') {
+        setPanelView('slideshow')
+        return
+      }
+      if (result === 'cancelled') return
     }
     folderInputRef.current?.click()
   }
 
-  async function chooseSample(collectionId: string) {
-    setIsSamplePickerOpen(false)
-    await slideshow.selectBundledCollection(collectionId, panelId)
-    posthog.capture('image_collection_selected')
+  async function importFolderFallback(files: FileList) {
+    await slideshow.importFiles(files, panelId)
+    setPanelView('slideshow')
+  }
+
+  async function chooseCollection(collectionId: string) {
+    const selected = await selectImageCollection(
+      collectionId,
+      (selectedId) => slideshow.selectBundledCollection(selectedId, panelId),
+      () => posthog.capture('image_collection_selected'),
+    )
+    if (!selected) return
+    setPanelView('slideshow')
+    // The source loader may have rendered between the async collection load
+    // and this view switch. Reassert playback here so changing collections
+    // never leaves the newly loaded slideshow looking paused.
+    slideshow.setIsPlaying(true, panelId)
   }
 
   return (
     <section
-      className={focusView ? 'panel panel-slideshow-surface is-focus-view' : 'panel panel-slideshow-surface'}
+      className={`panel panel-slideshow-surface${focusView ? ' is-focus-view' : ''}${isBrowsingCollections ? ' is-collection-browser' : ''}`}
       onPointerMove={focusView ? revealFocusHint : undefined}
       onPointerLeave={focusView ? hideFocusHint : undefined}
     >
@@ -152,16 +185,15 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             label: `${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`,
             icon: <Images size={17} aria-hidden="true" />,
             checked: isImagePickerOpen,
-            onSelect: () => { setIsSamplePickerOpen(false); setIsImagePickerOpen((current) => !current) },
+            onSelect: () => setIsImagePickerOpen((current) => !current),
           },
           { id: 'choose-folder', label: 'Choose a local folder', icon: <FolderOpen size={17} aria-hidden="true" />, onSelect: () => void chooseFolder() },
-          {
-            id: 'sample-collection',
-            label: 'Load a sample collection',
+          ...(panelSettings.imageSource.type === 'none' ? [] : [{
+            id: 'choose-collection',
+            label: 'Choose another collection',
             icon: <Sparkles size={17} aria-hidden="true" />,
-            checked: isSamplePickerOpen,
-            onSelect: () => { setIsImagePickerOpen(false); setIsSamplePickerOpen((current) => !current) },
-          },
+            onSelect: () => { setIsImagePickerOpen(false); setPanelView('browse-collections') },
+          }]),
           { id: 'clear', label: 'Clear images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) },
           {
             id: 'focus-view',
@@ -186,30 +218,22 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           </section>
         ) : null}
 
-        {isSamplePickerOpen ? (
-          <section className="sample-collection-popover" id="sample-collection-picker" aria-label="Sample collections" {...panelContentProps}>
-            <span className="sample-collection-heading">Sample collections</span>
-            <div className="sample-collection-list">
-              {collections.map((collection) => (
-                <SampleCollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  variant="row"
-                  onSelect={() => void chooseSample(collection.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <input ref={folderInputRef} className="visually-hidden-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.svg,image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,image/svg+xml" multiple webkitdirectory="" directory="" onChange={(event) => { const files = event.target.files; if (files?.length) void slideshow.importFiles(files, panelId); event.currentTarget.value = '' }} />
+        <input ref={folderInputRef} className="visually-hidden-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.svg,image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,image/svg+xml" multiple webkitdirectory="" directory="" onChange={(event) => { const files = event.target.files; if (files?.length) void importFolderFallback(files); event.currentTarget.value = '' }} />
       </PanelHeader>
       )}
 
       {/* Focus view drops the aspect-ratio box so the stage fills the panel and the
           picture, which is contained inside it, gets every pixel the panel allows. */}
-      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView ? undefined : stageAspectRatio }} {...(stageIsContent ? panelContentProps : {})}>
-        {currentImage ? (
+      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView || isBrowsingCollections ? undefined : stageAspectRatio }} {...(stageIsContent ? panelContentProps : {})}>
+        {isBrowsingCollections ? (
+          <CollectionBrowser
+            collections={collectionSource.collections}
+            loading={collectionSource.loading}
+            error={collectionSource.error}
+            initialCollectionId={panelSettings.imageSource.type === 'bundled' ? panelSettings.imageSource.collectionId : undefined}
+            onSelectCollection={(collectionId) => void chooseCollection(collectionId)}
+          />
+        ) : currentImage ? (
           <>
           <CrossfadeImage
             image={currentImage}
@@ -224,32 +248,11 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           ) : null}
           </>
         ) : (
-          <div className="empty-stage">
-            {/* Two ways in, weighted the same: peer headings over peer controls,
-                so neither the folder nor the samples read as the afterthought. */}
-            <div className="empty-stage-option">
-              <h3>Select images from a folder</h3>
-              <button className="card-icon-button is-wide empty-stage-folder-button" type="button" onClick={() => void chooseFolder()}><FolderOpen size={18} /> Choose a folder</button>
-            </div>
-            <div className="empty-stage-option">
-              <h3>Or try a sample collection</h3>
-              <div className="empty-stage-collections">
-                {collections.map((collection) => (
-                  <SampleCollectionCard
-                    key={collection.id}
-                    collection={collection}
-                    variant="tile"
-                    onSelect={() => void chooseSample(collection.id)}
-                  />
-                ))}
-              </div>
-            </div>
-            {panelSettings.imageSource.type === 'bundled' || panelError ? <p className="empty-stage-status" role="status">{panelStatus}</p> : null}
-          </div>
+          <div className="slideshow-source-status" role="status">{panelError ?? panelStatus}</div>
         )}
       </div>
 
-      {focusView ? null : (
+      {focusView || isBrowsingCollections ? null : (
         <>
         <div className="panel-body slideshow-controls" {...panelContentProps} onDragStart={(event) => event.preventDefault()}>
           <div className="transport-row">

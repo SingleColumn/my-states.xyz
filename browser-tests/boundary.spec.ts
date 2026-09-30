@@ -54,24 +54,26 @@ test.describe('frame: tldraw owns it', () => {
 })
 
 test.describe('content: the widget owns it', () => {
-  test('a header picker button opens its popover and does not move the panel', async ({ page }) => {
+  test('the header collection action opens the browser without moving the panel or clearing its source', async ({ page }) => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')
+    await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
+    const sourceBefore = (await panelById(page, images.panelId)).config
 
-    // The picker sits behind the panel's ... menu now (PanelHeader.tsx,
-    // cab8c98), but the trigger, the menu and the popover are all declared
-    // content (card-header-actions carries data-panel-content), so a press
+    // The chooser sits behind the panel's ... menu. The trigger, menu and
+    // browser are all declared content, so a press
     // that wanders a little before release, as real presses do, resolves
     // as an ordinary click at every step rather than the start of a drag.
     const trigger = shape.getByRole('button', { name: /panel actions$/ })
     await dragLocator(page, trigger, { dx: 3, dy: 2 })
-    const item = page.getByRole('menuitemcheckbox', { name: 'Load a sample collection' })
+    const item = page.getByRole('menuitem', { name: 'Choose another collection' })
     await expect(item).toBeVisible()
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
 
     await dragLocator(page, item, { dx: 3, dy: 2 })
-    await expect(shape.locator('#sample-collection-picker')).toBeVisible()
+    await expect(shape.getByRole('region', { name: 'Image collection browser' })).toBeVisible()
+    expect((await panelById(page, images.panelId)).config).toEqual(sourceBefore)
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
 
     // And a much larger wander back on the trigger -- reopening the menu --
@@ -112,14 +114,14 @@ test.describe('content: the widget owns it', () => {
     expect(geometryOf(after)).toEqual(geometryOf(images))
   })
 
-  test('dragging the empty stage does not move the panel', async ({ page }) => {
+  test('dragging the collection browser background does not move the panel', async ({ page }) => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')
-    const stage = (await shapeOf(page, images.panelId)).locator('.empty-stage')
+    const stage = (await shapeOf(page, images.panelId)).locator('.collection-browser')
 
     // Aim at a gap in the stage, not one of its buttons.
     const box = await stage.boundingBox()
-    if (!box) throw new Error('The empty stage is not on screen')
+    if (!box) throw new Error('The collection browser is not on screen')
     await page.mouse.move(box.x + 12, box.y + 12)
     await page.mouse.down()
     await page.mouse.move(box.x + 100, box.y + 80, { steps: 8 })

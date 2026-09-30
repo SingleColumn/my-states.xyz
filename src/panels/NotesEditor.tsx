@@ -7,7 +7,7 @@ import { clipboard } from '@milkdown/plugin-clipboard'
 import { Plugin, PluginKey, Selection } from '@milkdown/prose/state'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
-import { $prose, $view, getMarkdown } from '@milkdown/utils'
+import { $prose, $view, getMarkdown, replaceAll } from '@milkdown/utils'
 import { ProsemirrorAdapterProvider, useNodeViewFactory, usePluginViewFactory } from '@prosemirror-adapter/react'
 import type { NoteDocument } from '../types'
 import { NotesEditorActionsContext, type NotesEditorActions } from './notesEditorActions'
@@ -83,8 +83,11 @@ interface NotesEditorProps {
    * every keystroke.
    */
   toolbarHost: MutableRefObject<HTMLElement | null>
-  /** Every edit: the document as it now stands, and what the footer counts. */
-  onChange: (document: NoteDocument, stats: NoteStats) => void
+  /**
+   * Every edit: the document as it now stands, what the footer counts, and
+   * the note's name, which is the text of its first line.
+   */
+  onChange: (document: NoteDocument, stats: NoteStats, title: string) => void
   /**
    * The editor, once it is ready, for the few things the panel around it
    * has to ask of it. Called with null as the editor goes, which is also
@@ -98,12 +101,35 @@ export interface NotesEditorHandle {
   getMarkdown(): string
   /** Puts the caret at the start of the document -- where the title leads. */
   focusStart(): void
+  /**
+   * Renames the note by rewriting its first line, which is what names it.
+   * A rename is an edit to the writing now, not a change to a record beside
+   * it: a name written only to the record would last until the next
+   * keystroke, when it is derived from that line again.
+   */
+  setTitle(title: string): void
+  /** Replaces the document when the command surface supplies new Markdown. */
+  setMarkdown(markdown: string): void
 }
 
 /** What the panel's footer reports, counted from the document, not its Markdown. */
 export interface NoteStats {
   characters: number
   words: number
+}
+
+/**
+ * The note's name: the text of its first line, which is what the writer put
+ * at the top of the page. A first line that is a heading gives its words
+ * without the `#`, since the name is the writing, not its Markdown.
+ *
+ * An empty first line -- a note not started yet, or one that opens with a
+ * picture -- leaves the name empty, and whatever shows it says "Untitled
+ * note" in its place.
+ */
+export function noteTitleFromDoc(doc: ProseNode) {
+  const first = doc.firstChild
+  return first && firstBlockCanName(first) ? first.textContent.trim() : ''
 }
 
 /**
@@ -195,7 +221,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       .use(toggleHighlightCommand)
       .use(highlightKeymap)
       .use(highlightInputRule)
-      .use(changeReporter((doc, stats) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats)))
+      .use(changeReporter((doc, stats, title) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats, title)))
+      .use(titleFirstLine())
       .use(placeholderPlugin(placeholder))
       .use(floatingKeys(keyHandlers))
       .use(writingToolbar(pluginViewFactory({ component: NotesWritingToolbar, root: () => toolbarHost.current ?? document.body })))
@@ -214,17 +241,71 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       const ready = editorRef.current
       if (ready?.status !== EditorStatus.Created) return
       handleRef.current({
-        getMarkdown: () => ready.action(getMarkdown()),
+        getMarkdown: () => ready.action((ctx) => {
+          const doc = ctx.get(editorViewCtx).state.doc
+          return withoutSyntheticNamingLine(getMarkdown()(ctx), doc)
+        }),
         focusStart: () => ready.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)).scrollIntoView())
           view.focus()
         }),
+        setTitle: (title) => ready.action((ctx) => {
+          const view = ctx.get(editorViewCtx)
+          const { state } = view
+          let first = state.doc.firstChild
+          let transaction = state.tr
+          if (!first || !firstBlockCanName(first)) {
+            first = state.schema.nodes.paragraph.create()
+            transaction = transaction.insert(0, first)
+          }
+          // The first block's content, between its own open and close.
+          const from = 1
+          const to = first.nodeSize - 1
+          const named = title.trim()
+          view.dispatch(named
+            ? transaction.replaceWith(from, to, state.schema.text(named))
+            : transaction.delete(from, to))
+        }),
+        setMarkdown: (nextMarkdown) => ready.action(replaceAll(nextMarkdown)),
+      })
+    }
+
+    /**
+     * Puts the note's naming line in place as it opens.
+     *
+     * `titleFirstLine` repairs the document through `appendTransaction`,
+     * which runs on transactions and not on the state the editor is built
+     * with. A note stored with a list, a quotation or an embed at the top --
+     * which is how such a note is stored, since its empty naming line is not
+     * written to the Markdown -- would therefore open with that block first:
+     * drawn as the title by the `:first-child` styling, with no line to be
+     * named on, until some later keystroke inserted one and moved the name
+     * out from under the writer.
+     *
+     * Runs before the handle is offered, so a rename waiting on this editor
+     * lands on a line that can hold a name rather than on the list that was
+     * standing first.
+     *
+     * Dispatched rather than patched in place, so the change reporter hears
+     * it: the note's name and its stored document come right in the same
+     * moment the document does.
+     */
+    const settleFirstLine = () => {
+      const ready = editorRef.current
+      if (ready?.status !== EditorStatus.Created) return
+      ready.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const first = view.state.doc.firstChild
+        if (first && firstBlockCanName(first)) return
+        view.dispatch(view.state.tr
+          .insert(0, view.state.schema.nodes.paragraph.create())
+          .setMeta('addToHistory', false))
       })
     }
     let editor = make(true)
     editorRef.current = editor
-    void editor.create().then(offerHandle).catch(async (error: unknown) => {
+    void editor.create().then(() => { settleFirstLine(); offerHandle() }).catch(async (error: unknown) => {
       // A stored document the current schema cannot read (a node type gone,
       // an attribute changed) is not the end of the note: the Markdown
       // written beside it is what it looked like, so the note opens from
@@ -235,6 +316,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
       editor = make(false)
       editorRef.current = editor
       await editor.create()
+      settleFirstLine()
       offerHandle()
     })
 
@@ -267,7 +349,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
  * for the counts on a 20,000-word note. Its Markdown is not -- around 80ms
  * on the same note -- so that is left until something asks for it.
  */
-function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
+function changeReporter(report: (doc: ProseNode, stats: NoteStats, title: string) => void) {
   return $prose(() => new Plugin({
     key: new PluginKey('NOTES_CHANGE_REPORTER'),
     view: () => ({
@@ -277,7 +359,7 @@ function changeReporter(report: (doc: ProseNode, stats: NoteStats) => void) {
         // Counting the prose rather than the Markdown source also drops the
         // old count's habit of inflating itself with syntax.
         const text = doc.textBetween(0, doc.content.size, NEWLINE, ' ')
-        report(doc, { characters: text.length, words: text.match(/\S+/g)?.length ?? 0 })
+        report(doc, { characters: text.length, words: text.match(/\S+/g)?.length ?? 0 }, noteTitleFromDoc(doc))
       },
     }),
   }))
@@ -368,6 +450,80 @@ function floatingKeys(handlers: MutableRefObject<Set<(event: KeyboardEvent) => b
         }
         return false
       },
+    },
+  }))
+}
+
+/**
+ * Takes the empty naming line off the front of a note's Markdown.
+ *
+ * `titleFirstLine` puts an empty line above a note that starts with a list,
+ * a quotation or an embed, so the note has somewhere to be named. Markdown
+ * has no way to write an empty paragraph, and remark falls back to `<br />`
+ * -- which would put a line of HTML at the top of every such note, in the
+ * file an export saves, in the moment bundle and in the archive.
+ *
+ * So the document keeps the line and the Markdown does not mention it. A
+ * note read back from that Markdown starts with its list again and is given
+ * the line again on load, which is the state it was in when it was written:
+ * the round trip holds.
+ */
+function withoutSyntheticNamingLine(markdown: string, doc: ProseNode) {
+  const first = doc.firstChild
+  const second = doc.childCount > 1 ? doc.child(1) : null
+  if (!first || first.content.size > 0 || !second || firstBlockCanName(second)) return markdown
+  return markdown.replace(/^<br \/>\n\n/, '')
+}
+
+/**
+ * The block types that can name a note: the ones made of a line of text.
+ * A heading is here because the writer can make the first line one, and
+ * because that is what a note migrated from a title of its own carries.
+ */
+const CAN_NAME_A_NOTE = new Set(['paragraph', 'heading'])
+
+/**
+ * A text block can name the note when it is empty (the reserved naming line)
+ * or contains actual text. An image-only paragraph is a text block in the
+ * schema, but replacing its content would delete the image.
+ */
+function firstBlockCanName(block: ProseNode) {
+  if (!CAN_NAME_A_NOTE.has(block.type.name)) return false
+  return block.content.size === 0 || block.textContent.trim() !== ''
+}
+
+/**
+ * Keeps the note's first line a line of text.
+ *
+ * The note is named by its first line, so the name is only as good as what
+ * that line can hold. A bullet, a quote, a table or an embedded panel at
+ * the top leaves the note with a name made of nothing -- in the picker, in
+ * the file name an export is saved under and in the path an archive stores
+ * it at. It is also where the title styling lands, so a first line that is
+ * a list draws a bulleted title.
+ *
+ * Anything else is moved down rather than changed: an empty line is put
+ * above it, the writing is untouched, and the note has somewhere to be
+ * named. Nothing is destroyed to satisfy this, which is why the fix is an
+ * insertion and never a conversion -- a picture or an embed turned into a
+ * paragraph would be a way to lose work by dropping something in the wrong
+ * place.
+ *
+ * Marks are left alone. A writer who bolds half the title has a title that
+ * still reads as one and still names the note; taking the bold away again
+ * would be editing their writing to no end.
+ */
+function titleFirstLine() {
+  return $prose(() => new Plugin({
+    key: new PluginKey('NOTES_TITLE_FIRST_LINE'),
+    appendTransaction: (_transactions, _oldState, newState) => {
+      const first = newState.doc.firstChild
+      if (first && firstBlockCanName(first)) return null
+      // The inserted line becomes the first child, so the next pass finds a
+      // paragraph and this appends nothing: no loop.
+      return newState.tr
+        .insert(0, newState.schema.nodes.paragraph.create())
+        .setMeta('addToHistory', false)
     },
   }))
 }

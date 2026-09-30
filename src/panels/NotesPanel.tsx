@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
-import { CopyPlus, Download, FilePlus2, FileUp, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
-import { nextDuplicateName } from '../utils'
+import { markdownNamedAsCopy } from '../noteTitle'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
@@ -17,6 +17,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // untouched so the two treatments can be compared side by side.
   const isWritingMode = commands.isPanelFullScreen(panelId)
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
+  const [paperWidth, setPaperWidth] = useState(() => readPaperWidth())
   const [showTools, setShowTools] = useState(() => readShowTools())
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
@@ -47,13 +48,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     await notes.createNote(panelId, { title: markdownFileTitle(file.name), content })
   }
 
-  // A title is the first line of writing, not a form field: Enter carries on
-  // into the note, and so does Down, since there is no line below it here.
-  function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== 'Enter' && event.key !== 'ArrowDown') return
-    event.preventDefault()
-    editorHandle.current?.focusStart()
-  }
   const found = panels.get(panelId)
   const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
   // A note is written by one panel at a time. This one may be holding a
@@ -94,8 +88,8 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     // rather than what was last written to storage.
     const content = notes.getNoteMarkdown(heldBy)
     await notes.createNote(panelId, {
-      title: nextDuplicateName(getDisplayNoteTitle(namedNote), notes.notes.map(getDisplayNoteTitle)),
-      content,
+      title: '',
+      content: markdownNamedAsCopy(content, notes.notes.map(getDisplayNoteTitle)),
     })
   }
 
@@ -195,16 +189,28 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ]}
-        trailingMenuItems={Object.entries(editorFontSizes).map(([size, { label }]) => ({
-          id: `text-size-${size}`,
-          label,
-          icon: <Type size={17} aria-hidden="true" />,
-          checked: size === fontSize,
-          onSelect: () => {
-            setFontSize(size as EditorFontSize)
-            window.localStorage.setItem(editorFontSizeStorageKey, size)
-          },
-        }))}
+        trailingMenuItems={[
+          ...Object.entries(editorFontSizes).map(([size, { label }]) => ({
+            id: `text-size-${size}`,
+            label,
+            icon: <Type size={17} aria-hidden="true" />,
+            checked: size === fontSize,
+            onSelect: () => {
+              setFontSize(size as EditorFontSize)
+              window.localStorage.setItem(editorFontSizeStorageKey, size)
+            },
+          })),
+          ...Object.entries(paperWidths).map(([width, { label }]) => ({
+            id: `paper-width-${width}`,
+            label: `Paper: ${label}`,
+            icon: <Ruler size={17} aria-hidden="true" />,
+            checked: width === paperWidth,
+            onSelect: () => {
+              setPaperWidth(width as PaperWidth)
+              window.localStorage.setItem(paperWidthStorageKey, width)
+            },
+          })),
+        ]}
       >
         {isWritingMode && hasNotes ? (
           <label className="writing-note-picker">
@@ -222,28 +228,17 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         style={{
           '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
           '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
+          '--notes-paper-width': paperWidths[paperWidth].width,
         } as CSSProperties}
       >
-        {isWritingMode ? null : (
+        {/* No title field in either treatment: the note is named by its
+            first line, so the name is written where it is read. What is
+            left here is the choice of note, and only when there is one. */}
+        {isWritingMode || !hasNotes ? null : (
           <div className="notes-document-controls" {...panelContentProps}>
-            {hasNotes ? (
-              <label className="note-control-field">
-                <span>Choose a note</span>
-                {noteSelect}
-              </label>
-            ) : null}
-
             <label className="note-control-field">
-              <span>Note title</span>
-              <input
-                className="note-title-input ph-mask"
-                value={activeNote?.title ?? ''}
-                onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
-                onKeyDown={handleTitleKeyDown}
-                disabled={!activeNote}
-                aria-label="Note title"
-                placeholder="Name this note"
-              />
+              <span>Choose a note</span>
+              {noteSelect}
             </label>
           </div>
         )}
@@ -267,30 +262,26 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             // editor's scroll box rather than inside it.
             {...panelScrollProps}
           >
-            {isWritingMode ? (
-              <input
-                className="writing-title ph-mask"
-                value={activeNote.title}
-                onChange={(event) => notes.setActiveNoteTitle(event.target.value, panelId)}
-                onKeyDown={handleTitleKeyDown}
-                aria-label="Note title"
-                placeholder="Untitled"
-              />
-            ) : null}
             <NotesEditor
               key={activeNote.id}
               toolbarHost={toolbarHostRef}
               markdown={activeNote.content}
               document={activeNote.document}
               placeholder={editorPlaceholder}
-              onChange={(document, next) => {
-                notes.setActiveNoteDocument(document, panelId)
+              onChange={(document, next, title) => {
+                notes.setActiveNoteDocument(document, panelId, activeNote.id)
+                // Only when the first line's words actually change. The
+                // document is kept out of React state on purpose (see
+                // NotesEditor), but the name is in it -- every note list in
+                // the app reads it -- so writing it on every keystroke
+                // would re-render all of them for a note being typed into.
+                if (title !== activeNote.title) notes.setActiveNoteTitle(title, panelId, activeNote.id)
                 setStats(next)
                 captureWritingProgress(next.words)
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle
-                notes.registerMarkdownSource(panelId, handle ? () => handle.getMarkdown() : null)
+                notes.registerEditor(panelId, handle, activeNote.id)
               }}
             />
           </div>
@@ -357,6 +348,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
 const newDocumentSelectValue = '__new_document__'
 const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
+const paperWidthStorageKey = 'mic:notes-paper-width'
 const showToolsStorageKey = 'mic:notes-formatting-tools'
 
 /**
@@ -372,13 +364,31 @@ function readShowTools() {
     return false
   }
 }
+
+const paperWidths = {
+  narrow: { label: 'Narrow', width: '680px' },
+  standard: { label: 'A4', width: '794px' },
+  wide: { label: 'Wide', width: '960px' },
+} as const
+type PaperWidth = keyof typeof paperWidths
+const defaultPaperWidth: PaperWidth = 'standard'
+
+function readPaperWidth(): PaperWidth {
+  try {
+    const stored = window.localStorage.getItem(paperWidthStorageKey)
+    return stored && stored in paperWidths ? stored as PaperWidth : defaultPaperWidth
+  } catch {
+    return defaultPaperWidth
+  }
+}
+
 // Four steps for reading at, each with the leading that suits it: tighter
 // where the line is short, looser where it is long. Medium is the default.
 const editorFontSizes = {
-  small: { label: 'Small', fontSize: '14px', lineHeight: '21px' },
-  medium: { label: 'Medium', fontSize: '16px', lineHeight: '26px' },
-  large: { label: 'Large', fontSize: '18px', lineHeight: '29px' },
-  xlarge: { label: 'Extra large', fontSize: '21px', lineHeight: '34px' },
+  small: { label: 'Small', fontSize: '16px', lineHeight: '25px' },
+  medium: { label: 'Medium', fontSize: '18px', lineHeight: '30px' },
+  large: { label: 'Large', fontSize: '20px', lineHeight: '34px' },
+  xlarge: { label: 'Extra large', fontSize: '23px', lineHeight: '40px' },
 } as const
 type EditorFontSize = keyof typeof editorFontSizes
 const defaultEditorFontSize: EditorFontSize = 'medium'
@@ -386,7 +396,7 @@ const defaultEditorFontSize: EditorFontSize = 'medium'
 // The empty page has to carry the discoverability that hidden controls give
 // up. The writing tools are off until asked for, so it names where they are
 // as well as the shortcut for anyone who would rather type.
-const editorPlaceholder = 'Start writing. For headings, lists, pictures and emoji, open the ··· menu and choose Show formatting tools — or type / here.'
+const editorPlaceholder = 'The first line names this note. For headings, lists, pictures and emoji, open the ··· menu and choose Show formatting tools — or type / here.'
 
 function readEditorFontSize(): EditorFontSize {
   const stored = window.localStorage.getItem(editorFontSizeStorageKey)
