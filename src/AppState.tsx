@@ -178,6 +178,15 @@ interface SpotifyState {
   logout(): void
   clearSearchResults(): void
   handleCallback(code: string, state: string | null): Promise<void>
+  /**
+   * True once a sign-in that left for Spotify has come back without succeeding:
+   * cancelled there, refused, or its code could not be exchanged. The panel uses
+   * it to give back what the visitor was doing, which a success gives back by
+   * another route.
+   */
+  signInFailed: boolean
+  /** For the ways a callback fails before there is a code to exchange. */
+  reportSignInFailure(): void
   playlistsHaveMore: boolean
   loadMorePlaylists(): Promise<void>
   searchPlaylists(query: string): Promise<void>
@@ -1253,6 +1262,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     selectedTrackEpochRef.current += 1
     setSelectedTrack(next)
   }, [])
+  const [signInFailed, setSignInFailed] = useState(false)
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
   // Only the connected panel shows this line, and it shows it before the
@@ -1468,10 +1478,17 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     setStatus('Logged out of Spotify.')
   }, [])
   const handleCallback = useCallback(async (code: string, state: string | null) => {
-    setTokens(await exchangeSpotifyCode(code, state))
+    try {
+      setTokens(await exchangeSpotifyCode(code, state))
+    } catch (caught) {
+      setSignInFailed(true)
+      throw caught
+    }
+    setSignInFailed(false)
     setStatus('Spotify login complete.')
     setError(null)
   }, [])
+  const reportSignInFailure = useCallback(() => setSignInFailed(true), [])
 
   /**
    * One page of playlists, from whichever Spotify the asker has.
@@ -1672,7 +1689,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   }, [playPlaylist, panels, track])
 
   return {
-    tokens, playlists, tracks, track, selectedTrack, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl,
+    tokens, playlists, tracks, track, selectedTrack, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, signInFailed, reportSignInFailure, searchPlaylists, searchTracks, loadPlaylistFromUrl,
     selectPlaylist, selectTrack, lookupTrack, playPlaylist, playTrack,
     playlistsHaveMore, loadMorePlaylists,
     togglePlay,

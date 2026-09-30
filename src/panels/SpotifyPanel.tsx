@@ -28,7 +28,7 @@ import type { SpotifyPlaylistSummary, SpotifyTrackSummary } from '../spotify'
 import { fetchCuratedPlaylists } from '../spotifyCatalog'
 import type { CuratedSpotifyPlaylist } from '../config/spotifyCuratedPlaylists'
 import { getSessionSuggestions, shuffleSessionSuggestions } from '../spotifySuggestions'
-import { forgetReturnContext, rememberReturnContext, takeReturnContext } from '../spotifyReturnContext'
+import { forgetReturnContext, rememberReturnContext, takeReturnContext, type SpotifyReturnContext } from '../spotifyReturnContext'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
 
@@ -245,6 +245,12 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // moment's saved playlist is not that: it was chosen on some other day, or
   // arrived with an imported moment.
   const [chosenPlaylistThisVisit, setChosenPlaylistThisVisit] = useState(false)
+  // The playlist that was chosen before a sign-in that did not succeed, given
+  // back by id rather than as a yes-or-no. Whether it is the one the moment has
+  // saved cannot be settled when it is restored: on a page that has just
+  // reloaded the moment's data can reach the panel a moment later. Held as an
+  // id, the comparison is made on every render and holds whenever it arrives.
+  const [restoredPlaylistId, setRestoredPlaylistId] = useState<string | null>(null)
   // A song chosen before connecting is looked up again on the way back, and
   // until that answers there is nothing to play it with. Without this the
   // panel falls back to the moment's saved playlist in the meantime — names it,
@@ -256,12 +262,24 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // question with no good answer, so it stays out of sight until they choose
   // one now — or connect, when it is theirs to play and is shown as ever.
   // Everything that names "the playlist" reads this rather than the moment.
-  const shownPlaylist = connected || chosenPlaylistThisVisit ? panelPlaylist : defaultSpotifyPlaylistReference
+  const playlistWasChosen = chosenPlaylistThisVisit || (restoredPlaylistId !== null && restoredPlaylistId === panelPlaylist.id)
+  const shownPlaylist = connected || playlistWasChosen ? panelPlaylist : defaultSpotifyPlaylistReference
 
   // A different moment has a different saved playlist, and nothing chosen in
   // the last one carries over to it.
+  //
+  // Only a change counts. React's development mode runs every effect twice when
+  // a component mounts, and this one runs before the effects that give back
+  // what the visitor was doing on the way back from Spotify: run again, it wiped
+  // what they had just restored, and the context they read it from was already
+  // used up. So it remembers which moment it last saw and does nothing when the
+  // moment is the same.
+  const lastMomentIdRef = useRef(moments.activeMoment?.id)
   useEffect(() => {
+    if (lastMomentIdRef.current === moments.activeMoment?.id) return
+    lastMomentIdRef.current = moments.activeMoment?.id
     setChosenPlaylistThisVisit(false)
+    setRestoredPlaylistId(null)
     setInvitations(0)
     setRestoringSong(false)
     // The "press play to start…" prompt is about what was chosen before leaving
@@ -270,18 +288,20 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     setCameBackToPlay(false)
   }, [moments.activeMoment?.id])
 
+  // Whose is a context? It was read from this tab's own storage, but the page
+  // that came back opens whichever moment is active in storage shared by every
+  // tab, and another tab may have opened a different one while this tab was at
+  // Spotify. A context for another panel or moment is not this panel's to
+  // restore — its query and song would land in the wrong moment. Whatever reads
+  // one has already taken it, so one that is not ours is simply dropped.
+  const isOurContext = (context: SpotifyReturnContext) =>
+    context.panelId === panelId && (context.momentId === null || context.momentId === moments.activeMoment?.id)
+
   useEffect(() => {
     if (!connected) return
     const context = takeReturnContext()
     if (!context) return
-    // Whose is this? It was read from this tab's own storage, but the page that
-    // came back opens whichever moment is active in storage shared by every tab,
-    // and another tab may have opened a different one while this tab was at
-    // Spotify. A context for another panel or moment is not this panel's to
-    // restore — its query and song would land in the wrong moment. It has been
-    // taken, so it is simply dropped.
-    if (context.panelId !== panelId) return
-    if (context.momentId !== null && context.momentId !== moments.activeMoment?.id) return
+    if (!isOurContext(context)) return
     setSearchType(context.searchType)
     setQuery(context.query)
     if (!context.choice) return
@@ -292,6 +312,29 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       void runRef.current(() => spotifyRef.current.lookupTrack(choice.spotifyId)).finally(() => setRestoringSong(false))
     }
   }, [connected])
+
+  // A sign-in that comes back without succeeding — cancelled at Spotify,
+  // refused, or a code that could not be exchanged — leaves the visitor here,
+  // not connected, on a page that has reloaded: the search, its results and
+  // what they had chosen are gone. Some of that can be given back, and is.
+  //
+  // The search text and type can. A playlist can: it was saved in the moment as
+  // soon as it was clicked, so it only has to be made visible again, which it is
+  // once it is the one that was chosen (see restoredPlaylistId). A song cannot: it was only ever held in
+  // memory, and cannot be found again without a sign-in, so it stays gone.
+  //
+  // This waits to be told the sign-in failed rather than restoring whenever the
+  // panel opens signed out, because a sign-in that is about to succeed also
+  // opens signed out for a moment, and must find its context still there.
+  useEffect(() => {
+    if (!spotify.signInFailed || connected) return
+    const context = takeReturnContext()
+    if (!context) return
+    if (!isOurContext(context)) return
+    setSearchType(context.searchType)
+    setQuery(context.query)
+    if (context.choice?.kind === 'playlist') setRestoredPlaylistId(context.choice.spotifyId)
+  }, [spotify.signInFailed])
 
   // Once something is playing, or the session ends, the prompt has done its job
   // — and so has a song that was only being held until Play was pressed.
@@ -306,6 +349,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     if (connected) {
       setInvitations(0)
       setChosenPlaylistThisVisit(false)
+      setRestoredPlaylistId(null)
     }
   }, [connected])
 

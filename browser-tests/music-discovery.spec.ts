@@ -442,3 +442,74 @@ test.describe("the dev server's copy of the Spotify API", () => {
     expect(response.status()).not.toBe(405)
   })
 })
+
+// Cancelling at Spotify brings the visitor back to /callback?error=..., signed
+// out, on a page that has reloaded. The search and what they chose used to be
+// gone; the search and a chosen playlist now come back. A song cannot, since it
+// was only ever held in memory.
+test.describe('the Music panel, after a sign-in that did not succeed', () => {
+  /** A playlist chosen and saved in the moment, and what the app left behind when it sent the visitor to Spotify. */
+  async function leaveForSpotify(page: Page) {
+    await withDiscovery(page)
+    await openApp(page)
+    const music = await panelOfType(page, 'spotify')
+    await dispatch(page, {
+      kind: 'panel.update',
+      panelId: music.panelId,
+      config: { playlist: { id: 'r1', uri: 'spotify:playlist:r1', name: 'Rain on Glass', url: 'https://open.spotify.com/playlist/r1', image: null } },
+    })
+    // The visit to /callback below reloads the page, and has to find this moment again.
+    await expectCanvasSaved(page)
+    const canvas = await describeCanvas(page)
+    await page.evaluate(
+      (context) => window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify(context)),
+      { panelId: music.panelId, momentId: canvas.moment!.id, choice: { kind: 'playlist', spotifyId: 'r1' }, query: 'rain', searchType: 'playlists' },
+    )
+    return music.panelId
+  }
+
+  async function panelShape(page: Page) {
+    await waitForCanvas(page)
+    return shapeOf(page, (await panelOfType(page, 'spotify')).panelId)
+  }
+
+  test('gives back the search and the chosen playlist when the visitor cancels at Spotify', async ({ page }) => {
+    await leaveForSpotify(page)
+
+    await page.goto('/callback?error=access_denied')
+    const shape = await panelShape(page)
+
+    await expect(page.getByText('Spotify login failed: access_denied')).toBeVisible()
+    await expect(shape.getByLabel('Search playlists')).toHaveValue('rain')
+    await expect(shape.getByRole('button', { name: /Rain on Glass/ })).toBeVisible()
+    // The playlist is named again, with what happens next, and they are still signed out.
+    await expect(shape.locator('.loaded-playlist')).toContainText('Rain on Glass')
+    await expect(shape.getByRole('status')).toContainText('Connect Spotify to play this playlist here')
+    await expect(shape.getByRole('button', { name: /connect spotify/i })).toHaveCount(1)
+    expect(await page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
+  })
+
+  // The other way a return fails: a code arrives that cannot be exchanged.
+  test('gives it back when the code cannot be exchanged either', async ({ page }) => {
+    await leaveForSpotify(page)
+
+    await page.goto('/callback?code=not-a-real-code&state=not-the-state-we-sent')
+    const shape = await panelShape(page)
+
+    await expect(shape.getByLabel('Search playlists')).toHaveValue('rain')
+    await expect(shape.locator('.loaded-playlist')).toContainText('Rain on Glass')
+    await expect(shape.getByRole('button', { name: /connect spotify/i })).toHaveCount(1)
+  })
+
+  // A page that merely opens signed out, with no failed sign-in behind it, must
+  // leave the context for a sign-in that is about to succeed.
+  test('leaves the context alone on an ordinary visit', async ({ page }) => {
+    await leaveForSpotify(page)
+
+    await page.goto('/')
+    const shape = await panelShape(page)
+
+    await expect(shape.getByLabel('Search playlists')).toHaveValue('')
+    expect(await page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).not.toBeNull()
+  })
+})

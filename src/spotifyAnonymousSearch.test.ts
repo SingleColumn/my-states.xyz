@@ -538,3 +538,62 @@ describe('A song lookup that is overtaken', () => {
     expect(result.current.selectedTrack).toBeNull()
   })
 })
+
+// A sign-in that leaves for Spotify can come back without succeeding: cancelled
+// there, refused, or with a code that cannot be exchanged. The panel gives back
+// what the visitor was doing only when it is told so, because a sign-in that is
+// about to succeed also opens signed out for a moment. Found in review.
+describe('A sign-in that comes back without succeeding', () => {
+  it('is not reported as failed to begin with', async () => {
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+    expect(result.current.signInFailed).toBe(false)
+  })
+
+  it('is reported when the code cannot be exchanged, and the failure still reaches the caller', async () => {
+    spotifyApi.exchangeSpotifyCode.mockRejectedValue(new Error('Spotify token exchange failed (400).'))
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+
+    await act(async () => {
+      await expect(result.current.handleCallback('code', 'state')).rejects.toThrow('400')
+    })
+
+    expect(result.current.signInFailed).toBe(true)
+    expect(result.current.tokens).toBeNull()
+  })
+
+  it('is reported when the app finds the callback failed before there was a code to exchange', async () => {
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+
+    act(() => { result.current.reportSignInFailure() })
+
+    expect(result.current.signInFailed).toBe(true)
+    expect(spotifyApi.exchangeSpotifyCode).not.toHaveBeenCalled()
+  })
+
+  it('is cleared by a sign-in that then succeeds', async () => {
+    spotifyApi.exchangeSpotifyCode.mockRejectedValueOnce(new Error('Spotify token exchange failed (400).'))
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+    await act(async () => { await result.current.handleCallback('code', 'state').catch(() => {}) })
+    expect(result.current.signInFailed).toBe(true)
+
+    spotifyApi.exchangeSpotifyCode.mockResolvedValue(userTokens)
+    await act(async () => { await result.current.handleCallback('code', 'state') })
+
+    expect(result.current.signInFailed).toBe(false)
+    expect(result.current.tokens).not.toBeNull()
+  })
+
+  it('is not reported by a sign-in that succeeds', async () => {
+    spotifyApi.exchangeSpotifyCode.mockResolvedValue(userTokens)
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+
+    await act(async () => { await result.current.handleCallback('code', 'state') })
+
+    expect(result.current.signInFailed).toBe(false)
+  })
+})

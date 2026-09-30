@@ -10,7 +10,7 @@
 // second half of this file drives the panel with no session at all: the
 // search still works, and choosing a playlist still only chooses it.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { createElement } from 'react'
+import { StrictMode, createElement } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { PanelCommands } from '../PanelHeader'
 import { PanelCommandsProvider } from '../PanelHeader'
@@ -76,7 +76,7 @@ const commands: PanelCommands = {
 }
 
 /** A connected panel whose search calls are spies, over the results given. */
-function mountPanel(overrides: Record<string, unknown> = {}) {
+function mountPanel(overrides: Record<string, unknown> = {}, options: { strict?: boolean } = {}) {
   const searchPlaylists = vi.fn(async () => {})
   const searchTracks = vi.fn(async () => {})
   const clearSearchResults = vi.fn()
@@ -129,7 +129,9 @@ function mountPanel(overrides: Record<string, unknown> = {}) {
     commands,
     children: createElement(SpotifyPanel, { panelId: 'panel_music' }),
   })
-  const view = render(element())
+  // The app mounts everything in React.StrictMode, which in development runs
+  // every effect twice. A test that means to see what the app does asks for it.
+  const view = render(element(), options.strict ? { wrapper: StrictMode } : undefined)
 
   // Re-renders the panel that is already mounted, so a change of view or of
   // session is a transition the component lives through rather than a fresh
@@ -141,8 +143,8 @@ function mountPanel(overrides: Record<string, unknown> = {}) {
 }
 
 /** The same panel with no Spotify session: what a first-time visitor sees. */
-function mountAnonymousPanel(overrides: Record<string, unknown> = {}) {
-  return mountPanel({ tokens: null, ...overrides })
+function mountAnonymousPanel(overrides: Record<string, unknown> = {}, options: { strict?: boolean } = {}) {
+  return mountPanel({ tokens: null, ...overrides }, options)
 }
 
 /** What the search looks for is a setting in the panel's ··· menu, not a control in the body. */
@@ -1095,6 +1097,31 @@ describe('Music panel on returning from connecting Spotify', () => {
     expect(selectTrack).toHaveBeenCalledWith(null)
   })
 
+  // The same double run of effects, on the way back from a sign-in that worked:
+  // the prompt and the wait for the song were reset by it in development.
+  describe('when React runs the effects twice, as it does in development', () => {
+    it('still says to press play', async () => {
+      leaveAnIntent('playlist')
+      mountPanel({}, { strict: true })
+      await act(async () => { await Promise.resolve() })
+
+      expect(screen.getByRole('status').textContent).toContain('Press play to start Deep Focus')
+    })
+
+    it('still holds Play back while the song is looked up', async () => {
+      leaveAnIntent('track')
+      let release!: () => void
+      const held = new Promise<void>((resolve) => { release = resolve })
+      const lookupTrack = vi.fn(() => held)
+      mountPanel({ lookupTrack }, { strict: true })
+      await act(async () => { await Promise.resolve() })
+
+      expect(screen.getByRole('status').textContent).toContain('Getting the song you chose ready')
+      expect((screen.getByTitle('Play or pause') as HTMLButtonElement).disabled).toBe(true)
+      await act(async () => { release(); await Promise.resolve(); await Promise.resolve() })
+    })
+  })
+
   it('is not shown to someone who was connected already and left nothing behind', async () => {
     mountPanel()
     await act(async () => { await Promise.resolve() })
@@ -1241,5 +1268,152 @@ describe('Music panel suggestions', () => {
     await settleSuggestions()
 
     expect(screen.queryByText('Suggested for this session')).toBeNull()
+  })
+})
+
+// Cancelling at Spotify, or a code that cannot be exchanged, brings the visitor
+// back signed out on a page that has reloaded, with the search and their choice
+// gone. What can be given back is: the search, and a playlist (saved in the
+// moment when clicked, so it only has to be shown again). A song cannot be: it
+// was only ever held in memory. Found in review.
+describe('Music panel after a sign-in that did not succeed', () => {
+  function leaveContext(extra: {
+    kind?: 'playlist' | 'track' | null
+    spotifyId?: string
+    query?: string
+    searchType?: 'playlists' | 'tracks'
+    panelId?: string
+    momentId?: string
+  } = {}) {
+    const kind = extra.kind === undefined ? 'playlist' : extra.kind
+    window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({
+      panelId: extra.panelId ?? 'panel_music',
+      momentId: extra.momentId ?? 'moment_1',
+      choice: kind === null ? null : { kind, spotifyId: extra.spotifyId ?? (kind === 'track' ? 't1' : 'playlist_1') },
+      query: extra.query ?? 'rain',
+      searchType: extra.searchType ?? 'playlists',
+    }))
+  }
+  const failedSignIn = (overrides: Record<string, unknown> = {}, options: { strict?: boolean } = {}) =>
+    mountAnonymousPanel({ signInFailed: true, ...overrides }, options)
+  const storedContext = () => window.sessionStorage.getItem('mic:spotify-return-context')
+
+  it('gives back the search, and runs it again', async () => {
+    leaveContext({ query: 'rain' })
+    const { searchPlaylists } = failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
+    await settle()
+    expect(searchPlaylists).toHaveBeenCalledWith('rain')
+  })
+
+  it('gives back a song search as a song search', async () => {
+    leaveContext({ kind: null, query: 'xtal', searchType: 'tracks' })
+    const { searchTracks } = failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search songs') as HTMLInputElement).value).toBe('xtal')
+    await settle()
+    expect(searchTracks).toHaveBeenCalledWith('xtal')
+  })
+
+  // Saved in the moment when it was clicked, and hidden until chosen this visit:
+  // the visitor sees nothing chosen unless it is shown again.
+  it('shows the playlist that was chosen again, with what happens next', async () => {
+    leaveContext({ spotifyId: 'playlist_1' })
+    failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect(document.querySelector('.loaded-playlist')?.textContent).toContain('Deep Focus')
+    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this playlist here')
+  })
+
+  it('does not show a saved playlist that is not the one that was chosen', async () => {
+    leaveContext({ spotifyId: 'a_different_playlist' })
+    failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
+    expect(document.querySelector('.loaded-playlist')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  // Only ever held in memory, and cannot be found without a sign-in.
+  it('does not bring a chosen song back, and does not try to look it up', async () => {
+    leaveContext({ kind: 'track', query: 'xtal', searchType: 'tracks' })
+    const { lookupTrack } = failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search songs') as HTMLInputElement).value).toBe('xtal')
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(document.querySelector('.loaded-playlist')).toBeNull()
+    expect(lookupTrack).not.toHaveBeenCalled()
+  })
+
+  it('uses the context up, so a later visit does not find it', async () => {
+    leaveContext()
+    failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect(storedContext()).toBeNull()
+  })
+
+  it('does not restore what was saved for another moment or another panel', async () => {
+    leaveContext({ momentId: 'moment_elsewhere' })
+    failedSignIn()
+    await act(async () => { await Promise.resolve() })
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
+    expect(document.querySelector('.loaded-playlist')).toBeNull()
+    expect(storedContext()).toBeNull()
+    cleanup()
+
+    leaveContext({ panelId: 'panel_other' })
+    failedSignIn()
+    await act(async () => { await Promise.resolve() })
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
+    expect(document.querySelector('.loaded-playlist')).toBeNull()
+  })
+
+  // The other half of the rule. A sign-in that is about to succeed also opens
+  // signed out for a moment, and must find its context still there.
+  it('leaves the context alone when the sign-in has not been reported as failed', async () => {
+    leaveContext({ query: 'rain' })
+    mountAnonymousPanel()
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
+    expect(storedContext()).not.toBeNull()
+  })
+
+  // Found by running the real page: in development React runs every effect twice
+  // on mount, and the reset that runs when a moment changes ran the second time
+  // after the context had been used up, and wiped what had just been restored.
+  it('keeps what it gave back when React runs the effects twice, as it does in development', async () => {
+    leaveContext({ query: 'rain', spotifyId: 'playlist_1' })
+    failedSignIn({}, { strict: true })
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
+    expect(document.querySelector('.loaded-playlist')?.textContent).toContain('Deep Focus')
+    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this playlist here')
+  })
+
+  it('does nothing when the sign-in failed but nothing had been left behind', async () => {
+    failedSignIn()
+    await act(async () => { await Promise.resolve() })
+
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
+    expect(document.querySelector('.loaded-playlist')).toBeNull()
+  })
+
+  it('does not run when connected, where the ordinary return does the restoring', async () => {
+    leaveContext({ query: 'rain' })
+    mountPanel({ signInFailed: true })
+    await act(async () => { await Promise.resolve() })
+
+    // Restored once, by the ordinary route; the context is used up either way.
+    expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
+    expect(storedContext()).toBeNull()
   })
 })
