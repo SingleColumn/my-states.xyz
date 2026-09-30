@@ -13,7 +13,7 @@ import type { PanelsState } from './AppState'
 import type { Panel } from './types'
 
 const session = vi.hoisted(() => ({ tokens: null as unknown }))
-const spotifyApi = vi.hoisted(() => ({ spotifyFetch: vi.fn(), exchangeSpotifyCode: vi.fn() }))
+const spotifyApi = vi.hoisted(() => ({ spotifyFetch: vi.fn(), exchangeSpotifyCode: vi.fn(), refreshSpotifyToken: vi.fn() }))
 const catalog = vi.hoisted(() => ({
   searchCatalogPlaylists: vi.fn(),
   searchCatalogTracks: vi.fn(),
@@ -24,6 +24,7 @@ vi.mock('./spotify', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./spotify')>()),
   spotifyFetch: spotifyApi.spotifyFetch,
   exchangeSpotifyCode: spotifyApi.exchangeSpotifyCode,
+  refreshSpotifyToken: spotifyApi.refreshSpotifyToken,
 }))
 
 vi.mock('./spotifyCatalog', () => catalog)
@@ -119,6 +120,7 @@ beforeEach(() => {
   session.tokens = null
   spotifyApi.spotifyFetch.mockReset()
   spotifyApi.exchangeSpotifyCode.mockReset()
+  spotifyApi.refreshSpotifyToken.mockReset()
   catalog.searchCatalogPlaylists.mockReset()
   catalog.searchCatalogTracks.mockReset()
   catalog.fetchCuratedPlaylists.mockReset().mockResolvedValue([])
@@ -225,6 +227,75 @@ describe('Searching Spotify with a session', () => {
     expect(spotifyApi.spotifyFetch).toHaveBeenCalled()
     expect(catalog.searchCatalogPlaylists).not.toHaveBeenCalled()
     expect(result.current.playlists.map((playlist) => playlist.name)).toEqual(['Theirs'])
+  })
+
+  // Found in review. A thin first page is followed at once by a second, and
+  // when the token was about to expire each of the two refreshed it: a second
+  // use of a refresh token that may have been rotated, and a failure there
+  // signs the visitor out although the first refresh had worked.
+  describe('when the token is about to expire and the first page comes back thin', () => {
+    const thinPage = (names: string[], next: string | null) => ({
+      playlists: {
+        next,
+        items: names.map((name, index) => ({
+          id: `${name}-${index}`, name, uri: `spotify:playlist:${name}`, external_urls: { spotify: '' },
+          images: [], owner: { display_name: 'Someone' }, tracks: { total: 5 },
+        })),
+      },
+    })
+
+    function searchWithExpiringToken() {
+      session.tokens = { accessToken: 'old-token', refreshToken: 'refresh-1', expiresAt: Date.now() + 10_000 }
+      spotifyApi.refreshSpotifyToken.mockResolvedValue({ accessToken: 'renewed-token', refreshToken: 'refresh-2', expiresAt: Date.now() + 3_600_000 })
+      spotifyApi.spotifyFetch
+        .mockResolvedValueOnce(thinPage(['One', 'Two'], 'https://api.spotify.com/next'))
+        .mockResolvedValueOnce(thinPage(['Three'], null))
+      return panelsStub()
+    }
+
+    it('refreshes it once, not once per page', async () => {
+      const { panels } = searchWithExpiringToken()
+      const { result } = await mountSpotifyState(panels)
+
+      await act(async () => { await result.current.searchPlaylists('rain') })
+
+      expect(spotifyApi.spotifyFetch).toHaveBeenCalledTimes(2)
+      expect(spotifyApi.refreshSpotifyToken).toHaveBeenCalledTimes(1)
+      expect(result.current.playlists).toHaveLength(3)
+    })
+
+    it('asks for both pages with the renewed token', async () => {
+      const { panels } = searchWithExpiringToken()
+      const { result } = await mountSpotifyState(panels)
+
+      await act(async () => { await result.current.searchPlaylists('rain') })
+
+      expect(spotifyApi.spotifyFetch.mock.calls.map((call) => call[1])).toEqual(['renewed-token', 'renewed-token'])
+    })
+
+    it('does not sign the visitor out when only a second refresh would have failed', async () => {
+      const { panels } = searchWithExpiringToken()
+      spotifyApi.refreshSpotifyToken
+        .mockReset()
+        .mockResolvedValueOnce({ accessToken: 'renewed-token', refreshToken: 'refresh-2', expiresAt: Date.now() + 3_600_000 })
+        .mockRejectedValue(new Error('refresh token already used'))
+      const { result } = await mountSpotifyState(panels)
+
+      await act(async () => { await result.current.searchPlaylists('rain') })
+
+      expect(result.current.tokens).not.toBeNull()
+      expect(result.current.playlists).toHaveLength(3)
+    })
+  })
+
+  it('does not refresh anything for a search with no session', async () => {
+    catalog.searchCatalogPlaylists.mockResolvedValue({ items: playlistSummaries(['Rain on Glass']), hasMore: false })
+    const { panels } = panelsStub()
+    const { result } = await mountSpotifyState(panels)
+
+    await act(async () => { await result.current.searchPlaylists('rain') })
+
+    expect(spotifyApi.refreshSpotifyToken).not.toHaveBeenCalled()
   })
 })
 

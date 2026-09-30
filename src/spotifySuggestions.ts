@@ -59,8 +59,10 @@ export function selectSuggestions(
   const chosen = takeDiverse(fresh, count)
   if (chosen.length >= count) return chosen
 
+  // The categories the fresh picks already cover count against the repeats
+  // too: a second `ambient` must wait until every category has been spent once.
   const taken = new Set(chosen.map((entry) => entry.id))
-  for (const entry of takeDiverse(repeats, count - chosen.length)) {
+  for (const entry of takeDiverse(repeats, count - chosen.length, categoriesOf(chosen))) {
     if (taken.has(entry.id)) continue
     chosen.push(entry)
     taken.add(entry.id)
@@ -73,14 +75,14 @@ export function selectSuggestions(
  * them twice. Entries with no category are all treated as their own kind, so
  * a pool that carries no categories at all is plain sampling.
  */
-function takeDiverse(entries: readonly CuratedSpotifyPlaylist[], count: number) {
+function takeDiverse(entries: readonly CuratedSpotifyPlaylist[], count: number, alreadySpent: ReadonlySet<string> = new Set()) {
   const chosen: CuratedSpotifyPlaylist[] = []
-  const spentCategories = new Set<string>()
+  const spentCategories = new Set<string>(alreadySpent)
   const leftovers: CuratedSpotifyPlaylist[] = []
 
   for (const entry of entries) {
     if (chosen.length >= count) break
-    const category = entry.category?.trim().toLowerCase()
+    const category = categoryOf(entry)
     if (category && spentCategories.has(category)) {
       leftovers.push(entry)
       continue
@@ -94,6 +96,14 @@ function takeDiverse(entries: readonly CuratedSpotifyPlaylist[], count: number) 
     chosen.push(entry)
   }
   return chosen
+}
+
+function categoryOf(entry: CuratedSpotifyPlaylist) {
+  return entry.category?.trim().toLowerCase()
+}
+
+function categoriesOf(entries: readonly CuratedSpotifyPlaylist[]) {
+  return new Set(entries.map(categoryOf).filter((category): category is string => Boolean(category)))
 }
 
 /** Fisher-Yates over a copy, with the caller's random source. */

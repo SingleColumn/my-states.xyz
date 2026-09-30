@@ -121,6 +121,29 @@ describe('Keeping a set of suggestions varied', () => {
     expect(new Set(chosen.map((entry) => entry.category?.trim().toLowerCase())).size).toBe(2)
   })
 
+  // Found in review. When the unseen entries cannot fill the count, the seen
+  // ones make up the rest, and the categories the unseen ones already cover
+  // still count: the second pass used to start from nothing, and took a second
+  // `ambient` only because it came first.
+  it('does not repeat a category among the seen entries while another one is left', () => {
+    const mixed: CuratedSpotifyPlaylist[] = [
+      { id: 'fresh_ambient', category: 'ambient' },
+      { id: 'seen_ambient', category: 'ambient' },
+      { id: 'seen_jazz', category: 'jazz' },
+    ]
+    const chosen = selectSuggestions(mixed, { count: 2, exclude: ['seen_ambient', 'seen_jazz'], random: noShuffle })
+    expect(chosen.map((entry) => entry.id).sort()).toEqual(['fresh_ambient', 'seen_jazz'])
+  })
+
+  it('still repeats a category among the seen entries when nothing else is left', () => {
+    const mixed: CuratedSpotifyPlaylist[] = [
+      { id: 'fresh_ambient', category: 'ambient' },
+      { id: 'seen_ambient', category: 'ambient' },
+    ]
+    const chosen = selectSuggestions(mixed, { count: 2, exclude: ['seen_ambient'], random: noShuffle })
+    expect(chosen.map((entry) => entry.id).sort()).toEqual(['fresh_ambient', 'seen_ambient'])
+  })
+
   it('is the same choice twice over for the same random source', () => {
     const roll = () => sequence([0.31, 0.77, 0.12, 0.58, 0.94, 0.06, 0.41])
     const first = selectSuggestions(pool(24, ['a', 'b', 'c']), { random: roll() })

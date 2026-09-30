@@ -1502,16 +1502,27 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
    * this line (the thin-first-page rule, the cursor, de-duplication, the
    * sequence guard) has no business knowing which of the two it got.
    */
-  const fetchPlaylistPage = useCallback(async (query: string, offset: number): Promise<SpotifyPlaylistSearchResult> => {
-    if (!tokens) return searchCatalogPlaylists(query, offset)
-    const fresh = await ensureFreshTokens()
+  const fetchPlaylistPage = useCallback(async (query: string, offset: number, accessToken: string | null): Promise<SpotifyPlaylistSearchResult> => {
+    if (accessToken === null) return searchCatalogPlaylists(query, offset)
     const params = new URLSearchParams({ q: query, type: 'playlist', limit: String(searchResultLimit), offset: String(offset) })
-    const page = await requestSpotify(() => spotifyFetch<SpotifyPlaylistSearchPage>(`/search?${params.toString()}`, fresh.accessToken))
+    const page = await requestSpotify(() => spotifyFetch<SpotifyPlaylistSearchPage>(`/search?${params.toString()}`, accessToken))
     return {
       items: page.playlists.items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist),
       hasMore: Boolean(page.playlists.next),
     }
-  }, [ensureFreshTokens, requestSpotify, tokens])
+  }, [requestSpotify])
+
+  // A search can take two requests (a thin first page is followed at once by a
+  // second), and both must use the token this refreshes. Each `ensureFreshTokens`
+  // call reads the `tokens` its render closed over, so a second call inside the
+  // same search would find it still near expiry and refresh it again: a second
+  // use of a refresh token that may already have been rotated, and a failure
+  // there ends a session the first refresh had just renewed. Null when signed
+  // out, which is the anonymous route.
+  const searchAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!tokens) return null
+    return (await ensureFreshTokens()).accessToken
+  }, [ensureFreshTokens, tokens])
 
   const fetchTrackPage = useCallback(async (query: string): Promise<SpotifyTrackSearchResult> => {
     if (!tokens) return searchCatalogTracks(query)
@@ -1532,7 +1543,9 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
       playlistCursorRef.current = null
       return
     }
-    const first = await fetchPlaylistPage(trimmed, 0)
+    const accessToken = await searchAccessToken()
+    if (sequence !== searchSequenceRef.current) return
+    const first = await fetchPlaylistPage(trimmed, 0, accessToken)
     if (sequence !== searchSequenceRef.current) return
 
     let items = [...first.items]
@@ -1545,7 +1558,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     // reaches here. A thin first page is the one case worth a second request
     // straight away, so a search does not open on a near-empty list.
     if (hasMore && items.length < minFirstPageResults) {
-      const second = await fetchPlaylistPage(trimmed, offset)
+      const second = await fetchPlaylistPage(trimmed, offset, accessToken)
       if (sequence !== searchSequenceRef.current) return
       items = items.concat(second.items)
       offset += searchResultLimit
@@ -1556,7 +1569,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     playlistCursorRef.current = { query: trimmed, offset }
     setPlaylistsHaveMore(hasMore)
     setError(null)
-  }, [fetchPlaylistPage])
+  }, [fetchPlaylistPage, searchAccessToken])
 
   // Asked for by the person reading the list, so it appends rather than
   // replacing, and a search started in the meantime cancels it.
@@ -1564,13 +1577,15 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const cursor = playlistCursorRef.current
     if (!cursor) return
     const sequence = searchSequenceRef.current
-    const page = await fetchPlaylistPage(cursor.query, cursor.offset)
+    const accessToken = await searchAccessToken()
+    if (sequence !== searchSequenceRef.current) return
+    const page = await fetchPlaylistPage(cursor.query, cursor.offset, accessToken)
     if (sequence !== searchSequenceRef.current || playlistCursorRef.current?.query !== cursor.query) return
     setPlaylists((current) => [...new Map([...current, ...page.items].map((item) => [item.id, item])).values()])
     playlistCursorRef.current = { query: cursor.query, offset: cursor.offset + searchResultLimit }
     setPlaylistsHaveMore(page.hasMore)
     setError(null)
-  }, [fetchPlaylistPage])
+  }, [fetchPlaylistPage, searchAccessToken])
 
   const searchTracks = useCallback(async (query: string) => {
     const sequence = ++searchSequenceRef.current
