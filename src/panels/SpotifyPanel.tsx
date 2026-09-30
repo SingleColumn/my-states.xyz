@@ -245,6 +245,11 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // moment's saved playlist is not that: it was chosen on some other day, or
   // arrived with an imported moment.
   const [chosenPlaylistThisVisit, setChosenPlaylistThisVisit] = useState(false)
+  // A song chosen before connecting is looked up again on the way back, and
+  // until that answers there is nothing to play it with. Without this the
+  // panel falls back to the moment's saved playlist in the meantime — names it,
+  // and starts it on Play — when the visitor asked for a song.
+  const [restoringSong, setRestoringSong] = useState(false)
 
   // Not connected, the playlist saved in the moment is a name that cannot be
   // played and that this visitor did not just choose. Showing it invites a
@@ -258,18 +263,30 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   useEffect(() => {
     setChosenPlaylistThisVisit(false)
     setInvitations(0)
+    setRestoringSong(false)
   }, [moments.activeMoment?.id])
 
   useEffect(() => {
     if (!connected) return
     const context = takeReturnContext()
     if (!context) return
+    // Whose is this? It was read from this tab's own storage, but the page that
+    // came back opens whichever moment is active in storage shared by every tab,
+    // and another tab may have opened a different one while this tab was at
+    // Spotify. A context for another panel or moment is not this panel's to
+    // restore — its query and song would land in the wrong moment. It has been
+    // taken, so it is simply dropped.
+    if (context.panelId !== panelId) return
+    if (context.momentId !== null && context.momentId !== moments.activeMoment?.id) return
     setSearchType(context.searchType)
     setQuery(context.query)
     if (!context.choice) return
     setCameBackToPlay(true)
     const { choice } = context
-    if (choice.kind === 'track') void runRef.current(() => spotifyRef.current.lookupTrack(choice.spotifyId))
+    if (choice.kind === 'track') {
+      setRestoringSong(true)
+      void runRef.current(() => spotifyRef.current.lookupTrack(choice.spotifyId)).finally(() => setRestoringSong(false))
+    }
   }, [connected])
 
   // Once something is playing, or the session ends, the prompt has done its job
@@ -433,6 +450,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // id — and none of it is sent anywhere.
       rememberReturnContext({
         panelId,
+        momentId: moments.activeMoment?.id ?? null,
         choice: selection ? { kind: selection.kind, spotifyId: selection.id } : null,
         query,
         searchType,
@@ -763,7 +781,13 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               </div>
             ) : null}
 
-            {showChosenNote && selection ? (
+            {restoringSong && !focusView && !searchHidden ? (
+              <div className="spotify-chosen" role="status">
+                <p className="spotify-chosen-note">Getting the song you chose ready…</p>
+              </div>
+            ) : null}
+
+            {showChosenNote && !restoringSong && selection ? (
               <div className="spotify-chosen" role="status">
                 {selection.kind === 'track' ? (
                   <div className="track-copy">
@@ -826,6 +850,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                     className="card-icon-button is-primary is-large"
                     type="button"
                     title="Play or pause"
+                    disabled={restoringSong}
                     onClick={() => void run(async () => {
                       const wasPlaying = Boolean(spotify.track)
                       // A song picked before connecting is what Play is for

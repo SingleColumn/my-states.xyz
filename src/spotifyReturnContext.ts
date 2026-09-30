@@ -25,6 +25,13 @@ export type SpotifyReturnSearchType = 'playlists' | 'tracks'
 
 export interface SpotifyReturnContext {
   panelId: string
+  /**
+   * The moment the panel was in. The panel id alone is not enough to say whose
+   * this is: the browser opens whichever moment is active when the page comes
+   * back, and another tab may have changed that while this one was at Spotify.
+   * Null for a context written without one.
+   */
+  momentId: string | null
   /** What they had picked when they left, if anything. */
   choice: { kind: 'playlist' | 'track'; spotifyId: string } | null
   /** What was in the search box, so the results they were looking at can be found again. */
@@ -54,11 +61,12 @@ export function takeReturnContext(storage: Storage | null = sessionStorageOrNull
     if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
-    const { panelId, choice, query, searchType } = parsed as Partial<Record<keyof SpotifyReturnContext, unknown>>
+    const { panelId, momentId, choice, query, searchType } = parsed as Partial<Record<keyof SpotifyReturnContext, unknown>>
     if (typeof panelId !== 'string') return null
 
     return {
       panelId,
+      momentId: typeof momentId === 'string' ? momentId : null,
       choice: readChoice(choice),
       query: typeof query === 'string' ? query.slice(0, maxRememberedQueryLength) : '',
       searchType: searchType === 'tracks' ? 'tracks' : 'playlists',

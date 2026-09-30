@@ -18,6 +18,7 @@ const key = 'mic:spotify-return-context'
 
 const context: SpotifyReturnContext = {
   panelId: 'panel_music',
+  momentId: 'moment_1',
   choice: { kind: 'playlist', spotifyId: 'abc123' },
   query: 'rain',
   searchType: 'playlists',
@@ -87,7 +88,7 @@ describe('The return context', () => {
   it('falls back field by field on a record that is partly wrong', () => {
     const storage = new MemorySessionStorage()
     storage.setItem(key, JSON.stringify({ panelId: 'panel_music', choice: { kind: 'album', spotifyId: 'x' }, query: 42, searchType: 'everything' }))
-    expect(takeReturnContext(storage)).toEqual({ panelId: 'panel_music', choice: null, query: '', searchType: 'playlists' })
+    expect(takeReturnContext(storage)).toEqual({ panelId: 'panel_music', momentId: null, choice: null, query: '', searchType: 'playlists' })
   })
 
   it('drops a choice with no Spotify id', () => {
@@ -114,7 +115,7 @@ describe('The return context', () => {
 
     const written = storage.getItem(key) ?? ''
     expect(written).not.toContain('secret')
-    expect(Object.keys(JSON.parse(written)).sort()).toEqual(['choice', 'panelId', 'query', 'searchType'])
+    expect(Object.keys(JSON.parse(written)).sort()).toEqual(['choice', 'momentId', 'panelId', 'query', 'searchType'])
   })
 })
 
@@ -144,5 +145,30 @@ describe('Forgetting the return context', () => {
     forgetReturnContext(storage)
 
     expect(storage.getItem('mic:spotify-suggestions')).toBe('["a"]')
+  })
+})
+
+// Which moment a context was written in decides whether it may be restored, so
+// what comes back from storage has to be exactly that or nothing.
+describe('The moment a return context belongs to', () => {
+  it('comes back as written', () => {
+    const storage = new MemorySessionStorage()
+    rememberReturnContext({ ...context, momentId: 'moment_42' }, storage)
+    expect(takeReturnContext(storage)?.momentId).toBe('moment_42')
+  })
+
+  it('is null when the context was written without one, or with a nothing-moment', () => {
+    const storage = new MemorySessionStorage()
+    storage.setItem(key, JSON.stringify({ panelId: 'p', choice: null, query: '', searchType: 'playlists' }))
+    expect(takeReturnContext(storage)?.momentId).toBeNull()
+
+    rememberReturnContext({ ...context, momentId: null }, storage)
+    expect(takeReturnContext(storage)?.momentId).toBeNull()
+  })
+
+  it('is null rather than a guess when what is stored is not a string', () => {
+    const storage = new MemorySessionStorage()
+    storage.setItem(key, JSON.stringify({ panelId: 'p', momentId: 42, choice: null, query: '', searchType: 'playlists' }))
+    expect(takeReturnContext(storage)?.momentId).toBeNull()
   })
 })

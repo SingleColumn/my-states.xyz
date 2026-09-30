@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { cameraZoom, choosePanelMenuItem, describeCanvas, dispatch, openApp, panelOfType, shapeOf } from './helpers'
+import { cameraZoom, choosePanelMenuItem, describeCanvas, dispatch, expectCanvasSaved, openApp, panelOfType, shapeOf, waitForCanvas } from './helpers'
 
 /**
  * The Music panel with no Spotify session — which is how everyone arrives.
@@ -318,12 +318,15 @@ test.describe('the Music panel, before Spotify is connected', () => {
 // back is read from the tab's own sessionStorage, and the real hook then asks
 // Spotify -- with the visitor's own token this time -- for the same search.
 test.describe('the Music panel, coming back from connecting Spotify', () => {
-  test('brings the search back with its results, answered by the visitor\'s own Spotify', async ({ page }) => {
+  /**
+   * The visitor is signed in, and Spotify's own search is answered here. Returns
+   * the requests it was asked, so a test can say what did and did not go to it.
+   */
+  async function connectedSpotify(page: Page) {
     const spotifyCalls: Array<{ url: string; authorization: string | undefined }> = []
 
     await page.addInitScript(() => {
       window.localStorage.setItem('mic:spotify-tokens', JSON.stringify({ accessToken: 'test-access', refreshToken: null, expiresAt: Date.now() + 3_600_000 }))
-      window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({ panelId: 'panel_music', choice: null, query: 'rain', searchType: 'playlists' }))
     })
 
     // The Web Playback SDK is Spotify's to serve and is not what is under test.
@@ -348,8 +351,34 @@ test.describe('the Music panel, coming back from connecting Spotify', () => {
         },
       })
     })
+    return spotifyCalls
+  }
 
-    const { shape } = await openMusicPanel(page)
+  /**
+   * What the app leaves in this tab's storage when it sends the visitor to
+   * Spotify, and then the page coming back. The ids are the app's own, read from
+   * the open moment: a context belongs to one panel in one moment, and only the
+   * real ones are restored. `momentId` says whose it is claimed to be.
+   */
+  async function comeBack(page: Page, whose: { momentId?: string } = {}) {
+    await openApp(page)
+    // The reload below has to find this same moment, so let its first save land.
+    await expectCanvasSaved(page)
+    const canvas = await describeCanvas(page)
+    const music = await panelOfType(page, 'spotify')
+    await page.evaluate(
+      (context) => window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify(context)),
+      { panelId: music.panelId, momentId: whose.momentId ?? canvas.moment!.id, choice: null, query: 'rain', searchType: 'playlists' },
+    )
+    await page.reload()
+    await waitForCanvas(page)
+    return shapeOf(page, (await panelOfType(page, 'spotify')).panelId)
+  }
+
+  test("brings the search back with its results, answered by the visitor's own Spotify", async ({ page }) => {
+    const spotifyCalls = await connectedSpotify(page)
+
+    const shape = await comeBack(page)
 
     await expect(shape.getByLabel('Search playlists')).toHaveValue('rain')
     await expect(shape.getByRole('button', { name: /Rain on Glass/ })).toBeVisible()
@@ -359,6 +388,21 @@ test.describe('the Music panel, coming back from connecting Spotify', () => {
     expect(spotifyCalls[0].authorization).toBe('Bearer test-access')
     // Read once: a reload must not restore the same visit a second time.
     expect(await page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
+  })
+
+  // Another tab can open a different moment while this one is at Spotify, and the
+  // page that comes back opens whichever is active in storage every tab shares.
+  // What this tab saved belongs to the moment it was saved in.
+  test('does not restore into a moment it was not saved for', async ({ page }) => {
+    const spotifyCalls = await connectedSpotify(page)
+
+    const shape = await comeBack(page, { momentId: 'moment_opened_in_another_tab' })
+
+    // The context has been read and used up; the panel has decided what to do with it.
+    await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
+    await expect(shape.getByLabel('Search playlists')).toHaveValue('')
+    await expect(shape.getByRole('button', { name: /Rain on Glass/ })).toHaveCount(0)
+    expect(spotifyCalls).toHaveLength(0)
   })
 })
 

@@ -565,6 +565,7 @@ describe('Music panel before Spotify is connected', () => {
     expect(login).toHaveBeenCalled()
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
       panelId: 'panel_music',
+      momentId: 'moment_1',
       choice: { kind: 'playlist', spotifyId: 'p1' },
       query: 'rain',
       searchType: 'playlists',
@@ -632,6 +633,7 @@ describe('Music panel before Spotify is connected', () => {
 
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
       panelId: 'panel_music',
+      momentId: 'moment_1',
       choice: null,
       query: 'rain',
       searchType: 'playlists',
@@ -811,9 +813,10 @@ describe('Music panel before Spotify is connected', () => {
 // a browser will not start sound without a click -- so the panel says so, and
 // the player's own Play button is the one to press: no second Play beside it.
 describe('Music panel on returning from connecting Spotify', () => {
-  function leaveAnIntent(kind: 'playlist' | 'track' = 'playlist', extra: { query?: string; searchType?: 'playlists' | 'tracks' } = {}) {
+  function leaveAnIntent(kind: 'playlist' | 'track' = 'playlist', extra: { query?: string; searchType?: 'playlists' | 'tracks'; panelId?: string; momentId?: string | null } = {}) {
     window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({
-      panelId: 'panel_music',
+      panelId: extra.panelId ?? 'panel_music',
+      ...(extra.momentId === null ? {} : { momentId: extra.momentId ?? 'moment_1' }),
       choice: { kind, spotifyId: kind === 'track' ? 't1' : 'playlist_1' },
       query: extra.query ?? '',
       searchType: extra.searchType ?? 'playlists',
@@ -922,6 +925,130 @@ describe('Music panel on returning from connecting Spotify', () => {
     expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
     expect(searchPlaylists).toHaveBeenCalledWith('rain')
     expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  // Found in review: the page that comes back opens whichever moment is active
+  // in storage shared by every tab, and another tab may have opened a different
+  // one while this tab was at Spotify. What this tab saved is for the panel and
+  // moment it was saved in, and for no other.
+  describe('when the page comes back to a different panel or moment', () => {
+    it('restores into the panel and moment it was saved for', async () => {
+      leaveAnIntent('playlist', { query: 'rain', momentId: 'moment_1' })
+      mountPanel()
+      await act(async () => { await Promise.resolve() })
+
+      expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
+      expect(screen.getByRole('status').textContent).toContain('Press play to start')
+    })
+
+    it('does not restore into a different moment', async () => {
+      leaveAnIntent('track', { query: 'rain', momentId: 'moment_elsewhere' })
+      const { lookupTrack } = mountPanel()
+      await act(async () => { await Promise.resolve() })
+
+      expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
+      expect(screen.queryByRole('status')).toBeNull()
+      expect(lookupTrack).not.toHaveBeenCalled()
+    })
+
+    it('does not restore into a different panel', async () => {
+      leaveAnIntent('track', { query: 'rain', panelId: 'panel_other' })
+      const { lookupTrack } = mountPanel()
+      await act(async () => { await Promise.resolve() })
+
+      expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
+      expect(screen.queryByRole('status')).toBeNull()
+      expect(lookupTrack).not.toHaveBeenCalled()
+    })
+
+    it('still restores a context written without a moment, for the panel it names', async () => {
+      leaveAnIntent('playlist', { query: 'rain', momentId: null })
+      mountPanel()
+      await act(async () => { await Promise.resolve() })
+
+      expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
+    })
+
+    // It has been taken either way: a second panel mounting later must not find it.
+    it('uses the context up whether or not it was restored', async () => {
+      leaveAnIntent('track', { query: 'rain', momentId: 'moment_elsewhere' })
+      mountPanel()
+      await act(async () => { await Promise.resolve() })
+
+      expect(window.sessionStorage.getItem('mic:spotify-return-context')).toBeNull()
+    })
+  })
+
+  // Found in review: until the song has been looked up again there is nothing to
+  // play it with, and the panel fell back to the moment's saved playlist -- named
+  // it, and started it on Play -- when the visitor had asked for a song.
+  describe('while the song they chose is being looked up again', () => {
+    const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
+
+    function slowLookup() {
+      let release!: () => void
+      const held = new Promise<void>((resolve) => { release = resolve })
+      const lookupTrack = vi.fn(() => held.then(() => { spotify.state.selectedTrack = song }))
+      return { lookupTrack, release }
+    }
+    const playButton = () => screen.getByTitle('Play or pause') as HTMLButtonElement
+
+    it('says so, and does not name the saved playlist as what will play', async () => {
+      leaveAnIntent('track')
+      const { lookupTrack } = slowLookup()
+      mountPanel({ lookupTrack })
+      await act(async () => { await Promise.resolve() })
+
+      const status = screen.getByRole('status').textContent ?? ''
+      expect(status).toContain('Getting the song you chose ready')
+      expect(status).not.toContain('Deep Focus')
+      expect(status).not.toContain('Press play')
+    })
+
+    it('holds Play back, so it cannot start the saved playlist in the meantime', async () => {
+      leaveAnIntent('track')
+      const { lookupTrack } = slowLookup()
+      const { togglePlay } = mountPanel({ lookupTrack })
+      await act(async () => { await Promise.resolve() })
+
+      expect(playButton().disabled).toBe(true)
+      fireEvent.click(playButton())
+      expect(togglePlay).not.toHaveBeenCalled()
+    })
+
+    it('offers the song once it is found, and lets Play start it', async () => {
+      leaveAnIntent('track')
+      const { lookupTrack, release } = slowLookup()
+      const { playTrack, togglePlay } = mountPanel({ lookupTrack })
+      await act(async () => { await Promise.resolve() })
+
+      await act(async () => { release(); await Promise.resolve(); await Promise.resolve() })
+
+      expect(screen.getByRole('status').textContent).toContain('Press play to start Xtal')
+      expect(playButton().disabled).toBe(false)
+      fireEvent.click(playButton())
+      expect(playTrack).toHaveBeenCalledWith(expect.objectContaining({ id: 't1' }), 'panel_music')
+      expect(togglePlay).not.toHaveBeenCalled()
+    })
+
+    // The song is gone either way; what matters is that Play is not left dead.
+    it('gives Play back, with the error shown, if the song cannot be found', async () => {
+      leaveAnIntent('track')
+      const lookupTrack = vi.fn(async () => { throw new Error('Spotify request failed (404).') })
+      mountPanel({ lookupTrack })
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+      expect(playButton().disabled).toBe(false)
+      expect(document.querySelector('.card-footer .error-text')?.textContent).toContain('404')
+    })
+
+    it('does not hold Play back for a playlist, which needs no lookup', async () => {
+      leaveAnIntent('playlist')
+      mountPanel()
+      await act(async () => { await Promise.resolve() })
+
+      expect(playButton().disabled).toBe(false)
+    })
   })
 
   it('is not shown to someone who was connected already and left nothing behind', async () => {
