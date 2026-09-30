@@ -210,13 +210,13 @@ export async function undo(page: Page) {
 }
 
 /**
- * Loads the first bundled sample collection into an Images panel through
- * its own empty-state picker and waits for the picture to be on screen.
+ * Loads the currently featured bundled collection through the Images panel's
+ * collection browser and waits for the picture to be on screen.
  * Setup for the tests that need a picture, not the interaction under test.
  */
 export async function loadSampleImages(page: Page, panelId: string) {
   const shape = await shapeOf(page, panelId)
-  await shape.locator('.empty-stage .sample-collection-card').first().click()
+  await shape.getByRole('button', { name: /^Use .+ collection$/ }).click()
   await expect(shape.locator('img.slideshow-image-layer')).toBeVisible()
   await expect.poll(async () => (await panelById(page, panelId)).config).toMatchObject({ imageSource: { type: 'bundled' } })
 }

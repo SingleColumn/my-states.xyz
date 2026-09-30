@@ -150,9 +150,9 @@ interface SlideshowState {
   isPlayingFor(panelId: string): boolean
   statusFor(panelId: string): string
   errorFor(panelId: string): string | null
-  selectFolder(panelId: string): Promise<boolean>
+  selectFolder(panelId: string): Promise<'selected' | 'cancelled' | 'fallback'>
   importFiles(files: FileList | File[], panelId: string): Promise<void>
-  selectBundledCollection(collectionId: string, panelId: string): Promise<void>
+  selectBundledCollection(collectionId: string, panelId: string): Promise<boolean>
   resetFolder(panelId: string): Promise<void>
   restoreFolder(panelId: string): Promise<void>
   setIsPlaying(value: boolean, panelId?: string): void
@@ -1050,14 +1050,14 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       try {
         const source = panel.config.imageSource
         if (source.type === 'none') {
-          state.status = 'Choose your images or try a sample collection.'
+          state.status = 'Choose an image collection, or use the panel menu for a local folder.'
           return
         }
         let nextImages: ImageItem[]
         if (source.type === 'bundled') {
           const loaded = await createImageItemsFromBundledCollection(source.collectionId)
           if (!loaded) {
-            const message = `The sample collection "${source.collectionId}" is not available in this version.`
+        const message = `The image collection "${source.collectionId}" is not available in this version.`
             state.status = message
             state.error = message
             return
@@ -1141,29 +1141,29 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
   }, [replaceImages])
 
   const selectFolder = useCallback(async (panelId: string) => {
-    if (!moment) return false
+    if (!moment) return 'fallback' as const
     if (!window.showDirectoryPicker) {
       getSlideshowPanelRuntimeState(panelId).error = 'Folder selection is unavailable in this browser. Use the file picker instead.'
       touch()
-      return false
+      return 'fallback' as const
     }
     const openedAt = performance.now()
     try {
       const handle = await window.showDirectoryPicker()
       await savePanelDirectoryHandle(moment.id, panelId, handle)
       await loadImagesFromHandle(handle, panelId)
-      return true
+      return 'selected' as const
     } catch (caught) {
       // A genuine cancel is the end of it. An abort that arrives before a
       // dialog could have appeared means this browser never showed one, and
       // the caller should offer the file input instead.
       if (caught instanceof DOMException && caught.name === 'AbortError') {
-        return isFolderPickerCancelledByUser(caught, performance.now() - openedAt)
+        return isFolderPickerCancelledByUser(caught, performance.now() - openedAt) ? 'cancelled' as const : 'fallback' as const
       }
       const state = getSlideshowPanelRuntimeState(panelId)
       state.error = caught instanceof Error ? caught.message : 'Could not select the folder.'
       touch()
-      return false
+      return 'fallback' as const
     }
   }, [loadImagesFromHandle, moment, touch])
 
@@ -1173,11 +1173,11 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     try {
       const nextImages = await createImageItemsFromBundledCollection(collectionId)
       if (!nextImages) {
-        const message = `The sample collection "${collectionId}" is not available in this version.`
+        const message = `The image collection "${collectionId}" is not available in this version.`
         state.error = message
         state.status = message
         touch()
-        return
+        return false
       }
       if (state.timerId !== null) window.clearTimeout(state.timerId)
       state.timerId = null
@@ -1192,9 +1192,11 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       state.error = null
       if (state.isPlaying) schedulePanelAdvance(panelId)
       touch()
+      return true
     } catch (caught) {
-      state.error = caught instanceof Error ? caught.message : 'Could not load the sample collection.'
+      state.error = caught instanceof Error ? caught.message : 'Could not load the image collection.'
       touch()
+      return false
     }
   }, [schedulePanelAdvance, moment, settingsOf, touch, writeSettings])
 
@@ -1229,7 +1231,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     }
     releaseImageItems(state.images)
     state.images = []
-    state.status = 'Choose your images or try a sample collection.'
+    state.status = 'Choose an image collection, or use the panel menu for a local folder.'
     state.error = null
     const cleared = settingsForClearedImages(current)
     state.sourceKey = imageSourceKey(cleared.imageSource)
@@ -1722,7 +1724,7 @@ function getSlideshowPanelRuntimeState(panelId: string): SlideshowPanelRuntimeSt
     currentIndex: 0,
     sourceKey: null,
     timerId: null,
-    status: 'Choose your images or try a sample collection.',
+    status: 'Choose an image collection, or use the panel menu for a local folder.',
     error: null,
   }
   slideshowPanelRuntimeStates.set(panelId, created)

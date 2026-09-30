@@ -6,10 +6,16 @@ import type { ImageAttribution, ImageItem } from './types'
    the set of collections is written down in this file, so adding one is a
    matter of dropping a folder in. */
 
-export interface BundledCollection {
+/** The source-independent metadata the collection browser needs. */
+export interface CollectionSummary {
   id: string
   title: string
   coverUrl: string | null
+  imageCount?: number
+}
+
+/** Today's manifest always knows its complete image count. */
+export interface BundledCollection extends CollectionSummary {
   imageCount: number
 }
 
@@ -23,6 +29,8 @@ interface ManifestCollection {
   cover: string | null
   images: ManifestImage[]
 }
+
+let bundledManifestRequest: Promise<ManifestCollection[]> | null = null
 
 export async function loadBundledCollections(
   fetchManifest: typeof fetch = fetch,
@@ -62,9 +70,24 @@ export async function createImageItemsFromBundledCollection(
   })
 }
 
-async function readManifest(fetchManifest: typeof fetch): Promise<ManifestCollection[]> {
+function readManifest(fetchManifest: typeof fetch): Promise<ManifestCollection[]> {
+  // Every Images panel may browse independently, but they all read the same
+  // bundled catalog. Share only this immutable source request; carousel and
+  // slideshow runtime state remain panel-local. Injected fetches stay uncached
+  // so tests and other prospective sources retain explicit control.
+  if (fetchManifest !== fetch) return fetchAndReadManifest(fetchManifest)
+  if (!bundledManifestRequest) {
+    bundledManifestRequest = fetchAndReadManifest(fetchManifest).catch((error: unknown) => {
+      bundledManifestRequest = null
+      throw error
+    })
+  }
+  return bundledManifestRequest
+}
+
+async function fetchAndReadManifest(fetchManifest: typeof fetch): Promise<ManifestCollection[]> {
   const response = await fetchManifest('/sample-images/manifest.json', { cache: 'no-cache' })
-  if (!response.ok) throw new Error('Sample collections could not be loaded.')
+  if (!response.ok) throw new Error('Image collections could not be loaded.')
   const value = await response.json() as unknown
 
   if (!isRecord(value) || !Array.isArray(value.collections)) {
