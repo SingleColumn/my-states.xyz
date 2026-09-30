@@ -264,6 +264,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     setChosenPlaylistThisVisit(false)
     setInvitations(0)
     setRestoringSong(false)
+    // The "press play to start…" prompt is about what was chosen before leaving
+    // for Spotify, in the moment it was chosen in. Left standing, another moment
+    // would show it beside its own saved playlist: music nobody picked there.
+    setCameBackToPlay(false)
   }, [moments.activeMoment?.id])
 
   useEffect(() => {

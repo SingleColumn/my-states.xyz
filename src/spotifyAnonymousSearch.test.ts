@@ -430,10 +430,25 @@ describe('A song held for Play, when something else is played', () => {
     expect(result.current.selectedTrack).toBeNull()
   })
 
-  it('is dropped when a different song starts playing', async () => {
+  // The song just started is what Play is for until the player reports it. If
+  // it were cleared at once, a second press of Play in that gap would find
+  // nothing held and start the moment's saved playlist over it. Found in review.
+  it('becomes the song that was just started, so a second Play cannot replace it', async () => {
     const result = await connectedWithASongHeld()
-    await act(async () => { await result.current.playTrack({ ...song, id: 't2', uri: 'spotify:track:t2', name: 'Another' }, 'panel_music') })
-    expect(result.current.selectedTrack).toBeNull()
+    const another = { ...song, id: 't2', uri: 'spotify:track:t2', name: 'Another' }
+
+    await act(async () => { await result.current.playTrack(another, 'panel_music') })
+
+    expect(result.current.selectedTrack).toEqual(another)
+    expect(result.current.selectedTrack).not.toEqual(song)
+  })
+
+  it('is still held after the very song it was held for starts playing', async () => {
+    const result = await connectedWithASongHeld()
+
+    await act(async () => { await result.current.playTrack(song, 'panel_music') })
+
+    expect(result.current.selectedTrack).toEqual(song)
   })
 
   // If playing fails the song was not superseded, and is still what Play is for.

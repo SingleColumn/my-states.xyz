@@ -1051,6 +1051,50 @@ describe('Music panel on returning from connecting Spotify', () => {
     })
   })
 
+  // Found in review: the prompt is about what was chosen before leaving for
+  // Spotify, in the moment it was chosen in. Another moment must not show it
+  // beside its own saved playlist, for music nobody picked there.
+  it('stops saying "press play" when another moment is opened', async () => {
+    leaveAnIntent('playlist')
+    const { rerender } = mountPanel()
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByRole('status').textContent).toContain('Press play to start')
+
+    panel.momentId = 'moment_2'
+    rerender()
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  // A song just started stays what Play is for until the player reports it, so a
+  // second press in that gap asks for the same song again and never falls to the
+  // saved playlist. Found in review.
+  it('starts the song again, not the saved playlist, when Play is pressed twice before the player reports', async () => {
+    const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
+    leaveAnIntent('track')
+    const { playTrack, togglePlay } = mountPanel({ selectedTrack: song, lookupTrack: vi.fn(async () => {}) })
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+
+    fireEvent.click(screen.getByTitle('Play or pause'))
+    fireEvent.click(screen.getByTitle('Play or pause'))
+
+    expect(playTrack).toHaveBeenCalledTimes(2)
+    expect(playTrack).toHaveBeenNthCalledWith(2, song, 'panel_music')
+    expect(togglePlay).not.toHaveBeenCalled()
+  })
+
+  it('lets the held song go once the player reports what is playing', async () => {
+    const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
+    const { rerender, selectTrack } = mountPanel({ selectedTrack: song })
+    await act(async () => { await Promise.resolve() })
+    expect(selectTrack).not.toHaveBeenCalledWith(null)
+
+    spotify.state.track = { title: 'Xtal', artist: 'Aphex Twin', album: 'SAW 85-92', albumArt: null, url: null, durationMs: 1000, positionMs: 0, paused: false }
+    rerender()
+
+    expect(selectTrack).toHaveBeenCalledWith(null)
+  })
+
   it('is not shown to someone who was connected already and left nothing behind', async () => {
     mountPanel()
     await act(async () => { await Promise.resolve() })

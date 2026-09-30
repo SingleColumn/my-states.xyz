@@ -1643,10 +1643,13 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) }))
-    // Playback has been accepted, so whatever song was being held for Play is
-    // superseded. The player only reports what is playing some moments later,
-    // and until it does the held song would still outrank this in the panel.
-    changeSelectedTrack(null)
+    // Playback has been accepted, and this is now the song Play is for. It has
+    // to stay that way until the player reports what is playing, which it does
+    // some moments later: cleared here, a second press of Play in that gap would
+    // find nothing held and fall through to the moment's saved playlist,
+    // replacing the song that was just started. Held, a second press only asks
+    // for the same song again. The panel lets it go when the player reports.
+    changeSelectedTrack(summary)
     setStatus(`Playing ${summary.name} by ${summary.artists}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify])
