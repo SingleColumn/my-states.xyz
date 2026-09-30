@@ -73,7 +73,10 @@ export function mapPlaylist(item: SpotifyPlaylistApiItem): SpotifyPlaylistSummar
     url: item.external_urls?.spotify ?? '',
     image: item.images?.[0]?.url ?? null,
     owner: item.owner?.display_name ?? 'Spotify',
-    trackCount: item.items?.total ?? item.tracks?.total ?? 0,
+    // Playlist-detail responses use `tracks.total`. Some Spotify responses
+    // also expose an `items.total` compatibility field, which can be zero even
+    // when the canonical tracks count is populated, so prefer tracks first.
+    trackCount: item.tracks?.total ?? item.items?.total ?? 0,
   }
 }
 

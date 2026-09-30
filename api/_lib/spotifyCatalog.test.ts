@@ -181,6 +181,14 @@ describe('Catalog search results', () => {
 })
 
 describe('Curated playlist lookup', () => {
+  it('prefers the canonical tracks count when an items compatibility count is also present', async () => {
+    const stub = spotifyStub(json({ ...playlistItem, items: { total: 0 } }))
+    const result = await handleCuratedPlaylists(params({ ids: 'p1' }), { env, fetch: stub.fetch })
+
+    expect(result.status).toBe(200)
+    expect((result.body as { items: Array<{ trackCount: number }> }).items[0]?.trackCount).toBe(42)
+  })
+
   it('reads each id and keeps the order it was asked in', async () => {
     const second = { ...playlistItem, id: 'p2', name: 'Night Kitchen', uri: 'spotify:playlist:p2' }
     const stub = spotifyStub(json(playlistItem), json(second))
