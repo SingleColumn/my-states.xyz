@@ -189,6 +189,16 @@ describe('Curated playlist lookup', () => {
     expect((result.body as { items: Array<{ trackCount: number }> }).items[0]?.trackCount).toBe(42)
   })
 
+  it('fills a zero playlist-detail count from the tracks endpoint', async () => {
+    const detail = { ...playlistItem, tracks: { total: 0 } }
+    const stub = spotifyStub(json(detail), json({ total: 245, items: [] }))
+    const result = await handleCuratedPlaylists(params({ ids: 'p1' }), { env, fetch: stub.fetch })
+
+    expect(result.status).toBe(200)
+    expect((result.body as { items: Array<{ trackCount: number }> }).items[0]?.trackCount).toBe(245)
+    expect(stub.calls.at(-1)).toContain('/playlists/p1/tracks?limit=1')
+  })
+
   it('reads each id and keeps the order it was asked in', async () => {
     const second = { ...playlistItem, id: 'p2', name: 'Night Kitchen', uri: 'spotify:playlist:p2' }
     const stub = spotifyStub(json(playlistItem), json(second))

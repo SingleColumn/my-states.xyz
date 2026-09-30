@@ -125,7 +125,20 @@ export async function handleCuratedPlaylists(params: URLSearchParams, deps: Cata
   return respond(async () => {
     const found = await Promise.all(ids.map(async (id) => {
       try {
-        return mapPlaylist(await spotifyAppFetch<SpotifyPlaylistApiItem>(`/playlists/${encodeURIComponent(id)}`, deps))
+        const playlist = mapPlaylist(await spotifyAppFetch<SpotifyPlaylistApiItem>(`/playlists/${encodeURIComponent(id)}`, deps))
+        if (playlist.trackCount > 0) return playlist
+
+        // Some playlist-detail responses expose a zero/placeholder count.
+        // The tracks endpoint carries the authoritative total, without
+        // downloading any track items when limit=1.
+        try {
+          const tracks = await spotifyAppFetch<SpotifyPlaylistTracksPage>(`/playlists/${encodeURIComponent(id)}/tracks?limit=1`, deps)
+          return { ...playlist, trackCount: tracks.total ?? playlist.trackCount }
+        } catch {
+          // Keep valid playlist metadata if Spotify does not allow the tracks
+          // subresource for this playlist.
+          return playlist
+        }
       } catch (caught) {
         if (isPlaylistUnavailable(caught)) return null
         throw caught
@@ -133,6 +146,10 @@ export async function handleCuratedPlaylists(params: URLSearchParams, deps: Cata
     }))
     return { status: 200, body: { items: found.filter(isPresent) }, headers: cacheFor(3600) }
   })
+}
+
+interface SpotifyPlaylistTracksPage {
+  total?: number
 }
 
 /**
