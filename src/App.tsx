@@ -116,11 +116,13 @@ function AppContent() {
     const error = params.get('error')
 
     if (error) {
+      spotify.reportSignInFailure()
       setCallbackStatus(`Spotify login failed: ${error}`)
       window.history.replaceState({}, '', '/')
       return
     }
     if (!code) {
+      spotify.reportSignInFailure()
       setCallbackStatus('Spotify did not return an authorization code.')
       window.history.replaceState({}, '', '/')
       return

@@ -71,18 +71,23 @@ import {
 import {
   exchangeSpotifyCode,
   getSpotifyPlaybackAction,
+  isSpotifyPlaylistApiItem,
+  isSpotifyTrackApiItem,
   mapPlaylist,
   mapTrack,
   parseSpotifyPlaylistUrl,
   refreshSpotifyToken,
   SpotifyPlaylistApiItem,
+  SpotifyPlaylistSearchResult,
   SpotifyPlaylistSummary,
   SpotifyAuthenticationError,
   SpotifyTrackApiItem,
+  SpotifyTrackSearchResult,
   SpotifyTrackSummary,
   spotifyFetch,
   startSpotifyLogin,
 } from './spotify'
+import { fetchCuratedPlaylists, searchCatalogPlaylists, searchCatalogTracks } from './spotifyCatalog'
 
 const supportedImagePattern = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i
 
@@ -167,6 +172,13 @@ interface SpotifyState {
   playlists: SpotifyPlaylistSummary[]
   tracks: SpotifyTrackSummary[]
   track: SpotifyTrackState | null
+  /**
+   * A song someone picked out of the results without playing it. Runtime
+   * only, and never part of a moment: a moment remembers a playlist, which
+   * is what the panel is for, and a chosen song is a step on the way to one
+   * rather than something to reopen a moment on.
+   */
+  selectedTrack: SpotifyTrackSummary | null
   deviceId: string | null
   isReady: boolean
   status: string
@@ -175,11 +187,29 @@ interface SpotifyState {
   logout(): void
   clearSearchResults(): void
   handleCallback(code: string, state: string | null): Promise<void>
+  /**
+   * True once a sign-in that left for Spotify has come back without succeeding:
+   * cancelled there, refused, or its code could not be exchanged. The panel uses
+   * it to give back what the visitor was doing, which a success gives back by
+   * another route.
+   */
+  signInFailed: boolean
+  /** For the ways a callback fails before there is a code to exchange. */
+  reportSignInFailure(): void
   playlistsHaveMore: boolean
   loadMorePlaylists(): Promise<void>
   searchPlaylists(query: string): Promise<void>
   searchTracks(query: string): Promise<void>
   loadPlaylistFromUrl(url: string, panelId?: string): Promise<void>
+  /**
+   * Makes a playlist the panel's loaded one without playing it. Choosing and
+   * playing are two things: someone browsing before they have connected
+   * Spotify can do the first, and only the second needs their account.
+   */
+  selectPlaylist(summary: SpotifyPlaylistSummary, panelId?: string): void
+  selectTrack(summary: SpotifyTrackSummary | null): void
+  /** Reads one song's public details by id — how a song chosen before connecting is found again afterwards. */
+  lookupTrack(trackId: string): Promise<void>
   playPlaylist(summary?: SpotifyPlaylistSummary, panelId?: string): Promise<void>
   playTrack(summary: SpotifyTrackSummary, panelId?: string): Promise<void>
   togglePlay(panelId?: string): Promise<void>
@@ -1336,9 +1366,24 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
   const [track, setTrack] = useState<SpotifyTrackState | null>(null)
+  const [selectedTrack, setSelectedTrack] = useState<SpotifyTrackSummary | null>(null)
+  // Counts every deliberate change to the held song: chosen, cleared, or
+  // superseded by playing something. A lookup still in flight when that
+  // happens is answering a question about an earlier state — the visitor may
+  // have opened another moment, cleared the search or picked something else —
+  // and must not put its answer back.
+  const selectedTrackEpochRef = useRef(0)
+  const changeSelectedTrack = useCallback((next: SpotifyTrackSummary | null) => {
+    selectedTrackEpochRef.current += 1
+    setSelectedTrack(next)
+  }, [])
+  const [signInFailed, setSignInFailed] = useState(false)
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
-  const [status, setStatus] = useState('Log in to Spotify to play a playlist.')
+  // Only the connected panel shows this line, and it shows it before the
+  // browser device has reported in. Asking someone to log in was wrong there
+  // even before searching stopped needing a session: they already had one.
+  const [status, setStatus] = useState('Choose a playlist to play.')
   const [error, setError] = useState<string | null>(null)
   const playerRef = useRef<Spotify.Player | null>(null)
   const tokensRef = useRef(tokens)
@@ -1380,7 +1425,8 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     setPlaylists([])
     setTracks([])
     setTrack(null)
-  }, [moment?.id])
+    changeSelectedTrack(null)
+  }, [moment?.id, changeSelectedTrack])
 
   useEffect(() => {
     saveSpotifyTokens(tokens)
@@ -1485,24 +1531,43 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   // panel can still show which playlist is loaded.
   const savedPlaylist = spotifyPanel?.config.playlist
   const playlistMissingArtwork = savedPlaylist?.id && !savedPlaylist.image ? savedPlaylist.id : null
+  // What has been asked about, and by which way of asking. "Once" means once
+  // per playlist per way: the app can only describe a public playlist, so
+  // "nothing found" before connecting says nothing about what the visitor's own
+  // account can see, and must not stop the lookup being made with it later.
   const artworkLookupsRef = useRef(new Set<string>())
 
   useEffect(() => {
-    if (!playlistMissingArtwork || !tokens || artworkLookupsRef.current.has(playlistMissingArtwork)) return
-    artworkLookupsRef.current.add(playlistMissingArtwork)
+    if (!playlistMissingArtwork) return
+    const lookupKey = `${playlistMissingArtwork}:${tokens ? 'user' : 'app'}`
+    if (artworkLookupsRef.current.has(lookupKey)) return
+    artworkLookupsRef.current.add(lookupKey)
     let cancelled = false
+    let answered = false
     void (async () => {
       try {
-        const fresh = await ensureFreshTokens()
-        const summary = mapPlaylist(await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${playlistMissingArtwork}`, fresh.accessToken))
-        if (cancelled || !summary.image) return
+        // Artwork is public, so this works before anyone connects too: the
+        // catalog endpoint answers the same question with the application's
+        // credentials. An imported moment therefore shows its cover either way.
+        const summary = tokens
+          ? mapPlaylist(await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${playlistMissingArtwork}`, (await ensureFreshTokens()).accessToken))
+          : (await fetchCuratedPlaylists([playlistMissingArtwork]))[0]
+        answered = true
+        if (cancelled || !summary?.image) return
         setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, undefined, { history: 'ignore' })
       } catch {
         // Artwork is decoration: a failed lookup must not interrupt playback.
+        // Nor is it final. Forgetting the attempt lets the next thing that
+        // changes — connecting Spotify, most likely — try again.
+        if (!cancelled) artworkLookupsRef.current.delete(lookupKey)
       }
     })()
     return () => {
       cancelled = true
+      // Cut off before it could say anything (the visitor finished connecting
+      // while it was in flight): the attempt did not happen, so the run that
+      // replaces this one must be free to make it.
+      if (!answered) artworkLookupsRef.current.delete(lookupKey)
     }
   }, [ensureFreshTokens, playlistMissingArtwork, setMomentPlaylist, tokens])
 
@@ -1528,15 +1593,61 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     setStatus('Logged out of Spotify.')
   }, [])
   const handleCallback = useCallback(async (code: string, state: string | null) => {
-    setTokens(await exchangeSpotifyCode(code, state))
+    try {
+      setTokens(await exchangeSpotifyCode(code, state))
+    } catch (caught) {
+      setSignInFailed(true)
+      throw caught
+    }
+    setSignInFailed(false)
     setStatus('Spotify login complete.')
     setError(null)
   }, [])
+  const reportSignInFailure = useCallback(() => setSignInFailed(true), [])
 
-  const fetchPlaylistPage = useCallback(async (query: string, offset: number, accessToken: string) => {
+  /**
+   * One page of playlists, from whichever Spotify the asker has.
+   *
+   * Connected, that is Spotify itself with the visitor's own token, which is
+   * what makes their results theirs. Not connected, it is this app's own
+   * endpoint, which asks Spotify with the application's credentials — the
+   * public catalog, and nothing that belongs to anybody.
+   *
+   * Both answer in the same shape, already mapped, because everything above
+   * this line (the thin-first-page rule, the cursor, de-duplication, the
+   * sequence guard) has no business knowing which of the two it got.
+   */
+  const fetchPlaylistPage = useCallback(async (query: string, offset: number, accessToken: string | null): Promise<SpotifyPlaylistSearchResult> => {
+    if (accessToken === null) return searchCatalogPlaylists(query, offset)
     const params = new URLSearchParams({ q: query, type: 'playlist', limit: String(searchResultLimit), offset: String(offset) })
-    return requestSpotify(() => spotifyFetch<SpotifyPlaylistSearchPage>(`/search?${params.toString()}`, accessToken))
+    const page = await requestSpotify(() => spotifyFetch<SpotifyPlaylistSearchPage>(`/search?${params.toString()}`, accessToken))
+    return {
+      items: page.playlists.items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist),
+      hasMore: Boolean(page.playlists.next),
+    }
   }, [requestSpotify])
+
+  // A search can take two requests (a thin first page is followed at once by a
+  // second), and both must use the token this refreshes. Each `ensureFreshTokens`
+  // call reads the `tokens` its render closed over, so a second call inside the
+  // same search would find it still near expiry and refresh it again: a second
+  // use of a refresh token that may already have been rotated, and a failure
+  // there ends a session the first refresh had just renewed. Null when signed
+  // out, which is the anonymous route.
+  const searchAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!tokens) return null
+    return (await ensureFreshTokens()).accessToken
+  }, [ensureFreshTokens, tokens])
+
+  const fetchTrackPage = useCallback(async (query: string): Promise<SpotifyTrackSearchResult> => {
+    if (!tokens) return searchCatalogTracks(query)
+    const fresh = await ensureFreshTokens()
+    const result = await requestSpotify(() => spotifyFetch<{ tracks: { items: Array<SpotifyTrackApiItem | null> } }>(
+      `/search?${new URLSearchParams({ q: query, type: 'track', limit: String(searchResultLimit) }).toString()}`,
+      fresh.accessToken,
+    ))
+    return { items: result.tracks.items.filter(isSpotifyTrackApiItem).map(mapTrack) }
+  }, [ensureFreshTokens, requestSpotify, tokens])
 
   const searchPlaylists = useCallback(async (query: string) => {
     const sequence = ++searchSequenceRef.current
@@ -1547,32 +1658,33 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
       playlistCursorRef.current = null
       return
     }
-    const fresh = await ensureFreshTokens()
-    const first = await fetchPlaylistPage(trimmed, 0, fresh.accessToken)
+    const accessToken = await searchAccessToken()
+    if (sequence !== searchSequenceRef.current) return
+    const first = await fetchPlaylistPage(trimmed, 0, accessToken)
     if (sequence !== searchSequenceRef.current) return
 
-    let items = [...first.playlists.items]
+    let items = [...first.items]
     let offset = searchResultLimit
-    let next = first.playlists.next
+    let hasMore = first.hasMore
 
     // Spotify blanks entries in playlist search results: a full page of ten
     // came back carrying six real playlists for "dark techno" (measured
-    // 2026-09-27). A thin first page is the one case worth a second request
+    // 2026-09-27), and the blanks are already dropped by the time a page
+    // reaches here. A thin first page is the one case worth a second request
     // straight away, so a search does not open on a near-empty list.
-    if (next && items.filter(isSpotifyPlaylistApiItem).length < minFirstPageResults) {
-      const second = await fetchPlaylistPage(trimmed, offset, fresh.accessToken)
+    if (hasMore && items.length < minFirstPageResults) {
+      const second = await fetchPlaylistPage(trimmed, offset, accessToken)
       if (sequence !== searchSequenceRef.current) return
-      items = items.concat(second.playlists.items)
+      items = items.concat(second.items)
       offset += searchResultLimit
-      next = second.playlists.next
+      hasMore = second.hasMore
     }
 
-    const mapped = items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist)
-    setPlaylists([...new Map(mapped.map((item) => [item.id, item])).values()])
+    setPlaylists([...new Map(items.map((item) => [item.id, item])).values()])
     playlistCursorRef.current = { query: trimmed, offset }
-    setPlaylistsHaveMore(Boolean(next))
+    setPlaylistsHaveMore(hasMore)
     setError(null)
-  }, [ensureFreshTokens, fetchPlaylistPage])
+  }, [fetchPlaylistPage, searchAccessToken])
 
   // Asked for by the person reading the list, so it appends rather than
   // replacing, and a search started in the meantime cancels it.
@@ -1580,15 +1692,15 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const cursor = playlistCursorRef.current
     if (!cursor) return
     const sequence = searchSequenceRef.current
-    const fresh = await ensureFreshTokens()
-    const page = await fetchPlaylistPage(cursor.query, cursor.offset, fresh.accessToken)
+    const accessToken = await searchAccessToken()
+    if (sequence !== searchSequenceRef.current) return
+    const page = await fetchPlaylistPage(cursor.query, cursor.offset, accessToken)
     if (sequence !== searchSequenceRef.current || playlistCursorRef.current?.query !== cursor.query) return
-    const mapped = page.playlists.items.filter(isSpotifyPlaylistApiItem).map(mapPlaylist)
-    setPlaylists((current) => [...new Map([...current, ...mapped].map((item) => [item.id, item])).values()])
+    setPlaylists((current) => [...new Map([...current, ...page.items].map((item) => [item.id, item])).values()])
     playlistCursorRef.current = { query: cursor.query, offset: cursor.offset + searchResultLimit }
-    setPlaylistsHaveMore(Boolean(page.playlists.next))
+    setPlaylistsHaveMore(page.hasMore)
     setError(null)
-  }, [ensureFreshTokens, fetchPlaylistPage])
+  }, [fetchPlaylistPage, searchAccessToken])
 
   const searchTracks = useCallback(async (query: string) => {
     const sequence = ++searchSequenceRef.current
@@ -1597,16 +1709,11 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
       setTracks([])
       return
     }
-    const fresh = await ensureFreshTokens()
-    const result = await requestSpotify(() => spotifyFetch<{ tracks: { items: Array<SpotifyTrackApiItem | null> } }>(
-      `/search?${new URLSearchParams({ q: buildTrackSearchQuery(trimmed), type: 'track', limit: String(searchResultLimit) }).toString()}`,
-      fresh.accessToken,
-    ))
+    const result = await fetchTrackPage(buildTrackSearchQuery(trimmed))
     if (sequence !== searchSequenceRef.current) return
-    const mapped = result.tracks.items.filter(isSpotifyTrackApiItem).map(mapTrack)
-    setTracks(rankTracks(mapped, trimmed))
+    setTracks(rankTracks(result.items, trimmed))
     setError(null)
-  }, [ensureFreshTokens, requestSpotify])
+  }, [fetchTrackPage])
 
   const loadPlaylistFromUrl = useCallback(async (url: string, panelId?: string) => {
     const id = parseSpotifyPlaylistUrl(url)
@@ -1618,11 +1725,48 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
+    // Playback has been accepted, so whatever song was being held for Play is
+    // superseded. The player only reports what is playing some moments later,
+    // and until it does the held song would still outrank this in the panel.
+    changeSelectedTrack(null)
     setMomentPlaylist(selected, panelId)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
     setStatus(`Playing ${summary.name}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify, setMomentPlaylist])
+
+  /**
+   * Choosing a playlist, which is not the same as playing it. A visitor who
+   * has not connected Spotify can still say which playlist this panel is
+   * about; playback is the step that needs their account, and it is offered
+   * separately rather than smuggled into the click that chose the playlist.
+   */
+  const selectPlaylist = useCallback((summary: SpotifyPlaylistSummary, panelId?: string) => {
+    setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, panelId)
+    // The newest choice is the one that counts. A song chosen earlier outranks
+    // the panel's playlist wherever the panel decides what is chosen, so it has
+    // to go, or the panel keeps describing — and, after connecting, plays — the
+    // song instead of the playlist that was just picked.
+    changeSelectedTrack(null)
+    setStatus(`${summary.name} is ready.`)
+    setError(null)
+  }, [setMomentPlaylist])
+
+  const selectTrack = useCallback((summary: SpotifyTrackSummary | null) => {
+    changeSelectedTrack(summary)
+    if (summary) setError(null)
+  }, [])
+
+  const lookupTrack = useCallback(async (trackId: string) => {
+    if (!tokens) return
+    // What the held song was when this was asked. If it has been changed by
+    // the time the answer arrives, the answer is stale and is dropped.
+    const epoch = selectedTrackEpochRef.current
+    const fresh = await ensureFreshTokens()
+    const item = await requestSpotify(() => spotifyFetch<SpotifyTrackApiItem>(`/tracks/${encodeURIComponent(trackId)}`, fresh.accessToken))
+    if (selectedTrackEpochRef.current !== epoch) return
+    setSelectedTrack(mapTrack(item))
+  }, [ensureFreshTokens, requestSpotify, tokens])
 
   const playPlaylist = useCallback(async (summary?: SpotifyPlaylistSummary, panelId?: string) => {
     const panelPlaylist = (panelId ? panels.get(panelId) : undefined)?.type === 'spotify' ? (panels.get(panelId!) as Panel<'spotify'>).config.playlist : undefined
@@ -1632,6 +1776,10 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
+    // Playback has been accepted, so whatever song was being held for Play is
+    // superseded. The player only reports what is playing some moments later,
+    // and until it does the held song would still outrank this in the panel.
+    changeSelectedTrack(null)
     setMomentPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
@@ -1642,6 +1790,13 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) }))
+    // Playback has been accepted, and this is now the song Play is for. It has
+    // to stay that way until the player reports what is playing, which it does
+    // some moments later: cleared here, a second press of Play in that gap would
+    // find nothing held and fall through to the moment's saved playlist,
+    // replacing the song that was just started. Held, a second press only asks
+    // for the same song again. The panel lets it go when the player reports.
+    changeSelectedTrack(summary)
     setStatus(`Playing ${summary.name} by ${summary.artists}.`)
     setError(null)
   }, [deviceId, ensureFreshTokens, requestSpotify])
@@ -1664,7 +1819,8 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   }, [playPlaylist, panels, track])
 
   return {
-    tokens, playlists, tracks, track, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, searchPlaylists, searchTracks, loadPlaylistFromUrl, playPlaylist, playTrack,
+    tokens, playlists, tracks, track, selectedTrack, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, signInFailed, reportSignInFailure, searchPlaylists, searchTracks, loadPlaylistFromUrl,
+    selectPlaylist, selectTrack, lookupTrack, playPlaylist, playTrack,
     playlistsHaveMore, loadMorePlaylists,
     togglePlay,
     previousTrack: async () => playerRef.current?.previousTrack(),
@@ -1754,10 +1910,6 @@ export const panelRuntime = {
 function spotifyUrlFromUri(uri?: string) {
   const match = uri?.match(/^spotify:(track|episode):([A-Za-z0-9]+)$/)
   return match ? `https://open.spotify.com/${match[1]}/${match[2]}` : null
-}
-
-function isSpotifyTrackApiItem(item: SpotifyTrackApiItem | null): item is SpotifyTrackApiItem {
-  return Boolean(item?.id && item.name && item.uri)
 }
 
 function buildTrackSearchQuery(query: string) {
@@ -1878,6 +2030,3 @@ function loadSpotifySdk() {
   })
 }
 
-function isSpotifyPlaylistApiItem(item: SpotifyPlaylistApiItem | null): item is SpotifyPlaylistApiItem {
-  return Boolean(item?.id && item.name && item.uri)
-}

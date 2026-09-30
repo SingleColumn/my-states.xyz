@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./tsconfig.api.tsbuildinfo",
+    // The server functions are Web handlers: Request, Response, URL and fetch
+    // are the whole of what they use, and all four are in the DOM lib the app
+    // project already asks for. No Node types are needed; `process` is
+    // declared in api/_lib/env.d.ts.
+    "types": []
+  },
+  "include": ["api"]
+}

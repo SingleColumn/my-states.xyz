@@ -3,7 +3,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // The server functions under api/ are covered here too: their logic is
+    // plain functions over a URLSearchParams and an injected fetch, so they
+    // are tested the same way everything else is, with Spotify mocked.
+    include: ['src/**/*.test.ts', 'api/**/*.test.ts'],
     setupFiles: ['./src/test/setup.ts'],
     // Keep the suite in one worker. Several tests import tldraw and the
     // Spotify search modules; parallel fork startup can time out on Windows

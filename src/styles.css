@@ -1052,25 +1052,24 @@ input[type="range"]:focus-visible {
   stroke-width: var(--icon-stroke-width);
 }
 
-.spotify-login {
+/* The focus view, with no Spotify session. The full view can offer search
+   and six suggestions; this one is a few centimetres tall, so all it says is
+   which playlist is chosen and that playing it needs Spotify. */
+.spotify-focus-connect {
   display: grid;
   align-content: center;
   gap: var(--space-spotify-login-gap);
   min-height: 100%;
   padding: var(--card-padding);
+  text-align: center;
 }
 
-.spotify-login h3 {
-  margin: 0 0 var(--space-spotify-title-bottom);
-  font-size: var(--font-size-spotify-login-title);
-  /* Explicit because the browser default (bold) would otherwise make this
-     heavier than the matching headings in the Images and Notes empty states.
-     Medium across all three: at semibold every line in a panel was bold, so
-     weight had stopped separating anything. */
-  font-weight: var(--font-weight-medium);
+.spotify-focus-connect .loaded-playlist {
+  margin-bottom: 0;
+  justify-items: center;
 }
 
-.spotify-login p,
+.spotify-focus-connect p,
 .muted {
   margin: 0;
   color: var(--color-text-muted);
@@ -1305,7 +1304,11 @@ input[type="range"]:focus-visible {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-row-gap);
-  margin-top: var(--space-input-row-top);
+  /* The search field's focus ring reaches out by its width plus its offset.
+     Spaced by the row gap alone, the ring ended a few pixels from these
+     buttons and read as touching them; the ring's own reach is added, so the
+     clear space between field and buttons is still the row gap. */
+  margin-top: calc(var(--space-input-row-top) + var(--focus-ring-width) + var(--focus-ring-offset));
 }
 
 /* These two tidy up after a search; the field starts one. At the wide
@@ -1319,18 +1322,6 @@ input[type="range"]:focus-visible {
   border-radius: var(--radius-control);
   color: var(--color-input-placeholder);
   font-weight: var(--font-weight-regular);
-}
-
-/* The select ends where the Reset button's midpoint falls, so the field starts
-   on a line the row below explains rather than at an arbitrary offset. Two
-   equal buttons put that midpoint at a quarter of the row. */
-.spotify-search-row select {
-  flex: 0 0 max(var(--size-form-select-min), calc((100% - var(--space-row-gap)) / 4));
-  width: auto;
-  min-width: 0;
-  /* Beats .app-dropdown's !important, so the four controls in these two rows
-     share one corner instead of the select keeping the dropdown's. */
-  border-radius: var(--radius-control) !important;
 }
 
 .spotify-search-actions .spotify-reset-button {
@@ -1374,6 +1365,207 @@ input[type="range"]:focus-visible {
 
 .spotify-show-search {
   margin-bottom: var(--space-playlist-top);
+}
+
+/* Connecting Spotify sits in the same row as Reset fields, which is styled
+   down to the field's weight so the search leads. This one is the offer that
+   row exists to carry, so it keeps the primary fill and the control weight
+   the rest of the panel's primary actions have. */
+.spotify-search-actions .spotify-connect {
+  background: var(--card-primary-bg);
+  border-color: var(--card-primary-border);
+  color: var(--card-primary-icon);
+  font-weight: var(--font-weight-control);
+}
+
+/* Someone has just clicked a playlist and only connecting Spotify can play it,
+   so the button that does that draws the eye. It is the same slow halo as the
+   About button's — three pulses over twenty seconds, each rising over ~1.4s,
+   holding ~1.6s and fading over ~2s — in the same theme colour, so the two
+   read as one family of "look here". Unlike the About button it rests in this
+   button's own primary colours rather than the neutral ones. */
+.spotify-connect.is-inviting {
+  animation: spotify-connect-invite 20s ease-in-out 1;
+}
+
+@keyframes spotify-connect-invite {
+  0%,
+  5%,
+  30%,
+  38%,
+  63%,
+  71%,
+  96%,
+  100% {
+    border-color: var(--card-primary-border);
+    background: var(--card-primary-bg);
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 0 0 transparent;
+  }
+  12%,
+  20%,
+  45%,
+  53%,
+  78%,
+  86% {
+    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-primary-border));
+    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-primary-bg));
+    box-shadow:
+      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
+      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
+  }
+}
+
+/* No movement was asked for, but the invitation is still worth making: the
+   glow at its brightest, held still for as long as the choice stands. */
+@media (prefers-reduced-motion: reduce) {
+  .spotify-connect.is-inviting {
+    animation: none;
+    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-primary-border));
+    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-primary-bg));
+    box-shadow:
+      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
+      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
+  }
+}
+
+/*
+ * Suggestions — what an empty panel offers instead of an empty list. They
+ * occupy the room the results would, and give it straight back the moment
+ * there is a search to answer, so the two never compete for the same space.
+ *
+ * Deliberately outside the whole-row measurement the results list uses: this
+ * is a grid of whole cards that is either shown or not, with no half-card to
+ * round away.
+ */
+.spotify-suggestions {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: var(--space-playlist-top);
+  margin-bottom: var(--space-playlist-bottom);
+}
+
+.spotify-suggestions-heading {
+  margin: 0 0 var(--space-spotify-title-bottom);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-spotify-login-title);
+  /* Medium, matching the other panels' empty-state headings: at semibold
+     every line in a panel is bold and weight stops separating anything. */
+  font-weight: var(--font-weight-medium);
+}
+
+.spotify-suggestion-grid {
+  display: grid;
+  /* Three across in a panel at its default width, two in a narrow one, and
+     never one card stretched over the whole row. Three rather than four
+     because six cards then fill two even rows instead of leaving a ragged
+     pair on the second, and the covers are big enough to tell apart. */
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  align-content: start;
+  gap: var(--space-playlist-gap);
+  min-height: 0;
+  overflow: auto;
+  padding-right: var(--space-playlist-padding-inline-end);
+}
+
+.suggestion-card {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--space-control-inner-gap);
+  min-width: 0;
+  padding: var(--space-playlist-padding);
+  border: var(--border-width-hairline) solid var(--color-panel-divider);
+  border-radius: var(--radius-playlist-card);
+  background: var(--color-card-bg);
+  color: var(--color-input-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.suggestion-card:hover {
+  background: var(--color-card-bg-hover);
+}
+
+/* The chosen one, marked the way a current playlist row is, so a click that
+   landed leaves something behind to show for it. */
+.suggestion-card.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.suggestion-card:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.suggestion-card:disabled:hover {
+  background: var(--color-card-bg);
+}
+
+.suggestion-card img,
+.suggestion-card-art {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--content-radius);
+  background: var(--color-album-empty);
+  object-fit: cover;
+}
+
+.suggestion-card strong {
+  overflow: hidden;
+  color: var(--color-input-text);
+  font-size: var(--font-size-playlist-meta);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
+  /* Two lines of title, then an ellipsis: a long playlist name must not make
+     one card taller than the five beside it. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Below search and below Connect Spotify in the order of things, so it is
+   drawn as a link rather than as a third button competing with them. */
+.spotify-suggestions-shuffle {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  gap: var(--space-control-inner-gap);
+  margin-top: var(--space-playlist-gap);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-playlist-meta);
+}
+
+.spotify-suggestions-shuffle:hover {
+  color: var(--color-text);
+}
+
+/* What is chosen and not yet playing: a line saying what happens next. Plain
+   words in the muted colour, not a card and not a control — the panel has one
+   button for connecting Spotify and this only explains why it is there. */
+.spotify-chosen {
+  display: grid;
+  gap: var(--space-control-inner-gap);
+  margin-bottom: var(--space-now-playing-bottom);
+}
+
+.spotify-chosen .track-copy {
+  margin: 0;
+}
+
+.spotify-chosen-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-playlist-meta);
+  line-height: var(--line-height-body);
+  text-wrap: balance;
 }
 
 .playlist-option {
