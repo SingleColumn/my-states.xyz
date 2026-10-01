@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CollectionSummary } from '../imageCollections'
 import {
   CollectionBrowser,
+  collectionCaptionHandoffMs,
   collectionCoverTransitionMs,
   collectionInitialRotationDelayMs,
   collectionRotationIntervalMs,
@@ -93,16 +94,51 @@ describe('CollectionBrowser', () => {
   })
 
   it('moves next and previous with wraparound', () => {
+    vi.useFakeTimers()
     renderBrowser()
     const previous = screen.getByRole('button', { name: 'Previous collection' })
     const next = screen.getByRole('button', { name: 'Next collection' })
 
     fireEvent.click(previous)
+    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Gamma' })).toBeTruthy()
     fireEvent.click(next)
+    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
     fireEvent.click(next)
+    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+  })
+
+  it('hands the caption over after the incoming cover becomes visible', () => {
+    vi.useFakeTimers()
+    renderBrowser()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next collection' }))
+    expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
+
+    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs - 1))
+    expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+  })
+
+  it('keeps the previous cover underneath while the next cover fades in', () => {
+    vi.useFakeTimers()
+    const { container } = renderBrowser()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next collection' }))
+
+    const transitionLayers = container.querySelectorAll('.collection-browser-cover-visual')
+    expect(transitionLayers).toHaveLength(2)
+    expect(transitionLayers[0].classList.contains('is-outgoing')).toBe(true)
+    expect(transitionLayers[0].querySelector('img')?.getAttribute('src')).toBe('/alpha.jpg')
+    expect(transitionLayers[1].classList.contains('is-incoming')).toBe(true)
+    expect(transitionLayers[1].querySelector('img')?.getAttribute('src')).toBe('/beta.jpg')
+
+    act(() => vi.advanceTimersByTime(collectionCoverTransitionMs))
+    expect(container.querySelectorAll('.collection-browser-cover-visual')).toHaveLength(1)
   })
 
   it('restarts automatic advance after manual navigation', () => {
@@ -112,9 +148,9 @@ describe('CollectionBrowser', () => {
     act(() => vi.advanceTimersByTime(collectionInitialRotationDelayMs - 1))
     fireEvent.click(screen.getByRole('button', { name: 'Next collection' }))
     act(() => vi.advanceTimersByTime(collectionRotationIntervalMs - 1))
-    expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Beta collection' })).toBeTruthy()
     act(() => vi.advanceTimersByTime(1))
-    expect(screen.getByRole('heading', { name: 'Gamma' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Gamma collection' })).toBeTruthy()
   })
 
   it('does not wait for the full rotation interval before the first automatic advance', () => {
@@ -122,9 +158,9 @@ describe('CollectionBrowser', () => {
     renderBrowser()
 
     act(() => vi.advanceTimersByTime(collectionInitialRotationDelayMs - 1))
-    expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Alpha collection' })).toBeTruthy()
     act(() => vi.advanceTimersByTime(1))
-    expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Beta collection' })).toBeTruthy()
   })
 
   it('pauses for pointer hover and keyboard focus, resumes, and clears its timer on unmount', () => {
@@ -134,20 +170,20 @@ describe('CollectionBrowser', () => {
 
     fireEvent.pointerEnter(browser)
     act(() => vi.advanceTimersByTime(collectionRotationIntervalMs * 2))
-    expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Alpha collection' })).toBeTruthy()
 
     fireEvent.pointerLeave(browser)
     act(() => vi.advanceTimersByTime(collectionRotationIntervalMs))
-    expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Beta collection' })).toBeTruthy()
 
     const next = screen.getByRole('button', { name: 'Next collection' })
     fireEvent.focus(next)
     act(() => vi.advanceTimersByTime(collectionRotationIntervalMs * 2))
-    expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Beta collection' })).toBeTruthy()
 
     fireEvent.blur(next, { relatedTarget: null })
     act(() => vi.advanceTimersByTime(collectionRotationIntervalMs))
-    expect(screen.getByRole('heading', { name: 'Gamma' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose Gamma collection' })).toBeTruthy()
     act(() => vi.advanceTimersByTime(collectionCoverTransitionMs))
     expect(vi.getTimerCount()).toBe(1)
     unmount()

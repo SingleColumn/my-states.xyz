@@ -1,9 +1,10 @@
 import { ChevronLeft, ChevronRight, Images } from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent } from 'react'
 import type { CollectionSummary } from '../imageCollections'
 
 export const collectionRotationIntervalMs = 3000
 export const collectionCoverTransitionMs = 2500
+export const collectionCaptionHandoffMs = Math.round(collectionCoverTransitionMs * 0.35)
 // The first cover should change soon after entering the browser. Subsequent
 // rotations use the longer reading interval above.
 export const collectionInitialRotationDelayMs = 250
@@ -41,6 +42,7 @@ export function CollectionBrowser({
   const [isHovered, setIsHovered] = useState(false)
   const [hasFocusWithin, setHasFocusWithin] = useState(false)
   const [outgoingCollection, setOutgoingCollection] = useState<CollectionSummary | null>(null)
+  const [captionCollectionId, setCaptionCollectionId] = useState<string | null>(currentId)
   const previousCollectionIdRef = useRef<string | null>(currentId)
   const hasScheduledInitialRotationRef = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
@@ -58,18 +60,43 @@ export function CollectionBrowser({
 
   const currentIndex = Math.max(0, collections.findIndex((collection) => collection.id === currentId))
   const currentCollection = collections[currentIndex]
+  const captionIndex = Math.max(0, collections.findIndex((collection) => collection.id === captionCollectionId))
+  const captionCollection = collections[captionIndex] ?? currentCollection
   const isPaused = isHovered || hasFocusWithin
 
-  useEffect(() => {
+  // Prepare both layers before the browser paints the new current cover. A
+  // normal effect runs after paint and briefly exposes the new cover at full
+  // opacity, which looks like a hard cut regardless of the animation length.
+  useLayoutEffect(() => {
     const previousId = previousCollectionIdRef.current
     previousCollectionIdRef.current = currentId
-    if (!previousId || !currentId || previousId === currentId) return
+    if (!currentId) {
+      setOutgoingCollection(null)
+      setCaptionCollectionId(null)
+      return
+    }
+    if (!previousId || previousId === currentId) {
+      setOutgoingCollection(null)
+      setCaptionCollectionId(currentId)
+      return
+    }
     const previousCollection = collections.find((collection) => collection.id === previousId)
-    if (!previousCollection) return
+    if (!previousCollection) {
+      setOutgoingCollection(null)
+      setCaptionCollectionId(currentId)
+      return
+    }
 
     setOutgoingCollection(previousCollection)
+    const captionTimeoutId = window.setTimeout(
+      () => setCaptionCollectionId(currentId),
+      collectionCaptionHandoffMs,
+    )
     const timeoutId = window.setTimeout(() => setOutgoingCollection(null), collectionCoverTransitionMs)
-    return () => window.clearTimeout(timeoutId)
+    return () => {
+      window.clearTimeout(captionTimeoutId)
+      window.clearTimeout(timeoutId)
+    }
   }, [collections, currentId])
 
   useEffect(() => {
@@ -110,12 +137,22 @@ export function CollectionBrowser({
           aria-label={`Choose ${currentCollection.title} collection`}
           onClick={() => onSelectCollection(currentCollection.id)}
         >
-          {outgoingCollection ? <CollectionCoverVisual collection={outgoingCollection} className="is-outgoing" /> : null}
-          <CollectionCoverVisual collection={currentCollection} className={outgoingCollection ? 'is-incoming' : undefined} />
+          {outgoingCollection ? (
+            <CollectionCoverVisual
+              key={`outgoing-${outgoingCollection.id}`}
+              collection={outgoingCollection}
+              className="is-outgoing"
+            />
+          ) : null}
+          <CollectionCoverVisual
+            key={`incoming-${currentCollection.id}`}
+            collection={currentCollection}
+            className={outgoingCollection ? 'is-incoming' : undefined}
+          />
         </button>
         <div className="collection-browser-caption" aria-live="polite" aria-atomic="true">
-          <h3>{currentCollection.title}</h3>
-          <span>{currentIndex + 1} of {collections.length}</span>
+          <h3>{captionCollection.title}</h3>
+          <span>{captionIndex + 1} of {collections.length}</span>
         </div>
         <div className="collection-browser-navigation">
           <button className="card-icon-button" type="button" aria-label="Previous collection" onClick={() => move(-1)}>

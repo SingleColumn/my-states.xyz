@@ -1967,22 +1967,19 @@ input[type="range"]:focus-visible {
 
 .collection-browser-cover-visual.is-outgoing {
   z-index: 1;
-  animation: collection-browser-cover-out var(--collection-cover-transition-duration) ease both;
 }
 
 .collection-browser-cover-visual.is-incoming {
   z-index: 2;
-  animation: collection-browser-cover-in var(--collection-cover-transition-duration) ease both;
+  /* Keeping the old cover opaque underneath avoids the dim midpoint produced
+     by fading both layers at once. The new layer now controls the complete,
+     directly perceptible transition duration. */
+  animation: collection-browser-cover-in var(--collection-cover-transition-duration) ease-in-out both;
 }
 
 .collection-browser-cover-fallback {
   width: min(30%, 96px);
   height: min(30%, 96px);
-}
-
-@keyframes collection-browser-cover-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
 }
 
 @keyframes collection-browser-cover-in {
