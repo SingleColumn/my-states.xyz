@@ -9,6 +9,7 @@ import {
   expectArchitectureReportPass,
   expectCanvasSaved,
   geometryOf,
+  loadSampleImages,
   momentPicker,
   momentPickerNames,
   noteBodyOf,
@@ -58,6 +59,7 @@ test('panels, hiding, settings and stacking order survive a reload', async ({ pa
   await openApp(page)
   const music = await panelOfType(page, 'spotify')
   const images = await panelOfType(page, 'slideshow')
+  await loadSampleImages(page, images.panelId)
 
   // Add a panel and move it. A new panel lands on its type's default
   // layout, exactly on top of the Notes panel already there, so this also

@@ -20,7 +20,10 @@ export default defineConfig({
   // localStorage), so tests are independent and can run in parallel. The
   // count is capped because each test mounts a full tldraw + MDXEditor app.
   fullyParallel: true,
-  workers: process.env.CI ? 2 : 3,
+  // Keep local and CI load comparable. Three workers per project can saturate
+  // this full tldraw app (and the synced workspace) and makes timing-sensitive
+  // tests flaky without improving useful coverage.
+  workers: 2,
   retries: process.env.CI ? 1 : 0,
   forbidOnly: !!process.env.CI,
   timeout: 45_000,

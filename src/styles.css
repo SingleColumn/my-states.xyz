@@ -2812,6 +2812,15 @@ input[type="range"]:focus-visible {
    follow the panel's own edge instead -- the same edge as the note's title
    field and the editor below it. */
 .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Full-screen writing has a readable paper column; the ordinary panel keeps
+   its tools aligned with the panel edge because there is no separate column
+   for them to follow. */
+.canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
   width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
   max-width: var(--writing-paper-width);
   margin-inline: auto;

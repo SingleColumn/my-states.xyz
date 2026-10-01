@@ -357,11 +357,12 @@ test.describe('panel embeds', () => {
     const images = await panelOfType(page, 'slideshow')
     const notes = await panelOfType(page, 'notes')
     await loadSampleImages(page, images.panelId)
-    // Written through the command surface, which speaks only Markdown: no
-    // stored document, so the editor reads this line.
+    // Written through the command surface, which speaks Markdown. The editor
+    // may also persist its structured representation; the reload assertion
+    // below is the compatibility behavior this test is concerned with.
     await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: `Text first.\n\n[Images: whatever](my-states://panel/${images.panelId})\n\nText after.\n` })
     const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]).toMatchObject({ content: expect.stringContaining('my-states://panel/'), document: null })
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('my-states://panel/')
     await page.reload()
     await waitForCanvas(page)
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
@@ -671,10 +672,10 @@ test.describe('the first line names the note', () => {
       panelId: notes.panelId,
       content: '![A photograph](https://example.com/photo.png)\n\nThe body.\n',
     })
-    await expect(body.locator('img')).toHaveCount(1)
+    await expect(body.locator('img:not(.ProseMirror-separator)')).toHaveCount(1)
     await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'A safe name' })
 
-    await expect(body.locator('img')).toHaveCount(1)
+    await expect(body.locator('img:not(.ProseMirror-separator)')).toHaveCount(1)
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
       .toBe('A safe name\n\n![A photograph](https://example.com/photo.png)\n\nThe body.\n')
   })

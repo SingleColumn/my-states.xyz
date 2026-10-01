@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from
 import type { CollectionSummary } from '../imageCollections'
 
 export const collectionRotationIntervalMs = 3000
-export const collectionCoverTransitionMs = 900
+export const collectionCoverTransitionMs = 2500
 // The first cover should change soon after entering the browser. Subsequent
 // rotations use the longer reading interval above.
 export const collectionInitialRotationDelayMs = 250

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CollectionSummary } from '../imageCollections'
 import {
   CollectionBrowser,
+  collectionCoverTransitionMs,
   collectionInitialRotationDelayMs,
   collectionRotationIntervalMs,
   initialCollectionIndex,
@@ -147,6 +148,7 @@ describe('CollectionBrowser', () => {
     fireEvent.blur(next, { relatedTarget: null })
     act(() => vi.advanceTimersByTime(collectionRotationIntervalMs))
     expect(screen.getByRole('heading', { name: 'Gamma' })).toBeTruthy()
+    act(() => vi.advanceTimersByTime(collectionCoverTransitionMs))
     expect(vi.getTimerCount()).toBe(1)
     unmount()
     expect(vi.getTimerCount()).toBe(0)

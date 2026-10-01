@@ -98,6 +98,7 @@ test.describe('content: the widget owns it', () => {
   test('dragging a slider changes the setting and does not move the panel', async ({ page }) => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')
+    await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
     const speed = shape.locator('.range-grid label', { hasText: 'Speed' }).locator('input[type="range"]')
     const box = await speed.boundingBox()
