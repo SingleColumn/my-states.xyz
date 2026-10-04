@@ -73,6 +73,7 @@ const commands: PanelCommands = {
   restorePanelDefaultSize: () => {},
   isPanelFullScreen: () => false,
   togglePanelFocusView: () => {},
+  expandPanelFromStartingHeight: () => {},
 }
 
 /** A connected panel whose search calls are spies, over the results given. */

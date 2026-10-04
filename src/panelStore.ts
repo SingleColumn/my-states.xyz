@@ -147,6 +147,20 @@ export function setPanelFocusView(editor: Editor, panelId: string, focusView: bo
   return writePanelShape(editor, panelId, { props: { focusView } }, options)
 }
 
+/**
+ * Grows a panel that is still at its starting height to its default height,
+ * keeping its top edge where it is. A panel the user has already resized, or
+ * that never started short, is left alone. Not an undo step: the panel was
+ * only ever short because nobody had used it yet.
+ */
+export function expandPanelFromStartingHeight(editor: Editor, panelId: string) {
+  const shape = getPanelShape(editor, panelId)
+  if (!shape || shape.isLocked) return
+  const definition = getPanelDefinition(shape.props.panel.type)
+  if (definition.startingHeight === null || shape.props.focusView || shape.props.h !== definition.startingHeight) return
+  writePanelShape(editor, panelId, { props: { h: definition.defaultLayout.h } }, { history: 'ignore' })
+}
+
 export interface PanelPlacement {
   x: number
   y: number
@@ -216,7 +230,8 @@ export function shapesForDraft(draft: MomentDraft): TLShapePartial<PanelShape>[]
       isLocked: !visible,
       props: {
         w: layout?.w ?? definition.defaultLayout.w,
-        h: layout?.h ?? definition.defaultLayout.h,
+        // No saved layout means a brand-new moment, where some panels start short.
+        h: layout?.h ?? definition.startingHeight ?? definition.defaultLayout.h,
         panelId: panel.id,
         panel: { type: panel.type, config: panel.config } as PanelShapeProps['panel'],
         visible,

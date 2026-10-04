@@ -10,6 +10,8 @@ export interface PanelCommands {
   isPanelFullScreen(panelId: string): boolean
   /** Shrink a panel to its focus view, or give it back its previous size. */
   togglePanelFocusView(panelId: string): void
+  /** Grow a panel that is still at its short starting height to its default height. */
+  expandPanelFromStartingHeight(panelId: string): void
 }
 
 const PanelCommandsContext = createContext<PanelCommands | null>(null)

@@ -11,7 +11,7 @@ import { documentSchemaMatchesEditor } from './panelShapeSchema'
 import { getCanonicalPanelLayout, getPanelFocusViewSize, isPanelInFocusView } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { getPanelDefinition } from './panelRegistry'
-import { getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
+import { expandPanelFromStartingHeight, getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
 import { forgetFullScreen, readFullScreen, rememberFullScreen } from './fullScreenMemory'
@@ -441,6 +441,10 @@ function AppContent() {
     })
   }, [])
 
+  const expandPanelFromStartingHeightForId = useCallback((panelId: string) => {
+    if (editorRef.current) expandPanelFromStartingHeight(editorRef.current, panelId)
+  }, [])
+
   const restorePanelDefaultSizeForId = useCallback((panelId: string) => {
     const editor = editorRef.current
     const shape = editor ? getPanelShape(editor, panelId) : undefined
@@ -710,7 +714,7 @@ function AppContent() {
       data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
       style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
     >
-      <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView }}>
+      <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId }}>
         <AppChromePropsProvider value={appChromeProps}>
           <Tldraw
             shapeUtils={shapeUtils}

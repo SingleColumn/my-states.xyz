@@ -102,13 +102,6 @@
   --color-editor-bg: rgba(12, 23, 22, 0.78);
   --color-editor-border: rgba(255, 255, 255, 0.12);
   --background-notes-toolbar: rgba(9, 17, 17, 0.97);
-  --accent-spotify: #1db954;
-  --bg-spotify: #0e1712;
-  --shadow-album-art: 0 14px 32px rgba(0, 0, 0, 0.35);
-  --color-album-empty: rgba(255, 255, 255, 0.08);
-  --color-album-empty-highlight: rgba(255, 255, 255, 0.16);
-  --color-card-bg: rgba(0, 0, 0, 0.18);
-  --color-card-bg-hover: rgba(255, 255, 255, 0.11);
   --accent-slideshow: #7f77dd;
   --bg-slideshow: #16121f;
   --image-frame-border: none;
@@ -120,6 +113,13 @@
   --color-note-title: #fff8ee;
   --color-note-control-bg: rgba(7, 13, 14, 0.94);
   --color-note-control-bg-hover: rgba(13, 26, 25, 0.98);
+  --accent-spotify: #1db954;
+  --bg-spotify: #0e1712;
+  --shadow-album-art: 0 14px 32px rgba(0, 0, 0, 0.35);
+  --color-album-empty: rgba(255, 255, 255, 0.08);
+  --color-album-empty-highlight: rgba(255, 255, 255, 0.16);
+  --color-card-bg: rgba(0, 0, 0, 0.18);
+  --color-card-bg-hover: rgba(255, 255, 255, 0.11);
   /* @generated end */
 
   /* Aliases: names other rules use for tokens above. */

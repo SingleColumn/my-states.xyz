@@ -24,8 +24,8 @@ describe('panel geometry commands', () => {
 
   it('restores the canonical position and size used by Reset panel layout', () => {
     const layout = { panelId: 'panel-a', x: 123, y: 456, w: 900, h: 700 }
-    expect(restorePanelDefaultLayout(layout, 'notes')).toEqual({ panelId: 'panel-a', x: 280, y: -300, w: 460, h: 720 })
-    expect(restorePanelDefaultLayout(layout, 'spotify')).toEqual({ panelId: 'panel-a', x: -720, y: -300, w: 460, h: 720 })
+    expect(restorePanelDefaultLayout(layout, 'notes')).toEqual({ panelId: 'panel-a', x: -220, y: -300, w: 460, h: 720 })
+    expect(restorePanelDefaultLayout(layout, 'spotify')).toEqual({ panelId: 'panel-a', x: 280, y: -300, w: 460, h: 720 })
   })
 
   it('shrinks a panel to its focus view size where one exists, leaving it in place', () => {

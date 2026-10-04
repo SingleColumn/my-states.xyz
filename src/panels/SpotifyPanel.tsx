@@ -485,12 +485,24 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     setInvitations(0)
   }
 
+  // A new moment starts this panel short. Using it makes room: typing, a
+  // search or choice restored after coming back from Spotify, or being
+  // connected already all mean the panel is in use.
+  const inUse = query.trim() !== '' || selection !== null || connected
+  const { expandPanelFromStartingHeight } = commands
+  useEffect(() => {
+    if (inUse) expandPanelFromStartingHeight(panelId)
+  }, [inUse, expandPanelFromStartingHeight, panelId])
+
   /**
    * Connecting Spotify. The only way to it in this panel, and the only time
    * anyone leaves the page: Spotify sends them straight back once they have
    * agreed, which is what makes it worth leaving for.
    */
   function connect() {
+    // Grow now: the page is about to be left, and the panel should look the
+    // same on return as the person left it.
+    commands.expandPanelFromStartingHeight(panelId)
     posthog.capture('spotify_connect_clicked', { has_selection: selection !== null })
     if (selection || query.trim()) {
       // The crumbs that lead back to where they were: the search, and what they

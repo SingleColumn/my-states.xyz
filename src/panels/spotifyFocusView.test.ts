@@ -66,6 +66,7 @@ const commands: PanelCommands = {
   restorePanelDefaultSize: () => {},
   isPanelFullScreen: () => false,
   togglePanelFocusView: () => {},
+  expandPanelFromStartingHeight: () => {},
 }
 
 function renderMusicPanel(focusView: boolean, connected = true) {

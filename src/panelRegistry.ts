@@ -21,6 +21,12 @@ export interface PanelDefinition<Type extends PanelType> {
   singleton: boolean
   /** Where a new panel of this kind lands and how big it is. */
   defaultLayout: { x: number; y: number; w: number; h: number }
+  /**
+   * The height a panel has in a brand-new moment, when it is shorter than its
+   * default height. The panel grows to the default once someone uses it.
+   * Null starts at the default height.
+   */
+  startingHeight: number | null
   minimumSize: { w: number; h: number }
   /** The size focus view shrinks to. Null keeps the size the panel has. */
   focusViewSize: { w: number; h: number } | null
@@ -145,7 +151,9 @@ const spotify: PanelDefinition<'spotify'> = {
   type: 'spotify',
   label: 'Music',
   singleton: true,
-  defaultLayout: { x: -720, y: -300, w: 460, h: 720 },
+  defaultLayout: { x: 280, y: -300, w: 460, h: 720 },
+  // Just the search box and the connect button: nobody has asked for music yet.
+  startingHeight: 280,
   minimumSize: { w: 320, h: 260 },
   // The Music panel drops the playlist URL, search and results in focus view
   // and keeps playback, so it needs far less room.
@@ -171,7 +179,8 @@ const slideshow: PanelDefinition<'slideshow'> = {
   type: 'slideshow',
   label: 'Images',
   singleton: false,
-  defaultLayout: { x: -220, y: -300, w: 460, h: 720 },
+  defaultLayout: { x: -720, y: -300, w: 460, h: 720 },
+  startingHeight: null,
   minimumSize: { w: 320, h: 260 },
   // The Images panel keeps its size in focus view and gives the room its
   // controls took to the picture instead.
@@ -197,7 +206,8 @@ const notes: PanelDefinition<'notes'> = {
   type: 'notes',
   label: 'Notes',
   singleton: false,
-  defaultLayout: { x: 280, y: -300, w: 460, h: 720 },
+  defaultLayout: { x: -220, y: -300, w: 460, h: 720 },
+  startingHeight: null,
   minimumSize: { w: 320, h: 260 },
   focusViewSize: null,
   createConfig: () => ({ activeNoteId: null }),
@@ -218,7 +228,7 @@ const notes: PanelDefinition<'notes'> = {
   },
 }
 
-export const panelRegistry: { readonly [K in PanelType]: PanelDefinition<K> } = { spotify, slideshow, notes }
+export const panelRegistry: { readonly [K in PanelType]: PanelDefinition<K> } = { slideshow, notes, spotify }
 
 /** In the order a new moment lays them out, left to right. */
 export const PANEL_TYPES = Object.keys(panelRegistry) as readonly PanelType[]

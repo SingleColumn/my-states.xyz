@@ -57,6 +57,7 @@ const commands: PanelCommands = {
   restorePanelDefaultSize: () => {},
   isPanelFullScreen: () => false,
   togglePanelFocusView: () => {},
+  expandPanelFromStartingHeight: () => {},
 }
 
 function renderImagesPanel(focusView: boolean) {
