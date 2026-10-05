@@ -58,6 +58,7 @@
           "headerForeground": "#e5395f",
           "texture": "dots",
           "headerStyle": "band",
+          "density": "snug",
           "headerBandForeground": "#fff"
         },
         "button": {

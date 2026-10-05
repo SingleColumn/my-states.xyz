@@ -122,6 +122,7 @@ export const componentsSpec: GroupSpec = {
         backdropBlur: { kind: 'filter', description: 'The blur behind a panel.', token: '--blur-panel', derive: f('backdropBlur') },
         contentBackground: color('The background of the content area inside a panel. Derived from the panel accent when absent; set it to give panels a plain interior with the accent kept to the frame.', { token: '--panel-content-background' }),
         headerStyle: styleChoice('How a panel header is drawn: plain (title over the panel), band (a solid strip in the panel accent with a contrasting title), or underline (a rule beneath the header).', 'header-style', ['plain', 'band', 'underline']),
+        density: styleChoice('How much room the header and footer strips take: standard; snug, a little less padding above and below the title and the footer text; or slim, the least, for the lightest frame. Controls keep their size.', 'panel-density', ['standard', 'snug', 'slim']),
         headerBand: color('The band behind the header when headerStyle is band. The panel’s own accent when absent; set it for one colour across every panel.', { token: '--card-header-band' }),
         headerBandForeground: color('Title and buttons on the band. The main surface colour when absent, which contrasts with an accent band on light and dark themes alike.', { token: '--card-header-band-foreground', derive: s('surfacePrimary') }),
         headerRule: color('The rule beneath the header when headerStyle is underline. The panel’s own accent when absent.', { token: '--card-header-rule' }),

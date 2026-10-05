@@ -77,7 +77,8 @@
           "contentBackground": "#eee3cc",
           "texture": "paper",
           "ornament": "none",
-          "headerStyle": "band"
+          "headerStyle": "band",
+          "density": "snug"
         },
         "button": {
           "background": "rgba(255, 253, 247, 0.55)",

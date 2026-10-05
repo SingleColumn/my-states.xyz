@@ -438,6 +438,15 @@
                       ],
                       "description": "How a panel header is drawn: plain (title over the panel), band (a solid strip in the panel accent with a contrasting title), or underline (a rule beneath the header). One of: plain, band, underline."
                     },
+                    "density": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "snug",
+                        "slim"
+                      ],
+                      "description": "How much room the header and footer strips take: standard; snug, a little less padding above and below the title and the footer text; or slim, the least, for the lightest frame. Controls keep their size. One of: standard, snug, slim."
+                    },
                     "headerBand": {
                       "type": "string",
                       "minLength": 1,
@@ -776,55 +785,6 @@
                     }
                   }
                 },
-                "spotify": {
-                  "type": "object",
-                  "description": "The Music panel.",
-                  "additionalProperties": false,
-                  "properties": {
-                    "accent": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "panelBackground": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "artworkShadow": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "Shadow under album art. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
-                    },
-                    "artworkPlaceholder": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "Where album art would be, before there is any. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "artworkPlaceholderHighlight": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "The highlight on the placeholder. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "playlistRowBackground": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "A playlist row. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "playlistRowBackgroundHover": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    }
-                  }
-                },
                 "images": {
                   "type": "object",
                   "description": "The Images panel.",
@@ -910,6 +870,55 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "Those controls under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "spotify": {
+                  "type": "object",
+                  "description": "The Music panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkShadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Shadow under album art. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Where album art would be, before there is any. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholderHighlight": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The highlight on the placeholder. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     }
                   }
                 }
@@ -1300,6 +1309,15 @@
                       ],
                       "description": "How a panel header is drawn: plain (title over the panel), band (a solid strip in the panel accent with a contrasting title), or underline (a rule beneath the header). One of: plain, band, underline."
                     },
+                    "density": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "snug",
+                        "slim"
+                      ],
+                      "description": "How much room the header and footer strips take: standard; snug, a little less padding above and below the title and the footer text; or slim, the least, for the lightest frame. Controls keep their size. One of: standard, snug, slim."
+                    },
                     "headerBand": {
                       "type": "string",
                       "minLength": 1,
@@ -1638,55 +1656,6 @@
                     }
                   }
                 },
-                "spotify": {
-                  "type": "object",
-                  "description": "The Music panel.",
-                  "additionalProperties": false,
-                  "properties": {
-                    "accent": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "panelBackground": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "artworkShadow": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "Shadow under album art. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
-                    },
-                    "artworkPlaceholder": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "Where album art would be, before there is any. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "artworkPlaceholderHighlight": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "The highlight on the placeholder. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "playlistRowBackground": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "A playlist row. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    },
-                    "playlistRowBackgroundHover": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
-                    }
-                  }
-                },
                 "images": {
                   "type": "object",
                   "description": "The Images panel.",
@@ -1772,6 +1741,55 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "Those controls under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "spotify": {
+                  "type": "object",
+                  "description": "The Music panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkShadow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Shadow under album art. A CSS box-shadow, e.g. \"0 26px 70px rgba(0, 0, 0, 0.34)\" or \"none\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholder": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "Where album art would be, before there is any. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "artworkPlaceholderHighlight": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The highlight on the placeholder. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "playlistRowBackgroundHover": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     }
                   }
                 }

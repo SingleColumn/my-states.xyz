@@ -45,7 +45,8 @@
         },
         "panel": {
           "shellBorder": "1px solid rgba(57, 255, 136, 0.45)",
-          "headerStyle": "underline"
+          "headerStyle": "underline",
+          "density": "slim"
         },
         "typography": {
           "scale": "compact"

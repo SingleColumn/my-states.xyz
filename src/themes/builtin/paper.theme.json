@@ -62,7 +62,8 @@
           "headerForeground": "#2b2420",
           "footerForeground": "rgba(43, 36, 32, 0.56)",
           "texture": "paper",
-          "headerStyle": "underline"
+          "headerStyle": "underline",
+          "density": "slim"
         },
         "button": {
           "background": "rgba(139, 74, 47, 0.07)",

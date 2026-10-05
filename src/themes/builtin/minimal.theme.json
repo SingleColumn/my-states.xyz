@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "id": "minimal",
+  "name": "Minimal",
+  "version": "1.0.0",
+  "author": "my-states",
+  "description": "A quiet gallery wall: one neutral surface and a single graphite ink, hairline borders, almost square corners, no shadows or texture, and thin icons. Light and dark.",
+  "modes": {
+    "light": {
+      "foundation": {
+        "color": {
+          "background": "#f7f7f6",
+          "foreground": "#1d1d1f",
+          "muted": "rgba(29, 29, 31, 0.68)",
+          "faint": "rgba(29, 29, 31, 0.5)",
+          "accent": "#2c2c2e",
+          "border": "rgba(29, 29, 31, 0.14)",
+          "danger": "#a63a32",
+          "selection": "#2c2c2e"
+        },
+        "typography": {
+          "uiFont": "\"Helvetica Neue\", Helvetica, \"Segoe UI\", Arial, sans-serif",
+          "headingFont": "\"Helvetica Neue\", Helvetica, \"Segoe UI\", Arial, sans-serif",
+          "headingWeight": "500"
+        },
+        "shape": {
+          "radiusLarge": "3px",
+          "radiusMedium": "2px",
+          "radiusSmall": "1px"
+        },
+        "depth": {
+          "shadowSmall": "none",
+          "shadowMedium": "none",
+          "shadowLarge": "0 8px 24px rgba(0, 0, 0, 0.08)",
+          "backdropBlur": "none"
+        }
+      },
+      "semantic": {
+        "surfaceElevated": "#ffffff",
+        "surfaceOverlay": "#ffffff",
+        "textMuted": "rgba(29, 29, 31, 0.68)",
+        "textFaint": "rgba(29, 29, 31, 0.5)",
+        "borderSubtle": "rgba(29, 29, 31, 0.08)",
+        "borderNormal": "rgba(29, 29, 31, 0.16)",
+        "borderStrong": "rgba(29, 29, 31, 0.36)",
+        "focusRing": "#1d1d1f",
+        "interactive": "rgba(29, 29, 31, 0.04)",
+        "interactiveHover": "rgba(29, 29, 31, 0.08)",
+        "interactiveActive": "rgba(29, 29, 31, 0.14)"
+      },
+      "components": {
+        "canvas": {
+          "backdrop": "#f7f7f6",
+          "pattern": "none",
+          "selectionStrokeWidth": "1px"
+        },
+        "toolbar": {
+          "background": "#ffffff",
+          "border": "rgba(29, 29, 31, 0.16)",
+          "shadow": "none"
+        },
+        "panel": {
+          "border": "rgba(29, 29, 31, 0.16)",
+          "shellBorder": "1px solid rgba(29, 29, 31, 0.2)",
+          "divider": "rgba(29, 29, 31, 0.1)",
+          "headerForeground": "#1d1d1f",
+          "footerForeground": "rgba(29, 29, 31, 0.5)",
+          "contentBackground": "#ffffff",
+          "texture": "none",
+          "ornament": "none",
+          "headerStyle": "underline",
+          "density": "slim",
+          "headerRule": "rgba(29, 29, 31, 0.16)"
+        },
+        "button": {
+          "background": "transparent",
+          "border": "rgba(29, 29, 31, 0.2)",
+          "foreground": "rgba(29, 29, 31, 0.78)",
+          "backgroundHover": "rgba(29, 29, 31, 0.06)",
+          "backgroundActive": "rgba(29, 29, 31, 0.12)",
+          "borderActive": "#1d1d1f",
+          "foregroundActive": "#1d1d1f"
+        },
+        "control": {
+          "background": "#ffffff",
+          "border": "rgba(29, 29, 31, 0.2)",
+          "borderHover": "#1d1d1f",
+          "rangeAccent": "#1d1d1f",
+          "rangeTrack": "rgba(29, 29, 31, 0.3)",
+          "rangeThumb": "#1d1d1f",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "1"
+        },
+        "input": {
+          "background": "#ffffff",
+          "foreground": "#1d1d1f"
+        },
+        "menu": {
+          "background": "#ffffff"
+        },
+        "editor": {
+          "background": "#ffffff",
+          "border": "rgba(29, 29, 31, 0.16)",
+          "toolbarBackground": "#ffffff"
+        },
+        "dialog": {
+          "background": "#ffffff",
+          "backdrop": "rgba(29, 29, 31, 0.24)"
+        },
+        "spotify": {
+          "accent": "#2c2c2e",
+          "panelBackground": "#ffffff",
+          "playlistRowBackground": "#f7f7f6"
+        },
+        "images": {
+          "accent": "#2c2c2e",
+          "panelBackground": "#ffffff",
+          "frameBorder": "1px solid rgba(29, 29, 31, 0.14)",
+          "edge": "none"
+        },
+        "notes": {
+          "accent": "#2c2c2e",
+          "panelBackground": "#ffffff",
+          "titleForeground": "#1d1d1f",
+          "controlBackground": "#f7f7f6"
+        }
+      }
+    },
+    "dark": {
+      "foundation": {
+        "color": {
+          "background": "#121213",
+          "foreground": "#ececea",
+          "muted": "rgba(236, 236, 234, 0.68)",
+          "faint": "rgba(236, 236, 234, 0.48)",
+          "accent": "#d8d8d4",
+          "border": "rgba(236, 236, 234, 0.16)",
+          "danger": "#e07a70",
+          "selection": "#d8d8d4"
+        },
+        "typography": {
+          "uiFont": "\"Helvetica Neue\", Helvetica, \"Segoe UI\", Arial, sans-serif",
+          "headingFont": "\"Helvetica Neue\", Helvetica, \"Segoe UI\", Arial, sans-serif",
+          "headingWeight": "500"
+        },
+        "shape": {
+          "radiusLarge": "3px",
+          "radiusMedium": "2px",
+          "radiusSmall": "1px"
+        },
+        "depth": {
+          "shadowSmall": "none",
+          "shadowMedium": "none",
+          "shadowLarge": "0 8px 24px rgba(0, 0, 0, 0.4)",
+          "backdropBlur": "none"
+        }
+      },
+      "semantic": {
+        "surfaceElevated": "#1a1a1b",
+        "surfaceOverlay": "#1a1a1b",
+        "textMuted": "rgba(236, 236, 234, 0.68)",
+        "textFaint": "rgba(236, 236, 234, 0.48)",
+        "borderSubtle": "rgba(236, 236, 234, 0.1)",
+        "borderNormal": "rgba(236, 236, 234, 0.18)",
+        "borderStrong": "rgba(236, 236, 234, 0.4)",
+        "focusRing": "#ececea",
+        "interactive": "rgba(236, 236, 234, 0.05)",
+        "interactiveHover": "rgba(236, 236, 234, 0.1)",
+        "interactiveActive": "rgba(236, 236, 234, 0.16)"
+      },
+      "components": {
+        "canvas": {
+          "backdrop": "#121213",
+          "pattern": "none",
+          "selectionStrokeWidth": "1px"
+        },
+        "toolbar": {
+          "background": "#1a1a1b",
+          "border": "rgba(236, 236, 234, 0.18)",
+          "shadow": "none"
+        },
+        "panel": {
+          "border": "rgba(236, 236, 234, 0.18)",
+          "shellBorder": "1px solid rgba(236, 236, 234, 0.22)",
+          "divider": "rgba(236, 236, 234, 0.12)",
+          "headerForeground": "#ececea",
+          "footerForeground": "rgba(236, 236, 234, 0.48)",
+          "contentBackground": "#1a1a1b",
+          "texture": "none",
+          "ornament": "none",
+          "headerStyle": "underline",
+          "density": "slim",
+          "headerRule": "rgba(236, 236, 234, 0.18)"
+        },
+        "button": {
+          "background": "transparent",
+          "border": "rgba(236, 236, 234, 0.22)",
+          "foreground": "rgba(236, 236, 234, 0.8)",
+          "backgroundHover": "rgba(236, 236, 234, 0.08)",
+          "backgroundActive": "rgba(236, 236, 234, 0.15)",
+          "borderActive": "#ececea",
+          "foregroundActive": "#ffffff"
+        },
+        "control": {
+          "background": "#1a1a1b",
+          "border": "rgba(236, 236, 234, 0.22)",
+          "borderHover": "#ececea",
+          "rangeAccent": "#ececea",
+          "rangeTrack": "rgba(236, 236, 234, 0.3)",
+          "rangeThumb": "#ececea",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "1"
+        },
+        "input": {
+          "background": "#121213",
+          "foreground": "#ececea"
+        },
+        "menu": {
+          "background": "#1a1a1b"
+        },
+        "editor": {
+          "background": "#1a1a1b",
+          "border": "rgba(236, 236, 234, 0.18)",
+          "toolbarBackground": "#1a1a1b"
+        },
+        "dialog": {
+          "background": "#1a1a1b",
+          "backdrop": "rgba(0, 0, 0, 0.55)"
+        },
+        "spotify": {
+          "accent": "#d8d8d4",
+          "panelBackground": "#1a1a1b",
+          "playlistRowBackground": "#121213"
+        },
+        "images": {
+          "accent": "#d8d8d4",
+          "panelBackground": "#1a1a1b",
+          "frameBorder": "1px solid rgba(236, 236, 234, 0.16)",
+          "edge": "none"
+        },
+        "notes": {
+          "accent": "#d8d8d4",
+          "panelBackground": "#1a1a1b",
+          "titleForeground": "#ececea",
+          "controlBackground": "#121213"
+        }
+      }
+    }
+  }
+}

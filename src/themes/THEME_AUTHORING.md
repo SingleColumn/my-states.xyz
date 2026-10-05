@@ -30,7 +30,7 @@ For the idea, decide explicitly:
 | Flat or deep? | `foundation.depth.shadow*` and `backdropBlur`; `"none"` is a legitimate value |
 | What is the canvas drawn on? | `canvas.pattern`: `grid` (squared paper), `dots` (a bullet journal), `lines` (ruled), `none` (plain); `gridColor` and `gridSize` tune it |
 | Any texture or figure? | `panel.texture` (`none`, `paper`, `dots`), `panel.ornament` (`none`, `bow`, `star`), `images.edge` (`none`, `deckle`) |
-| How is a panel header drawn? | `panel.headerStyle`: `plain` (title over the panel), `band` (a solid strip in each panel's accent, or one colour via `panel.headerBand`; `headerBandForeground` for the title and buttons on it), `underline` (a rule beneath, `panel.headerRule`). The single biggest lever for making two themes look structurally different. |
+| How is a panel header drawn? | `panel.headerStyle`: `plain` (title over the panel), `band` (a solid strip in each panel's accent, or one colour via `panel.headerBand`; `headerBandForeground` for the title and buttons on it), `underline` (a rule beneath, `panel.headerRule`). `panel.density` (`standard`, `snug` or `slim`) trims the padding around the header and footer strips. The single biggest lever for making two themes look structurally different. |
 | How large and heavy is panel text? | `typography.scale`: `standard`, `compact` (smaller and a little heavier, for density), `spacious` (larger and a little lighter, for an airier feel). Both alternates keep the same ratio between title and body sizes as standard — this is a size lever, not a font-pairing one. |
 
 ## 2. Fill the foundation completely

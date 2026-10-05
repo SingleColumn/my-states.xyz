@@ -115,6 +115,7 @@ export interface ComponentTokens {
     texture?: 'none' | 'paper' | 'dots'
     ornament?: 'none' | 'bow' | 'star'
     headerStyle?: 'plain' | 'band' | 'underline'
+    density?: 'standard' | 'snug' | 'slim'
     headerBand?: string
     headerBandForeground?: string
     headerRule?: string

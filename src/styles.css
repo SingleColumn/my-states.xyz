@@ -617,6 +617,27 @@ button {
   border-bottom: 2px solid var(--card-header-rule, var(--accent));
 }
 
+/* Panel density, chosen by a theme (`panel.density`) and carried as
+   data-panel-density on the root. Snug is a step short of slim. Slim trims the padding around the header
+   and footer strips and nothing else: the buttons keep their size, so they
+   stay as easy to hit. The footer's min-height is re-declared on .panel
+   because it is computed from the padding there, not at the point of use. */
+:root[data-panel-density="snug"] .card-header {
+  padding-block: calc(var(--card-padding) * 0.7);
+}
+:root[data-panel-density="snug"] .panel {
+  --space-card-footer-padding-y: 8px;
+  --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
+}
+:root[data-panel-density="slim"] .card-header {
+  padding-block: calc(var(--card-padding) * 0.4);
+  border-bottom-width: 1px;
+}
+:root[data-panel-density="slim"] .panel {
+  --space-card-footer-padding-y: 5px;
+  --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
+}
+
 /* Type scales, chosen by a theme (`typography.scale`) and carried as
    data-type-scale on the root. Standard is the rules below, using
    --card-title-weight and no extra tracking. The size ladder itself
