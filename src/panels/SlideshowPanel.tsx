@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
@@ -7,6 +7,7 @@ import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 import { useFeaturedBundledCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { ImageAttributionOverlay } from './imageAttribution'
+import { ImageViewer } from './ImageViewer'
 import { panelContentProps } from '../panelSurface'
 import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
 import { CollectionBrowser } from './CollectionBrowser'
@@ -46,6 +47,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const currentImage = panelImages[currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
+  const [isViewerOpen, setIsViewerOpen] = useState(false)
   const [panelView, setPanelView] = useState<'slideshow' | 'browse-collections'>(() => (
     panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
   ))
@@ -241,6 +243,16 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             zoom={panelSettings.zoom}
           />
           {attribution ? <ImageAttributionOverlay attribution={attribution} /> : null}
+          <button
+            className="image-expand-button"
+            type="button"
+            title="View full screen"
+            aria-label="View this image full screen"
+            {...panelContentProps}
+            onClick={() => setIsViewerOpen(true)}
+          >
+            <Maximize2 size={14} aria-hidden="true" />
+          </button>
           {focusView ? (
             <p className={isFocusHintVisible ? 'focus-view-hint is-visible' : 'focus-view-hint'} role="status">
               Press <kbd>Esc</kbd> to show the controls
@@ -302,6 +314,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         </footer>
         </>
       )}
+      {isViewerOpen && panelImages.length ? (
+        <ImageViewer images={panelImages} startIndex={currentIndex} onClose={() => setIsViewerOpen(false)} />
+      ) : null}
     </section>
   )
 }

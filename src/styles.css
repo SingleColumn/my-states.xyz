@@ -1790,6 +1790,122 @@ input[type="range"]:focus-visible {
   opacity: 1;
 }
 
+/* Appears with the pointer, like the credit, so the picture stays clean. */
+.image-expand-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(12px);
+  color: var(--color-text-soft);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.slideshow-stage:hover .image-expand-button,
+.image-expand-button:focus-visible {
+  opacity: 1;
+}
+
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 56px 88px 72px;
+  background: rgba(6, 6, 8, 0.96);
+  color: var(--color-text-soft);
+}
+
+.image-viewer-picture {
+  /* Percent heights do not resolve against a grid track sized by this very
+     image, so the room left by the padding is stated in viewport units. */
+  max-width: calc(100vw - 176px);
+  max-height: calc(100vh - 128px);
+  object-fit: contain;
+  user-select: none;
+}
+
+.image-viewer-close,
+.image-viewer-step {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+}
+
+.image-viewer-close:hover,
+.image-viewer-step:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.image-viewer-close {
+  top: 16px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
+}
+
+.image-viewer-step {
+  top: 50%;
+  width: 48px;
+  height: 72px;
+  transform: translateY(-50%);
+}
+
+.image-viewer-step.is-previous { left: 16px; }
+.image-viewer-step.is-next { right: 16px; }
+
+.image-viewer-caption {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  max-width: calc(100% - 32px);
+  font-size: 14px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.image-viewer-caption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.image-viewer-caption a:hover {
+  text-decoration: underline;
+}
+
+.image-viewer-label,
+.image-viewer-counter {
+  color: var(--color-text-muted);
+}
+
+.image-viewer-label {
+  margin-right: 6px;
+}
+
+.image-viewer-credit {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Focus view hides every control, so the way out has to be stated. */
 .focus-view-hint {
   position: absolute;
