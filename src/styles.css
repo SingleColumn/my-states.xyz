@@ -2321,6 +2321,10 @@ input[type="range"]:focus-visible {
      fitted tightly around the text. */
   --writing-paper-width: min(100%, var(--notes-paper-width, 794px));
   --writing-measure: min(100%, calc(var(--writing-paper-width) - 160px));
+  /* A4 proportions in pixels. The width above contains a percentage, which
+     cannot resolve in a height, so the sheet's height is derived from the
+     pixel width instead. */
+  --writing-paper-height: calc(var(--notes-paper-width, 794px) * 1.414);
   display: flex;
   flex-direction: column;
   gap: var(--space-notes-gap);
@@ -2709,7 +2713,7 @@ input[type="range"]:focus-visible {
      writing surface sheds its normal card padding. */
   box-sizing: border-box;
   width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
-  min-height: max(100%, calc(var(--writing-paper-width) * 1.414));
+  min-height: var(--writing-paper-height);
   margin-inline: auto;
   padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom);
   /* The surrounding surface keeps its existing colour; this line is the
