@@ -1,10 +1,11 @@
-import { Check, EyeOff, Maximize2, MoreHorizontal, RotateCcw, Minimize2 } from 'lucide-react'
+import { Check, EyeOff, Maximize2, MoreHorizontal, RotateCcw, Minimize2, Trash2 } from 'lucide-react'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PanelType } from './types'
 import { panelContentProps } from './panelSurface'
 
 export interface PanelCommands {
   hidePanel(panelId: string): void
+  deletePanel(panelId: string): void
   togglePanelFullScreen(panelId: string): void
   restorePanelDefaultSize(panelId: string): void
   isPanelFullScreen(panelId: string): boolean
@@ -67,6 +68,7 @@ export function PanelHeader({ panelId, panelType, title, menuItems, trailingMenu
       onSelect: () => commands.togglePanelFullScreen(panelId),
     },
     { id: 'default-size', label: 'Restore panel to default size', icon: <RotateCcw size={17} aria-hidden="true" />, onSelect: () => commands.restorePanelDefaultSize(panelId) },
+    { id: 'delete', label: 'Delete panel', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => commands.deletePanel(panelId) },
   ]
 
   // Sections are drawn with a rule between them, grouped by what they act on:

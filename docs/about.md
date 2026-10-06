@@ -53,7 +53,7 @@ The right-hand end of each panel's header carries the same three buttons:
 ### Adding, duplicating and deleting panels
 
 - **Add panel** at the top of the canvas adds another Images or Notes panel. There is only ever one Music panel.
-- Right-click a panel's frame for a menu with **Hide panel**, arrange and reorder options, **Duplicate** and **Delete**. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.
+- Use a panel's **…** menu to hide, resize, or delete it. You can also right-click its frame for arrange, reorder, duplicate, and delete options. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.
 - The panel view menu (**…**) also offers **Fit selected panel**, **Reset selected panel size**, **Reset panel layout**, which puts every panel back where it started and unhides any hidden ones, and **Hide selected panel**.
 
 ## Panels
@@ -74,7 +74,7 @@ Below the picture, use **Previous image**, **Start slideshow** (which becomes **
 
 Every picture in a sample collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.
 
-To look at the pictures on their own, select **Reduce panel to focus view** in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Press **Esc** to bring the controls back; the panel reminds you of this whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
+To look at the pictures on their own, select **Adjust panel to focus view** in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Press **Esc** to bring the controls back; the panel reminds you of this whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
 
 ### Notes
 

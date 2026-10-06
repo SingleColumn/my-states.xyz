@@ -287,10 +287,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         ) : heldBy !== null ? (
           <div className="notes-empty-state" {...panelContentProps}>
-            <h3>Open in another Writing panel</h3>
+            <h3>Start writing in this panel</h3>
             <p className="notes-empty-hint">
-              A note is written in one panel at a time, so that two panels cannot
-              write over each other.
+              This note is open in another Writing panel. Make a separate copy
+              so you can continue writing here.
             </p>
             <button
               className="card-icon-button is-primary is-wide empty-note-button"
@@ -298,7 +298,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               onClick={() => { void copyNoteHere().catch(() => {}) }}
             >
               <CopyPlus size={18} />
-              Make a copy here
+              Copy note and start writing
             </button>
           </div>
         ) : (

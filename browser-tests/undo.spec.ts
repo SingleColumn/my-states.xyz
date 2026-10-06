@@ -37,7 +37,10 @@ test.describe('delete and undo', () => {
     const before = await panelById(page, notes.panelId)
 
     await selectPanel(page, notes.panelId)
-    await page.keyboard.press('Delete')
+    const canvasActions = page.getByRole('toolbar', { name: 'Canvas actions' })
+    await expect(canvasActions.getByRole('button', { name: 'Delete' })).toHaveCount(0)
+    await expect(canvasActions.getByRole('button', { name: 'Duplicate' })).toHaveCount(0)
+    await choosePanelMenuItem(await shapeOf(page, notes.panelId), 'Delete panel')
     await expect.poll(async () => (await describeCanvas(page)).panels.map((panel) => panel.panelId)).not.toContain(notes.panelId)
 
     await undo(page)
@@ -162,7 +165,7 @@ test.describe('focus view and undo', () => {
     const moved = geometryOf(await panelById(page, images.panelId))
     expect(moved).not.toEqual(geometryOf(images))
 
-    await choosePanelMenuItem(await shapeOf(page, images.panelId), 'Reduce panel to focus view')
+    await choosePanelMenuItem(await shapeOf(page, images.panelId), 'Adjust panel to focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
 
     await page.mouse.click(720, 860)

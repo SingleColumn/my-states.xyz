@@ -345,6 +345,18 @@ function AppContent() {
     if (selected.length === 1 && isPanelShape(selected[0])) hidePanel(selected[0].props.panelId)
   }, [hidePanel])
 
+  const deletePanel = useCallback((panelId: string) => {
+    const editor = editorRef.current
+    const shape = editor ? getPanelShape(editor, panelId) : undefined
+    if (!editor || !shape) return
+
+    previousPanelGeometryRef.current.delete(panelId)
+    preFocusPanelGeometryRef.current.delete(panelId)
+    setFullScreenPanelId((current) => current === panelId ? null : current)
+    editor.markHistoryStoppingPoint('delete panel')
+    editor.deleteShapes([shape.id])
+  }, [])
+
   const fullScreenBoundsFor = useCallback((editor: Editor) => {
     const viewport = editor.getViewportScreenBounds()
     const chrome = chromeRectRef.current
@@ -714,7 +726,7 @@ function AppContent() {
       data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
       style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
     >
-      <PanelCommandsProvider commands={{ hidePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId }}>
+      <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId }}>
         <AppChromePropsProvider value={appChromeProps}>
           <Tldraw
             shapeUtils={shapeUtils}

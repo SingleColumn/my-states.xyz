@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiToolbar } from 'tldraw'
+import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiMenuActionItem, TldrawUiToolbar, useCanRedo, useCanUndo } from 'tldraw'
 import { Hand, Settings } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
 import { MomentToolbar } from './MomentToolbar'
@@ -37,6 +37,20 @@ interface AppChromeProps {
 }
 
 export const HELP_ABOUT_LABEL = 'About'
+
+// Panel actions live on the panel itself. Keeping only history controls here
+// avoids a distant Delete or Duplicate button whose target is easy to miss.
+function UndoRedoQuickActions() {
+  const canUndo = useCanUndo()
+  const canRedo = useCanRedo()
+
+  return (
+    <>
+      <TldrawUiMenuActionItem actionId="undo" disabled={!canUndo} />
+      <TldrawUiMenuActionItem actionId="redo" disabled={!canRedo} />
+    </>
+  )
+}
 
 // Draws first-time visitors' attention to the About button without blocking the canvas.
 const ABOUT_PULSE_SEEN_KEY = 'mic:about-pulse-seen'
@@ -149,7 +163,9 @@ export function AppChrome({
 
       <nav className="app-chrome-tldraw" aria-label="Canvas and application controls">
         <TldrawUiToolbar className="app-chrome-tldraw-actions tlui-buttons__horizontal" label="Canvas actions">
-          <DefaultQuickActions />
+          <DefaultQuickActions>
+            <UndoRedoQuickActions />
+          </DefaultQuickActions>
           <DefaultActionsMenu>
             <DefaultActionsMenuContent />
           </DefaultActionsMenu>

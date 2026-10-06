@@ -517,7 +517,7 @@ test.describe('two Notes panels', () => {
     await expect.poll(async () => (await describeCanvas(page)).panels.filter((panel) => panel.type === 'notes')).toHaveLength(2)
     const copy = (await describeCanvas(page)).panels.find((panel) => panel.type === 'notes' && panel.panelId !== first.panelId)!
     const copyShape = await shapeOf(page, copy.panelId)
-    await copyShape.getByRole('button', { name: 'Make a copy here' }).click()
+    await copyShape.getByRole('button', { name: 'Copy note and start writing' }).click()
 
     // The bullet is the writing, not the name. Reading it as the name put
     // "(copy)" inside the list item and left the copy called nothing.
@@ -546,9 +546,9 @@ test.describe('two Notes panels', () => {
 
     // It does not open it. It says where the note is, and offers the only
     // safe way on.
-    await expect(copyShape.getByRole('heading', { name: 'Open in another Writing panel' })).toBeVisible()
+    await expect(copyShape.getByRole('heading', { name: 'Start writing in this panel' })).toBeVisible()
     await expect(noteBodyOf(copyShape)).toHaveCount(0)
-    await copyShape.getByRole('button', { name: 'Make a copy here' }).click()
+    await copyShape.getByRole('button', { name: 'Copy note and start writing' }).click()
 
     // Two notes now, and the copy says in its own first line that it is one
     // -- which is where its name lives, so the name survives being typed in.

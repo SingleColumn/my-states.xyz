@@ -176,7 +176,7 @@ test.describe('Images focus view', () => {
     await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
 
-    await choosePanelMenuItem(shape, 'Reduce panel to focus view')
+    await choosePanelMenuItem(shape, 'Adjust panel to focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
     const before = geometryOf(await panelById(page, images.panelId))
     const picture = shape.locator('img.slideshow-image-layer')

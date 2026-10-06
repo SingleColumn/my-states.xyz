@@ -53,6 +53,7 @@ vi.mock('../AppState', () => ({
 
 const commands: PanelCommands = {
   hidePanel: () => {},
+  deletePanel: () => {},
   togglePanelFullScreen: () => {},
   restorePanelDefaultSize: () => {},
   isPanelFullScreen: () => false,
@@ -112,7 +113,7 @@ describe('Images panel focus view', () => {
 
   it('offers the focus view toggle from the panel header, before the hide button', () => {
     const markup = renderImagesPanel(false)
-    expect(markup.indexOf('Reduce panel to focus view')).toBeLessThan(markup.indexOf('Hide panel'))
+    expect(markup.indexOf('Adjust panel to focus view')).toBeLessThan(markup.indexOf('Hide panel'))
   })
 
   it('keeps the source actions in the panel header menu', () => {

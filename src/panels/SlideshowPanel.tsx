@@ -199,7 +199,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           { id: 'clear', label: 'Clear images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) },
           {
             id: 'focus-view',
-            label: focusView ? 'Expand panel to full view' : 'Reduce panel to focus view',
+            label: focusView ? 'Expand panel to full view' : 'Adjust panel to focus view',
             icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
             onSelect: () => commands.togglePanelFocusView(panelId),
           },

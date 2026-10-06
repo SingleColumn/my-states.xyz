@@ -62,6 +62,7 @@ vi.mock('../AppState', () => ({
 
 const commands: PanelCommands = {
   hidePanel: () => {},
+  deletePanel: () => {},
   togglePanelFullScreen: () => {},
   restorePanelDefaultSize: () => {},
   isPanelFullScreen: () => false,
