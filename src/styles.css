@@ -3144,6 +3144,31 @@ input[type="range"]:focus-visible {
   background: transparent;
 }
 
+.notes-embed-picture {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+.notes-embed:has(.notes-embed-picture) {
+  position: relative;
+}
+
+/* The corner a picture is resized by; shown only while it is selected. */
+.notes-embed-resize {
+  position: absolute;
+  right: var(--space-detail-2);
+  bottom: var(--space-detail-2);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-focus-ring);
+  border-radius: 4px;
+  background: var(--color-code-block-bg);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
 /* ProseMirror's drop cursor between blocks, in the theme's accent. */
 .notes-drop-cursor {
   background: var(--accent-notes);

@@ -281,12 +281,12 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
                 className="card-icon-button slideshow-drag-handle"
                 role="img"
                 draggable
-                title="Drag into a note to embed this panel"
-                aria-label="Drag into a note to embed this panel"
+                title="Drag into a note to embed this image"
+                aria-label="Drag into a note to embed this image"
                 onDragStart={(event) => {
                   event.stopPropagation()
                   event.dataTransfer.effectAllowed = 'copy'
-                  event.dataTransfer.setData(PANEL_DRAG_TYPE, JSON.stringify({ panelId, title: embedTitleFor(panel, currentImage.name) }))
+                  event.dataTransfer.setData(PANEL_DRAG_TYPE, JSON.stringify({ panelId, imageId: currentImage.id, title: embedTitleFor(panel, currentImage.name) }))
                   // Plain text too, so a drop anywhere else gets the title.
                   event.dataTransfer.setData('text/plain', embedTitleFor(panel, currentImage.name))
                 }}

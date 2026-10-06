@@ -286,47 +286,70 @@ test.describe('panel embeds', () => {
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
     await body.click()
     await page.keyboard.type('Before the embed.')
-    const grip = (await shapeOf(page, images.panelId)).getByLabel('Drag into a note to embed this panel')
+    const grip = (await shapeOf(page, images.panelId)).getByLabel('Drag into a note to embed this image')
     await grip.dragTo(body, { targetPosition: { x: 40, y: 40 } })
     return { images, notes, body, embed: body.locator('.notes-embed') }
   }
 
-  test('a panel dragged from the Images panel becomes a live, sandboxed embed that survives a reload', async ({ page }) => {
+  test('an image dragged from the Images panel becomes an embed fixed to that image and survives a reload', async ({ page }) => {
     await openApp(page)
     const { images, notes, embed } = await embedImagesPanel(page)
     await expect(embed).toHaveCount(1)
-    await expect(embed.locator('.notes-embed-title')).toHaveText(/^Images: /)
-    const title = (await embed.locator('.notes-embed-title').textContent())!
 
-    // Nothing runs until asked: a poster, then the frame, and the frame is sandboxed.
+    // Shown at once: a plain picture runs nothing, so there is no poster or frame.
+    const picture = embed.locator('img.notes-embed-picture')
+    await expect(picture).toBeVisible()
     await expect(embed.locator('iframe')).toHaveCount(0)
-    await embed.getByRole('button', { name: /Show/ }).click()
-    const frame = embed.locator('iframe')
-    await expect(frame).toHaveAttribute('sandbox', 'allow-scripts')
-    await expect(frame).toHaveAttribute('title', title)
+    const name = (await picture.getAttribute('alt'))!
 
-    // Linked, not copied: the embed follows the source panel.
+    // Fixed, not followed: moving the slideshow on leaves the embed alone.
     await dispatch(page, { kind: 'images.next', panelId: images.panelId })
-    await expect(frame).not.toHaveAttribute('title', title)
+    await expect(picture).toHaveAttribute('alt', name)
 
     // Stored twice over: the exact document, and Markdown with the link line.
     // The drop was on the paragraph's text, so the embed sits beside it --
     // on whichever side was nearer -- never inside it.
     const { moment } = await describeCanvas(page)
-    const line = `[${title}](my-states://panel/${images.panelId})`
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
-      .toMatch(new RegExp(`^(Before the embed\\.\\n\\n${escapeRegExp(line)}|${escapeRegExp(line)}\\n\\nBefore the embed\\.)\\n$`))
+      .toMatch(new RegExp(`my-states://panel/${escapeRegExp(images.panelId)}\\?image=`))
     const stored = (await readStorage(page, moment!.id)).notes[0]!
     expect(stored.document?.schemaVersion).toBe(1)
-    expect(stored.document?.doc.content?.map((block) => block.type).sort()).toEqual(['panelEmbed', 'paragraph'])
+    // The editor may keep an empty line after a trailing block, so count only the embed.
+    expect(stored.document?.doc.content?.filter((block) => block.type === 'panelEmbed')).toHaveLength(1)
 
     await page.reload()
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
     await expect(again).toHaveCount(1)
-    // Back to the poster: opening a note never starts anything.
-    await expect(again.locator('iframe')).toHaveCount(0)
-    await expect(again.getByRole('button', { name: /Show/ })).toBeVisible()
+    await expect(again.locator('img.notes-embed-picture')).toHaveAttribute('alt', name)
+  })
+
+  test('a picture embed is resized by its corner handle and the width is kept', async ({ page }) => {
+    await openApp(page)
+    const { notes, body, embed } = await embedImagesPanel(page)
+    const picture = embed.locator('img.notes-embed-picture')
+    await expect(picture).toBeVisible()
+    const full = (await embed.boundingBox())!.width
+
+    await picture.click()
+    const handle = embed.getByRole('slider', { name: 'Picture width' })
+    await expect(handle).toBeVisible()
+    const box = (await handle.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x - full / 2, box.y + box.height / 2, { steps: 5 })
+    await page.mouse.up()
+    const half = (await embed.boundingBox())!.width
+    expect(half).toBeLessThan(full * 0.65)
+    expect(half).toBeGreaterThan(full * 0.35)
+
+    const { moment } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toMatch(/&width=\d+/)
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
+    expect((await again.boundingBox())!.width).toBeLessThan(full * 0.65)
+    void body
   })
 
   test('says so when the panel it came from is gone, and undo removes only the embed', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Play } from 'lucide-react'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
 import { dropCursor } from '@milkdown/prose/dropcursor'
@@ -10,19 +10,20 @@ import { useAppState } from '../AppState'
 import type { Panel, PanelType } from '../types'
 
 /**
- * A live embed of another panel inside a note.
+ * An embed of another panel's picture inside a note.
  *
  * The document holds only what identifies the source -- the panel's stable
- * id and the title it had when placed -- never what the panel was showing.
- * The node view looks the panel up in the app's state every time it
- * renders, so the embed follows the source as it changes and says so when
- * the source is gone. Nothing runs when a note opens: the view shows a
+ * id, the id of the picture that was dragged, and the title it had when
+ * placed -- never the picture itself. The node view looks both up in the
+ * app's state every time it renders, so the embed keeps showing the dragged
+ * picture and says so when the panel or the picture is gone. An embed with
+ * no picture id (an older note) follows whatever the panel is showing. Nothing runs when a note opens: the view shows a
  * poster until the reader asks, and what it then shows sits in a sandboxed
  * frame with no access to the page.
  *
  * In Markdown the embed becomes one line, a link with its own scheme:
  *
- *     [Images: teemu-jpeg](my-states://panel/panel-abc)
+ *     [Images: teemu-jpeg](my-states://panel/panel-abc?image=img-1)
  *
  * Any other tool shows a link and the title, which is the predictable
  * degradation the checklist asks for; this app reads the line back into an
@@ -36,6 +37,18 @@ export const EMBED_LINK_SCHEME = 'my-states://panel/'
 export interface PanelDragData {
   panelId: string
   title: string
+  /** The picture that was dragged. Empty for an embed that follows the panel. */
+  imageId: string
+  /** How wide a fixed picture is drawn, as a percentage of the note's width. */
+  width: number
+}
+
+export const MIN_EMBED_WIDTH = 20
+export const FULL_EMBED_WIDTH = 100
+
+function clampWidth(value: unknown) {
+  const width = Number(value)
+  return Number.isFinite(width) ? Math.min(FULL_EMBED_WIDTH, Math.max(MIN_EMBED_WIDTH, Math.round(width))) : FULL_EMBED_WIDTH
 }
 
 export function readPanelDragData(transfer: DataTransfer | null): PanelDragData | null {
@@ -43,7 +56,9 @@ export function readPanelDragData(transfer: DataTransfer | null): PanelDragData 
   if (!raw) return null
   try {
     const data = JSON.parse(raw) as Partial<PanelDragData>
-    return typeof data.panelId === 'string' ? { panelId: data.panelId, title: typeof data.title === 'string' ? data.title : '' } : null
+    return typeof data.panelId === 'string'
+      ? { panelId: data.panelId, title: typeof data.title === 'string' ? data.title : '', imageId: typeof data.imageId === 'string' ? data.imageId : '', width: FULL_EMBED_WIDTH }
+      : null
   } catch {
     return null
   }
@@ -59,23 +74,30 @@ export const panelEmbed = $node('panelEmbed', () => ({
   attrs: {
     panelId: { default: '' },
     title: { default: '' },
+    imageId: { default: '' },
+    width: { default: FULL_EMBED_WIDTH },
   },
   parseDOM: [{
     tag: 'div[data-panel-embed]',
-    getAttrs: (dom) => ({ panelId: (dom as HTMLElement).dataset.panelEmbed ?? '', title: (dom as HTMLElement).dataset.title ?? '' }),
+    getAttrs: (dom) => ({
+      panelId: (dom as HTMLElement).dataset.panelEmbed ?? '',
+      title: (dom as HTMLElement).dataset.title ?? '',
+      imageId: (dom as HTMLElement).dataset.imageId ?? '',
+      width: clampWidth((dom as HTMLElement).dataset.width ?? FULL_EMBED_WIDTH),
+    }),
   }],
-  toDOM: (node) => ['div', { 'data-panel-embed': node.attrs.panelId, 'data-title': node.attrs.title }],
+  toDOM: (node) => ['div', { 'data-panel-embed': node.attrs.panelId, 'data-title': node.attrs.title, 'data-image-id': node.attrs.imageId, 'data-width': node.attrs.width }],
   parseMarkdown: {
     match: (node) => node.type === 'panelEmbed',
     runner: (state, node, type) => {
-      state.addNode(type, { panelId: node.panelId as string, title: node.title as string })
+      state.addNode(type, { panelId: node.panelId as string, title: node.title as string, imageId: (node.imageId as string) ?? '', width: clampWidth(node.width ?? FULL_EMBED_WIDTH) })
     },
   },
   toMarkdown: {
     match: (node) => node.type.name === 'panelEmbed',
     runner: (state, node) => {
       state.openNode('paragraph')
-      state.openNode('link', undefined, { url: `${EMBED_LINK_SCHEME}${node.attrs.panelId}` })
+      state.openNode('link', undefined, { url: embedUrl(node.attrs.panelId, node.attrs.imageId, node.attrs.width) })
       state.addNode('text', undefined, node.attrs.title || 'Embedded panel')
       state.closeNode()
       state.closeNode()
@@ -102,18 +124,28 @@ export const panelEmbedRemark = $remark('panelEmbedRemark', () => () => (root) =
         visit(child)
         return child
       }
-      return { type: 'panelEmbed', panelId: link.panelId, title: link.title }
+      return { type: 'panelEmbed', panelId: link.panelId, title: link.title, imageId: link.imageId, width: link.width }
     })
   }
   visit(tree)
 })
+
+/** `my-states://panel/<panel>` or, for one fixed picture, `...?image=<picture>`. */
+function embedUrl(panelId: string, imageId: string, width: number) {
+  if (!imageId) return `${EMBED_LINK_SCHEME}${panelId}`
+  // A full-width picture is the default, so only a narrowed one says so.
+  const size = width < FULL_EMBED_WIDTH ? `&width=${width}` : ''
+  return `${EMBED_LINK_SCHEME}${panelId}?image=${encodeURIComponent(imageId)}${size}`
+}
 
 function embedLinkOf(node: MdNode): PanelDragData | null {
   if (node.type !== 'paragraph' || node.children?.length !== 1) return null
   const [link] = node.children
   if (link.type !== 'link' || typeof link.url !== 'string' || !link.url.startsWith(EMBED_LINK_SCHEME)) return null
   const title = (link.children ?? []).map((child) => (typeof child.value === 'string' ? child.value : '')).join('')
-  return { panelId: link.url.slice(EMBED_LINK_SCHEME.length), title }
+  const [panelId, query = ''] = link.url.slice(EMBED_LINK_SCHEME.length).split('?')
+  const params = new URLSearchParams(query)
+  return { panelId, title, imageId: params.get('image') ?? '', width: clampWidth(params.get('width') ?? FULL_EMBED_WIDTH) }
 }
 
 /**
@@ -158,17 +190,24 @@ const panelTitles: Record<PanelType, string> = {
 }
 
 export function PanelEmbedView() {
-  const { node, selected } = useNodeViewContext()
+  const { node, selected, setAttrs } = useNodeViewContext()
+  const figureRef = useRef<HTMLElement>(null)
   const { panels, slideshow, appearance } = useAppState()
   // What the reader has asked to see. Editor state, not document state:
   // it is not persisted, so opening a note never runs anything.
   const [showing, setShowing] = useState(false)
-  const { panelId, title } = node.attrs as { panelId: string; title: string }
+  const { panelId, title, imageId, width } = node.attrs as { panelId: string; title: string; imageId: string; width: number }
   const panel = panels.get(panelId)
-  const live = panel ? liveContentOf(panel, slideshow, appearance.effective.mode) : null
+  const live = panel ? liveContentOf(panel, slideshow, appearance.effective.mode, imageId) : null
 
   return (
-    <figure className={`notes-embed${selected ? ' is-selected' : ''}`} data-panel-embed={panelId} data-title={title}>
+    <figure
+      ref={figureRef}
+      className={`notes-embed${selected ? ' is-selected' : ''}`}
+      data-panel-embed={panelId}
+      data-title={title}
+      style={live?.picture ? { width: `${width}%` } : undefined}
+    >
       {!panel ? (
         <div className="notes-embed-poster is-missing">
           <span className="notes-embed-title">{title || 'Embedded panel'}</span>
@@ -179,6 +218,49 @@ export function PanelEmbedView() {
           <span className="notes-embed-title">{title || embedTitleFor(panel)}</span>
           <span className="notes-embed-note">Nothing to show for this panel yet.</span>
         </div>
+      ) : live.picture ? (
+        // A plain picture runs no script, so it needs no poster or frame, and
+        // an object URL from a local folder works here where it cannot in the
+        // frame.
+        <>
+          <img className="notes-embed-picture" src={live.picture.url} alt={live.picture.name} draggable={false} />
+          {selected ? (
+            <span
+              className="notes-embed-resize"
+              role="slider"
+              aria-label="Picture width"
+              aria-valuemin={MIN_EMBED_WIDTH}
+              aria-valuemax={FULL_EMBED_WIDTH}
+              aria-valuenow={width}
+              tabIndex={0}
+              title="Drag to resize"
+              onPointerDown={(event) => {
+                // The editor would otherwise start a text selection or
+                // move the embed itself.
+                event.preventDefault()
+                event.stopPropagation()
+                event.currentTarget.setPointerCapture(event.pointerId)
+              }}
+              onPointerMove={(event) => {
+                if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+                const figure = figureRef.current
+                const note = figure?.parentElement
+                if (!figure || !note) return
+                // The picture's left edge stays put, so its new width is
+                // however far the pointer is from that edge.
+                const next = clampWidth(((event.clientX - figure.getBoundingClientRect().left) / note.clientWidth) * 100)
+                if (next !== width) setAttrs({ width: next })
+              }}
+              onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+              onKeyDown={(event) => {
+                const step = event.key === 'ArrowRight' ? 5 : event.key === 'ArrowLeft' ? -5 : 0
+                if (!step) return
+                event.preventDefault()
+                setAttrs({ width: clampWidth(width + step) })
+              }}
+            />
+          ) : null}
+        </>
       ) : showing ? (
         <iframe
           className="notes-embed-frame"
@@ -202,6 +284,8 @@ interface LiveContent {
   /** What the source is showing right now, for the poster and the frame's title. */
   title: string
   srcDoc: string
+  /** Set for a fixed picture, which is drawn directly: it runs nothing. */
+  picture: { url: string; name: string } | null
 }
 
 /**
@@ -209,10 +293,12 @@ interface LiveContent {
  * frame. Each panel type that can be embedded adds a case here; a type
  * without one shows the "nothing to show" poster rather than an empty frame.
  */
-function liveContentOf(panel: Panel, slideshow: ReturnType<typeof useAppState>['slideshow'], mode: 'light' | 'dark'): LiveContent | null {
+function liveContentOf(panel: Panel, slideshow: ReturnType<typeof useAppState>['slideshow'], mode: 'light' | 'dark', imageId: string): LiveContent | null {
   if (panel.type !== 'slideshow') return null
   const images = slideshow.imagesFor(panel.id)
-  const image = images[slideshow.currentIndexFor(panel.id)] ?? images[0]
+  // A fixed picture that has left the panel shows nothing rather than a
+  // different picture: the embed was placed for that one.
+  const image = imageId ? images.find((item) => item.id === imageId) : images[slideshow.currentIndexFor(panel.id)] ?? images[0]
   if (!image) return null
   // The frame has its own origin, so a relative address must be made whole
   // here; an object URL from a local folder cannot cross that line and the
@@ -221,6 +307,7 @@ function liveContentOf(panel: Panel, slideshow: ReturnType<typeof useAppState>['
   const title = embedTitleFor(panel, image.name)
   return {
     title,
+    picture: imageId ? { url: image.url, name: image.name } : null,
     // The frame's colour scheme must match the page's: when they differ the
     // browser paints the frame on an opaque white canvas instead of letting
     // the note show through.
