@@ -246,9 +246,12 @@ export function PanelEmbedView() {
                 const figure = figureRef.current
                 const note = figure?.parentElement
                 if (!figure || !note) return
-                // The picture's left edge stays put, so its new width is
-                // however far the pointer is from that edge.
-                const next = clampWidth(((event.clientX - figure.getBoundingClientRect().left) / note.clientWidth) * 100)
+                // The picture stays centred while it changes size. The
+                // handle controls the right half, so twice its distance from
+                // the note's centre is the picture's full width.
+                const noteBounds = note.getBoundingClientRect()
+                const noteCentre = noteBounds.left + noteBounds.width / 2
+                const next = clampWidth(((event.clientX - noteCentre) * 2 / noteBounds.width) * 100)
                 if (next !== width) setAttrs({ width: next })
               }}
               onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}

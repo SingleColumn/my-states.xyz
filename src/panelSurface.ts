@@ -33,6 +33,11 @@ import type { SyntheticEvent } from 'react'
  * and frame in focus view (the header is gone, so the picture is the only
  * thing left to drag by). Declare that by adding or omitting the attribute,
  * not by intercepting events.
+ *
+ * A frame action is the narrow hybrid case: an element still lets pointer-down
+ * reach tldraw for dragging, but receives the browser's eventual click when
+ * the pointer did not move. The focus-view picture uses this to pause without
+ * giving up its job as the panel's drag surface.
  */
 export const PANEL_CONTENT_ATTRIBUTE = 'data-panel-content'
 
@@ -41,6 +46,11 @@ export const panelContentProps = { [PANEL_CONTENT_ATTRIBUTE]: '' } as const
 
 /** Every declared content region: what a panel hands the pointer back for. */
 export const panelContentSelector = `[${PANEL_CONTENT_ATTRIBUTE}]`
+
+export const PANEL_FRAME_ACTION_ATTRIBUTE = 'data-panel-frame-action'
+
+/** Restore DOM hit testing without claiming the press from the canvas. */
+export const panelFrameActionProps = { [PANEL_FRAME_ACTION_ATTRIBUTE]: '' } as const
 
 export function isInsidePanelContent(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(panelContentSelector) !== null

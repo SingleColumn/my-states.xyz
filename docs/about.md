@@ -74,7 +74,7 @@ Below the picture, use **Previous image**, **Start slideshow** (which becomes **
 
 Every picture in a sample collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.
 
-To look at the pictures on their own, select **Adjust panel to focus view** in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Press **Esc** to bring the controls back; the panel reminds you of this whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
+To look at the pictures on their own, select **Adjust panel to focus view** in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Click the picture to pause or resume the slideshow, and press **Esc** to bring the controls back; the panel reminds you of both whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
 
 ### Notes
 

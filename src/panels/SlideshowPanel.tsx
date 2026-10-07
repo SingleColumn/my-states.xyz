@@ -8,7 +8,7 @@ import { useFeaturedBundledCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
-import { panelContentProps } from '../panelSurface'
+import { panelContentProps, panelFrameActionProps } from '../panelSurface'
 import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
 import { CollectionBrowser } from './CollectionBrowser'
 import { selectImageCollection } from './collectionSelection'
@@ -43,6 +43,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const panelImages = slideshow.imagesFor(panelId)
   const panelStatus = slideshow.statusFor(panelId)
   const panelError = slideshow.errorFor(panelId)
+  const isPlaying = slideshow.isPlayingFor(panelId)
   const firstImage = panelImages[0]
   const currentImage = panelImages[currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
@@ -170,6 +171,10 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
     slideshow.setIsPlaying(true, panelId)
   }
 
+  function togglePlayback() {
+    slideshow.setIsPlaying(!slideshow.isPlayingFor(panelId), panelId)
+  }
+
   return (
     <section
       className={`panel panel-slideshow-surface${focusView ? ' is-focus-view' : ''}${isBrowsingCollections ? ' is-collection-browser' : ''}`}
@@ -241,6 +246,8 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             image={currentImage}
             transitionMs={panelSettings.transitionMs}
             zoom={panelSettings.zoom}
+            onActivate={focusView ? togglePlayback : undefined}
+            activationLabel={focusView ? (isPlaying ? 'Pause slideshow' : 'Start slideshow') : undefined}
           />
           {attribution ? <ImageAttributionOverlay attribution={attribution} /> : null}
           <button
@@ -255,7 +262,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
           </button>
           {focusView ? (
             <p className={isFocusHintVisible ? 'focus-view-hint is-visible' : 'focus-view-hint'} role="status">
-              Press <kbd>Esc</kbd> to show the controls
+              Click the image to {isPlaying ? 'pause' : 'play'} · Press <kbd>Esc</kbd> to show the controls
             </p>
           ) : null}
           </>
@@ -269,7 +276,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         <div className="panel-body slideshow-controls" {...panelContentProps} onDragStart={(event) => event.preventDefault()}>
           <div className="transport-row">
             <button className="card-icon-button" type="button" title="Previous image" aria-label="Previous image" onClick={() => slideshow.previous(panelId)}><SkipBack size={18} /></button>
-            <button className="card-icon-button is-primary is-large" type="button" title="Start or pause" aria-label={slideshow.isPlayingFor(panelId) ? 'Pause slideshow' : 'Start slideshow'} onClick={() => slideshow.setIsPlaying(!slideshow.isPlayingFor(panelId), panelId)}>{slideshow.isPlayingFor(panelId) ? <Pause size={20} /> : <Play size={20} />}</button>
+            <button className="card-icon-button is-primary is-large" type="button" title="Start or pause" aria-label={isPlaying ? 'Pause slideshow' : 'Start slideshow'} onClick={togglePlayback}>{isPlaying ? <Pause size={20} /> : <Play size={20} />}</button>
             <button className="card-icon-button" type="button" title="Next image" aria-label="Next image" onClick={() => slideshow.next(panelId)}><SkipForward size={18} /></button>
             <button className="card-icon-button" type="button" title="Stop" aria-label="Stop slideshow" onClick={() => slideshow.stop(panelId)}><Square size={16} /></button>
             <button className={`card-icon-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={18} /></button>
@@ -326,26 +333,95 @@ function CrossfadeImage({
   image,
   transitionMs,
   zoom,
+  onActivate,
+  activationLabel,
 }: {
   image: ImageItem
   transitionMs: number
   zoom: number
+  onActivate?: () => void
+  activationLabel?: string
 }) {
   const [displayedImage, setDisplayedImage] = useState(image)
   const [outgoingImage, setOutgoingImage] = useState<ImageItem | null>(null)
   const displayedImageRef = useRef(image)
+  const pressStartRef = useRef<{ pointerId: number, x: number, y: number } | null>(null)
+  const onActivateRef = useRef(onActivate)
+  onActivateRef.current = onActivate
+
+  // tldraw captures the pointer after the image's pointer-down so the panel
+  // can be dragged. A browser click is therefore not reliable here. Observe
+  // the captured gesture at the window instead and treat only a stationary
+  // release as activation.
+  useEffect(() => {
+    if (!onActivate) return
+
+    const finishPress = (event: PointerEvent) => {
+      const start = pressStartRef.current
+      if (!start || event.pointerId !== start.pointerId) return
+      pressStartRef.current = null
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) return
+      queueMicrotask(() => onActivateRef.current?.())
+    }
+    const cancelPress = (event: PointerEvent) => {
+      if (pressStartRef.current?.pointerId === event.pointerId) pressStartRef.current = null
+    }
+
+    window.addEventListener('pointerup', finishPress, true)
+    window.addEventListener('pointercancel', cancelPress, true)
+    return () => {
+      pressStartRef.current = null
+      window.removeEventListener('pointerup', finishPress, true)
+      window.removeEventListener('pointercancel', cancelPress, true)
+    }
+  }, [Boolean(onActivate)])
 
   useEffect(() => {
     if (image.id === displayedImageRef.current.id) return
 
-    const previousImage = displayedImageRef.current
-    displayedImageRef.current = image
-    setOutgoingImage(transitionMs > 0 ? previousImage : null)
-    setDisplayedImage(image)
+    let cancelled = false
+    let timeoutId: number | null = null
+    const preload = new window.Image()
 
-    if (transitionMs <= 0) return
-    const timeoutId = window.setTimeout(() => setOutgoingImage(null), transitionMs)
-    return () => window.clearTimeout(timeoutId)
+    async function showDecodedImage() {
+      preload.src = image.url
+
+      // A large image inserted before decoding has finished can visibly paint
+      // from top to bottom. Decode it away from the stage first so the
+      // crossfade always receives a complete frame.
+      if (typeof preload.decode === 'function') {
+        try {
+          await preload.decode()
+        } catch {
+          // SVGs and a few browser/image combinations may reject decode even
+          // though the image can still load normally. Wait for that fallback
+          // below instead of leaving the slideshow stuck on the old image.
+        }
+      }
+
+      if (!preload.complete) {
+        await new Promise<void>((resolve) => {
+          preload.addEventListener('load', () => resolve(), { once: true })
+          preload.addEventListener('error', () => resolve(), { once: true })
+        })
+      }
+      if (cancelled) return
+
+      const previousImage = displayedImageRef.current
+      displayedImageRef.current = image
+      setOutgoingImage(transitionMs > 0 ? previousImage : null)
+      setDisplayedImage(image)
+
+      if (transitionMs > 0) {
+        timeoutId = window.setTimeout(() => setOutgoingImage(null), transitionMs)
+      }
+    }
+
+    void showDecodedImage()
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) window.clearTimeout(timeoutId)
+    }
   }, [image])
 
   const imageStyle = { transform: `scale(${zoom})` }
@@ -371,8 +447,28 @@ function CrossfadeImage({
         key={displayedImage.id}
         src={displayedImage.url}
         alt={displayedImage.name}
+        role={onActivate ? 'button' : undefined}
+        tabIndex={onActivate ? 0 : undefined}
+        aria-label={activationLabel}
         draggable={false}
+        {...(onActivate ? panelFrameActionProps : {})}
         onDragStart={preventNativeDrag}
+        onPointerDown={onActivate ? (event) => {
+          pressStartRef.current = event.button === 0 ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY } : null
+        } : undefined}
+        onClick={onActivate ? (event) => {
+          // Pointer activation is handled above because tldraw owns that
+          // gesture. A zero-detail click is synthesized by assistive tech.
+          if (event.detail !== 0) return
+          event.stopPropagation()
+          onActivate()
+        } : undefined}
+        onKeyDown={onActivate ? (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          event.stopPropagation()
+          onActivate()
+        } : undefined}
         style={{ ...imageStyle, animationDuration: `${transitionMs}ms` }}
       />
     </>

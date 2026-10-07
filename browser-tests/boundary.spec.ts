@@ -170,6 +170,22 @@ test.describe('content: the widget owns it', () => {
 })
 
 test.describe('Images focus view', () => {
+  test('clicking the picture pauses and resumes the slideshow', async ({ page }) => {
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    await loadSampleImages(page, images.panelId)
+    const shape = await shapeOf(page, images.panelId)
+
+    await choosePanelMenuItem(shape, 'Adjust panel to focus view')
+    const pause = shape.getByRole('button', { name: 'Pause slideshow' })
+    await expect(pause).toBeVisible()
+    await pause.click()
+    const play = shape.getByRole('button', { name: 'Start slideshow' })
+    await expect(play).toBeVisible()
+    await play.click()
+    await expect(shape.getByRole('button', { name: 'Pause slideshow' })).toBeVisible()
+  })
+
   test('the picture becomes frame and the credit link stays content', async ({ page }) => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')

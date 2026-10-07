@@ -1,11 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import type { PanelCommands } from '../PanelHeader'
 import { PanelCommandsProvider } from '../PanelHeader'
 import { SlideshowPanel } from './SlideshowPanel'
 
 const panel = vi.hoisted(() => ({ focusView: false }))
+const slideshowRuntime = vi.hoisted(() => ({ playing: true, setIsPlaying: vi.fn() }))
 
 const image = { id: 'image_1', momentId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
 
@@ -27,13 +30,13 @@ vi.mock('../AppState', () => ({
       imagesFor: () => [image],
       statusFor: () => 'Showing 1 of 1',
       errorFor: () => null,
-      isPlayingFor: () => true,
+      isPlayingFor: () => slideshowRuntime.playing,
       updateSettings: () => {},
       selectFolder: async () => 'selected' as const,
       selectBundledCollection: async () => true,
       importFiles: async () => {},
       resetFolder: async () => {},
-      setIsPlaying: () => {},
+      setIsPlaying: slideshowRuntime.setIsPlaying,
       stop: () => {},
       next: () => {},
       previous: () => {},
@@ -69,6 +72,12 @@ function renderImagesPanel(focusView: boolean) {
   }))
 }
 
+afterEach(() => {
+  cleanup()
+  slideshowRuntime.playing = true
+  slideshowRuntime.setIsPlaying.mockReset()
+})
+
 describe('Images panel focus view', () => {
   it('keeps the picture and nothing else', () => {
     const markup = renderImagesPanel(true)
@@ -84,6 +93,39 @@ describe('Images panel focus view', () => {
     // naming the way out.
     expect(renderImagesPanel(true)).toContain('focus-view-hint')
     expect(renderImagesPanel(false)).not.toContain('focus-view-hint')
+  })
+
+  it('makes the focused picture an accessible playback control', () => {
+    const focused = renderImagesPanel(true)
+    expect(focused).toContain('role="button"')
+    expect(focused).toContain('tabindex="0"')
+    expect(focused).toContain('aria-label="Pause slideshow"')
+    expect(focused).toContain('data-panel-frame-action=""')
+    expect(focused).toContain('Click the image to pause')
+
+    const full = renderImagesPanel(false)
+    expect(full).not.toContain('role="button"')
+    expect(full).not.toContain('tabindex="0"')
+    expect(full).not.toContain('data-panel-frame-action=""')
+  })
+
+  it('treats a captured stationary press as play/pause, but not a drag', async () => {
+    panel.focusView = true
+    const view = render(createElement(PanelCommandsProvider, {
+      commands,
+      children: createElement(SlideshowPanel, { panelId: 'panel_images' }),
+    }))
+    const picture = view.getByRole('button', { name: 'Pause slideshow' })
+
+    fireEvent.pointerDown(picture, { pointerId: 7, button: 0, clientX: 100, clientY: 100 })
+    fireEvent.pointerUp(window, { pointerId: 7, button: 0, clientX: 102, clientY: 101 })
+    await waitFor(() => expect(slideshowRuntime.setIsPlaying).toHaveBeenCalledWith(false, 'panel_images'))
+
+    slideshowRuntime.setIsPlaying.mockClear()
+    fireEvent.pointerDown(picture, { pointerId: 8, button: 0, clientX: 100, clientY: 100 })
+    fireEvent.pointerUp(window, { pointerId: 8, button: 0, clientX: 130, clientY: 100 })
+    await Promise.resolve()
+    expect(slideshowRuntime.setIsPlaying).not.toHaveBeenCalled()
   })
 
   it('drops the slideshow controls, the sliders, and the footer from the focus view', () => {

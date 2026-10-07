@@ -337,11 +337,16 @@ test.describe('panel embeds', () => {
     const box = (await handle.boundingBox())!
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
-    await page.mouse.move(box.x - full / 2, box.y + box.height / 2, { steps: 5 })
+    // A centred picture changes on both sides, so moving the right handle by
+    // a quarter of the full width makes the whole picture about half-width.
+    await page.mouse.move(box.x - full / 4, box.y + box.height / 2, { steps: 5 })
     await page.mouse.up()
     const half = (await embed.boundingBox())!.width
     expect(half).toBeLessThan(full * 0.65)
     expect(half).toBeGreaterThan(full * 0.35)
+    const editorBox = (await body.boundingBox())!
+    const resizedBox = (await embed.boundingBox())!
+    expect(Math.abs((resizedBox.x + resizedBox.width / 2) - (editorBox.x + editorBox.width / 2))).toBeLessThan(2)
 
     const { moment } = await describeCanvas(page)
     await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toMatch(/&width=\d+/)
@@ -349,6 +354,9 @@ test.describe('panel embeds', () => {
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
     expect((await again.boundingBox())!.width).toBeLessThan(full * 0.65)
+    const reloadedEditor = (await again.locator('xpath=..').boundingBox())!
+    const reloadedEmbed = (await again.boundingBox())!
+    expect(Math.abs((reloadedEmbed.x + reloadedEmbed.width / 2) - (reloadedEditor.x + reloadedEditor.width / 2))).toBeLessThan(2)
     void body
   })
 
