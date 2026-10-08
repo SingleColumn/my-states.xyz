@@ -3,8 +3,12 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import type { CollectionSummary } from '../imageCollections'
 
 export const collectionRotationIntervalMs = 3000
+// Automatic browsing can be ambient and unhurried. An explicit arrow press
+// needs to answer immediately, so it gets a normal interface transition.
 export const collectionCoverTransitionMs = 2500
+export const collectionManualCoverTransitionMs = 250
 export const collectionCaptionHandoffMs = Math.round(collectionCoverTransitionMs * 0.35)
+export const collectionManualCaptionHandoffMs = Math.round(collectionManualCoverTransitionMs * 0.35)
 // The first cover should change soon after entering the browser. Subsequent
 // rotations use the longer reading interval above.
 export const collectionInitialRotationDelayMs = 250
@@ -44,6 +48,7 @@ export function CollectionBrowser({
   const [outgoingCollection, setOutgoingCollection] = useState<CollectionSummary | null>(null)
   const [captionCollectionId, setCaptionCollectionId] = useState<string | null>(currentId)
   const previousCollectionIdRef = useRef<string | null>(currentId)
+  const transitionDurationRef = useRef(collectionCoverTransitionMs)
   const hasScheduledInitialRotationRef = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
 
@@ -88,11 +93,12 @@ export function CollectionBrowser({
     }
 
     setOutgoingCollection(previousCollection)
+    const transitionDurationMs = transitionDurationRef.current
     const captionTimeoutId = window.setTimeout(
       () => setCaptionCollectionId(currentId),
-      collectionCaptionHandoffMs,
+      Math.round(transitionDurationMs * 0.35),
     )
-    const timeoutId = window.setTimeout(() => setOutgoingCollection(null), collectionCoverTransitionMs)
+    const timeoutId = window.setTimeout(() => setOutgoingCollection(null), transitionDurationMs)
     return () => {
       window.clearTimeout(captionTimeoutId)
       window.clearTimeout(timeoutId)
@@ -106,6 +112,7 @@ export function CollectionBrowser({
       : collectionInitialRotationDelayMs
     hasScheduledInitialRotationRef.current = true
     const timerId = window.setTimeout(() => {
+      transitionDurationRef.current = collectionCoverTransitionMs
       setCurrentId(collections[(currentIndex + 1) % collections.length].id)
     }, delay)
     return () => window.clearTimeout(timerId)
@@ -114,6 +121,7 @@ export function CollectionBrowser({
   function move(offset: number) {
     if (!collections.length) return
     const nextIndex = (currentIndex + offset + collections.length) % collections.length
+    transitionDurationRef.current = collectionManualCoverTransitionMs
     setCurrentId(collections[nextIndex].id)
   }
 
@@ -178,7 +186,7 @@ export function CollectionBrowser({
     <section
       ref={rootRef}
       className="collection-browser"
-      style={{ '--collection-cover-transition-duration': `${collectionCoverTransitionMs}ms` } as CSSProperties}
+      style={{ '--collection-cover-transition-duration': `${transitionDurationRef.current}ms` } as CSSProperties}
       aria-label="Image collection browser"
       onPointerEnter={() => setIsHovered(true)}
       onPointerLeave={() => setIsHovered(false)}

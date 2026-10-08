@@ -9,6 +9,8 @@ import {
   collectionCaptionHandoffMs,
   collectionCoverTransitionMs,
   collectionInitialRotationDelayMs,
+  collectionManualCaptionHandoffMs,
+  collectionManualCoverTransitionMs,
   collectionRotationIntervalMs,
   initialCollectionIndex,
   type CollectionBrowserProps,
@@ -100,13 +102,13 @@ describe('CollectionBrowser', () => {
     const next = screen.getByRole('button', { name: 'Next collection' })
 
     fireEvent.click(previous)
-    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
+    act(() => vi.advanceTimersByTime(collectionManualCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Gamma' })).toBeTruthy()
     fireEvent.click(next)
-    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
+    act(() => vi.advanceTimersByTime(collectionManualCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
     fireEvent.click(next)
-    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
+    act(() => vi.advanceTimersByTime(collectionManualCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
   })
 
@@ -117,7 +119,7 @@ describe('CollectionBrowser', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next collection' }))
     expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
 
-    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs - 1))
+    act(() => vi.advanceTimersByTime(collectionManualCaptionHandoffMs - 1))
     expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
 
     act(() => vi.advanceTimersByTime(1))
@@ -136,9 +138,21 @@ describe('CollectionBrowser', () => {
     expect(transitionLayers[0].querySelector('img')?.getAttribute('src')).toBe('/alpha.jpg')
     expect(transitionLayers[1].classList.contains('is-incoming')).toBe(true)
     expect(transitionLayers[1].querySelector('img')?.getAttribute('src')).toBe('/beta.jpg')
+    expect(screen.getByRole('region', { name: 'Image collection browser' }).style.getPropertyValue('--collection-cover-transition-duration')).toBe(`${collectionManualCoverTransitionMs}ms`)
 
-    act(() => vi.advanceTimersByTime(collectionCoverTransitionMs))
+    act(() => vi.advanceTimersByTime(collectionManualCoverTransitionMs))
     expect(container.querySelectorAll('.collection-browser-cover-visual')).toHaveLength(1)
+  })
+
+  it('keeps the slower cover transition for automatic browsing', () => {
+    vi.useFakeTimers()
+    renderBrowser()
+
+    act(() => vi.advanceTimersByTime(collectionInitialRotationDelayMs))
+    expect(screen.getByRole('region', { name: 'Image collection browser' }).style.getPropertyValue('--collection-cover-transition-duration')).toBe(`${collectionCoverTransitionMs}ms`)
+    expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
+    act(() => vi.advanceTimersByTime(collectionCaptionHandoffMs))
+    expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
   })
 
   it('restarts automatic advance after manual navigation', () => {
