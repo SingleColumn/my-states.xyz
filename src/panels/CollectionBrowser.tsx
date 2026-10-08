@@ -12,6 +12,7 @@ export const collectionManualCaptionHandoffMs = Math.round(collectionManualCover
 // The first cover should change soon after entering the browser. Subsequent
 // rotations use the longer reading interval above.
 export const collectionInitialRotationDelayMs = 250
+export const collectionsPerGridPage = 6
 
 export function initialCollectionIndex(collectionCount: number, randomValue = Math.random()) {
   if (collectionCount <= 0) return 0
@@ -24,6 +25,7 @@ export interface CollectionBrowserProps {
   loading: boolean
   error: string | null
   initialCollectionId?: string
+  viewMode: 'carousel' | 'grid'
   onSelectCollection(collectionId: string): void
 }
 
@@ -37,6 +39,7 @@ export function CollectionBrowser({
   loading,
   error,
   initialCollectionId,
+  viewMode,
   onSelectCollection,
 }: CollectionBrowserProps) {
   // Sample once for this browser instance. Async source completion and ordinary
@@ -47,7 +50,9 @@ export function CollectionBrowser({
   const [hasFocusWithin, setHasFocusWithin] = useState(false)
   const [outgoingCollection, setOutgoingCollection] = useState<CollectionSummary | null>(null)
   const [captionCollectionId, setCaptionCollectionId] = useState<string | null>(currentId)
+  const [gridPage, setGridPage] = useState(() => gridPageForCollection(collections, initialCollectionId))
   const previousCollectionIdRef = useRef<string | null>(currentId)
+  const hasLocatedInitialGridPageRef = useRef(collections.length > 0)
   const transitionDurationRef = useRef(collectionCoverTransitionMs)
   const hasScheduledInitialRotationRef = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
@@ -68,11 +73,31 @@ export function CollectionBrowser({
   const captionIndex = Math.max(0, collections.findIndex((collection) => collection.id === captionCollectionId))
   const captionCollection = collections[captionIndex] ?? currentCollection
   const isPaused = isHovered || hasFocusWithin
+  const gridPageCount = Math.max(1, Math.ceil(collections.length / collectionsPerGridPage))
+  const gridCollections = collections.slice(
+    gridPage * collectionsPerGridPage,
+    (gridPage + 1) * collectionsPerGridPage,
+  )
+
+  useEffect(() => {
+    setGridPage((page) => Math.min(page, gridPageCount - 1))
+  }, [gridPageCount])
+
+  useEffect(() => {
+    if (hasLocatedInitialGridPageRef.current || !collections.length) return
+    hasLocatedInitialGridPageRef.current = true
+    setGridPage(gridPageForCollection(collections, initialCollectionId))
+  }, [collections, initialCollectionId])
 
   // Prepare both layers before the browser paints the new current cover. A
   // normal effect runs after paint and briefly exposes the new cover at full
   // opacity, which looks like a hard cut regardless of the animation length.
   useLayoutEffect(() => {
+    if (viewMode === 'grid') {
+      setOutgoingCollection(null)
+      setCaptionCollectionId(currentId)
+      return
+    }
     const previousId = previousCollectionIdRef.current
     previousCollectionIdRef.current = currentId
     if (!currentId) {
@@ -103,10 +128,10 @@ export function CollectionBrowser({
       window.clearTimeout(captionTimeoutId)
       window.clearTimeout(timeoutId)
     }
-  }, [collections, currentId])
+  }, [collections, currentId, viewMode])
 
   useEffect(() => {
-    if (loading || error || isPaused || collections.length < 2 || !currentCollection) return
+    if (viewMode === 'grid' || loading || error || isPaused || collections.length < 2 || !currentCollection) return
     const delay = hasScheduledInitialRotationRef.current
       ? collectionRotationIntervalMs
       : collectionInitialRotationDelayMs
@@ -116,7 +141,7 @@ export function CollectionBrowser({
       setCurrentId(collections[(currentIndex + 1) % collections.length].id)
     }, delay)
     return () => window.clearTimeout(timerId)
-  }, [collections, currentCollection, currentIndex, error, isPaused, loading])
+  }, [collections, currentCollection, currentIndex, error, isPaused, loading, viewMode])
 
   function move(offset: number) {
     if (!collections.length) return
@@ -136,6 +161,63 @@ export function CollectionBrowser({
     content = <p className="collection-browser-message is-error" role="alert">{error}</p>
   } else if (!currentCollection) {
     content = <p className="collection-browser-message" role="status">No image collections are currently available.</p>
+  } else if (viewMode === 'grid') {
+    content = (
+      <div className="collection-browser-grid-layout">
+        <div className="collection-browser-grid" role="list" aria-label="Available image collections">
+          {gridCollections.map((collection) => {
+            const creatorLabel = collection.creators.length === 1
+              ? collection.creators[0]
+              : collection.creators.length > 1 ? 'Various creators' : 'Creator not listed'
+            return (
+              <div className="collection-grid-item" role="listitem" key={collection.id}>
+                <button
+                  className="collection-grid-card"
+                  type="button"
+                  aria-label={`Use ${collection.title} collection by ${creatorLabel}`}
+                  onClick={() => onSelectCollection(collection.id)}
+                >
+                  <span className="collection-grid-thumbnail" aria-hidden="true">
+                    {collection.coverUrl
+                      ? <img src={collection.coverUrl} alt="" loading="lazy" decoding="async" draggable={false} />
+                      : <Images className="collection-browser-cover-fallback" aria-hidden="true" />}
+                  </span>
+                  <span className="collection-grid-title">{collection.title}</span>
+                </button>
+              </div>
+            )
+          })}
+          {Array.from({ length: collectionsPerGridPage - gridCollections.length }, (_, index) => (
+            <div className="collection-grid-item is-placeholder" aria-hidden="true" key={`placeholder-${index}`} />
+          ))}
+        </div>
+        <div className="collection-browser-grid-pagination-space">
+          {gridPageCount > 1 ? (
+            <nav className="collection-browser-pagination" aria-label="Collection pages">
+              <button
+                className="card-icon-button"
+                type="button"
+                aria-label="Previous collection page"
+                disabled={gridPage === 0}
+                onClick={() => setGridPage((page) => Math.max(0, page - 1))}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </button>
+              <span aria-live="polite" aria-atomic="true">Page {gridPage + 1} of {gridPageCount}</span>
+              <button
+                className="card-icon-button"
+                type="button"
+                aria-label="Next collection page"
+                disabled={gridPage === gridPageCount - 1}
+                onClick={() => setGridPage((page) => Math.min(gridPageCount - 1, page + 1))}
+              >
+                <ChevronRight aria-hidden="true" />
+              </button>
+            </nav>
+          ) : null}
+        </div>
+      </div>
+    )
   } else {
     content = (
       <>
@@ -185,7 +267,7 @@ export function CollectionBrowser({
   return (
     <section
       ref={rootRef}
-      className="collection-browser"
+      className={`collection-browser${viewMode === 'grid' ? ' is-grid' : ''}`}
       style={{ '--collection-cover-transition-duration': `${transitionDurationRef.current}ms` } as CSSProperties}
       aria-label="Image collection browser"
       onPointerEnter={() => setIsHovered(true)}
@@ -213,4 +295,10 @@ function initialId(collections: CollectionSummary[], preferredId: string | undef
   if (!collections.length) return null
   if (preferredId && collections.some((collection) => collection.id === preferredId)) return preferredId
   return collections[initialCollectionIndex(collections.length, randomValue)].id
+}
+
+function gridPageForCollection(collections: CollectionSummary[], preferredId: string | undefined) {
+  if (!preferredId) return 0
+  const index = collections.findIndex((collection) => collection.id === preferredId)
+  return index < 0 ? 0 : Math.floor(index / collectionsPerGridPage)
 }

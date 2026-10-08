@@ -11,6 +11,7 @@ export interface CollectionSummary {
   id: string
   title: string
   coverUrl: string | null
+  creators: string[]
   imageCount?: number
 }
 
@@ -40,6 +41,7 @@ export async function loadBundledCollections(
     id,
     title,
     coverUrl: cover ?? images[0]?.url ?? null,
+    creators: [...new Set(images.map(({ creator }) => creator.trim()).filter(Boolean))],
     imageCount: images.length,
   }))
 }

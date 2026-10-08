@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
@@ -52,6 +52,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const [panelView, setPanelView] = useState<'slideshow' | 'browse-collections'>(() => (
     panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
   ))
+  const [collectionBrowserMode, setCollectionBrowserMode] = useState<'carousel' | 'grid'>('carousel')
   const sourceKey = panelSettings.imageSource.type === 'bundled'
     ? `bundled:${panelSettings.imageSource.collectionId}`
     : panelSettings.imageSource.type
@@ -199,8 +200,18 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             id: 'choose-collection',
             label: 'Choose another collection',
             icon: <Sparkles size={17} aria-hidden="true" />,
-            onSelect: () => { setIsImagePickerOpen(false); setPanelView('browse-collections') },
+            onSelect: () => { setIsImagePickerOpen(false); setCollectionBrowserMode('carousel'); setPanelView('browse-collections') },
           }]),
+          {
+            id: 'collection-view',
+            label: isBrowsingCollections && collectionBrowserMode === 'grid' ? 'Show collection carousel' : 'Show collection grid',
+            icon: <LayoutGrid size={17} aria-hidden="true" />,
+            onSelect: () => {
+              setIsImagePickerOpen(false)
+              setCollectionBrowserMode((current) => isBrowsingCollections && current === 'grid' ? 'carousel' : 'grid')
+              setPanelView('browse-collections')
+            },
+          },
           { id: 'clear', label: 'Clear images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) },
           {
             id: 'focus-view',
@@ -238,6 +249,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             loading={collectionSource.loading}
             error={collectionSource.error}
             initialCollectionId={panelSettings.imageSource.type === 'bundled' ? panelSettings.imageSource.collectionId : undefined}
+            viewMode={collectionBrowserMode}
             onSelectCollection={(collectionId) => void chooseCollection(collectionId)}
           />
         ) : currentImage ? (

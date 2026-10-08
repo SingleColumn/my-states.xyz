@@ -26,9 +26,23 @@ describe('bundled image collections', () => {
       { id: 'quiet-rooms', title: 'Quiet Rooms', images: [] },
     ))
     expect(collections).toEqual([
-      { id: 'neon-cities', title: 'Neon Cities', coverUrl: cover, imageCount: 1 },
-      { id: 'quiet-rooms', title: 'Quiet Rooms', coverUrl: null, imageCount: 0 },
+      { id: 'neon-cities', title: 'Neon Cities', coverUrl: cover, creators: ['Ada'], imageCount: 1 },
+      { id: 'quiet-rooms', title: 'Quiet Rooms', coverUrl: null, creators: [], imageCount: 0 },
     ])
+  })
+
+  it('summarizes every distinct creator without duplicating names', async () => {
+    const [collection] = await loadBundledCollections(manifestFetch({
+      id: 'mixed',
+      title: 'Mixed',
+      images: [
+        { url: '/sample-images/mixed/01.jpg', creator: 'Ada' },
+        { url: '/sample-images/mixed/02.jpg', creator: 'Grace' },
+        { url: '/sample-images/mixed/03.jpg', creator: 'Ada' },
+      ],
+    }))
+
+    expect(collection.creators).toEqual(['Ada', 'Grace'])
   })
 
   it('falls back to the first image when a collection names no cover', async () => {

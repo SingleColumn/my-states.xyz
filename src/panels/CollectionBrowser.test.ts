@@ -12,15 +12,16 @@ import {
   collectionManualCaptionHandoffMs,
   collectionManualCoverTransitionMs,
   collectionRotationIntervalMs,
+  collectionsPerGridPage,
   initialCollectionIndex,
   type CollectionBrowserProps,
 } from './CollectionBrowser'
 import { selectImageCollection } from './collectionSelection'
 
 const collections: CollectionSummary[] = [
-  { id: 'alpha', title: 'Alpha', coverUrl: '/alpha.jpg', imageCount: 3 },
-  { id: 'beta', title: 'Beta', coverUrl: '/beta.jpg', imageCount: 4 },
-  { id: 'gamma', title: 'Gamma', coverUrl: null, imageCount: 2 },
+  { id: 'alpha', title: 'Alpha', coverUrl: '/alpha.jpg', creators: ['Ada'], imageCount: 3 },
+  { id: 'beta', title: 'Beta', coverUrl: '/beta.jpg', creators: ['Grace', 'Lin'], imageCount: 4 },
+  { id: 'gamma', title: 'Gamma', coverUrl: null, creators: [], imageCount: 2 },
 ]
 
 afterEach(() => {
@@ -35,6 +36,7 @@ function renderBrowser(overrides: Partial<CollectionBrowserProps> = {}) {
     loading: false,
     error: null,
     initialCollectionId: 'alpha',
+    viewMode: 'carousel',
     onSelectCollection: vi.fn(),
     ...overrides,
   }
@@ -110,6 +112,69 @@ describe('CollectionBrowser', () => {
     fireEvent.click(next)
     act(() => vi.advanceTimersByTime(collectionManualCaptionHandoffMs))
     expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
+  })
+
+  it('shows every collection without repeating creator names over the covers and selects a card directly', () => {
+    const onSelectCollection = vi.fn()
+    const { container } = renderBrowser({ viewMode: 'grid', onSelectCollection })
+
+    expect(screen.getByRole('list', { name: 'Available image collections' })).toBeTruthy()
+    expect(container.querySelectorAll('.collection-grid-card')).toHaveLength(3)
+    expect(container.querySelector('.collection-grid-creator')).toBeNull()
+    expect(container.querySelector('.collection-browser-grid-pagination-space')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Next collection' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use Beta collection by Various creators' }))
+    expect(onSelectCollection).toHaveBeenCalledOnce()
+    expect(onSelectCollection).toHaveBeenCalledWith('beta')
+  })
+
+  it('shows six collections per grid page and pages forward and backward', () => {
+    const pagedCollections = Array.from({ length: collectionsPerGridPage + 2 }, (_, index): CollectionSummary => ({
+      id: `collection-${index + 1}`,
+      title: `Collection ${index + 1}`,
+      coverUrl: `/collection-${index + 1}.jpg`,
+      creators: [`Creator ${index + 1}`],
+      imageCount: 3,
+    }))
+    const { container } = renderBrowser({
+      collections: pagedCollections,
+      initialCollectionId: 'collection-1',
+      viewMode: 'grid',
+    })
+
+    expect(container.querySelectorAll('.collection-grid-card')).toHaveLength(6)
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Previous collection page' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Next collection page' }).hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next collection page' }))
+    expect(container.querySelectorAll('.collection-grid-card')).toHaveLength(2)
+    expect(screen.getByText('Collection 7')).toBeTruthy()
+    expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next collection page' }).hasAttribute('disabled')).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Previous collection page' }))
+    expect(container.querySelectorAll('.collection-grid-card')).toHaveLength(6)
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+  })
+
+  it('opens the grid page containing the selected collection', () => {
+    const pagedCollections = Array.from({ length: collectionsPerGridPage + 1 }, (_, index): CollectionSummary => ({
+      id: `collection-${index + 1}`,
+      title: `Collection ${index + 1}`,
+      coverUrl: `/collection-${index + 1}.jpg`,
+      creators: [`Creator ${index + 1}`],
+    }))
+
+    renderBrowser({
+      collections: pagedCollections,
+      initialCollectionId: 'collection-7',
+      viewMode: 'grid',
+    })
+
+    expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+    expect(screen.getByText('Collection 7')).toBeTruthy()
   })
 
   it('hands the caption over after the incoming cover becomes visible', () => {
