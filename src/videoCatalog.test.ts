@@ -61,9 +61,10 @@ describe('curated video catalogue', () => {
     expect(enabledVideoCatalogItems(catalog)).toEqual([enabled])
   })
 
-  it('ships only validated enabled or intentionally disabled catalogue records', () => {
+  it('ships all four configured videos as validated, enabled catalogue records', () => {
     expect(videoCatalogErrors).toEqual([])
-    expect(videoCatalog.length).toBeGreaterThan(0)
+    expect(videoCatalog).toHaveLength(4)
+    expect(enabledVideoCatalogItems()).toHaveLength(4)
     expect(videoCatalog.every((item) => validateVideoCatalogItem(item) !== null)).toBe(true)
   })
 })

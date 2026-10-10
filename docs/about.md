@@ -52,7 +52,7 @@ The right-hand end of each panel's header carries the same three buttons:
 
 ### Adding, duplicating and deleting panels
 
-- **Add panel** at the top of the canvas adds another Images, Notes, or Video panel. There is only ever one Music panel.
+- **Add panel** at the top of the canvas adds another Images or Notes panel. There is only ever one Music panel.
 - Use a panel's **…** menu to hide, resize, or delete it. You can also right-click its frame for arrange, reorder, duplicate, and delete options. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.
 - The panel view menu (**…**) also offers **Fit selected panel**, **Reset selected panel size**, **Reset panel layout**, which puts every panel back where it started and unhides any hidden ones, and **Hide selected panel**.
 

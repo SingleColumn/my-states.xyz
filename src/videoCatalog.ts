@@ -1,4 +1,4 @@
-import configuredVideoCatalog from './config/video-catalog.json'
+import configuredVideoCatalog from './config/video-catalog.json' with { type: 'json' }
 
 export interface VideoCatalogItem {
   id: string

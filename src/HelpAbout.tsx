@@ -101,7 +101,7 @@ export function HelpAbout({ isOpen, onClose, returnFocusRef }: HelpAboutProps) {
 
             <h4>Adding, duplicating and deleting panels</h4>
             <ul>
-              <li><strong>Add panel</strong> at the top of the canvas adds another Images, Notes, or Video panel. There is only ever one Music panel.</li>
+              <li><strong>Add panel</strong> at the top of the canvas adds another Images or Notes panel. There is only ever one Music panel.</li>
               <li>Use a panel's <strong>…</strong> menu to hide, resize, or delete it. You can also right-click its frame for arrange, reorder, duplicate, and delete options. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.</li>
               <li>The panel view menu (<strong>…</strong>) also offers <strong>Fit selected panel</strong>, <strong>Reset selected panel size</strong>, <strong>Reset panel layout</strong>, which puts every panel back where it started and unhides any hidden ones, and <strong>Hide selected panel</strong>.</li>
             </ul>

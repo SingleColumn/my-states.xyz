@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { videoCatalog } from '../src/videoCatalog'
-import { addPanelFromToolbar, describeCanvas, dispatch, expectCanvasSaved, openApp, panelById, shapeOf } from './helpers'
+import { describeCanvas, dispatch, expectCanvasSaved, openApp, panelById, shapeOf, waitForCanvas } from './helpers'
 
 test.describe('Video panels', () => {
   test('adds two independent panels, persists their catalogue selections, and exposes no URL input', async ({ page }) => {
@@ -8,16 +8,18 @@ test.describe('Video panels', () => {
     await page.route('https://www.instagram.com/**', (route) => route.abort())
     await openApp(page)
 
-    await expect(page.getByRole('option', { name: 'Video' })).toHaveCount(1)
+    await expect(page.getByRole('option', { name: 'Video' })).toHaveCount(0)
 
-    const first = await addPanelFromToolbar(page, 'video')
+    const first = await addVideoPanelForTest(page)
+    await dispatch(page, { kind: 'panel.move', panelId: first.panelId, x: -100, y: -200 })
     const firstShape = await shapeOf(page, first.panelId)
+    await expect(firstShape.getByRole('combobox', { name: 'Choose video' }).locator('option:not([disabled])')).toHaveCount(4)
     await firstShape.getByRole('combobox', { name: 'Choose video' }).selectOption(videoCatalog[0].id)
     await expect.poll(async () => (await panelById(page, first.panelId)).config).toEqual({ selectedVideoId: videoCatalog[0].id })
     await expect(firstShape.getByRole('textbox')).toHaveCount(0)
 
-    const second = await addPanelFromToolbar(page, 'video')
-    await dispatch(page, { kind: 'panel.move', panelId: second.panelId, x: second.x + 500, y: second.y })
+    const second = await addVideoPanelForTest(page)
+    await dispatch(page, { kind: 'panel.move', panelId: second.panelId, x: 0, y: -200 })
     const secondShape = await shapeOf(page, second.panelId)
     await secondShape.getByRole('combobox', { name: 'Choose video' }).selectOption(videoCatalog[1].id)
 
@@ -39,8 +41,17 @@ test.describe('Video panels', () => {
 
     await expectCanvasSaved(page)
     await page.reload()
+    await waitForCanvas(page)
     await expect.poll(async () => (await describeCanvas(page)).panels.filter((panel) => panel.type === 'video')).toHaveLength(2)
     expect((await panelById(page, first.panelId)).config).toEqual({ selectedVideoId: videoCatalog[2].id })
     expect((await panelById(page, second.panelId)).config).toEqual({ selectedVideoId: videoCatalog[1].id })
   })
 })
+
+async function addVideoPanelForTest(page: Parameters<typeof openApp>[0]) {
+  const before = (await describeCanvas(page)).panels.map((panel) => panel.panelId)
+  await dispatch(page, { kind: 'panel.add', type: 'video' })
+  const added = (await describeCanvas(page)).panels.find((panel) => !before.includes(panel.panelId))
+  if (!added) throw new Error('The test setup did not create a Video panel')
+  return added
+}
