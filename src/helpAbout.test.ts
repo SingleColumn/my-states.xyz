@@ -11,7 +11,7 @@ const documentSections = ['About', 'Getting started', 'Panels', 'Moments', 'Thir
 describe('Help & About feature contract', () => {
   it('keeps the document sections in the required order', () => {
     expect(documentSections).toEqual(['About', 'Getting started', 'Panels', 'Moments', 'Third-party licences'])
-    expect(['Music', 'Images', 'Notes']).toEqual(['Music', 'Images', 'Notes'])
+    expect(['Music', 'Images', 'Video', 'Notes']).toEqual(['Music', 'Images', 'Video', 'Notes'])
   })
 
   it('keeps the public links and deployed licence destination stable', () => {
@@ -25,6 +25,7 @@ describe('Help & About feature contract', () => {
     expect(markup.indexOf('>About</h3>')).toBeLessThan(markup.indexOf('>Getting started</h3>'))
     expect(markup).toContain('>Music</h4>')
     expect(markup).toContain('>Images</h4>')
+    expect(markup).toContain('>Video</h4>')
     expect(markup).toContain('>Notes</h4>')
     expect(markup).not.toContain('github.com')
     expect(markup).toContain('href="/licenses/tldraw-3.15.6.txt"')

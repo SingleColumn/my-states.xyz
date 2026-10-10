@@ -1,6 +1,7 @@
 import { EyeOff, Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { PanelType } from './types'
+import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
 
 interface CanvasViewControlsProps {
   isReady: boolean
@@ -83,9 +84,7 @@ export function CanvasViewControls({
         onChange={handleAddPanel}
       >
         <option value="">Add panel</option>
-        <option value="spotify">Music</option>
-        <option value="slideshow">Images</option>
-        <option value="notes">Notes</option>
+        {PANEL_TYPES.map((type) => <option value={type} key={type}>{getPanelDefinition(type).label}</option>)}
       </select>
       <button
         ref={triggerRef}
@@ -158,5 +157,5 @@ export function CanvasViewControls({
 }
 
 function panelTypeLabel(type: PanelType) {
-  return type === 'spotify' ? 'Spotify' : type === 'slideshow' ? 'Images' : 'Notes'
+  return getPanelDefinition(type).label
 }

@@ -11,6 +11,7 @@ import { getPanelMinimumSize } from './panelLayout'
 import { SpotifyPanel } from './panels/SpotifyPanel'
 import { SlideshowPanel } from './panels/SlideshowPanel'
 import { NotesPanel } from './panels/NotesPanel'
+import { VideoPanel } from './panels/VideoPanel'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeMigrations, panelShapeProps, type PanelShape } from './panelShapeSchema'
 import { createPanelProps, panelFromShape } from './panelStore'
@@ -30,6 +31,7 @@ const panelComponents: { readonly [K in PanelType]: ComponentType<{ panelId: str
   spotify: SpotifyPanel,
   slideshow: SlideshowPanel,
   notes: NotesPanel,
+  video: VideoPanel,
 }
 
 export function getPanelIdFromShape(shape: PanelShape) {

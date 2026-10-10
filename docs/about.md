@@ -10,7 +10,7 @@ This led me to the question: in what context or medium would it be more natural 
 
 Images evoke thoughts, feelings and memories, and I like to write these down. Images also evoke sounds and viceversa.
 
-my-states is an infinite canvas with three panels: one for music (currently Spotify playlists), one for images and one with a text editor. The panels can be selected and resized, moved, hidden, deleted or duplicated, except for the music panel. Panels have various buttons at the top, to change their size and how they look. For example, after I've selected a playlist, I make the music panel small and enlarge the text editor panel to focus on writing; and after I've selected a sample collection of images, I select the focus view option, which makes the image occupy the whole panel.
+my-states is an infinite canvas that starts with three panels: one for music (currently Spotify playlists), one for images and one with a text editor. Curated Video panels can be added when wanted. The panels can be selected and resized, moved, hidden, deleted or duplicated, except for the music panel. Panels have various buttons at the top, to change their size and how they look. For example, after I've selected a playlist, I make the music panel small and enlarge the text editor panel to focus on writing; and after I've selected a sample collection of images, I select the focus view option, which makes the image occupy the whole panel.
 
 my-states comes with various sample collections with the work of image creators that I find inspiring. Each image has a link to the original Instagram post made by the creator.
 
@@ -33,7 +33,7 @@ without permission. See [Licence](#licence) and
 
 ## Getting started
 
-The workspace is an infinite canvas with panels for Music, Images, and Notes. A panel has a frame and its content. The frame is for arranging the panel on the canvas; the content is for using it.
+The workspace is an infinite canvas with panels for Music, Images, Notes, and optional Video. A panel has a frame and its content. The frame is for arranging the panel on the canvas; the content is for using it.
 
 - Select a panel by clicking its frame, for example its title.
 - Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.
@@ -52,7 +52,7 @@ The right-hand end of each panel's header carries the same three buttons:
 
 ### Adding, duplicating and deleting panels
 
-- **Add panel** at the top of the canvas adds another Images or Notes panel. There is only ever one Music panel.
+- **Add panel** at the top of the canvas adds another Images, Notes, or Video panel. There is only ever one Music panel.
 - Use a panel's **…** menu to hide, resize, or delete it. You can also right-click its frame for arrange, reorder, duplicate, and delete options. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.
 - The panel view menu (**…**) also offers **Fit selected panel**, **Reset selected panel size**, **Reset panel layout**, which puts every panel back where it started and unhides any hidden ones, and **Hide selected panel**.
 
@@ -68,13 +68,19 @@ The panel shows the playlist that is loaded, with its cover. To keep only the pl
 
 An empty Images panel browses the image collections that come with the app, one cover at a time. Use the arrows to browse, or wait for the cover to change, then select the cover or **Use this collection**. To load supported images from your computer instead, open the panel menu (**…**) and select **Choose a local folder**. Where the browser cannot open a folder directly, the file picker is used instead.
 
-The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and **Clear images**, which removes the loaded images from the panel. After images are loaded, **Choose another collection** returns to the collection browser without clearing the current images until you make a new choice.
+The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and **Clear images**, which removes the loaded images from the panel. **Show collection grid** displays six collections at a time so you can choose one directly, with page controls when more are available. After images are loaded, **Choose another collection** returns to the collection browser without clearing the current images until you make a new choice.
 
 Below the picture, use **Previous image**, **Start slideshow** (which becomes **Pause slideshow**), **Next image**, **Stop slideshow** and **Shuffle images** to control the slideshow. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
 
 Every picture in a sample collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.
 
 To look at the pictures on their own, select **Adjust panel to focus view** in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Click the picture to pause or resume the slideshow, and press **Esc** to bring the controls back; the panel reminds you of both whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
+
+### Video
+
+Add a Video panel and use **Choose video** to select from the public Instagram posts and Reels curated by the application owner. The list is part of the deployed application; it does not accept pasted links or arbitrary web addresses. Each Video panel remembers its own selection, so several Video panels can show different catalogue entries.
+
+Instagram supplies the player and its controls. Selecting a video loads Instagram's official embed and therefore makes a request to Instagram. Public posts can still fail to appear when they have been deleted, made private, age-restricted, or had embedding disabled. When the embed cannot load, use **Open on Instagram** if it is available. **Adjust panel to focus view** hides the selector while retaining the selected video.
 
 ### Notes
 
@@ -90,7 +96,7 @@ Use **Save markdown file** to download the current note as a `.md` file, and **D
 
 ## Moments
 
-A moment is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, and your Notes.
+A moment is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, each Video panel's selected catalogue entry, and your Notes.
 
 The controls at the top left of the canvas manage moments. Pick one from **Open moment**, create one with **New moment**, and use **Rename moment**, **Duplicate moment**, or **Delete moment** on the current one; the **…** button beside them repeats these actions. **Duplicate moment** makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a moment removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
 

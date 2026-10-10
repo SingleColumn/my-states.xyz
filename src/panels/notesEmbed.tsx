@@ -187,6 +187,7 @@ const panelTitles: Record<PanelType, string> = {
   spotify: 'Music',
   slideshow: 'Images',
   notes: 'Writing',
+  video: 'Video',
 }
 
 export function PanelEmbedView() {

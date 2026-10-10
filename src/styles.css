@@ -563,6 +563,10 @@ button {
   background: var(--card-bg-gradient);
 }
 
+.panel-video-surface {
+  background: var(--card-bg-gradient);
+}
+
 .panel-body {
   flex: 1;
   min-height: 0;
@@ -1953,6 +1957,119 @@ input[type="range"]:focus-visible {
   animation-name: slideshow-image-fade-in;
   animation-timing-function: ease;
   animation-fill-mode: both;
+}
+
+.video-panel-body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-control-gap);
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-panel-body-top) var(--space-panel-body-x) var(--space-panel-body-bottom);
+  overflow: hidden;
+}
+
+.panel-video-surface.is-focus-view .video-panel-body {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.video-panel-selector {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-control-gap);
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+  font-weight: var(--font-weight-emphasis);
+}
+
+.video-panel-selector select {
+  width: 100%;
+  height: var(--size-input-height);
+  min-width: 0;
+  padding: 0 var(--size-input-padding-x);
+  border: var(--border-width-hairline) solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.video-panel-selector select:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.video-panel-selector select:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.video-panel-stage {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.instagram-video-embed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.instagram-video-embed .instagram-media {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 540px !important;
+  margin: 0 auto !important;
+  background: transparent;
+}
+
+.instagram-video-embed iframe {
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 540px !important;
+  margin: 0 auto !important;
+  border: 0 !important;
+}
+
+.video-embed-status {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.video-panel-message {
+  display: grid;
+  gap: var(--space-control-gap);
+  place-items: center;
+  max-width: var(--size-empty-stage-copy-max);
+  padding: var(--card-padding);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-body);
+  text-align: center;
+}
+
+.video-panel-message strong {
+  color: var(--color-text);
+  font-size: var(--type-lg);
+  font-weight: var(--font-weight-medium);
+}
+
+.video-panel-message a {
+  color: var(--card-primary-icon);
+  font-weight: var(--font-weight-emphasis);
 }
 
 .panel-slideshow-surface.is-focus-view .slideshow-image-layer[role="button"] {

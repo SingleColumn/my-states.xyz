@@ -3,6 +3,7 @@ import type { AppStateValue } from './AppState'
 import type { PanelConfigs, PanelType } from './types'
 import { PANEL_TYPES, getPanelDefinition, isPanelType } from './panelRegistry'
 import { createPanelShape, getPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, updatePanelConfig, writePanelShape } from './panelStore'
+import { isSelectableVideoId } from './videoCatalog'
 
 /**
  * The canvas for something that is not a person at the pointer: an agent, a
@@ -135,7 +136,14 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
       if (state.moments.isOperationPending()) throw new Error('Please wait for the current moment operation to finish.')
       switch (command.kind) {
         case 'panel.update': {
-          requirePanel(command.panelId)
+          const shape = requirePanel(command.panelId)
+          if (
+            shape.props.panel.type === 'video'
+            && 'selectedVideoId' in command.config
+            && !isSelectableVideoId(command.config.selectedVideoId)
+          ) {
+            throw new Error('A Video panel can select only an enabled entry from the curated catalogue.')
+          }
           updatePanelConfig(editor, command.panelId, command.config)
           return
         }

@@ -43,6 +43,11 @@ declare global {
     showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
     Spotify?: typeof Spotify
     onSpotifyWebPlaybackSDKReady?: () => void
+    instgrm?: {
+      Embeds: {
+        process(): void
+      }
+    }
   }
 
   namespace Spotify {

@@ -116,6 +116,7 @@ export const slideshowSettingsValidator: T.Validator<SlideshowSettings> = T.obje
 })
 
 export const notesConfigValidator: T.Validator<PanelConfigs['notes']> = T.object({ activeNoteId: T.nullable(T.string) })
+export const videoConfigValidator: T.Validator<PanelConfigs['video']> = T.object({ selectedVideoId: T.nullable(T.string) })
 
 /** Input that is not a plain object is rejected outright; `undefined` (a missing key) becomes an empty object so its fields take their defaults below. */
 export function record(value: unknown): Record<string, unknown> {
@@ -228,7 +229,32 @@ const notes: PanelDefinition<'notes'> = {
   },
 }
 
-export const panelRegistry: { readonly [K in PanelType]: PanelDefinition<K> } = { slideshow, notes, spotify }
+const video: PanelDefinition<'video'> = {
+  type: 'video',
+  label: 'Video',
+  singleton: false,
+  // Placed to the right of the existing three-panel row. The portrait size
+  // suits Instagram without making this provider detail part of the state.
+  defaultLayout: { x: 780, y: -300, w: 460, h: 720 },
+  startingHeight: null,
+  // Instagram's supported embed has a practical minimum width around 326px;
+  // this leaves room for the panel's own padding without clipping it.
+  minimumSize: { w: 360, h: 320 },
+  focusViewSize: null,
+  createConfig: () => ({ selectedVideoId: null }),
+  configValidator: videoConfigValidator,
+  normalizeConfig: (value) => {
+    const input = record(value)
+    return videoConfigValidator.validate({ selectedVideoId: input.selectedVideoId === undefined ? null : input.selectedVideoId })
+  },
+  duplicateConfig: (config) => ({ selectedVideoId: config.selectedVideoId }),
+  theme: {
+    key: 'video',
+    description: 'The Video panel.',
+  },
+}
+
+export const panelRegistry: { readonly [K in PanelType]: PanelDefinition<K> } = { slideshow, notes, spotify, video }
 
 /** In the order a new moment lays them out, left to right. */
 export const PANEL_TYPES = Object.keys(panelRegistry) as readonly PanelType[]

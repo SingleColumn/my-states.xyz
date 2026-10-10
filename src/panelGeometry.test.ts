@@ -18,6 +18,7 @@ describe('panel geometry commands', () => {
     const layout = { panelId: 'panel-a', x: 123, y: 456, w: 900, h: 700 }
     expect(getDefaultPanelSize('notes')).toEqual({ w: 460, h: 720 })
     expect(getDefaultPanelSize('slideshow')).toEqual({ w: 460, h: 720 })
+    expect(getDefaultPanelSize('video')).toEqual({ w: 460, h: 720 })
     expect(restorePanelDefaultSize(layout, 'notes')).toEqual({ ...layout, w: 460, h: 720 })
     expect(restorePanelDefaultSize(layout, 'spotify')).toEqual({ ...layout, w: 460, h: 720 })
   })
@@ -35,8 +36,10 @@ describe('panel geometry commands', () => {
     // used to take to the picture instead of shrinking away from it.
     expect(applyPanelFocusViewSize(layout, 'slideshow')).toEqual(layout)
     expect(applyPanelFocusViewSize(layout, 'notes')).toEqual(layout)
+    expect(applyPanelFocusViewSize(layout, 'video')).toEqual(layout)
     expect(getPanelFocusViewSize('spotify')).toEqual({ w: 380, h: 460 })
     expect(getPanelFocusViewSize('slideshow')).toBeNull()
+    expect(getPanelFocusViewSize('video')).toBeNull()
   })
 
   it('reads focus view from the panel', () => {

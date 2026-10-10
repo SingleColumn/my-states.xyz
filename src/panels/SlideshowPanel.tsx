@@ -52,7 +52,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const [panelView, setPanelView] = useState<'slideshow' | 'browse-collections'>(() => (
     panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
   ))
-  const [collectionBrowserMode, setCollectionBrowserMode] = useState<'carousel' | 'grid'>('carousel')
+  const [collectionBrowserMode, setCollectionBrowserMode] = useState<'carousel' | 'grid'>(() => (
+    panelSettings.imageSource.type === 'none' ? 'grid' : 'carousel'
+  ))
   const sourceKey = panelSettings.imageSource.type === 'bundled'
     ? `bundled:${panelSettings.imageSource.collectionId}`
     : panelSettings.imageSource.type

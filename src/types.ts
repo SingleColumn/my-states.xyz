@@ -10,6 +10,7 @@ export interface PanelConfigs {
   spotify: { playlist: SpotifyPlaylistReference }
   slideshow: SlideshowSettings
   notes: { activeNoteId: string | null }
+  video: { selectedVideoId: string | null }
 }
 
 export type PanelType = keyof PanelConfigs

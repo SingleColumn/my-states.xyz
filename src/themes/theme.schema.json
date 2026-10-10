@@ -921,6 +921,25 @@
                       "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     }
                   }
+                },
+                "video": {
+                  "type": "object",
+                  "description": "The Video panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
                 }
               }
             }
@@ -1790,6 +1809,25 @@
                       "minLength": 1,
                       "maxLength": 512,
                       "description": "A playlist row under the pointer. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    }
+                  }
+                },
+                "video": {
+                  "type": "object",
+                  "description": "The Video panel.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel accent colour. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
+                    },
+                    "panelBackground": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The panel background. A CSS colour, e.g. \"#1a1612\" or \"rgba(255, 255, 255, 0.16)\". Must not contain url(), var() or other references."
                     }
                   }
                 }

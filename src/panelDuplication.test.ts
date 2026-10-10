@@ -9,12 +9,15 @@ describe('panel duplication', () => {
     const music = createPanel('spotify')
     const images = createPanel('slideshow')
     const notes = createPanel('notes')
+    const video = createPanel('video')
 
-    expect(new Set([music.id, images.id, notes.id]).size).toBe(3)
+    expect(new Set([music.id, images.id, notes.id, video.id]).size).toBe(4)
     expect(music.type).toBe('spotify')
     expect(images.type).toBe('slideshow')
     expect(notes.type).toBe('notes')
+    expect(video.type).toBe('video')
     expect(notes).toMatchObject({ type: 'notes', config: { activeNoteId: null } })
+    expect(video).toMatchObject({ type: 'video', config: { selectedVideoId: null } })
   })
 
   it('gives a copy its own id and its own config object', () => {

@@ -69,3 +69,17 @@ describe('canvasApi note.delete', () => {
     expect(deleteNote).not.toHaveBeenCalled()
   })
 })
+
+describe('canvasApi Video panel control', () => {
+  it('rejects a selectedVideoId that is not an enabled catalogue entry', async () => {
+    const shape = makeShape('video', 'panel-video')
+    const { state } = fakeState()
+    const api = createCanvasApi(editorWith(shape), () => state)
+
+    await expect(api.dispatch({
+      kind: 'panel.update',
+      panelId: 'panel-video',
+      config: { selectedVideoId: 'https://www.instagram.com/reel/not-a-catalogue-id/' },
+    })).rejects.toThrow('curated catalogue')
+  })
+})

@@ -60,7 +60,7 @@ describe('panel architecture report', () => {
   })
 
   it('reports every panel kind and describes ownership as the system has it', () => {
-    const shapes = [makeShape('spotify', 'p1', 'shape:1', { index: 'a1' }), makeShape('slideshow', 'p2', 'shape:2', { index: 'a2' }), makeShape('notes', 'p3', 'shape:3', { index: 'a3' })]
+    const shapes = [makeShape('spotify', 'p1', 'shape:1', { index: 'a1' }), makeShape('slideshow', 'p2', 'shape:2', { index: 'a2' }), makeShape('notes', 'p3', 'shape:3', { index: 'a3' }), makeShape('video', 'p4', 'shape:4', { index: 'a4' })]
     const report = buildPanelArchitectureReport(makeMoment(shapes), editorWith(...shapes))
 
     expect(report.summary.status).toBe('PASS')

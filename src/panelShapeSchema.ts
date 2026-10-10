@@ -19,10 +19,11 @@ export const panelContentValidator = T.union('type', {
   spotify: T.object({ type: T.literal('spotify'), config: panelRegistry.spotify.configValidator }),
   slideshow: T.object({ type: T.literal('slideshow'), config: panelRegistry.slideshow.configValidator }),
   notes: T.object({ type: T.literal('notes'), config: panelRegistry.notes.configValidator }),
+  video: T.object({ type: T.literal('video'), config: panelRegistry.video.configValidator }),
 }) as unknown as T.Validator<PanelContent>
 
 // If a panel type is added to PanelConfigs without a branch above, this stops compiling.
-const _everyTypeHasABranch: Record<PanelType, true> = { spotify: true, slideshow: true, notes: true }
+const _everyTypeHasABranch: Record<PanelType, true> = { spotify: true, slideshow: true, notes: true, video: true }
 void _everyTypeHasABranch
 
 export const panelShapeProps = {

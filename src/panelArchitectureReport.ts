@@ -210,6 +210,7 @@ function countByType(shapes: PanelShape[]) {
 function getContentReferences(panel: PanelContent): Record<string, string | null> {
   if (panel.type === 'notes') return { activeNoteId: panel.config.activeNoteId }
   if (panel.type === 'spotify') return { playlistId: panel.config.playlist.id, playlistUri: panel.config.playlist.uri }
+  if (panel.type === 'video') return { selectedVideoId: panel.config.selectedVideoId }
   if (panel.config.imageSource.type === 'bundled') return { imageCollectionId: panel.config.imageSource.collectionId }
   return { imageSourceType: panel.config.imageSource.type, folderName: panel.config.folderName }
 }

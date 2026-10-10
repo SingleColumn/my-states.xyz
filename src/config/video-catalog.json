@@ -1,0 +1,29 @@
+[
+  {
+    "id": "featured-reel-001",
+    "provider": "instagram",
+    "title": "Tiny camera walk",
+    "creator": "insta360",
+    "creatorUrl": "https://www.instagram.com/insta360/",
+    "sourceUrl": "https://www.instagram.com/reel/DJf0_RmSd-T/",
+    "enabled": true
+  },
+  {
+    "id": "emilio-piano-titanic",
+    "provider": "instagram",
+    "title": "A young singer performs My Heart Will Go On",
+    "creator": "emilio.piano",
+    "creatorUrl": "https://www.instagram.com/emilio.piano/",
+    "sourceUrl": "https://www.instagram.com/reel/C_qU9qyo9_M/",
+    "enabled": true
+  },
+  {
+    "id": "liz-6-sunset",
+    "provider": "instagram",
+    "title": "AI-generated sunset",
+    "creator": "liz_6",
+    "creatorUrl": "https://www.instagram.com/liz_6/",
+    "sourceUrl": "https://www.instagram.com/reel/CvkWer_gHCf/",
+    "enabled": true
+  }
+]

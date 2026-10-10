@@ -11,7 +11,7 @@ import type {
   SpotifyTokens,
 } from './types'
 import { createId } from './utils'
-import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
+import { getPanelDefinition } from './panelRegistry'
 import { normalizeDraftPanel } from './panelInput'
 import { documentFromDraft } from './panelStore'
 import { MOMENT_SCHEMA_VERSION } from './momentSchema'
@@ -69,9 +69,13 @@ export function createPanel<Type extends PanelType>(type: Type): Panel<Type> {
   return { id: createId('panel'), type, config: getPanelDefinition(type).createConfig(), visible: true, focusView: false } as Panel<Type>
 }
 
-/** One of each kind, in the registry's order. */
+// A new moment keeps the established three-panel workspace. Optional panel
+// kinds such as Video are added through the registry-driven Add panel menu.
+const DEFAULT_PANEL_TYPES = ['slideshow', 'notes', 'spotify'] as const satisfies readonly PanelType[]
+
+/** The core panels a brand-new moment starts with. */
 export function createDefaultPanels(): Panel[] {
-  return PANEL_TYPES.map((type) => createPanel(type))
+  return DEFAULT_PANEL_TYPES.map((type) => createPanel(type))
 }
 
 export interface ImportedMomentContent {

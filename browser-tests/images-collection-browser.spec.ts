@@ -8,7 +8,8 @@ test.describe('Images collection browser', () => {
     const shape = await shapeOf(page, images.panelId)
     const browser = shape.getByRole('region', { name: 'Image collection browser' })
 
-    await choosePanelMenuItem(shape, 'Show collection grid')
+    // A new user sees the scannable overview first, but can still switch to
+    // the one-at-a-time carousel from the same panel menu.
     await expect(browser.getByRole('list', { name: 'Available image collections' })).toBeVisible()
     await expect(browser.locator('.collection-grid-card')).toHaveCount(6)
     await expect(browser.locator('.collection-grid-creator')).toHaveCount(0)
@@ -17,6 +18,11 @@ test.describe('Images collection browser', () => {
     await shape.getByRole('button', { name: 'Images panel actions' }).click()
     await expect(page.getByRole('menuitem', { name: 'Show collection carousel' })).toBeVisible()
     await page.keyboard.press('Escape')
+
+    await choosePanelMenuItem(shape, 'Show collection carousel')
+    await expect(browser.locator('.collection-browser-cover')).toHaveCount(1)
+    await choosePanelMenuItem(shape, 'Show collection grid')
+    await expect(browser.getByRole('list', { name: 'Available image collections' })).toBeVisible()
 
     await browser.getByRole('button', { name: /^Use .+ collection by .+$/ }).first().click()
     await expect(shape.locator('img.slideshow-image-layer')).toBeVisible()
@@ -33,6 +39,7 @@ test.describe('Images collection browser', () => {
     const shape = await shapeOf(page, images.panelId)
     const browser = shape.getByRole('region', { name: 'Image collection browser' })
 
+    await choosePanelMenuItem(shape, 'Show collection carousel')
     await expect(browser).toBeVisible()
     await expect(browser.locator('.collection-browser-cover')).toHaveCount(1)
     await expect(browser.getByRole('button', { name: /folder/i })).toHaveCount(0)
