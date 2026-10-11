@@ -48,6 +48,7 @@ import { persistNoteSnapshot } from './notePersistence'
 import { MomentOperation } from './momentOperation'
 import { withRestoreWriteAccess } from './canvasRestore'
 import { createImageItemsFromBundledCollection } from './imageCollections'
+import { configuredImageCollectionsBaseUrl, createImageItemsFromCuratedCollection } from './curatedImageCollections'
 import type { NotesEditorHandle } from './panels/NotesEditor'
 import { getPanelDefinition } from './panelRegistry'
 import { markdownHeadingForText, noteTitleFromMarkdown } from './noteTitle'
@@ -64,6 +65,7 @@ import {
   isFolderPickerCancelledByUser,
   releaseImageItems,
   settingsForBundledCollection,
+  settingsForCuratedCollection,
   settingsForClearedImages,
   settingsForMomentAssets,
   statusForImageSource,
@@ -158,6 +160,7 @@ interface SlideshowState {
   selectFolder(panelId: string): Promise<'selected' | 'cancelled' | 'fallback'>
   importFiles(files: FileList | File[], panelId: string): Promise<void>
   selectBundledCollection(collectionId: string, panelId: string): Promise<boolean>
+  selectCuratedCollection(collectionSlug: string, title: string, panelId: string): Promise<boolean>
   resetFolder(panelId: string): Promise<void>
   restoreFolder(panelId: string): Promise<void>
   setIsPlaying(value: boolean, panelId?: string): void
@@ -1087,7 +1090,22 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
         if (source.type === 'bundled') {
           const loaded = await createImageItemsFromBundledCollection(source.collectionId)
           if (!loaded) {
-        const message = `The image collection "${source.collectionId}" is not available in this version.`
+            const message = `The image collection "${source.collectionId}" is not available in this version.`
+            state.status = message
+            state.error = message
+            return
+          }
+          nextImages = loaded
+        } else if (source.type === 'curated') {
+          if (!configuredImageCollectionsBaseUrl) {
+            const message = 'This image collection is no longer available. Choose another collection.'
+            state.status = message
+            state.error = message
+            return
+          }
+          const loaded = await createImageItemsFromCuratedCollection(source.collectionSlug, configuredImageCollectionsBaseUrl)
+          if (!loaded) {
+            const message = 'This image collection is no longer available. Choose another collection.'
             state.status = message
             state.error = message
             return
@@ -1095,7 +1113,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
           nextImages = loaded
         } else {
           const assets = await getMomentAssets(moment!.id, panel.id)
-          nextImages = await Promise.all(assets.map(createImageItemFromAsset))
+          nextImages = await Promise.all(assets.map((asset) => createImageItemFromAsset(asset)))
           nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
         }
         if (cancelled) {
@@ -1230,6 +1248,44 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     }
   }, [schedulePanelAdvance, moment, settingsOf, touch, writeSettings])
 
+  const selectCuratedCollection = useCallback(async (collectionSlug: string, title: string, panelId: string) => {
+    if (!moment) throw new Error('Open a moment before selecting images.')
+    const state = getSlideshowPanelRuntimeState(panelId)
+    if (!configuredImageCollectionsBaseUrl) {
+      state.error = 'Image collections are not available right now.'
+      touch()
+      return false
+    }
+    try {
+      const nextImages = await createImageItemsFromCuratedCollection(collectionSlug, configuredImageCollectionsBaseUrl)
+      if (!nextImages) {
+        const message = 'This image collection is no longer available. Choose another collection.'
+        state.error = message
+        state.status = message
+        touch()
+        return false
+      }
+      if (state.timerId !== null) window.clearTimeout(state.timerId)
+      state.timerId = null
+      releaseImageItems(state.images)
+      state.images = nextImages
+      state.isPlaying = nextImages.length > 0
+      const nextSettings = settingsForCuratedCollection(settingsOf(panelId), collectionSlug, title)
+      state.currentIndex = nextSettings.currentIndex
+      state.sourceKey = imageSourceKey(nextSettings.imageSource)
+      writeSettings(panelId, nextSettings)
+      state.status = statusForImageSource(nextSettings.imageSource, nextImages.length)
+      state.error = null
+      if (state.isPlaying) schedulePanelAdvance(panelId)
+      touch()
+      return true
+    } catch (caught) {
+      state.error = caught instanceof Error ? caught.message : 'Could not load the image collection.'
+      touch()
+      return false
+    }
+  }, [schedulePanelAdvance, moment, settingsOf, touch, writeSettings])
+
   const restoreFolder = useCallback(async (panelId: string) => {
     if (!moment) return
     const stored = await getPanelDirectoryHandle(moment.id, panelId)
@@ -1312,6 +1368,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     errorFor: (panelId) => getSlideshowPanelRuntimeState(panelId).error,
     selectFolder,
     selectBundledCollection,
+    selectCuratedCollection,
     importFiles: (files, panelId) => replaceImages(files, 'Imported images', panelId),
     resetFolder,
     restoreFolder,
@@ -1868,7 +1925,9 @@ function getNotesPanelRuntimeState(panelId: string): NotesPanelRuntimeState {
 }
 
 function imageSourceKey(source: SlideshowSettings['imageSource']) {
-  return source.type === 'bundled' ? `bundled:${source.collectionId}` : source.type
+  if (source.type === 'bundled') return `bundled:${source.collectionId}`
+  if (source.type === 'curated') return `curated:${source.collectionSlug}`
+  return source.type
 }
 
 function getSlideshowPanelRuntimeState(panelId: string): SlideshowPanelRuntimeState {

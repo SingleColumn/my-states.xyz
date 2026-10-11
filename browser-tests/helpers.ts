@@ -210,15 +210,18 @@ export async function undo(page: Page) {
 }
 
 /**
- * Loads the currently featured bundled collection through the Images panel's
+ * Loads the first available collection through the Images panel's
  * collection browser and waits for the picture to be on screen.
  * Setup for the tests that need a picture, not the interaction under test.
  */
 export async function loadSampleImages(page: Page, panelId: string) {
   const shape = await shapeOf(page, panelId)
-  await shape.getByRole('button', { name: /^Use .+ collection$/ }).click()
+  const carouselChoice = shape.getByRole('button', { name: /^Use .+ collection$/ })
+  const gridChoice = shape.getByRole('button', { name: /^Use .+ collection by .+$/ }).first()
+  await carouselChoice.or(gridChoice).first().click()
   await expect(shape.locator('img.slideshow-image-layer')).toBeVisible()
-  await expect.poll(async () => (await panelById(page, panelId)).config).toMatchObject({ imageSource: { type: 'bundled' } })
+  await expect.poll(async () => ((await panelById(page, panelId)).config as { imageSource?: { type?: string } }).imageSource?.type)
+    .toMatch(/^(bundled|curated)$/)
 }
 
 /** What the app's own IndexedDB holds for a moment, read with no help from the page's code. */

@@ -9,6 +9,10 @@ export function settingsForBundledCollection(settings: SlideshowSettings, collec
   return { ...settings, folderName: collectionId, imageSource: { type: 'bundled', collectionId }, currentIndex: 0 }
 }
 
+export function settingsForCuratedCollection(settings: SlideshowSettings, collectionSlug: string, title: string): SlideshowSettings {
+  return { ...settings, folderName: title, imageSource: { type: 'curated', collectionSlug }, currentIndex: 0 }
+}
+
 export function settingsForClearedImages(settings: SlideshowSettings): SlideshowSettings {
   return { ...settings, folderName: null, imageSource: { type: 'none' }, currentIndex: 0, zoom: DEFAULT_SLIDESHOW_ZOOM }
 }
@@ -18,6 +22,11 @@ export function statusForImageSource(source: SlideshowSettings['imageSource'], i
     return imageCount
       ? `${source.collectionId} · ${imageCount} images`
       : `No images are available yet in "${source.collectionId}".`
+  }
+  if (source.type === 'curated') {
+    return imageCount
+      ? `${imageCount} images from this collection.`
+      : 'No images are currently available in this collection.'
   }
   return imageCount ? `${imageCount} images loaded from this moment.` : 'No supported images are available.'
 }

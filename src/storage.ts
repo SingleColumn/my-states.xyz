@@ -395,11 +395,14 @@ export async function importMomentContent(content: ImportedMomentContent) {
   }
 
   for (const asset of content.assets) {
+    const panelIds = asset.panelIds
+      ?.flatMap((panelId) => panelIdMap.has(panelId) ? [panelIdMap.get(panelId)!] : [])
     await tx.objectStore('assets').put({
       ...asset,
       id: createId('image'),
       momentId: moment.id,
       ...(asset.panelId && panelIdMap.has(asset.panelId) ? { panelId: panelIdMap.get(asset.panelId)! } : {}),
+      ...(panelIds?.length ? { panelIds } : {}),
     })
   }
 
@@ -435,7 +438,9 @@ export async function deleteNote(id: string) {
 export async function getMomentAssets(momentId: string, panelId?: string) {
   const db = await dbPromise
   const assets = await db.getAllFromIndex('assets', 'by-moment', momentId)
-  return panelId ? assets.filter((asset) => !asset.panelId || asset.panelId === panelId) : assets
+  return panelId
+    ? assets.filter((asset) => asset.panelIds?.includes(panelId) || (!asset.panelIds?.length && (!asset.panelId || asset.panelId === panelId)))
+    : assets
 }
 
 export async function saveMomentAssets(momentId: string, assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>, panelId?: string) {
@@ -453,8 +458,19 @@ export async function replaceMomentAssets(momentId: string, assets: Array<Omit<M
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
   const existing = await tx.store.index('by-moment').getAll(momentId)
-  const existingIds = existing.filter((asset) => !panelId || !asset.panelId || asset.panelId === panelId).map((asset) => asset.id)
-  await Promise.all(existingIds.map((id) => tx.store.delete(id)))
+  for (const asset of existing) {
+    if (!panelId) {
+      await tx.store.delete(asset.id)
+      continue
+    }
+    if (asset.panelIds?.includes(panelId)) {
+      const panelIds = asset.panelIds.filter((candidate) => candidate !== panelId)
+      if (panelIds.length) await tx.store.put({ ...asset, panelIds })
+      else await tx.store.delete(asset.id)
+      continue
+    }
+    if (!asset.panelIds?.length && (!asset.panelId || asset.panelId === panelId)) await tx.store.delete(asset.id)
+  }
   for (const asset of assets) {
     await tx.store.put({ ...asset, momentId, ...(panelId ? { panelId } : {}) })
   }
@@ -586,6 +602,9 @@ function validateAssets(assets: Array<Omit<MomentImage, 'momentId'> & { blob: Bl
 
   let total = 0
   for (const asset of assets) {
+    if (asset.panelIds !== undefined && (!Array.isArray(asset.panelIds) || asset.panelIds.some((panelId) => typeof panelId !== 'string'))) {
+      throw new Error(`${asset.filename} has invalid panel references.`)
+    }
     if (asset.blob.size > momentLimits.maxImageBytes) {
       throw new Error(`${asset.filename} exceeds the ${formatBytes(momentLimits.maxImageBytes)} per-image limit.`)
     }

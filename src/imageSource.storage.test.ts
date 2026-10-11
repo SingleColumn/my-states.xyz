@@ -28,4 +28,18 @@ describe('persisted slideshow image sources', () => {
     expect(slideshowOf(await getMoment(moment.id))?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'teemu-jpeg' })
     expect(await getMomentAssets(moment.id)).toEqual([])
   })
+
+  it('normalizes and persists curated references without relabeling them as bundled', async () => {
+    expect(normalizeSlideshowSettings({ ...defaultSlideshowSettings, imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' } }).imageSource)
+      .toEqual({ type: 'curated', collectionSlug: 'rbnks-autumn' })
+
+    const panels = createDefaultPanels().map((panel): Panel => panel.type === 'slideshow'
+      ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'Autumn', imageSource: { type: 'curated' as const, collectionSlug: 'rbnks-autumn' } } }
+      : panel)
+    const moment = await importMomentContent({ name: 'Curated selection', panels, canvas: null, notes: [], assets: [] })
+    expect(slideshowOf(await getMoment(moment.id))?.config).toMatchObject({
+      folderName: 'Autumn',
+      imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' },
+    })
+  })
 })

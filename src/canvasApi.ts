@@ -60,6 +60,7 @@ export type CanvasCommand =
   | { kind: 'note.setTitle'; panelId: string; title: string }
   | { kind: 'note.setContent'; panelId: string; content: string }
   | { kind: 'images.selectSampleCollection'; panelId: string; collectionId: string }
+  | { kind: 'images.selectCuratedCollection'; panelId: string; collectionSlug: string; title: string }
   | { kind: 'images.play'; panelId: string }
   | { kind: 'images.pause'; panelId: string }
   | { kind: 'images.next'; panelId: string }
@@ -213,6 +214,10 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
         case 'images.selectSampleCollection':
           requirePanel(command.panelId)
           await state.slideshow.selectBundledCollection(command.collectionId, command.panelId)
+          return
+        case 'images.selectCuratedCollection':
+          requirePanel(command.panelId)
+          await state.slideshow.selectCuratedCollection(command.collectionSlug, command.title, command.panelId)
           return
         case 'images.play':
           requirePanel(command.panelId)

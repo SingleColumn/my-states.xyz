@@ -2318,7 +2318,14 @@ input[type="range"]:focus-visible {
 }
 
 .collection-browser-message.is-error {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
   color: var(--color-danger);
+}
+
+.collection-browser-message.is-error p {
+  margin: 0;
 }
 
 .collection-browser.is-grid {

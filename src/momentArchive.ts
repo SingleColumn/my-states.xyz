@@ -12,6 +12,7 @@ import {
 } from './storage'
 import { draftFromDocument } from './panelStore'
 import { normalizeDraftPanel } from './panelInput'
+import { configuredImageCollectionsBaseUrl, loadCuratedCollectionCatalog, type CuratedCollectionItem } from './curatedImageCollections'
 import { isBuiltInThemeId } from './themes/registry'
 import type { ThemeDefinition } from './themes/types'
 import { acceptEveryValue, THEME_ID_PATTERN, validateThemeDefinition, type SupportsCssValue } from './themes/validate'
@@ -21,6 +22,7 @@ import type {
   Note,
   Panel,
   MomentImage,
+  ImageAttribution,
 } from './types'
 
 /**
@@ -33,10 +35,12 @@ import type {
  * The optional `theme` field was added on 2026-09-15 without a version
  * change: a build without themes ignores an unknown manifest key, and a
  * manifest without the key means the moment follows the global theme, which
- * is what every earlier moment did. It is inline in the manifest rather than
- * a file of its own because earlier builds refuse a file they do not expect.
+ * is what every earlier moment did. Version 3 adds shared image-to-panel
+ * references so a repeated curated image travels only once; version 2 stays
+ * readable. Themes are inline because older builds reject unexpected files.
  */
-const FORMAT_VERSION = 2
+const FORMAT_VERSION = 3
+const OLDEST_SUPPORTED_FORMAT_VERSION = 2
 const maxNoteCount = 500
 const maxNoteBytes = 1024 * 1024
 const maxTotalNoteBytes = 10 * 1024 * 1024
@@ -51,7 +55,7 @@ const supportedImageTypes = new Set([
 ])
 
 interface MomentManifest {
-  formatVersion: typeof FORMAT_VERSION
+  formatVersion: number
   moment: {
     name: string
     createdAt: number
@@ -78,6 +82,7 @@ interface MomentManifest {
   images: Array<{
     id: string
     panelId?: string
+    panelIds?: string[]
     filename: string
     path: string
     mimeType: string
@@ -85,6 +90,7 @@ interface MomentManifest {
     lastModified: number
     width: number | null
     height: number | null
+    attribution?: ImageAttribution
   }>
 }
 
@@ -95,7 +101,12 @@ interface MomentManifest {
  * that could become a different moment"; `exportMomentArchive` packages it
  * into a zip, `duplicateMoment` hands it straight back to storage.
  */
-async function buildMomentContent(momentId: string): Promise<{ moment: Moment; content: ImportedMomentContent }> {
+async function buildMomentContent(
+  momentId: string,
+  snapshotCurated = false,
+  fetcher: typeof fetch = fetch,
+  curatedBaseUrl: string | null = configuredImageCollectionsBaseUrl,
+): Promise<{ moment: Moment; content: ImportedMomentContent }> {
   const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
   if (!moment) throw new Error('The selected moment no longer exists.')
   // The archive carries a moment as a draft, in the app's own terms: the
@@ -107,11 +118,16 @@ async function buildMomentContent(momentId: string): Promise<{ moment: Moment; c
   // second panel showing a note deleted through a different one). Import
   // rejects that reference outright, so a moment carrying it must not be
   // allowed to produce a copy it cannot itself restore.
-  const panels = draftPanels.map((panel) => panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)
+  let panels = draftPanels.map((panel) => panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)
     ? { ...panel, config: { activeNoteId: null } }
     : panel)
   // Bundled files already ship with the app; inactive local assets are not duplicated.
-  const exportedAssets = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
+  let exportedAssets: ImportedMomentContent['assets'] = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
+  if (snapshotCurated && panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'curated')) {
+    const snapshot = await snapshotCuratedCollections(panels, fetcher, curatedBaseUrl)
+    panels = snapshot.panels
+    exportedAssets = [...exportedAssets, ...snapshot.assets]
+  }
   validateExportContent(notes, exportedAssets)
 
   const content: ImportedMomentContent = {
@@ -125,8 +141,79 @@ async function buildMomentContent(momentId: string): Promise<{ moment: Moment; c
   return { moment, content }
 }
 
-export async function exportMomentArchive(momentId: string) {
-  const { moment, content } = await buildMomentContent(momentId)
+async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch, curatedBaseUrl: string | null) {
+  if (!curatedBaseUrl) {
+    throw new Error('This moment uses online image collections, but their source is not configured. The export was not created.')
+  }
+  const catalog = await loadCuratedCollectionCatalog(curatedBaseUrl, fetcher)
+  const collections = new Map(catalog.collections.map((collection) => [collection.id, collection]))
+  const portable = new Map<string, {
+    item: CuratedCollectionItem
+    panelIds: string[]
+  }>()
+
+  const snapshotPanels = panels.map((panel): Panel => {
+    if (panel.type !== 'slideshow' || panel.config.imageSource.type !== 'curated') return panel
+    const collection = collections.get(panel.config.imageSource.collectionSlug)
+    if (!collection) {
+      throw new Error(`The image collection "${panel.config.folderName ?? panel.config.imageSource.collectionSlug}" is no longer available, so this moment cannot be exported yet.`)
+    }
+    for (const item of collection.items) {
+      const existing = portable.get(item.id)
+      if (existing) {
+        if (!existing.panelIds.includes(panel.id)) existing.panelIds.push(panel.id)
+      } else {
+        portable.set(item.id, { item, panelIds: [panel.id] })
+      }
+    }
+    return {
+      ...panel,
+      config: {
+        ...panel.config,
+        folderName: collection.title,
+        imageSource: { type: 'session-assets' },
+      },
+    }
+  })
+
+  const assets = await Promise.all([...portable.values()].map(async ({ item, panelIds }) => {
+    let response: Response
+    try {
+      response = await fetcher(item.fileUrl)
+    } catch {
+      throw new Error(`An image from "${item.attribution.creator}" could not be included in the export.`)
+    }
+    if (!response.ok) throw new Error(`An image from "${item.attribution.creator}" could not be included in the export.`)
+    const bytes = await response.arrayBuffer()
+    const blob = new Blob([bytes], { type: item.mimeType })
+    return {
+      id: `curated_${item.id}`,
+      panelIds,
+      filename: item.filename,
+      name: item.filename,
+      mimeType: item.mimeType,
+      size: blob.size,
+      lastModified: 0,
+      width: item.width,
+      height: item.height,
+      attribution: item.attribution,
+      blob,
+    }
+  }))
+
+  return { panels: snapshotPanels, assets }
+}
+
+export async function exportMomentArchive(
+  momentId: string,
+  options: { fetcher?: typeof fetch; curatedBaseUrl?: string | null } = {},
+) {
+  const { moment, content } = await buildMomentContent(
+    momentId,
+    true,
+    options.fetcher ?? fetch,
+    options.curatedBaseUrl === undefined ? configuredImageCollectionsBaseUrl : options.curatedBaseUrl,
+  )
   const theme = moment.themeId ? await themeForArchive(moment.themeId) : undefined
 
   const files: Record<string, Uint8Array> = {}
@@ -164,6 +251,7 @@ export async function exportMomentArchive(momentId: string) {
     manifest.images.push({
       id: asset.id,
       ...(asset.panelId ? { panelId: asset.panelId } : {}),
+      ...(asset.panelIds?.length ? { panelIds: asset.panelIds } : {}),
       filename: asset.filename,
       path,
       mimeType: asset.mimeType,
@@ -171,6 +259,7 @@ export async function exportMomentArchive(momentId: string) {
       lastModified: asset.lastModified,
       width: asset.width,
       height: asset.height,
+      ...(asset.attribution ? { attribution: asset.attribution } : {}),
     })
   }
 
@@ -254,6 +343,7 @@ export async function importMomentArchive(file: File, supportsCssValue: Supports
   const assets = manifest.images.map((image) => ({
     id: image.id,
     ...(image.panelId ? { panelId: image.panelId } : {}),
+    ...(image.panelIds?.length ? { panelIds: image.panelIds } : {}),
     filename: image.filename,
     mimeType: image.mimeType,
     name: image.filename,
@@ -261,6 +351,7 @@ export async function importMomentArchive(file: File, supportsCssValue: Supports
     lastModified: image.lastModified,
     width: image.width,
     height: image.height,
+    ...(image.attribution ? { attribution: image.attribution } : {}),
     blob: new Blob([toArrayBuffer(files.get(image.path)!)], { type: image.mimeType }),
   }))
 
@@ -293,7 +384,7 @@ export function downloadMomentArchive(blob: Blob, momentName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-function validateExportContent(notes: Note[], assets: Array<MomentImage & { blob: Blob }>) {
+function validateExportContent(notes: Note[], assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>) {
   if (notes.length > maxNoteCount) throw new Error(`A moment can contain at most ${maxNoteCount} notes.`)
   if (assets.length > momentLimits.maxImageCount) throw new Error(`A moment can contain at most ${momentLimits.maxImageCount} images.`)
 
@@ -393,7 +484,7 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
   if (formatVersion === 1) {
     throw new Error('This file was exported by an earlier version of my-states and cannot be opened by this one.')
   }
-  if (formatVersion !== FORMAT_VERSION) {
+  if (formatVersion !== FORMAT_VERSION && formatVersion !== OLDEST_SUPPORTED_FORMAT_VERSION) {
     throw new Error('This moment archive uses an unsupported format version.')
   }
   if (!isMomentMetadata(manifest.moment) || !isPanels(manifest.panels)) {
@@ -410,6 +501,7 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
   const referencedPaths = new Set<string>(['manifest.json'])
   const noteIds = new Set<string>()
   const imageIds = new Set<string>()
+  const panelIds = new Set(manifest.panels.map((panel) => panel.id))
   let noteBytes = 0
   let imageBytes = 0
 
@@ -428,7 +520,20 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
   }
 
   for (const image of manifest.images) {
-    if (!isRecord(image) || !isSafeId(image.id) || (image.panelId !== undefined && !isSafeId(image.panelId)) || imageIds.has(image.id) || typeof image.filename !== 'string' || !supportedImageTypes.has(image.mimeType) || !isTimestamp(image.lastModified) || !isNullableDimension(image.width) || !isNullableDimension(image.height)) {
+    if (
+      !isRecord(image)
+      || !isSafeId(image.id)
+      || (image.panelId !== undefined && (!isSafeId(image.panelId) || !panelIds.has(image.panelId)))
+      || (image.panelIds !== undefined && (!Array.isArray(image.panelIds) || !image.panelIds.length || new Set(image.panelIds).size !== image.panelIds.length || image.panelIds.some((panelId) => !isSafeId(panelId) || !panelIds.has(panelId))))
+      || (image.panelId !== undefined && image.panelIds !== undefined)
+      || (image.attribution !== undefined && !isImageAttribution(image.attribution))
+      || imageIds.has(image.id)
+      || typeof image.filename !== 'string'
+      || !supportedImageTypes.has(image.mimeType)
+      || !isTimestamp(image.lastModified)
+      || !isNullableDimension(image.width)
+      || !isNullableDimension(image.height)
+    ) {
       throw new Error('The manifest contains an invalid image.')
     }
     const expectedPath = `images/${image.id}.${extensionForMimeType(image.mimeType)}`
@@ -565,6 +670,24 @@ function isSafeId(value: unknown): value is string {
 
 function isNullableDimension(value: unknown) {
   return value === null || (typeof value === 'number' && Number.isFinite(value) && value > 0)
+}
+
+function isImageAttribution(value: unknown): value is ImageAttribution {
+  return isRecord(value)
+    && typeof value.creator === 'string'
+    && value.creator.trim().length > 0
+    && (value.creatorUrl === undefined || isSafeHttpsUrl(value.creatorUrl))
+    && (value.sourceUrl === undefined || isSafeHttpsUrl(value.sourceUrl))
+}
+
+function isSafeHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+  } catch {
+    return false
+  }
 }
 
 function isMomentMetadata(value: unknown): value is MomentManifest['moment'] {

@@ -76,7 +76,7 @@ function manifest(entries: Record<string, Uint8Array>) {
   return JSON.parse(strFromU8(entries['manifest.json'])) as {
     formatVersion: number
     theme?: { id: string; definition?: ThemeDefinition }
-    images: Array<{ path: string; mimeType: string }>
+    images: Array<{ path: string; mimeType: string; panelIds?: string[]; attribution?: { creator: string; creatorUrl?: string; sourceUrl?: string } }>
     notes: Array<{ path: string }>
     panels: Panel[]
   }
@@ -169,7 +169,7 @@ describe('portable moment archives', () => {
     const entries = await archiveEntries(archive)
     const exportedManifest = manifest(entries)
 
-    expect(exportedManifest.formatVersion).toBe(2)
+    expect(exportedManifest.formatVersion).toBe(3)
     expect(JSON.stringify(exportedManifest)).not.toContain('access-secret')
     expect(JSON.stringify(exportedManifest)).not.toContain('refresh-secret')
     expect(Object.values(entries).map((entry) => strFromU8(entry)).join('')).not.toContain('access-secret')
@@ -208,6 +208,15 @@ describe('portable moment archives', () => {
     expect(assets).toEqual([])
   })
 
+  it('continues to import portable archives written in format version 2', async () => {
+    const entries = await archiveEntries(await createCompleteArchive())
+    const previous = manifest(entries)
+    previous.formatVersion = 2
+    entries['manifest.json'] = strToU8(JSON.stringify(previous))
+    const { moment } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
+    expect(await getMoment(moment.id)).toBeTruthy()
+  })
+
   it('exports and imports a bundled collection reference without copying image blobs', async () => {
     const source = await storeMoment('Sample archive', createDefaultPanels().map((panel): Panel => panel.type === 'slideshow' ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'eightbitstrana', imageSource: { type: 'bundled', collectionId: 'eightbitstrana' } } } : panel))
     await saveMomentAssets(source.id, [makeAsset('inactive_local', 'inactive.png', new Uint8Array([1, 2, 3]))])
@@ -222,6 +231,61 @@ describe('portable moment archives', () => {
     const { moment: imported } = await importMomentArchive(asFile(archive))
     expect(slideshowIn(panelsOf(await getMoment(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
     expect(await getMomentAssets(imported.id)).toEqual([])
+  })
+
+  it('embeds curated images once, preserves attribution, and restores each panel from session assets', async () => {
+    const panels = createDefaultPanels()
+    const first = slideshowIn(panels)
+    const second: Panel<'slideshow'> = { ...first, id: 'second_slideshow', config: { ...first.config } }
+    const curatedPanels = [...panels, second].map((panel): Panel => panel.type === 'slideshow'
+      ? { ...panel, config: { ...panel.config, folderName: 'Autumn', imageSource: { type: 'curated', collectionSlug: 'autumn' } } }
+      : panel)
+    const source = await storeMoment('Curated archive', curatedPanels)
+    const baseUrl = 'https://cdn.example/export'
+    const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('.json')) expect(init?.cache).toBe('no-store')
+      if (url === `${baseUrl}/collections/index.json`) return Response.json({
+        manifest_version: 1,
+        generated_at: '2026-10-02T08:01:00Z',
+        collections: [{ slug: 'autumn', title: 'Autumn', kind: 'creator', creator: 'rbnks', version: 3, published_at: '2026-10-02T08:00:00Z', count: 1, manifest: 'collections/autumn/latest.json' }],
+      })
+      if (url === `${baseUrl}/collections/autumn/latest.json`) return Response.json({
+        manifest_version: 1,
+        slug: 'autumn',
+        title: 'Autumn',
+        kind: 'creator',
+        creator: 'rbnks',
+        version: 3,
+        published_at: '2026-10-02T08:00:00Z',
+        count: 1,
+        items: [{ position: 0, id: 'shared-image', file: 'images/ab/shared-image.jpg', thumb: 'thumbs/ab/shared-image.webp', width: 1200, height: 1600, source: 'rbnks', source_url: 'https://www.instagram.com/p/example/' }],
+      })
+      if (url === `${baseUrl}/images/ab/shared-image.jpg`) return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+      return new Response('', { status: 404 })
+    }) as unknown as typeof fetch
+
+    const archive = await exportMomentArchive(source.id, { fetcher, curatedBaseUrl: baseUrl })
+    const entries = await archiveEntries(archive)
+    const exportedManifest = manifest(entries)
+    expect(exportedManifest.images).toHaveLength(1)
+    expect(exportedManifest.images[0]).toMatchObject({
+      panelIds: expect.arrayContaining(exportedManifest.panels.filter((panel) => panel.type === 'slideshow').map((panel) => panel.id)),
+      attribution: { creator: 'rbnks', creatorUrl: 'https://www.instagram.com/rbnks/', sourceUrl: 'https://www.instagram.com/p/example/' },
+    })
+    expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toHaveLength(1)
+    expect(exportedManifest.panels.filter((panel) => panel.type === 'slideshow').every((panel) => panel.config.imageSource.type === 'session-assets')).toBe(true)
+
+    const { moment: imported } = await importMomentArchive(asFile(archive))
+    const importedPanels = panelsOf(await getMoment(imported.id)).filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+    expect(importedPanels).toHaveLength(2)
+    expect(importedPanels.every((panel) => panel.config.imageSource.type === 'session-assets' && panel.config.folderName === 'Autumn')).toBe(true)
+    expect(await getMomentAssets(imported.id)).toHaveLength(1)
+    for (const panel of importedPanels) {
+      expect(await getMomentAssets(imported.id, panel.id)).toEqual([
+        expect.objectContaining({ attribution: { creator: 'rbnks', creatorUrl: 'https://www.instagram.com/rbnks/', sourceUrl: 'https://www.instagram.com/p/example/' } }),
+      ])
+    }
   })
 
   it('imports an unavailable bundled collection reference without crashing or substituting it', async () => {

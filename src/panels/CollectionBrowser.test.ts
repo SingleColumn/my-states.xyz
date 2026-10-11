@@ -86,6 +86,13 @@ describe('CollectionBrowser', () => {
     expect(screen.getByRole('heading', { name: 'Alpha' })).toBeTruthy()
   })
 
+  it('offers a retry action when the collection source cannot be loaded', () => {
+    const onRetry = vi.fn()
+    renderBrowser({ collections: [], error: 'Image collections could not be loaded.', onRetry })
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(onRetry).toHaveBeenCalledOnce()
+  })
+
   it('selects only when the visible cover or selection affordance is activated', () => {
     const onSelectCollection = vi.fn()
     renderBrowser({ onSelectCollection })

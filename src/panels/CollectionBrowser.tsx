@@ -27,6 +27,7 @@ export interface CollectionBrowserProps {
   initialCollectionId?: string
   viewMode: 'carousel' | 'grid'
   onSelectCollection(collectionId: string): void
+  onRetry?: () => void
 }
 
 /**
@@ -41,6 +42,7 @@ export function CollectionBrowser({
   initialCollectionId,
   viewMode,
   onSelectCollection,
+  onRetry,
 }: CollectionBrowserProps) {
   // Sample once for this browser instance. Async source completion and ordinary
   // rerenders reuse the same value rather than reshuffling what is featured.
@@ -158,7 +160,12 @@ export function CollectionBrowser({
   if (loading) {
     content = <p className="collection-browser-message" role="status">Loading image collections…</p>
   } else if (error) {
-    content = <p className="collection-browser-message is-error" role="alert">{error}</p>
+    content = (
+      <div className="collection-browser-message is-error">
+        <p role="alert">{error}</p>
+        {onRetry ? <button type="button" className="collection-browser-select" onClick={onRetry}>Try again</button> : null}
+      </div>
+    )
   } else if (!currentCollection) {
     content = <p className="collection-browser-message" role="status">No image collections are currently available.</p>
   } else if (viewMode === 'grid') {

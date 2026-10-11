@@ -6,6 +6,7 @@ declare global {
     readonly VITE_SPOTIFY_CLIENT_ID?: string
     readonly VITE_SPOTIFY_REDIRECT_URI?: string
     readonly VITE_ENABLE_PANEL_REPORT?: string
+    readonly VITE_IMAGE_COLLECTIONS_BASE_URL?: string
     readonly VITE_POSTHOG_HOST: string
     readonly VITE_POSTHOG_INTERNAL_TESTER?: string
     readonly VITE_POSTHOG_PROJECT_TOKEN: string

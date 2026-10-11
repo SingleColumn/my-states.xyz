@@ -12,7 +12,7 @@ The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other 
 - Search Spotify playlists and songs, and browse a rotating set of curated suggestions, without connecting a Spotify account.
 - Connect Spotify with OAuth PKCE when you want playback, and control it in the panel.
 - Load a playlist from a Spotify playlist URL or URI.
-- Browse bundled image collections one cover at a time, or select a local folder from the Images panel menu, then play the images as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
+- Browse live curated image collections when their public export is configured (or bundled samples in local fallback mode), or select a local folder from the Images panel menu, then play the images as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
 - Import a directory through the browser's file picker when direct folder access is unavailable.
 - Create, select, rename, edit, autosave, delete, and download Markdown notes.
 - Use a rich Markdown editor with formatting, lists, links, tables, quotes, code blocks, and source/preview modes.
@@ -102,6 +102,14 @@ export const curatedSpotifyPlaylists: CuratedSpotifyPlaylist[] = [
 
 ## Run locally
 
+To browse the live curated image feed, set its public export root in `.env`:
+
+```dotenv
+VITE_IMAGE_COLLECTIONS_BASE_URL=https://your-public-storage.example/curated-export
+```
+
+The value is the root containing `collections/index.json`; trailing slashes are ignored. Leave it blank to use the bundled sample collections. The storage or CDN must allow cross-origin `GET` requests from the exact origin where my-states runs (for production, the exact `https://my-states.xyz` origin). No credentials or cookies are sent. If a configured feed cannot be reached, the Images panel reports the problem and offers a retry instead of silently showing bundled data.
+
 ```bash
 npm install
 npm run dev
@@ -164,6 +172,7 @@ Before production deployment, set these Vercel Production environment variables 
 ```dotenv
 VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
 VITE_SPOTIFY_REDIRECT_URI=https://your-domain.example/callback
+VITE_IMAGE_COLLECTIONS_BASE_URL=https://your-public-storage.example/curated-export
 SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 ```
@@ -178,6 +187,7 @@ In the Vercel dashboard, choose the variable type like this (Vercel's **Config**
 | `SPOTIFY_CLIENT_ID` | Config | Already public: the browser sends it to Spotify in the login link. |
 | `VITE_SPOTIFY_CLIENT_ID` | Config | Every `VITE_` variable is compiled into the JavaScript visitors download. |
 | `VITE_SPOTIFY_REDIRECT_URI` | Config | Same, and it is only a URL. |
+| `VITE_IMAGE_COLLECTIONS_BASE_URL` | Config | Public root URL for the read-only curated image export. |
 
 The same applies to the other `VITE_` variables (the tldraw licence key and the PostHog values): they are already public in the bundle, so marking them Secret would add nothing.
 
@@ -192,7 +202,7 @@ On first launch, the app creates a moment with its three panels. Use the moment 
 | Panel | How to use it |
 | --- | --- |
 | Music | Search Spotify, or pick one of the suggested playlists, straight away -- no Spotify account is needed to look. Connect Spotify to play what you have chosen, or to paste a Spotify playlist URL/URI. Playback requires Spotify Premium. |
-| Images | Browse and select a bundled collection from the collection browser, or choose a local folder from the panel menu. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active moment; bundled samples remain static app assets. |
+| Images | Browse and select a live curated collection when configured (otherwise a bundled sample), or choose a local folder from the panel menu. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active moment. |
 | Markdown Text Editor | Create a document, give it a name, and write with the toolbar. Notes autosave; use the download button to export the active note as `.md`. |
 
 Drag a panel by its frame and use its resize handles to change its size. Use the usual canvas gestures to pan and zoom. Canvas interactions are isolated from each panel's internal controls.
@@ -219,11 +229,11 @@ For a responsive app, prefer WebP or AVIF where appropriate, avoid unnecessarily
 
 ## Portable moments
 
-Export downloads a complete `.moment.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Spotify login tokens, playback device data, current-track data, search results, and the session's suggestions are not included. Nothing the discovery endpoints return is stored either: they hold no application token and mint no record of a visitor.
+Export downloads a complete `.moment.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. Curated selections are copied into the archive with their attribution and restore as local session images, so the archive does not depend on the live feed remaining unchanged. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Spotify login tokens, playback device data, current-track data, search results, and the session's suggestions are not included.
 
 Version 1 supports up to 200 images, 25 MB per image, and 250 MB of image data in a moment. Import validates the archive structure and rejects unsupported or oversized content. Before a moment is switched, created, deleted, imported, or exported, pending note and canvas saves are flushed so the archive and stored moment include the most recent changes.
 
-Archives are written in format version 2. A file exported by an earlier version of the app (format version 1) is refused with a message that says so: on 2026-09-13 the app started over with a new browser database and a new file format, and neither carries earlier saved work forward. From version 2 on, an exported file is meant to stay openable by later versions of the app.
+Archives are written in format version 3, which can associate one embedded curated image with several Images panels without storing its bytes repeatedly. Format version 2 remains importable. A file exported by the earlier format version 1 is refused with a message that says so: on 2026-09-13 the app started over with a new browser database and a new file format, and neither carries earlier saved work forward. From version 2 on, an exported file is meant to stay openable by later versions of the app.
 
 ## Data and browser permissions
 

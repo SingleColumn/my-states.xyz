@@ -30,6 +30,15 @@ describe('panel duplication', () => {
     expect(duplicate.config).not.toBe(source.config)
   })
 
+  it('keeps a curated collection reference when an Images panel is duplicated', () => {
+    const source = createPanel('slideshow')
+    source.config = { ...source.config, folderName: 'Autumn', imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' } }
+    const duplicate = duplicatePanel(source)
+    if (!duplicate || duplicate.type !== 'slideshow') throw new Error('Slideshow panel unexpectedly rejected for duplication')
+    expect(duplicate?.config).toEqual(source.config)
+    expect(duplicate?.config.imageSource).not.toBe(source.config.imageSource)
+  })
+
   it('refuses to copy a singleton kind', () => {
     expect(duplicatePanel(createPanel('spotify'))).toBeNull()
   })

@@ -5,6 +5,7 @@ import {
   isFolderPickerCancelledByUser,
   releaseImageItems,
   settingsForBundledCollection,
+  settingsForCuratedCollection,
   settingsForClearedImages,
   settingsForMomentAssets,
   statusForImageSource,
@@ -29,6 +30,12 @@ describe('slideshow image source transitions', () => {
     expect(statusForImageSource(selected.imageSource, 0)).toBe('No images are available yet in "jaumecopilotos-ai".')
   })
 
+  it('keeps a curated slug explicit while showing the collection title', () => {
+    const selected = settingsForCuratedCollection(defaultSlideshowSettings, 'rbnks-autumn', 'Autumn')
+    expect(selected).toMatchObject({ folderName: 'Autumn', imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' }, currentIndex: 0 })
+    expect(statusForImageSource(selected.imageSource, 3)).toBe('3 images from this collection.')
+  })
+
   it('treats only an abort that arrives after a dialog could have shown as a user cancel', () => {
     const abort = new DOMException('The user aborted a request.', 'AbortError')
     expect(isFolderPickerCancelledByUser(abort, 1800)).toBe(true)
@@ -45,6 +52,7 @@ describe('slideshow image source transitions', () => {
     releaseImageItems([
       { ...base, url: 'blob:local', urlKind: 'object-url' },
       { ...base, id: 'sample', url: '/sample-images/teemu-jpeg/image.jpg', urlKind: 'static' },
+      { ...base, id: 'curated', url: 'https://cdn.example/image.jpg', urlKind: 'remote' },
     ] as ImageItem[])
     expect(revoke).toHaveBeenCalledOnce()
     expect(revoke).toHaveBeenCalledWith('blob:local')

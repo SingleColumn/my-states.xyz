@@ -70,6 +70,15 @@ describe('panel architecture report', () => {
     expect(report.ownership.react).toContain('component-internal UI state')
   })
 
+  it('reports a curated Images source by its saved slug', () => {
+    const shape = makeShape('slideshow', 'panel-images', 'shape:images', {
+      config: { folderName: 'Autumn', imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' }, currentIndex: 0, intervalMs: 5000, transitionMs: 500, shuffle: false, zoom: 1 },
+    })
+    const report = buildPanelArchitectureReport(makeMoment([shape]), editorWith(shape))
+    expect(report.summary.status).toBe('PASS')
+    expect(report.panels[0].contentReferences).toEqual({ curatedCollectionSlug: 'rbnks-autumn' })
+  })
+
   it('reports two shapes sharing a panelId', () => {
     const one = makeShape('slideshow', 'panel-a', 'shape:one')
     const two = makeShape('slideshow', 'panel-a', 'shape:two')

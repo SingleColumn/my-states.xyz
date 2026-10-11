@@ -92,6 +92,7 @@ export const imageCollectionSourceValidator: T.Validator<ImageCollectionSource> 
   none: T.object({ type: T.literal('none') }),
   'session-assets': T.object({ type: T.literal('session-assets') }),
   bundled: T.object({ type: T.literal('bundled'), collectionId: T.string }),
+  curated: T.object({ type: T.literal('curated'), collectionSlug: T.string }),
 })
 
 // The floor a slideshow's own timer already enforces (SlideshowPanel.tsx);
@@ -143,7 +144,9 @@ export function normalizeSlideshowSettings(value: unknown): SlideshowSettings {
   const source = input.imageSource === undefined ? { type: 'none' } : record(input.imageSource)
   const imageSource = source.type === 'bundled'
     ? { type: source.type, collectionId: source.collectionId }
-    : { type: source.type }
+    : source.type === 'curated'
+      ? { type: source.type, collectionSlug: source.collectionSlug }
+      : { type: source.type }
   const config = { ...fields(defaultSlideshowSettings, input), imageSource }
   return slideshowSettingsValidator.validate(config)
 }

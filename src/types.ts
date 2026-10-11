@@ -67,6 +67,7 @@ export type ImageCollectionSource =
   | { type: 'none' }
   | { type: 'session-assets' }
   | { type: 'bundled'; collectionId: string }
+  | { type: 'curated'; collectionSlug: string }
 
 export interface ImageMetadata {
   name: string
@@ -80,8 +81,11 @@ export interface MomentImage extends ImageMetadata {
   id: string
   momentId: string
   panelId?: string
+  /** Shared archive assets can belong to several Images panels without storing their bytes twice. */
+  panelIds?: string[]
   filename: string
   mimeType: string
+  attribution?: ImageAttribution
 }
 
 /** Who made a picture, and where the original can be seen. */
@@ -97,7 +101,7 @@ export interface ImageItem extends ImageMetadata {
   filename: string
   mimeType: string
   url: string
-  urlKind: 'object-url' | 'static'
+  urlKind: 'object-url' | 'static' | 'remote'
   /** Sample collections credit every image; a viewer's own folder cannot. */
   attribution?: ImageAttribution
 }

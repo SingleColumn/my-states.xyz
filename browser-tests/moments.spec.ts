@@ -49,7 +49,7 @@ test('a fresh profile opens one moment with three panels and a clean report', as
   const canvas = await describeCanvas(page)
   expect(canvas.moment?.name).toBe('A new moment')
   expect(await momentPickerNames(page)).toEqual(['A new moment'])
-  expect(canvas.panels.map((panel) => panel.type)).toEqual(['spotify', 'slideshow', 'notes'])
+  expect(canvas.panels.map((panel) => panel.type)).toEqual(['slideshow', 'notes', 'spotify'])
   expect(canvas.panels.every((panel) => panel.visible && !panel.focusView)).toBe(true)
   await expectArchitectureReportPass(page)
   expect(pageErrors).toEqual([])
@@ -84,7 +84,7 @@ test('panels, hiding, settings and stacking order survive a reload', async ({ pa
   await speed.focus()
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('ArrowRight')
-  await expect.poll(async () => (await panelById(page, images.panelId)).config).toMatchObject({ shuffle: true, intervalMs: 5500 })
+  await expect.poll(async () => (await panelById(page, images.panelId)).config).toMatchObject({ shuffle: true, intervalMs: 6500 })
 
   // Bring Images to the front of the stacking order (tldraw's "]").
   await selectPanel(page, images.panelId)

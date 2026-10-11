@@ -4,7 +4,7 @@ import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
-import { useFeaturedBundledCollections } from '../collectionSource'
+import { useFeaturedImageCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
@@ -39,7 +39,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // Focus view leaves the picture alone on the panel: every control is dropped,
   // including the header, so Escape is the only way back out.
   const focusView = panel?.focusView === true
-  const collectionSource = useFeaturedBundledCollections()
+  const collectionSource = useFeaturedImageCollections()
   const panelImages = slideshow.imagesFor(panelId)
   const panelStatus = slideshow.statusFor(panelId)
   const panelError = slideshow.errorFor(panelId)
@@ -57,7 +57,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   ))
   const sourceKey = panelSettings.imageSource.type === 'bundled'
     ? `bundled:${panelSettings.imageSource.collectionId}`
-    : panelSettings.imageSource.type
+    : panelSettings.imageSource.type === 'curated'
+      ? `curated:${panelSettings.imageSource.collectionSlug}`
+      : panelSettings.imageSource.type
   const previousSourceKeyRef = useRef(sourceKey)
   const isBrowsingCollections = panelView === 'browse-collections' || panelSettings.imageSource.type === 'none'
   const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
@@ -161,9 +163,13 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   }
 
   async function chooseCollection(collectionId: string) {
+    const collection = collectionSource.collections.find((candidate) => candidate.id === collectionId)
+    if (!collection) return
     const selected = await selectImageCollection(
       collectionId,
-      (selectedId) => slideshow.selectBundledCollection(selectedId, panelId),
+      (selectedId) => collectionSource.sourceType === 'curated'
+        ? slideshow.selectCuratedCollection(selectedId, collection.title, panelId)
+        : slideshow.selectBundledCollection(selectedId, panelId),
       () => posthog.capture('image_collection_selected'),
     )
     if (!selected) return
@@ -250,9 +256,12 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             collections={collectionSource.collections}
             loading={collectionSource.loading}
             error={collectionSource.error}
-            initialCollectionId={panelSettings.imageSource.type === 'bundled' ? panelSettings.imageSource.collectionId : undefined}
+            initialCollectionId={panelSettings.imageSource.type === 'bundled'
+              ? panelSettings.imageSource.collectionId
+              : panelSettings.imageSource.type === 'curated' ? panelSettings.imageSource.collectionSlug : undefined}
             viewMode={collectionBrowserMode}
             onSelectCollection={(collectionId) => void chooseCollection(collectionId)}
+            onRetry={collectionSource.retry}
           />
         ) : currentImage ? (
           <>
