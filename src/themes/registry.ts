@@ -6,6 +6,8 @@ import terminal from './builtin/terminal.theme.json'
 import kittyBow from './builtin/kitty-bow.theme.json'
 import scrapbook from './builtin/scrapbook.theme.json'
 import minimal from './builtin/minimal.theme.json'
+import blueBeachhouse from './builtin/blue-beachhouse.theme.json'
+import ukiyo from './builtin/ukiyo.theme.json'
 
 /**
  * The built-in themes ship in the bundle and are never written to the
@@ -17,7 +19,7 @@ import minimal from './builtin/minimal.theme.json'
  * the browser-only CSS value check): a built-in that would fail import is a
  * bug worth failing loudly on at startup.
  */
-export const builtInThemes: readonly ThemeDefinition[] = [midnight, paper, terminal, kittyBow, scrapbook, minimal].map((definition) => validateThemeDefinition(definition, acceptEveryValue))
+export const builtInThemes: readonly ThemeDefinition[] = [midnight, paper, terminal, kittyBow, scrapbook, minimal, blueBeachhouse, ukiyo].map((definition) => validateThemeDefinition(definition, acceptEveryValue))
 
 /** What a fresh profile shows, and what everything falls back to. Pinned by name, not by position in the list. */
 export const DEFAULT_THEME_ID = 'midnight'

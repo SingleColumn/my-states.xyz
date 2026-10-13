@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "id": "blue-beachhouse",
+  "name": "Blue beachhouse",
+  "version": "1.0.0",
+  "author": "my-states",
+  "description": "A seaside cottage in sea air: deep teal-and-navy at night, soft dusty blue by day, a sea-green accent and typewriter-set titles.",
+  "modes": {
+    "dark": {
+      "foundation": {
+        "color": {
+          "background": "#253847",
+          "foreground": "#d0d0d0",
+          "muted": "#9fb4b0",
+          "faint": "#7f9a98",
+          "accent": "#2babb5",
+          "border": "rgba(95, 160, 150, 0.28)",
+          "danger": "#ee7a7a",
+          "selection": "#2babb5"
+        },
+        "typography": {
+          "uiFont": "\"Segoe UI\", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          "headingFont": "\"CMU Typewriter Text\", \"Courier New\", Courier, monospace",
+          "monoFont": "\"JetBrains Mono\", Consolas, \"Liberation Mono\", monospace",
+          "headingWeight": "700"
+        },
+        "shape": {
+          "radiusLarge": "10px",
+          "radiusMedium": "6px",
+          "radiusSmall": "4px"
+        },
+        "depth": {
+          "shadowSmall": "0 6px 18px rgba(8, 20, 30, 0.35)",
+          "shadowMedium": "0 10px 26px rgba(8, 20, 30, 0.38)",
+          "shadowLarge": "0 18px 48px rgba(8, 20, 30, 0.42)",
+          "backdropBlur": "none"
+        }
+      },
+      "semantic": {
+        "surfacePrimary": "#253847",
+        "surfaceElevated": "#233241",
+        "surfaceOverlay": "#1d2d3a",
+        "textPrimary": "#d0d0d0",
+        "textSecondary": "#bccac8",
+        "textMuted": "#9fb4b0",
+        "textFaint": "#7f9a98",
+        "borderSubtle": "rgba(95, 160, 150, 0.16)",
+        "borderNormal": "rgba(95, 160, 150, 0.3)",
+        "borderStrong": "rgba(95, 160, 150, 0.5)",
+        "focusRing": "#35bbc4",
+        "interactive": "#2e505a",
+        "interactiveHover": "#335a5a",
+        "interactiveActive": "#48867d",
+        "danger": "#ee7a7a",
+        "accentLift": "#35bbc4"
+      },
+      "components": {
+        "canvas": {
+          "background": "#253847",
+          "backdrop": "#253847",
+          "pattern": "lines",
+          "gridColor": "rgba(95, 160, 150, 0.12)",
+          "gridSize": "32px",
+          "selectionStroke": "#35bbc4",
+          "selectionStrokeWidth": "1.5px"
+        },
+        "panel": {
+          "border": "rgba(95, 160, 150, 0.3)",
+          "divider": "rgba(95, 160, 150, 0.2)",
+          "frame": "rgba(95, 160, 150, 0.2)",
+          "shellBorder": "1px solid rgba(95, 160, 150, 0.4)",
+          "headerForeground": "#d0d0d0",
+          "footerForeground": "#7f9a98",
+          "shadow": "0 18px 48px rgba(8, 20, 30, 0.42)",
+          "backdropBlur": "none",
+          "headerStyle": "underline",
+          "headerRule": "1px solid rgba(43, 171, 181, 0.45)",
+          "density": "snug"
+        },
+        "button": {
+          "background": "rgba(95, 160, 150, 0.1)",
+          "border": "rgba(95, 160, 150, 0.3)",
+          "foreground": "#b5cbc7",
+          "backgroundHover": "#2e505a",
+          "backgroundActive": "#48867d",
+          "borderActive": "#2babb5",
+          "foregroundActive": "#ffffff"
+        },
+        "control": {
+          "background": "#284052",
+          "border": "rgba(95, 160, 150, 0.35)",
+          "borderHover": "#2babb5",
+          "emptyBackground": "rgba(95, 160, 150, 0.12)",
+          "emptyBackgroundHover": "rgba(95, 160, 150, 0.22)",
+          "rangeAccent": "#2babb5",
+          "rangeTrack": "rgba(95, 160, 150, 0.45)",
+          "rangeThumb": "#35bbc4",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "1.75"
+        },
+        "input": {
+          "background": "#1d2d3a",
+          "foreground": "#d0d0d0"
+        },
+        "menu": {
+          "background": "#1d2d3a",
+          "surface": "#233241"
+        },
+        "toolbar": {
+          "background": "#233241",
+          "border": "rgba(95, 160, 150, 0.35)",
+          "foreground": "#d0d0d0",
+          "shadow": "0 10px 26px rgba(8, 20, 30, 0.38)",
+          "backdropBlur": "none"
+        },
+        "toast": {
+          "background": "#1d2d3a",
+          "border": "rgba(43, 171, 181, 0.55)",
+          "foreground": "#d0d0d0"
+        },
+        "dialog": {
+          "background": "#253847",
+          "border": "rgba(95, 160, 150, 0.5)",
+          "backdrop": "rgba(10, 22, 32, 0.6)",
+          "shadow": "0 24px 70px rgba(8, 20, 30, 0.55)"
+        },
+        "editor": {
+          "background": "#1d2d3a",
+          "border": "rgba(95, 160, 150, 0.3)",
+          "toolbarBackground": "#192a35"
+        },
+        "typography": {
+          "scale": "standard"
+        },
+        "spotify": {
+          "accent": "#3ec28b",
+          "panelBackground": "#22403f",
+          "artworkShadow": "0 8px 20px rgba(8, 20, 30, 0.4)",
+          "artworkPlaceholder": "#2e505a",
+          "artworkPlaceholderHighlight": "#335a5a",
+          "playlistRowBackground": "rgba(25, 42, 53, 0.45)",
+          "playlistRowBackgroundHover": "rgba(95, 160, 150, 0.22)"
+        },
+        "images": {
+          "accent": "#74ccff",
+          "panelBackground": "#213a4e",
+          "frameBorder": "1px solid rgba(116, 204, 255, 0.3)",
+          "frameShadow": "none",
+          "edge": "none"
+        },
+        "notes": {
+          "accent": "#2babb5",
+          "panelBackground": "#233241",
+          "titleForeground": "#e4eceb",
+          "controlBackground": "#1d2d3a",
+          "controlBackgroundHover": "#284052"
+        }
+      }
+    },
+    "light": {
+      "foundation": {
+        "color": {
+          "background": "#e4eaf2",
+          "foreground": "#3b5a85",
+          "muted": "#5a7194",
+          "faint": "#6a80a0",
+          "accent": "#5f9aa6",
+          "border": "rgba(59, 90, 133, 0.22)",
+          "danger": "#b8383f",
+          "selection": "#5f9aa6"
+        },
+        "typography": {
+          "uiFont": "\"Segoe UI\", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          "headingFont": "\"CMU Typewriter Text\", \"Courier New\", Courier, monospace",
+          "monoFont": "\"JetBrains Mono\", Consolas, \"Liberation Mono\", monospace",
+          "headingWeight": "700"
+        },
+        "shape": {
+          "radiusLarge": "10px",
+          "radiusMedium": "6px",
+          "radiusSmall": "4px"
+        },
+        "depth": {
+          "shadowSmall": "0 4px 14px rgba(59, 90, 133, 0.12)",
+          "shadowMedium": "0 8px 22px rgba(59, 90, 133, 0.16)",
+          "shadowLarge": "0 14px 40px rgba(59, 90, 133, 0.2)",
+          "backdropBlur": "none"
+        }
+      },
+      "semantic": {
+        "surfacePrimary": "#e4eaf2",
+        "surfaceElevated": "#dfe7f1",
+        "surfaceOverlay": "#eaf0f6",
+        "textPrimary": "#3b5a85",
+        "textSecondary": "#4a6890",
+        "textMuted": "#5a7194",
+        "textFaint": "#6a80a0",
+        "borderSubtle": "rgba(59, 90, 133, 0.12)",
+        "borderNormal": "rgba(59, 90, 133, 0.24)",
+        "borderStrong": "rgba(59, 90, 133, 0.45)",
+        "focusRing": "#3b5a85",
+        "interactive": "#c6d3e3",
+        "interactiveHover": "#b9cade",
+        "interactiveActive": "#a6bad2",
+        "danger": "#b8383f",
+        "accentLift": "#74aab5"
+      },
+      "components": {
+        "canvas": {
+          "background": "#e4eaf2",
+          "backdrop": "#e4eaf2",
+          "pattern": "lines",
+          "gridColor": "rgba(90, 120, 163, 0.14)",
+          "gridSize": "32px",
+          "selectionStroke": "#3b5a85",
+          "selectionStrokeWidth": "1.5px"
+        },
+        "panel": {
+          "border": "rgba(59, 90, 133, 0.22)",
+          "divider": "rgba(59, 90, 133, 0.14)",
+          "frame": "rgba(59, 90, 133, 0.14)",
+          "shellBorder": "1px solid rgba(59, 90, 133, 0.32)",
+          "headerForeground": "#3b5a85",
+          "footerForeground": "#6a80a0",
+          "shadow": "0 14px 40px rgba(59, 90, 133, 0.2)",
+          "backdropBlur": "none",
+          "headerStyle": "underline",
+          "headerRule": "1px solid rgba(95, 154, 166, 0.55)",
+          "density": "snug"
+        },
+        "button": {
+          "background": "rgba(59, 90, 133, 0.06)",
+          "border": "rgba(59, 90, 133, 0.22)",
+          "foreground": "#3b5a85",
+          "backgroundHover": "#b9cade",
+          "backgroundActive": "#a6bad2",
+          "borderActive": "#5f9aa6",
+          "foregroundActive": "#2a4263"
+        },
+        "control": {
+          "background": "#d0dbe9",
+          "border": "rgba(59, 90, 133, 0.25)",
+          "borderHover": "#5f9aa6",
+          "emptyBackground": "rgba(59, 90, 133, 0.07)",
+          "emptyBackgroundHover": "rgba(59, 90, 133, 0.14)",
+          "rangeAccent": "#5f9aa6",
+          "rangeTrack": "rgba(59, 90, 133, 0.3)",
+          "rangeThumb": "#3b5a85",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "1.75"
+        },
+        "input": {
+          "background": "#f3f6fa",
+          "foreground": "#3b5a85"
+        },
+        "menu": {
+          "background": "#eaf0f6",
+          "surface": "#eaf0f6"
+        },
+        "toolbar": {
+          "background": "#dfe7f1",
+          "border": "rgba(59, 90, 133, 0.25)",
+          "foreground": "#3b5a85",
+          "shadow": "0 8px 22px rgba(59, 90, 133, 0.16)",
+          "backdropBlur": "none"
+        },
+        "toast": {
+          "background": "#eaf0f6",
+          "border": "rgba(95, 154, 166, 0.6)",
+          "foreground": "#3b5a85"
+        },
+        "dialog": {
+          "background": "#e4eaf2",
+          "border": "rgba(59, 90, 133, 0.4)",
+          "backdrop": "rgba(59, 90, 133, 0.28)",
+          "shadow": "0 24px 70px rgba(59, 90, 133, 0.3)"
+        },
+        "editor": {
+          "background": "#f3f6fa",
+          "border": "rgba(59, 90, 133, 0.22)",
+          "toolbarBackground": "#d4dfec"
+        },
+        "typography": {
+          "scale": "standard"
+        },
+        "spotify": {
+          "accent": "#4f9a92",
+          "panelBackground": "#d9e6e6",
+          "artworkShadow": "0 6px 16px rgba(59, 90, 133, 0.2)",
+          "artworkPlaceholder": "#c6d3e3",
+          "artworkPlaceholderHighlight": "#b9cade",
+          "playlistRowBackground": "rgba(255, 255, 255, 0.55)",
+          "playlistRowBackgroundHover": "rgba(59, 90, 133, 0.1)"
+        },
+        "images": {
+          "accent": "#6a9cc4",
+          "panelBackground": "#d3e0ee",
+          "frameBorder": "1px solid rgba(59, 90, 133, 0.22)",
+          "frameShadow": "none",
+          "edge": "none"
+        },
+        "notes": {
+          "accent": "#5a78a3",
+          "panelBackground": "#dfe7f1",
+          "titleForeground": "#2a4263",
+          "controlBackground": "#d4dfec",
+          "controlBackgroundHover": "#c6d3e3"
+        }
+      }
+    }
+  }
+}

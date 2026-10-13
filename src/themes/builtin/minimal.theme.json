@@ -9,7 +9,7 @@
     "light": {
       "foundation": {
         "color": {
-          "background": "#f7f7f6",
+          "background": "#eceae6",
           "foreground": "#1d1d1f",
           "muted": "rgba(29, 29, 31, 0.68)",
           "faint": "rgba(29, 29, 31, 0.5)",
@@ -36,8 +36,8 @@
         }
       },
       "semantic": {
-        "surfaceElevated": "#ffffff",
-        "surfaceOverlay": "#ffffff",
+        "surfaceElevated": "#f5f4f1",
+        "surfaceOverlay": "#f5f4f1",
         "textMuted": "rgba(29, 29, 31, 0.68)",
         "textFaint": "rgba(29, 29, 31, 0.5)",
         "borderSubtle": "rgba(29, 29, 31, 0.08)",
@@ -50,12 +50,12 @@
       },
       "components": {
         "canvas": {
-          "backdrop": "#f7f7f6",
+          "backdrop": "#eceae6",
           "pattern": "none",
           "selectionStrokeWidth": "1px"
         },
         "toolbar": {
-          "background": "#ffffff",
+          "background": "#f5f4f1",
           "border": "rgba(29, 29, 31, 0.16)",
           "shadow": "none"
         },
@@ -65,7 +65,7 @@
           "divider": "rgba(29, 29, 31, 0.1)",
           "headerForeground": "#1d1d1f",
           "footerForeground": "rgba(29, 29, 31, 0.5)",
-          "contentBackground": "#ffffff",
+          "contentBackground": "#f5f4f1",
           "texture": "none",
           "ornament": "none",
           "headerStyle": "underline",
@@ -82,7 +82,7 @@
           "foregroundActive": "#1d1d1f"
         },
         "control": {
-          "background": "#ffffff",
+          "background": "#f5f4f1",
           "border": "rgba(29, 29, 31, 0.2)",
           "borderHover": "#1d1d1f",
           "rangeAccent": "#1d1d1f",
@@ -93,37 +93,37 @@
           "iconStrokeWidth": "1"
         },
         "input": {
-          "background": "#ffffff",
+          "background": "#f5f4f1",
           "foreground": "#1d1d1f"
         },
         "menu": {
-          "background": "#ffffff"
+          "background": "#f5f4f1"
         },
         "editor": {
-          "background": "#ffffff",
+          "background": "#f5f4f1",
           "border": "rgba(29, 29, 31, 0.16)",
-          "toolbarBackground": "#ffffff"
+          "toolbarBackground": "#f5f4f1"
         },
         "dialog": {
-          "background": "#ffffff",
+          "background": "#f5f4f1",
           "backdrop": "rgba(29, 29, 31, 0.24)"
         },
         "spotify": {
           "accent": "#2c2c2e",
-          "panelBackground": "#ffffff",
-          "playlistRowBackground": "#f7f7f6"
+          "panelBackground": "#f5f4f1",
+          "playlistRowBackground": "#eceae6"
         },
         "images": {
           "accent": "#2c2c2e",
-          "panelBackground": "#ffffff",
+          "panelBackground": "#f5f4f1",
           "frameBorder": "1px solid rgba(29, 29, 31, 0.14)",
           "edge": "none"
         },
         "notes": {
           "accent": "#2c2c2e",
-          "panelBackground": "#ffffff",
+          "panelBackground": "#f5f4f1",
           "titleForeground": "#1d1d1f",
-          "controlBackground": "#f7f7f6"
+          "controlBackground": "#eceae6"
         }
       }
     },
