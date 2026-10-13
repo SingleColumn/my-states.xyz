@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "id": "paper",
   "name": "Paper",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "author": "my-states",
-  "description": "A printed page: one cream stock with a visible grain and no colour but ink and a single terracotta, sharp corners, hairline rules, bold serif headings over a warm sans, thin pen-line icons, and pictures torn straight from the sheet. Text is set to clear WCAG AA on every surface.",
+  "description": "A quiet notebook on a desk in soft daylight: pale sheets on a greyed linen ground, warm charcoal ink, one muted sage accent, faint ruled lines, a serif for titles over a plain sans, and no decoration that competes with the words.",
   "modes": {
     "light": {
       "foundation": {
         "color": {
-          "background": "#f3eee4",
-          "foreground": "#2b2420",
-          "muted": "rgba(43, 36, 32, 0.74)",
-          "faint": "rgba(43, 36, 32, 0.56)",
-          "accent": "#8b4a2f",
-          "border": "rgba(43, 36, 32, 0.1)",
+          "background": "#d5c7aa",
+          "foreground": "#3a2e27",
+          "muted": "#6e5f52",
+          "faint": "#74665a",
+          "accent": "#5f7349",
+          "border": "rgba(58, 46, 39, 0.1)",
           "danger": "#9b3d2e",
-          "selection": "#8b4a2f"
+          "selection": "#5f7349"
         },
         "typography": {
-          "uiFont": "Seravek, \"Gill Sans\", \"Gill Sans MT\", Calibri, \"Trebuchet MS\", \"Segoe UI\", sans-serif",
-          "headingFont": "\"Iowan Old Style\", \"Palatino Linotype\", Palatino, \"Book Antiqua\", Georgia, \"Times New Roman\", serif",
-          "headingWeight": "700"
+          "uiFont": "Georgia, \"Times New Roman\", serif",
+          "headingFont": "Georgia, \"Times New Roman\", serif",
+          "headingWeight": "600"
         },
         "shape": {
           "radiusLarge": "6px",
@@ -29,93 +29,96 @@
           "radiusSmall": "2px"
         },
         "depth": {
-          "shadowSmall": "0 1px 2px rgba(60, 40, 20, 0.08), 0 6px 14px rgba(60, 40, 20, 0.08)",
-          "shadowMedium": "0 1px 2px rgba(60, 40, 20, 0.08), 0 8px 20px rgba(60, 40, 20, 0.09)",
-          "shadowLarge": "0 1px 1px rgba(60, 40, 20, 0.1), 0 6px 18px rgba(60, 40, 20, 0.1)",
-          "backdropBlur": "blur(10px)"
+          "shadowSmall": "0 1px 2px rgba(70, 50, 25, 0.12), 0 6px 16px rgba(70, 50, 25, 0.1)",
+          "shadowMedium": "0 1px 2px rgba(70, 50, 25, 0.12), 0 10px 28px rgba(70, 50, 25, 0.14)",
+          "shadowLarge": "0 1px 2px rgba(70, 50, 25, 0.12), 0 10px 28px rgba(70, 50, 25, 0.14)",
+          "backdropBlur": "none"
         }
       },
       "semantic": {
-        "surfaceElevated": "rgba(249, 246, 239, 0.92)",
-        "surfaceOverlay": "#fbf8f2",
-        "textMuted": "rgba(43, 36, 32, 0.74)",
-        "textFaint": "rgba(43, 36, 32, 0.56)",
-        "borderSubtle": "rgba(43, 36, 32, 0.08)",
-        "borderNormal": "rgba(43, 36, 32, 0.12)",
-        "borderStrong": "rgba(43, 36, 32, 0.24)",
-        "focusRing": "#8b4a2f",
-        "interactive": "rgba(139, 74, 47, 0.06)",
-        "interactiveHover": "rgba(139, 74, 47, 0.12)",
-        "interactiveActive": "rgba(139, 74, 47, 0.18)"
+        "surfaceElevated": "#fbf6ea",
+        "surfaceOverlay": "#fffbf1",
+        "textMuted": "#6e5f52",
+        "textFaint": "#74665a",
+        "borderSubtle": "rgba(58, 46, 39, 0.07)",
+        "borderNormal": "rgba(58, 46, 39, 0.12)",
+        "borderStrong": "rgba(58, 46, 39, 0.24)",
+        "focusRing": "#5f7349",
+        "interactive": "rgba(58, 46, 39, 0.04)",
+        "interactiveHover": "rgba(95, 115, 73, 0.12)",
+        "interactiveActive": "rgba(95, 115, 73, 0.2)"
       },
       "components": {
         "canvas": {
-          "backdrop": "linear-gradient(135deg, #f5f0e7 0%, #efe8dc 100%)",
+          "backdrop": "#d5c7aa",
           "pattern": "lines",
-          "gridColor": "rgba(43, 36, 32, 0.09)",
+          "gridColor": "rgba(110, 80, 45, 0.16)",
           "gridSize": "32px",
           "selectionStrokeWidth": "1.5px"
         },
         "panel": {
-          "border": "rgba(43, 36, 32, 0.08)",
-          "shellBorder": "1px solid rgba(43, 36, 32, 0.14)",
-          "headerForeground": "#2b2420",
-          "footerForeground": "rgba(43, 36, 32, 0.56)",
+          "border": "rgba(58, 46, 39, 0.07)",
+          "shellBorder": "1px solid rgba(58, 46, 39, 0.22)",
+          "headerForeground": "#3a2e27",
+          "footerForeground": "#74665a",
+          "contentBackground": "#fbf6ea",
           "texture": "paper",
-          "headerStyle": "underline",
+          "headerStyle": "plain",
+          "headerRule": "1px solid rgba(58, 46, 39, 0.08)",
           "density": "slim"
         },
         "button": {
-          "background": "rgba(139, 74, 47, 0.07)",
-          "border": "rgba(139, 74, 47, 0.22)",
-          "foreground": "rgba(43, 36, 32, 0.8)",
-          "backgroundHover": "rgba(139, 74, 47, 0.14)",
-          "backgroundActive": "rgba(139, 74, 47, 0.2)",
-          "borderActive": "#8b4a2f",
-          "foregroundActive": "#2b2420"
+          "background": "rgba(58, 46, 39, 0.04)",
+          "border": "rgba(58, 46, 39, 0.14)",
+          "foreground": "rgba(58, 46, 39, 0.8)",
+          "backgroundHover": "rgba(95, 115, 73, 0.12)",
+          "backgroundActive": "rgba(95, 115, 73, 0.2)",
+          "borderActive": "#5f7349",
+          "foregroundActive": "#3a2e27"
         },
         "control": {
-          "background": "rgba(139, 74, 47, 0.06)",
-          "border": "rgba(43, 36, 32, 0.14)",
-          "borderHover": "#8b4a2f",
-          "rangeAccent": "#8b4a2f",
-          "rangeTrack": "rgba(43, 36, 32, 0.3)",
-          "rangeThumb": "#8b4a2f",
+          "background": "rgba(58, 46, 39, 0.04)",
+          "border": "rgba(58, 46, 39, 0.14)",
+          "borderHover": "#5f7349",
+          "rangeAccent": "#5f7349",
+          "rangeTrack": "rgba(58, 46, 39, 0.25)",
+          "rangeThumb": "#5f7349",
           "rangeWell": "transparent",
           "rangeWellBorder": "transparent",
           "iconStrokeWidth": "1.25"
         },
         "input": {
-          "background": "rgba(255, 255, 255, 0.35)",
-          "foreground": "#2b2420"
+          "background": "rgba(255, 255, 255, 0.5)",
+          "foreground": "#3a2e27"
         },
         "editor": {
-          "background": "rgba(244, 239, 229, 0.75)",
-          "toolbarBackground": "#f7f3eb"
+          "background": "#fffbf1",
+          "toolbarBackground": "#f3ecda"
         },
         "dialog": {
-          "background": "#f4efe5",
-          "backdrop": "rgba(60, 40, 20, 0.3)"
+          "background": "#fbf6ea",
+          "backdrop": "rgba(58, 46, 39, 0.25)"
         },
         "typography": {
           "scale": "spacious"
         },
         "spotify": {
-          "accent": "#8b4a2f",
-          "panelBackground": "#f1ebe0",
-          "playlistRowBackground": "rgba(255, 255, 255, 0.5)"
+          "accent": "#a07f3c",
+          "panelBackground": "#fbf6ea",
+          "playlistRowBackground": "rgba(255, 255, 255, 0.55)"
         },
         "images": {
-          "accent": "#8b4a2f",
-          "panelBackground": "#f1ebe0",
-          "frameBorder": "none",
-          "edge": "deckle"
+          "accent": "#a07f3c",
+          "panelBackground": "#fbf6ea",
+          "frameBorder": "1px solid rgba(58, 46, 39, 0.12)",
+          "frameShadow": "none",
+          "edge": "none"
         },
         "notes": {
-          "accent": "#8b4a2f",
-          "panelBackground": "#f1ebe0",
-          "titleForeground": "#2b2420",
-          "controlBackground": "#f5f0e6"
+          "accent": "#a07f3c",
+          "panelBackground": "#fbf6ea",
+          "titleForeground": "#3a2e27",
+          "controlBackground": "#f3ecda"
         }
       }
     }
