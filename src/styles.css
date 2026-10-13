@@ -2742,9 +2742,16 @@ input[type="range"]:focus-visible {
   margin-bottom: var(--space-rich-content-block);
 }
 
-/* Headings are sized from the writer's chosen text size, not from the panel:
-   the panel-size scale keeps growing in full screen while the paragraph stays
-   put, which made a title more than twice the size of its text. */
+/* The note title is sized against the panel header it sits under: smaller
+   than the header at the small text size, equal at medium, larger at large
+   (the ratio comes from the text-size choice). It stays between 1.1x and
+   2x the paragraph, so neither a tiny title nor a very large window can throw
+   it out of proportion to the text, which the panel-size scale alone did. h2 and h3 step down from
+   the title, and never below the paragraph. */
+.notes-editor-content {
+  --note-title-size: clamp(calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.1), calc(var(--note-title-anchor, var(--card-title-size)) * var(--notes-title-ratio, 1)), calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 2));
+}
+
 .notes-editor-content h1,
 .notes-editor-content h2,
 .notes-editor-content h3 {
@@ -2755,15 +2762,15 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor-content h1 {
-  font-size: calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.6);
+  font-size: var(--note-title-size);
 }
 
 .notes-editor-content h2 {
-  font-size: calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.33);
+  font-size: max(calc(var(--note-title-size) * 0.83), calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.1));
 }
 
 .notes-editor-content h3 {
-  font-size: calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.17);
+  font-size: max(calc(var(--note-title-size) * 0.73), calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.05));
 }
 
 /* The first line is the note's name, so it is drawn as one -- whatever it is
@@ -2780,7 +2787,7 @@ input[type="range"]:focus-visible {
   margin: 0 0 var(--space-rich-content-block);
   color: var(--color-note-title);
   font-family: var(--font-family-display);
-  font-size: calc(var(--notes-editor-font-size, var(--font-size-notes-editor)) * 1.6);
+  font-size: var(--note-title-size);
   font-weight: var(--font-weight-note-title);
   line-height: var(--line-height-tight);
 }
@@ -2964,6 +2971,10 @@ input[type="range"]:focus-visible {
 
 .panel-notes-surface.is-writing-mode .card-header {
   padding-block: calc(var(--card-padding) / 3);
+}
+
+.panel-notes-surface.is-writing-mode {
+  --note-title-anchor: var(--type-md);
 }
 
 .panel-notes-surface.is-writing-mode .card-title {
