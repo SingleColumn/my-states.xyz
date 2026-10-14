@@ -32,10 +32,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
   useEffect(() => {
     if (isWritingMode && !wasInWritingModeRef.current) {
-      posthog.capture('writing_mode_entered', { writing_mode: true, panel_id: panelId })
+      posthog.capture('writing_mode_entered', { writing_mode: true })
     }
     wasInWritingModeRef.current = isWritingMode
-  }, [isWritingMode, panelId, posthog])
+  }, [isWritingMode, posthog])
 
   async function openMarkdownFile(file: File) {
     // Every Markdown this app writes uses \n alone -- every toMarkdown
@@ -67,7 +67,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     }
 
     const milestones = writingMilestonesRef.current
-    const writingContext = { writing_mode: isWritingMode, panel_id: panelId }
+    const writingContext = { writing_mode: isWritingMode }
     if (words > 0 && !milestones.started) {
       posthog.capture('writing_started', writingContext)
       milestones.started = true
@@ -256,7 +256,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
 
         {activeNote ? (
           <div
-            className={['notes-editor', 'card-content', 'ph-mask', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
+            className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
             {...panelContentProps}
             // What the wheel scrolls when it lands somewhere with nothing
             // scrollable above it -- the note's title, which sits beside the
