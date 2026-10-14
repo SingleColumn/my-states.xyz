@@ -14,6 +14,7 @@ import {
   collectionRotationIntervalMs,
   collectionsPerGridPage,
   initialCollectionIndex,
+  shuffleCollectionOrder,
   type CollectionBrowserProps,
 } from './CollectionBrowser'
 import { selectImageCollection } from './collectionSelection'
@@ -44,6 +45,14 @@ function renderBrowser(overrides: Partial<CollectionBrowserProps> = {}) {
 }
 
 describe('CollectionBrowser', () => {
+  it('changes a repeated randomized grid order while preserving every collection', () => {
+    const first = shuffleCollectionOrder(collections, [], () => 0)
+    const second = shuffleCollectionOrder(collections, first.map((collection) => collection.id), () => 0)
+
+    expect(second.map((collection) => collection.id)).not.toEqual(first.map((collection) => collection.id))
+    expect(new Set(second.map((collection) => collection.id))).toEqual(new Set(collections.map((collection) => collection.id)))
+  })
+
   it('captures analytics only after an actual collection selection', async () => {
     const captureSelection = vi.fn()
     const failedLoad = vi.fn(async () => false)

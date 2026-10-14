@@ -1,5 +1,5 @@
 import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
@@ -10,7 +10,7 @@ import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
 import { panelContentProps, panelFrameActionProps } from '../panelSurface'
 import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
-import { CollectionBrowser } from './CollectionBrowser'
+import { CollectionBrowser, shuffleCollectionOrder } from './CollectionBrowser'
 import { selectImageCollection } from './collectionSelection'
 
 const minSlideshowInterval = 250
@@ -55,6 +55,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const [collectionBrowserMode, setCollectionBrowserMode] = useState<'carousel' | 'grid'>(() => (
     panelSettings.imageSource.type === 'none' ? 'grid' : 'carousel'
   ))
+  const [gridCollectionIds, setGridCollectionIds] = useState<string[]>([])
   const sourceKey = panelSettings.imageSource.type === 'bundled'
     ? `bundled:${panelSettings.imageSource.collectionId}`
     : panelSettings.imageSource.type === 'curated'
@@ -62,6 +63,16 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
       : panelSettings.imageSource.type
   const previousSourceKeyRef = useRef(sourceKey)
   const isBrowsingCollections = panelView === 'browse-collections' || panelSettings.imageSource.type === 'none'
+  const collectionSourceKey = collectionSource.collections.map((collection) => collection.id).join('\u0000')
+  const browserCollections = useMemo(() => {
+    if (collectionBrowserMode !== 'grid' || !gridCollectionIds.length) return collectionSource.collections
+    const collectionsById = new Map(collectionSource.collections.map((collection) => [collection.id, collection]))
+    const ordered = gridCollectionIds
+      .map((id) => collectionsById.get(id))
+      .filter((collection): collection is NonNullable<typeof collection> => collection !== undefined)
+    const includedIds = new Set(ordered.map((collection) => collection.id))
+    return [...ordered, ...collectionSource.collections.filter((collection) => !includedIds.has(collection.id))]
+  }, [collectionBrowserMode, collectionSource.collections, gridCollectionIds])
   const stageAspectRatio = firstImage?.width && firstImage.height ? `${firstImage.width} / ${firstImage.height}` : undefined
   const attribution = currentImage?.attribution ?? null
   const [isFocusHintVisible, setIsFocusHintVisible] = useState(false)
@@ -85,6 +96,28 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
     previousSourceKeyRef.current = sourceKey
     if (panelSettings.imageSource.type !== 'none') setPanelView('slideshow')
   }, [panelSettings.imageSource.type, sourceKey])
+
+  useLayoutEffect(() => {
+    if (!isBrowsingCollections || collectionBrowserMode !== 'grid') return
+    setGridCollectionIds((current) => {
+      const currentIds = new Set(current)
+      const sourceIds = collectionSource.collections.map((collection) => collection.id)
+      const hasCurrentSource = current.length === sourceIds.length
+        && sourceIds.every((id) => currentIds.has(id))
+      return hasCurrentSource
+        ? current
+        : shuffleCollectionOrder(collectionSource.collections, current).map((collection) => collection.id)
+    })
+  }, [collectionBrowserMode, collectionSource.collections, collectionSourceKey, isBrowsingCollections])
+
+  function showCollectionGrid() {
+    setIsImagePickerOpen(false)
+    setGridCollectionIds((current) => (
+      shuffleCollectionOrder(collectionSource.collections, current).map((collection) => collection.id)
+    ))
+    setCollectionBrowserMode('grid')
+    setPanelView('browse-collections')
+  }
 
   function showFocusHint(onEntry: boolean) {
     if (focusHintTimeoutRef.current !== null) window.clearTimeout(focusHintTimeoutRef.current)
@@ -215,9 +248,13 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             label: isBrowsingCollections && collectionBrowserMode === 'grid' ? 'Show collection carousel' : 'Show collection grid',
             icon: <LayoutGrid size={17} aria-hidden="true" />,
             onSelect: () => {
-              setIsImagePickerOpen(false)
-              setCollectionBrowserMode((current) => isBrowsingCollections && current === 'grid' ? 'carousel' : 'grid')
-              setPanelView('browse-collections')
+              if (isBrowsingCollections && collectionBrowserMode === 'grid') {
+                setIsImagePickerOpen(false)
+                setCollectionBrowserMode('carousel')
+                setPanelView('browse-collections')
+                return
+              }
+              showCollectionGrid()
             },
           },
           { id: 'clear', label: 'Clear images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) },
@@ -253,7 +290,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
       <div className="slideshow-stage card-content" style={{ aspectRatio: focusView || isBrowsingCollections ? undefined : stageAspectRatio }} {...(stageIsContent ? panelContentProps : {})}>
         {isBrowsingCollections ? (
           <CollectionBrowser
-            collections={collectionSource.collections}
+            collections={browserCollections}
             loading={collectionSource.loading}
             error={collectionSource.error}
             initialCollectionId={panelSettings.imageSource.type === 'bundled'

@@ -20,6 +20,30 @@ export function initialCollectionIndex(collectionCount: number, randomValue = Ma
   return Math.floor(boundedRandom * collectionCount)
 }
 
+export function shuffleCollectionOrder(
+  collections: CollectionSummary[],
+  previousOrder: string[] = [],
+  random: () => number = Math.random,
+) {
+  const shuffled = [...collections]
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomValue = Math.min(Math.max(random(), 0), 0.999999999)
+    const swapIndex = Math.floor(randomValue * (index + 1))
+    ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
+  }
+
+  // Randomness can occasionally produce the same sequence. A grid revisited
+  // by the user should visibly change, so rotate that rare repeat once.
+  if (
+    shuffled.length > 1
+    && shuffled.length === previousOrder.length
+    && shuffled.every((collection, index) => collection.id === previousOrder[index])
+  ) {
+    shuffled.push(shuffled.shift()!)
+  }
+  return shuffled
+}
+
 export interface CollectionBrowserProps {
   collections: CollectionSummary[]
   loading: boolean
