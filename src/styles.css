@@ -544,7 +544,15 @@ button {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.panel-slideshow-surface.is-collection-browser .slideshow-stage {
+.panel-slideshow-surface.is-collection-browser /* Pills drawn over a picture sit on the picture, not on the theme's surface,
+   so they keep one dark scrim with light text in every theme and mode. */
+:root {
+  --image-overlay-bg: rgba(14, 14, 18, 0.78);
+  --image-overlay-text: #f5f3ee;
+  --image-overlay-text-muted: rgba(245, 243, 238, 0.72);
+}
+
+.slideshow-stage {
   align-self: stretch;
   justify-self: stretch;
   width: calc(100% - (var(--image-panel-stage-inset-x) * 2));
@@ -1743,7 +1751,8 @@ input[type="range"]:focus-visible {
   max-width: calc(100% - 24px);
   padding: 4px 9px;
   border-radius: 999px;
-  background: rgba(10, 10, 12, 0.52);
+  background: var(--image-overlay-bg);
+  color: var(--image-overlay-text);
   backdrop-filter: blur(12px);
   /* Below the smallest scale step: the credit should read as a caption on the
      picture rather than as panel text. */
@@ -1757,24 +1766,23 @@ input[type="range"]:focus-visible {
 
 .slideshow-stage:hover .image-attribution,
 .image-attribution:focus-within {
-  background: rgba(10, 10, 12, 0.72);
   opacity: 1;
 }
 
 .image-attribution-label {
-  color: var(--color-text-muted);
+  color: var(--image-overlay-text-muted);
 }
 
 .image-attribution-creator {
   overflow: hidden;
-  color: var(--color-text-soft);
+  color: var(--image-overlay-text);
   font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
 }
 
 .image-attribution-creator.is-link,
 .image-attribution-source {
-  color: var(--color-text-soft);
+  color: var(--image-overlay-text);
   text-decoration: none;
 }
 
@@ -1788,7 +1796,7 @@ input[type="range"]:focus-visible {
 .image-attribution-source {
   max-width: 0;
   overflow: hidden;
-  color: var(--color-text-muted);
+  color: var(--image-overlay-text-muted);
   opacity: 0;
   transition: max-width 180ms ease, opacity 180ms ease, margin-left 180ms ease;
 }
@@ -1813,9 +1821,9 @@ input[type="range"]:focus-visible {
   padding: 0;
   border: 0;
   border-radius: 8px;
-  background: rgba(10, 10, 12, 0.6);
+  background: var(--image-overlay-bg);
   backdrop-filter: blur(12px);
-  color: var(--color-text-soft);
+  color: var(--image-overlay-text);
   cursor: pointer;
   opacity: 0;
   transition: opacity 180ms ease;
@@ -1919,18 +1927,25 @@ input[type="range"]:focus-visible {
 /* Focus view hides every control, so the way out has to be stated. */
 .focus-view-hint {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 8px;
+  left: 8px;
   z-index: 2;
+  box-sizing: border-box;
+  /* Left-aligned, with the expand button's width (26px + 8px gaps) kept
+     clear on the right so the two can never overlap. */
+  max-width: calc(100% - 8px - 42px);
   margin: 0;
-  padding: 6px 12px;
+  padding: 0 12px;
+  height: 26px;
   border-radius: 999px;
-  background: rgba(10, 10, 12, 0.62);
+  background: var(--image-overlay-bg);
   backdrop-filter: blur(12px);
-  color: var(--color-text-soft);
+  color: var(--image-overlay-text);
   font-size: var(--type-sm);
-  line-height: 1.2;
+  line-height: 26px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 0;
   pointer-events: none;
   transition: opacity 260ms ease;
@@ -1942,7 +1957,7 @@ input[type="range"]:focus-visible {
 
 .focus-view-hint kbd {
   padding: 1px 6px;
-  border: var(--border-width-hairline) solid rgba(245, 243, 238, 0.28);
+  border: var(--border-width-hairline) solid rgba(245, 243, 238, 0.4);
   border-radius: 5px;
   font-family: inherit;
   font-size: 0.92em;
