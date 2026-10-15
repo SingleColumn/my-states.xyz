@@ -544,7 +544,7 @@ button {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.panel-slideshow-surface.is-collection-browser /* Pills drawn over a picture sit on the picture, not on the theme's surface,
+/* Pills drawn over a picture sit on the picture, not on the theme's surface,
    so they keep one dark scrim with light text in every theme and mode. */
 :root {
   --image-overlay-bg: rgba(14, 14, 18, 0.78);
@@ -552,7 +552,7 @@ button {
   --image-overlay-text-muted: rgba(245, 243, 238, 0.72);
 }
 
-.slideshow-stage {
+.panel-slideshow-surface.is-collection-browser .slideshow-stage {
   align-self: stretch;
   justify-self: stretch;
   width: calc(100% - (var(--image-panel-stage-inset-x) * 2));
