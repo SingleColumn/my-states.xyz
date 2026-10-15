@@ -43,7 +43,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     // some exports) is normalised on the way in. Without this the note's
     // stored content kept the file's own line endings verbatim until an
     // edit next settled it, which is one string for a note that had never
-    // been touched and a different one, silently, the moment it was.
+    // been touched and a different one, silently, the board it was.
     const content = (await file.text()).replace(/\r\n?/g, '\n')
     await notes.createNote(panelId, { title: markdownFileTitle(file.name), content })
   }
@@ -102,7 +102,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     await notes.selectNote(documentId, panelId)
   }
 
-  // A single note - even the blank one a fresh moment opens with - is not a
+  // A single note - even the blank one a fresh board opens with - is not a
   // choice yet, so a dropdown offering nothing but itself and "Create new
   // note" is a control for a choice that doesn't exist.
   const hasNotes = notes.notes.length > 1
@@ -407,7 +407,7 @@ function readEditorFontSize(): EditorFontSize {
 }
 
 // Counts the note's Markdown, which is what there is to count before the
-// editor has reported anything: the moment it does, its own count of the
+// editor has reported anything: the board it does, its own count of the
 // prose replaces this one.
 function countWords(markdown: string) {
   const words = markdown.trim().match(/\S+/g)

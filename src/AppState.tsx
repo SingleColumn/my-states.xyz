@@ -8,8 +8,8 @@ import type {
   Panel,
   PanelConfigs,
   PanelType,
-  Moment,
-  MomentSummary,
+  Board,
+  BoardSummary,
   SlideshowSettings,
   SpotifyPlaylistReference,
   SpotifyTokens,
@@ -17,35 +17,35 @@ import type {
 } from './types'
 import {
   clearPanelDirectoryHandle,
-  createMoment as createStoredMoment,
+  createBoard as createStoredBoard,
   defaultSlideshowSettings,
   defaultSpotifyPlaylistReference,
   deleteNote as deleteStoredNote,
-  deleteMoment as deleteStoredMoment,
+  deleteBoard as deleteStoredBoard,
   getPanelDirectoryHandle,
   getNotes,
-  getMoment,
-  getMomentAssets,
-  getMomentSummaries,
-  initializeMoments,
-  replaceMomentAssets,
+  getBoard,
+  getBoardAssets,
+  getBoardSummaries,
+  initializeBoards,
+  replaceBoardAssets,
   savePanelDirectoryHandle,
   saveNote,
-  renameMoment,
-  saveMomentDocument,
-  setMomentTheme,
+  renameBoard,
+  saveBoardDocument,
+  setBoardTheme,
   subscribeStorageStatus,
   saveSpotifyTokens,
-  setActiveMomentId,
-  momentLimits,
+  setActiveBoardId,
+  boardLimits,
   loadSpotifyTokens,
 } from './storage'
-import { downloadMomentArchive, duplicateMoment as duplicateStoredMoment, exportMomentArchive, importMomentArchive } from './momentArchive'
+import { downloadBoardArchive, duplicateBoard as duplicateStoredBoard, exportBoardArchive, importBoardArchive } from './boardArchive'
 import { useAppearanceState, type AppearanceState } from './appearanceState'
 import { createId, nextDuplicateName } from './utils'
 import { SaveQueue } from './saveQueue'
 import { persistNoteSnapshot } from './notePersistence'
-import { MomentOperation } from './momentOperation'
+import { BoardOperation } from './boardOperation'
 import { withRestoreWriteAccess } from './canvasRestore'
 import { createImageItemsFromBundledCollection } from './imageCollections'
 import { configuredImageCollectionsBaseUrl, createImageItemsFromCuratedCollection } from './curatedImageCollections'
@@ -67,7 +67,7 @@ import {
   settingsForBundledCollection,
   settingsForCuratedCollection,
   settingsForClearedImages,
-  settingsForMomentAssets,
+  settingsForBoardAssets,
   statusForImageSource,
 } from './slideshowSources'
 import {
@@ -177,9 +177,9 @@ interface SpotifyState {
   track: SpotifyTrackState | null
   /**
    * A song someone picked out of the results without playing it. Runtime
-   * only, and never part of a moment: a moment remembers a playlist, which
+   * only, and never part of a board: a board remembers a playlist, which
    * is what the panel is for, and a chosen song is a step on the way to one
-   * rather than something to reopen a moment on.
+   * rather than something to reopen a board on.
    */
   selectedTrack: SpotifyTrackSummary | null
   deviceId: string | null
@@ -222,35 +222,35 @@ interface SpotifyState {
   seek(positionMs: number): Promise<void>
 }
 
-interface MomentsState {
+interface BoardsState {
   isReady: boolean
-  moments: MomentSummary[]
-  activeMoment: Moment | null
+  boards: BoardSummary[]
+  activeBoard: Board | null
   error: string | null
   create(name: string): Promise<void>
-  open(momentId: string): Promise<void>
+  open(boardId: string): Promise<void>
   rename(name: string): Promise<void>
-  /** Pins a theme to the active moment; null returns it to the global theme. */
+  /** Pins a theme to the active board; null returns it to the global theme. */
   setTheme(themeId: string | null): Promise<void>
-  remove(momentId: string): Promise<void>
-  /** A copy of the active moment, named "<name> (copy)" or the next free number, opened once made. Never asks: the name is chosen to already be free. */
+  remove(boardId: string): Promise<void>
+  /** A copy of the active board, named "<name> (copy)" or the next free number, opened once made. Never asks: the name is chosen to already be free. */
   duplicate(): Promise<void>
   exportActive(): Promise<void>
   /**
    * Resolves to a notice worth showing (a theme that came with the archive
    * was renamed), or null. `name`, when given, overrides the archive's own
-   * name -- used to resolve a collision with an existing moment's name in
+   * name -- used to resolve a collision with an existing board's name in
    * the same step as the import, rather than importing under the colliding
    * name and asking for a separate rename afterward.
    */
   importFile(file: File, name?: string): Promise<string | null>
-  /** The canvas has changed; this is the whole of what a moment persists about it. */
-  updateDocument(momentId: string, document: TLStoreSnapshot, camera: CanvasCamera): void
-  /** Last successfully read/written moment, including its document. React's activeMoment is not updated on every document save. */
-  getActiveMomentRecord(): Moment | null
+  /** The canvas has changed; this is the whole of what a board persists about it. */
+  updateDocument(boardId: string, document: TLStoreSnapshot, camera: CanvasCamera): void
+  /** Last successfully read/written board, including its document. React's activeBoard is not updated on every document save. */
+  getActiveBoardRecord(): Board | null
   registerCanvasFlush(flush: () => void | Promise<void>): () => void
   registerCanvasPause(pause: (paused: boolean) => void): () => void
-  registerCanvasRestore(prepare: (moment: Moment) => (() => void)): () => void
+  registerCanvasRestore(prepare: (board: Board) => (() => void)): () => void
   isOperationPending(): boolean
   flush(): Promise<void>
 }
@@ -263,7 +263,7 @@ interface MomentsState {
 export interface PanelsState {
   /** Every panel in stacking order, hidden ones included. Empty until the canvas is ready. */
   all: Panel[]
-  /** True once the editor is attached and the active moment has been restored into it. */
+  /** True once the editor is attached and the active board has been restored into it. */
   isReady: boolean
   get(panelId: string): Panel | undefined
   updateConfig<Type extends PanelType>(panelId: string, patch: Partial<PanelConfigs[Type]>, options?: PanelWriteOptions): void
@@ -271,13 +271,13 @@ export interface PanelsState {
   setFocusView(panelId: string, focusView: boolean): void
   /** Adds a panel of a kind at its default place. Null when the kind is a singleton that already exists, or the canvas is not ready. */
   add(type: PanelType): Panel | null
-  /** Wired by the canvas: the editor to read and write through, and the moment it has restored. */
+  /** Wired by the canvas: the editor to read and write through, and the board it has restored. */
   attachEditor(editor: Editor | null): void
-  markRestored(momentId: string | null): void
+  markRestored(boardId: string | null): void
 }
 
 export interface AppStateValue {
-  moments: MomentsState
+  boards: BoardsState
   panels: PanelsState
   notes: NotesState
   slideshow: SlideshowState
@@ -288,91 +288,91 @@ export interface AppStateValue {
 const AppStateContext = createContext<AppStateValue | null>(null)
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const momentCore = useMomentState()
-  const panels = usePanelsState(momentCore.activeMoment?.id ?? null)
-  const notes = useNotesState(momentCore.activeMoment, panels, momentCore.operation)
-  const slideshow = useSlideshowState(momentCore.activeMoment, panels)
-  const spotify = useSpotifyState(momentCore.activeMoment, panels)
-  const appearance = useAppearanceState(momentCore.activeMoment)
+  const boardCore = useBoardState()
+  const panels = usePanelsState(boardCore.activeBoard?.id ?? null)
+  const notes = useNotesState(boardCore.activeBoard, panels, boardCore.operation)
+  const slideshow = useSlideshowState(boardCore.activeBoard, panels)
+  const spotify = useSpotifyState(boardCore.activeBoard, panels)
+  const appearance = useAppearanceState(boardCore.activeBoard)
 
-  const moments = useMemo<MomentsState>(
+  const boards = useMemo<BoardsState>(
     () => ({
-      isReady: momentCore.isReady,
-      moments: momentCore.moments,
-      activeMoment: momentCore.activeMoment,
-      error: momentCore.error ?? notes.error,
-      create: (name) => momentCore.operation.run(async () => {
+      isReady: boardCore.isReady,
+      boards: boardCore.boards,
+      activeBoard: boardCore.activeBoard,
+      error: boardCore.error ?? notes.error,
+      create: (name) => boardCore.operation.run(async () => {
         await notes.flush()
-        await momentCore.flush()
-        await momentCore.create(name)
+        await boardCore.flush()
+        await boardCore.create(name)
       }),
-      open: (momentId) => momentCore.operation.run(async () => {
+      open: (boardId) => boardCore.operation.run(async () => {
         await notes.flush()
-        await momentCore.flush()
-        await momentCore.open(momentId)
+        await boardCore.flush()
+        await boardCore.open(boardId)
       }),
-      rename: (name) => momentCore.operation.run(() => momentCore.rename(name)),
-      setTheme: (themeId) => momentCore.operation.run(() => momentCore.setTheme(themeId)),
-      remove: (momentId) => momentCore.operation.run(async () => {
+      rename: (name) => boardCore.operation.run(() => boardCore.rename(name)),
+      setTheme: (themeId) => boardCore.operation.run(() => boardCore.setTheme(themeId)),
+      remove: (boardId) => boardCore.operation.run(async () => {
         await notes.flush()
-        await momentCore.flush()
-        await momentCore.remove(momentId)
+        await boardCore.flush()
+        await boardCore.remove(boardId)
       }),
-      duplicate: () => momentCore.operation.run(async () => {
-        const current = momentCore.activeMoment
-        if (!current) throw new Error('No moment is open.')
+      duplicate: () => boardCore.operation.run(async () => {
+        const current = boardCore.activeBoard
+        if (!current) throw new Error('No board is open.')
         await notes.flush()
-        await momentCore.flush()
-        const name = nextDuplicateName(current.name, momentCore.moments.map((summary) => summary.name))
-        const duplicated = await duplicateStoredMoment(current.id, name)
-        await momentCore.refreshSummaries()
-        await momentCore.open(duplicated.id)
+        await boardCore.flush()
+        const name = nextDuplicateName(current.name, boardCore.boards.map((summary) => summary.name))
+        const duplicated = await duplicateStoredBoard(current.id, name)
+        await boardCore.refreshSummaries()
+        await boardCore.open(duplicated.id)
       }),
-      exportActive: () => momentCore.operation.run(async () => {
+      exportActive: () => boardCore.operation.run(async () => {
         await notes.flush()
-        if (!momentCore.activeMoment) throw new Error('No moment is open.')
-        await momentCore.flush()
-        const blob = await exportMomentArchive(momentCore.activeMoment.id)
-        downloadMomentArchive(blob, momentCore.activeMoment.name)
+        if (!boardCore.activeBoard) throw new Error('No board is open.')
+        await boardCore.flush()
+        const blob = await exportBoardArchive(boardCore.activeBoard.id)
+        downloadBoardArchive(blob, boardCore.activeBoard.name)
       }),
-      importFile: (file, name) => momentCore.operation.run(async () => {
+      importFile: (file, name) => boardCore.operation.run(async () => {
         await notes.flush()
-        await momentCore.flush()
-        const imported = await importMomentArchive(file)
+        await boardCore.flush()
+        const imported = await importBoardArchive(file)
         // The archive may have installed a theme; the library is read from
         // storage, so tell it. The picker likewise lists summaries; without
-        // this the imported moment is open but absent from the list until
+        // this the imported board is open but absent from the list until
         // the next create or delete.
         if (imported.theme) await appearance.refreshLibrary()
-        await momentCore.refreshSummaries()
-        await momentCore.open(imported.moment.id)
+        await boardCore.refreshSummaries()
+        await boardCore.open(imported.board.id)
         // A caller resolving a name collision renames within this same
         // operation, so the picker never shows the colliding name at all,
         // not even for the instant between two separate actions.
-        if (name !== undefined && name !== imported.moment.name) {
-          await momentCore.rename(name)
-          await momentCore.refreshSummaries()
+        if (name !== undefined && name !== imported.board.name) {
+          await boardCore.rename(name)
+          await boardCore.refreshSummaries()
         }
         return imported.theme?.outcome === 'renamed'
-          ? `The theme "${imported.theme.name}" that came with this moment was added under a new id because one with the same id was already installed.`
+          ? `The theme "${imported.theme.name}" that came with this board was added under a new id because one with the same id was already installed.`
           : null
       }),
-      updateDocument: momentCore.updateDocument,
-      getActiveMomentRecord: momentCore.getActiveMomentRecord,
-      registerCanvasFlush: momentCore.registerCanvasFlush,
-      registerCanvasPause: (pause) => momentCore.operation.registerPause(pause),
-      registerCanvasRestore: momentCore.registerCanvasRestore,
-      isOperationPending: () => momentCore.operation.isBusy,
+      updateDocument: boardCore.updateDocument,
+      getActiveBoardRecord: boardCore.getActiveBoardRecord,
+      registerCanvasFlush: boardCore.registerCanvasFlush,
+      registerCanvasPause: (pause) => boardCore.operation.registerPause(pause),
+      registerCanvasRestore: boardCore.registerCanvasRestore,
+      isOperationPending: () => boardCore.operation.isBusy,
       flush: async () => {
         // Start both now: a lifecycle event must not wait for notes before
         // taking the canvas snapshot (the page may be leaving).
-        await Promise.all([notes.flush(), momentCore.flush()])
+        await Promise.all([notes.flush(), boardCore.flush()])
       },
     }),
-    [notes, momentCore, appearance],
+    [notes, boardCore, appearance],
   )
 
-  const value = useMemo(() => ({ moments, panels, notes, slideshow, spotify, appearance }), [moments, panels, notes, slideshow, spotify, appearance])
+  const value = useMemo(() => ({ boards, panels, notes, slideshow, spotify, appearance }), [boards, panels, notes, slideshow, spotify, appearance])
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
 }
@@ -383,10 +383,10 @@ export function useAppState() {
   return value
 }
 
-function usePanelsState(activeMomentId: string | null): PanelsState {
+function usePanelsState(activeBoardId: string | null): PanelsState {
   const [editor, setEditor] = useState<Editor | null>(null)
-  const [restoredMomentId, setRestoredMomentId] = useState<string | null>(null)
-  const isReady = editor !== null && restoredMomentId !== null && restoredMomentId === activeMomentId
+  const [restoredBoardId, setRestoredBoardId] = useState<string | null>(null)
+  const isReady = editor !== null && restoredBoardId !== null && restoredBoardId === activeBoardId
 
   // Re-runs whenever a panel shape changes in the store. A drag changes a
   // shape's x/y but keeps its props object, and the view is cached on the
@@ -409,23 +409,23 @@ function usePanelsState(activeMomentId: string | null): PanelsState {
       return getPanelFromEditor(editor, shape.props.panelId) ?? null
     },
     attachEditor: setEditor,
-    markRestored: setRestoredMomentId,
+    markRestored: setRestoredBoardId,
   }), [all, editor, isReady])
 }
 
-function useMomentState() {
-  const [moments, setMoments] = useState<MomentSummary[]>([])
-  const [activeMoment, setActiveMoment] = useState<Moment | null>(null)
+function useBoardState() {
+  const [boards, setBoards] = useState<BoardSummary[]>([])
+  const [activeBoard, setActiveBoard] = useState<Board | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const activeMomentRef = useRef<Moment | null>(null)
-  const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the moment. Keep this tab open and try again.')))
-  const [operation] = useState(() => new MomentOperation())
+  const activeBoardRef = useRef<Board | null>(null)
+  const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the board. Keep this tab open and try again.')))
+  const [operation] = useState(() => new BoardOperation())
   const canvasFlushRef = useRef<(() => void | Promise<void>) | null>(null)
-  const canvasRestoreRef = useRef<((moment: Moment) => (() => void)) | null>(null)
+  const canvasRestoreRef = useRef<((board: Board) => (() => void)) | null>(null)
 
   const refreshSummaries = useCallback(async () => {
-    setMoments(await getMomentSummaries())
+    setBoards(await getBoardSummaries())
   }, [])
 
   useEffect(() => subscribeStorageStatus((status) => { if (status) setError(status) }), [])
@@ -434,48 +434,48 @@ function useMomentState() {
     let cancelled = false
     async function load() {
       try {
-        const initial = await initializeMoments()
-        let summaries = await getMomentSummaries()
+        const initial = await initializeBoards()
+        let summaries = await getBoardSummaries()
         if (cancelled) return
-        let moment = await getMoment(initial.activeMomentId).catch(() => undefined)
+        let board = await getBoard(initial.activeBoardId).catch(() => undefined)
         let openError: string | null = null
         // Listing is metadata-only and does not hit this, but opening the
-        // remembered active moment can still fail (schema mismatch, for
-        // instance). Fall back to another moment rather than stranding the
+        // remembered active board can still fail (schema mismatch, for
+        // instance). Fall back to another board rather than stranding the
         // user on the loading screen with nothing to open; the unreadable
         // record is left untouched and stays listed for a build that can
         // read it.
-        if (!moment) {
-          openError = 'Your last-opened moment could not be read. Its stored data has not been changed.'
+        if (!board) {
+          openError = 'Your last-opened board could not be read. Its stored data has not been changed.'
           for (const candidate of summaries) {
-            if (candidate.id === initial.activeMomentId) continue
-            moment = await getMoment(candidate.id).catch(() => undefined)
+            if (candidate.id === initial.activeBoardId) continue
+            board = await getBoard(candidate.id).catch(() => undefined)
             if (cancelled) return
-            if (moment) {
-              await setActiveMomentId(candidate.id)
+            if (board) {
+              await setActiveBoardId(candidate.id)
               break
             }
           }
         }
-        if (!moment) {
-          // Every stored moment failed to open, not only the active one (for
+        if (!board) {
+          // Every stored board failed to open, not only the active one (for
           // example, a schema version bump made all of them unreadable at
           // once): fall back exactly as if there were none, rather than
           // leaving nothing to open and no way to start one. Their records
           // are left untouched and stay listed.
-          moment = await createStoredMoment('A new moment')
+          board = await createStoredBoard('A new board')
           if (cancelled) return
-          summaries = await getMomentSummaries()
-          await setActiveMomentId(moment.id)
-          openError = summaries.length > 1 ? 'None of your saved moments could be opened by this version. A new one has been started; their stored data has not been changed.' : null
+          summaries = await getBoardSummaries()
+          await setActiveBoardId(board.id)
+          openError = summaries.length > 1 ? 'None of your saved boards could be opened by this version. A new one has been started; their stored data has not been changed.' : null
         }
         if (cancelled) return
-        setMoments(summaries)
-        activeMomentRef.current = moment
-        setActiveMoment(moment)
+        setBoards(summaries)
+        activeBoardRef.current = board
+        setActiveBoard(board)
         setError(openError)
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load your moments.')
+        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load your boards.')
       } finally {
         if (!cancelled) setIsReady(true)
       }
@@ -493,7 +493,7 @@ function useMomentState() {
     }
   }, [])
 
-  const registerCanvasRestore = useCallback((prepare: (moment: Moment) => (() => void)) => {
+  const registerCanvasRestore = useCallback((prepare: (board: Board) => (() => void)) => {
     canvasRestoreRef.current = prepare
     return () => { if (canvasRestoreRef.current === prepare) canvasRestoreRef.current = null }
   }, [])
@@ -506,41 +506,41 @@ function useMomentState() {
     await saveQueue.flush()
   }, [saveQueue])
 
-  const loadMoment = useCallback(async (momentId: string, flushCurrent = true) => {
-    const moment = await getMoment(momentId)
-    if (!moment) throw new Error('The requested moment no longer exists.')
-    const restore = canvasRestoreRef.current?.(moment)
-    // Input is paused by the enclosing moment operation. Take one final
+  const loadBoard = useCallback(async (boardId: string, flushCurrent = true) => {
+    const board = await getBoard(boardId)
+    if (!board) throw new Error('The requested board no longer exists.')
+    const restore = canvasRestoreRef.current?.(board)
+    // Input is paused by the enclosing board operation. Take one final
     // snapshot before committing the active preference and ref handoff.
     if (flushCurrent) await flush()
-    await setActiveMomentId(momentId)
-    activeMomentRef.current = moment
+    await setActiveBoardId(boardId)
+    activeBoardRef.current = board
     // Finish the editor handoff while the operation still owns the input
     // pause, not in a later React effect after input has been released.
     restore?.()
-    setActiveMoment(moment)
+    setActiveBoard(board)
     setError(null)
   }, [flush])
 
-  const open = useCallback(async (momentId: string) => {
+  const open = useCallback(async (boardId: string) => {
     await flush()
-    await loadMoment(momentId)
-  }, [flush, loadMoment])
+    await loadBoard(boardId)
+  }, [flush, loadBoard])
 
   const create = useCallback(async (name: string) => {
-    const moment = await createStoredMoment(name)
+    const board = await createStoredBoard(name)
     await refreshSummaries()
-    await open(moment.id)
+    await open(board.id)
   }, [open, refreshSummaries])
 
   const rename = useCallback(async (name: string) => {
-    const current = activeMomentRef.current
+    const current = activeBoardRef.current
     if (!current) return
     saveQueue.enqueue(`name:${current.id}`, async () => {
-      const saved = await renameMoment(current.id, name)
-      if (activeMomentRef.current?.id === saved.id) {
-        activeMomentRef.current = { ...activeMomentRef.current, name: saved.name, updatedAt: saved.updatedAt }
-        setActiveMoment((active) => active?.id === saved.id ? { ...active, name: saved.name, updatedAt: saved.updatedAt } : active)
+      const saved = await renameBoard(current.id, name)
+      if (activeBoardRef.current?.id === saved.id) {
+        activeBoardRef.current = { ...activeBoardRef.current, name: saved.name, updatedAt: saved.updatedAt }
+        setActiveBoard((active) => active?.id === saved.id ? { ...active, name: saved.name, updatedAt: saved.updatedAt } : active)
       }
     })
     await saveQueue.flush()
@@ -548,14 +548,14 @@ function useMomentState() {
   }, [refreshSummaries, saveQueue])
 
   const setTheme = useCallback(async (themeId: string | null) => {
-    const current = activeMomentRef.current
+    const current = activeBoardRef.current
     if (!current) return
     saveQueue.enqueue(`theme:${current.id}`, async () => {
-      const saved = await setMomentTheme(current.id, themeId)
-      if (activeMomentRef.current?.id !== saved.id) return
-      const { themeId: _previous, ...rest } = activeMomentRef.current
-      activeMomentRef.current = { ...rest, ...(saved.themeId ? { themeId: saved.themeId } : {}), updatedAt: saved.updatedAt }
-      setActiveMoment((active) => {
+      const saved = await setBoardTheme(current.id, themeId)
+      if (activeBoardRef.current?.id !== saved.id) return
+      const { themeId: _previous, ...rest } = activeBoardRef.current
+      activeBoardRef.current = { ...rest, ...(saved.themeId ? { themeId: saved.themeId } : {}), updatedAt: saved.updatedAt }
+      setActiveBoard((active) => {
         if (active?.id !== saved.id) return active
         const { themeId: _stale, ...kept } = active
         return { ...kept, ...(saved.themeId ? { themeId: saved.themeId } : {}), updatedAt: saved.updatedAt }
@@ -565,36 +565,36 @@ function useMomentState() {
     await refreshSummaries()
   }, [refreshSummaries, saveQueue])
 
-  const remove = useCallback(async (momentId: string) => {
-    const removingActive = activeMomentRef.current?.id === momentId
-    await deleteStoredMoment(momentId)
-    if (removingActive) activeMomentRef.current = null
-    const remaining = await getMomentSummaries()
-    setMoments(remaining)
+  const remove = useCallback(async (boardId: string) => {
+    const removingActive = activeBoardRef.current?.id === boardId
+    await deleteStoredBoard(boardId)
+    if (removingActive) activeBoardRef.current = null
+    const remaining = await getBoardSummaries()
+    setBoards(remaining)
     if (!removingActive) return
 
     if (remaining[0]) {
-      await loadMoment(remaining[0].id, false)
+      await loadBoard(remaining[0].id, false)
       return
     }
 
-    const replacement = await createStoredMoment('A new moment')
-    setMoments(await getMomentSummaries())
-    await loadMoment(replacement.id, false)
-  }, [loadMoment])
+    const replacement = await createStoredBoard('A new board')
+    setBoards(await getBoardSummaries())
+    await loadBoard(replacement.id, false)
+  }, [loadBoard])
 
   // The document changes on every drag and every edit, so it is kept on the
   // ref and in the database and not in React state: nothing renders from it,
   // and a state update here would re-render every panel on each change.
-  const updateDocument = useCallback((momentId: string, document: TLStoreSnapshot, camera: CanvasCamera) => {
+  const updateDocument = useCallback((boardId: string, document: TLStoreSnapshot, camera: CanvasCamera) => {
     // A delayed listener from the outgoing canvas must not save into the
-    // destination, or resurrect a moment the user has just removed.
-    if (activeMomentRef.current?.id !== momentId) return
-    saveQueue.enqueue(`document:${momentId}`, async () => {
-      const saved = await saveMomentDocument(momentId, document, camera)
+    // destination, or resurrect a board the user has just removed.
+    if (activeBoardRef.current?.id !== boardId) return
+    saveQueue.enqueue(`document:${boardId}`, async () => {
+      const saved = await saveBoardDocument(boardId, document, camera)
       // This ref describes committed storage, not an optimistic snapshot.
       // The queue retains unsaved snapshots independently for retry.
-      if (activeMomentRef.current?.id === saved.id) activeMomentRef.current = saved
+      if (activeBoardRef.current?.id === saved.id) activeBoardRef.current = saved
       setError(null)
     })
   }, [saveQueue])
@@ -602,8 +602,8 @@ function useMomentState() {
   return {
     isReady,
     operation,
-    moments,
-    activeMoment,
+    boards,
+    activeBoard,
     error,
     create,
     open,
@@ -612,25 +612,25 @@ function useMomentState() {
     remove,
     refreshSummaries,
     updateDocument,
-    getActiveMomentRecord: () => activeMomentRef.current,
+    getActiveBoardRecord: () => activeBoardRef.current,
     registerCanvasFlush,
     registerCanvasRestore,
     flush,
   }
 }
 
-function useNotesState(moment: Moment | null, panels: PanelsState, operation: MomentOperation): NotesState {
+function useNotesState(board: Board | null, panels: PanelsState, operation: BoardOperation): NotesState {
   const [notes, setNotes] = useState<Note[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save your note. Keep this tab open and try again.')))
   const panelsRef = useRef(panels)
   panelsRef.current = panels
-  // Which moment `notes` actually holds loaded notes for. A moment switch
+  // Which board `notes` actually holds loaded notes for. A board switch
   // updates panels synchronously (tldraw's own store) but notes only once
   // this hook's async load effect below finishes, so between those two
-  // points panelId can already name the new moment while `notes` still
-  // holds the old one's. Set only at the moment load() actually replaces
-  // `notes` with real data for `momentId` - never for the moment a switch
+  // points panelId can already name the new board while `notes` still
+  // holds the old one's. Set only at the board load() actually replaces
+  // `notes` with real data for `boardId` - never for the board a switch
   // is merely heading towards.
   const notesLoadedForRef = useRef('')
   const runNoteOperation = useCallback((work: () => Promise<void>) => operation.run(work).catch((caught) => {
@@ -685,12 +685,12 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     }))
   }, [persistPanelNote])
 
-  // The loading boundary is the moment, once the canvas has restored it:
+  // The loading boundary is the board, once the canvas has restored it:
   // which note each Notes panel shows is read from the panels then.
-  const loadKey = panels.isReady ? moment?.id ?? '' : ''
+  const loadKey = panels.isReady ? board?.id ?? '' : ''
   useEffect(() => {
     let cancelled = false
-    const momentId = loadKey
+    const boardId = loadKey
     const notePanels = panelsRef.current.all.filter((panel): panel is Panel<'notes'> => panel.type === 'notes')
 
     async function load() {
@@ -704,10 +704,10 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
         state.saveTimer = null
       }
       setNotes([])
-      if (!momentId) return
-      const storedNotes = await getNotes(momentId)
+      if (!boardId) return
+      const storedNotes = await getNotes(boardId)
       if (cancelled) return
-      // A moment with no notes yet (freshly created, or its last note just
+      // A board with no notes yet (freshly created, or its last note just
       // removed) opens with a blank note already active, rather than
       // making the writer click through an empty state to start one.
       if (storedNotes.length === 0 && notePanels.length > 0) {
@@ -715,11 +715,11 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
         // No name: a note is named by its first line, and nothing has been
         // written at the top of this one yet. Every list that shows it says
         // "Untitled note" in place of the empty name.
-        const blank: Note = { id: createId('note'), momentId, title: '', content: '', createdAt: now, updatedAt: now }
+        const blank: Note = { id: createId('note'), boardId, title: '', content: '', createdAt: now, updatedAt: now }
         await saveNote(blank)
         if (cancelled) return
         setNotes([blank])
-        notesLoadedForRef.current = momentId
+        notesLoadedForRef.current = boardId
         for (const panel of notePanels) {
           getNotesPanelRuntimeState(panel.id).activeNote = blank
           panelsRef.current.updateConfig<'notes'>(panel.id, { activeNoteId: blank.id })
@@ -729,7 +729,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
       const openedNotes = await Promise.all(storedNotes.map(withNameAsFirstLine))
       if (cancelled) return
       setNotes(openedNotes)
-      notesLoadedForRef.current = momentId
+      notesLoadedForRef.current = boardId
       for (const panel of notePanels) {
         const selected = openedNotes.find((note) => note.id === panel.config.activeNoteId) ?? openedNotes[0] ?? null
         getNotesPanelRuntimeState(panel.id).activeNote = selected
@@ -774,7 +774,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
 
   /**
    * Which panel owns a note: the one that opened it first, which is the one
-   * with the lowest id, since an id carries the moment it was made in.
+   * with the lowest id, since an id carries the board it was made in.
    *
    * Deliberately not the first in `panels.all`: that is stacking order, and
    * it changes when a panel is brought to the front -- expanding one to full
@@ -791,7 +791,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   }, [panels])
 
   const createNote = useCallback((panelId: string, opening?: NoteOpening) => runNoteOperation(async () => {
-    if (!moment) return
+    if (!board) return
     await flush(panelId)
     const now = Date.now()
     const openingTitle = opening ? noteTitleFromMarkdown(opening.content) : ''
@@ -799,7 +799,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const content = fallbackHeading ? `${fallbackHeading}\n\n${opening!.content}` : opening?.content ?? ''
     const note: Note = {
       id: createId('note'),
-      momentId: moment.id,
+      boardId: board.id,
       // The first line names the note. A file that starts with a text line
       // uses it; otherwise its file name is written in as a heading so the
       // stored name and the writing never begin life in disagreement.
@@ -815,13 +815,13 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     state.activeNote = note
     setNotes((current) => [note, ...current])
     panels.updateConfig<'notes'>(panelId, { activeNoteId: note.id })
-  }), [panels, moment, flush, runNoteOperation])
+  }), [panels, board, flush, runNoteOperation])
 
   const selectNote = useCallback((id: string, panelId: string) => {
-    // notesLoadedForRef, not just membership: right after a moment switch,
-    // panelId can already belong to the new moment while `notes` still
+    // notesLoadedForRef, not just membership: right after a board switch,
+    // panelId can already belong to the new board while `notes` still
     // holds the old one's, and an old note's id would otherwise be found
-    // "valid" and get written onto the new moment's panel.
+    // "valid" and get written onto the new board's panel.
     if (notesLoadedForRef.current !== loadKey) return Promise.resolve()
     const next = notes.find((note) => note.id === id)
     if (!next) return Promise.resolve()
@@ -844,15 +844,15 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
   }, [flush, loadKey, noteOpenElsewhere, notes, panels, runNoteOperation])
 
   const deleteNote = useCallback((id: string, panelId: string) => runNoteOperation(async () => {
-    // deleteStoredNote deletes by id alone, with no moment to scope it to.
-    // A stale or foreign id (retained across a moment switch, say) must
+    // deleteStoredNote deletes by id alone, with no board to scope it to.
+    // A stale or foreign id (retained across a board switch, say) must
     // never reach it: it would permanently delete a note out of whichever
-    // moment actually owns it, leaving that moment's own panels pointing
+    // board actually owns it, leaving that board's own panels pointing
     // at a note that no longer exists - the same failure this function's
     // own redirect loop below exists to prevent, reached through a
     // different door. Mirrors the same check selectNote already makes -
     // gated on notesLoadedForRef too, not just membership in `notes`: a
-    // panelId can already belong to a moment just switched into while
+    // panelId can already belong to a board just switched into while
     // `notes` still holds the one just left, and a foreign note's id would
     // otherwise be found "valid" in that stale array.
     if (notesLoadedForRef.current !== loadKey || !notes.some((note) => note.id === id)) return
@@ -864,7 +864,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     // Every Notes panel that showed the deleted note follows it, not only
     // the one the delete came through: a second panel left pointing at a
     // vanished note is a dangling reference an export cannot come back
-    // from on import (see the archive validation in momentArchive.ts).
+    // from on import (see the archive validation in boardArchive.ts).
     for (const panel of panels.all) {
       if (panel.type !== 'notes' || panel.config.activeNoteId !== id) continue
       const state = getNotesPanelRuntimeState(panel.id)
@@ -946,14 +946,14 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
     const open = state.activeNote
     if (!open) return
     // Only this note's own editor. A panel just pointed at another note
-    // still has the outgoing note's editor standing for a moment, and
+    // still has the outgoing note's editor standing for a board, and
     // renaming through that would write this name into the note being left.
     if (state.editor && state.editor.noteId === open.id) {
       state.editor.handle.setTitle(title)
       return
     }
-    // The editor mounts a moment after the note is opened, and a command can
-    // land inside that moment -- a script renaming a note it has just made,
+    // The editor mounts a board after the note is opened, and a command can
+    // land inside that board -- a script renaming a note it has just made,
     // whose await returned before any editor existed. The rename waits for
     // the editor instead of being dropped on the floor while the command
     // reports success. Tied to the note it was meant for, so a rename cannot
@@ -995,7 +995,7 @@ function useNotesState(moment: Moment | null, panels: PanelsState, operation: Mo
  */
 async function withNameAsFirstLine(note: Note): Promise<Note> {
   const stored = note.title.trim()
-  // What the note will call itself the moment it is opened. A first line
+  // What the note will call itself the board it is opened. A first line
   // that starts a list or a quotation names nothing -- the editor puts an
   // empty line above it -- so the name is empty rather than that block's
   // words.
@@ -1021,7 +1021,7 @@ async function withNameAsFirstLine(note: Note): Promise<Note> {
   return named
 }
 
-function useSlideshowState(moment: Moment | null, panels: PanelsState): SlideshowState {
+function useSlideshowState(board: Board | null, panels: PanelsState): SlideshowState {
   const [, rerender] = useState(0)
   const touch = useCallback(() => rerender((value) => value + 1), [])
   const panelsRef = useRef(panels)
@@ -1042,8 +1042,8 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     touch()
   }, [touch, writeSettings])
 
-  // The loading boundary is the moment, once the canvas has restored it.
-  const loadKey = panels.isReady ? moment?.id ?? '' : ''
+  // The loading boundary is the board, once the canvas has restored it.
+  const loadKey = panels.isReady ? board?.id ?? '' : ''
   // Which Images panels exist and where each takes its pictures from. A
   // panel that arrives later (undo of a delete, a copy, a command) or whose
   // source changes under it loads its pictures the same way one present at
@@ -1112,7 +1112,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
           }
           nextImages = loaded
         } else {
-          const assets = await getMomentAssets(moment!.id, panel.id)
+          const assets = await getBoardAssets(board!.id, panel.id)
           nextImages = await Promise.all(assets.map((asset) => createImageItemFromAsset(asset)))
           nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
         }
@@ -1126,7 +1126,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
         touch()
       } catch (caught) {
         if (!cancelled) {
-          const message = caught instanceof Error ? caught.message : 'Could not load the images for this moment.'
+          const message = caught instanceof Error ? caught.message : 'Could not load the images for this board.'
           state.status = message
           state.error = message
           touch()
@@ -1160,11 +1160,11 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
   }, [setCurrentIndex])
 
   const replaceImages = useCallback(async (files: FileList | File[], folderName: string, panelId: string) => {
-    if (!moment) return
+    if (!board) return
     const selected = Array.from(files).filter(isSupportedImageFile)
-    if (selected.length > momentLimits.maxImageCount) throw new Error(`A moment can contain at most ${momentLimits.maxImageCount} images.`)
-    const assets = await Promise.all(selected.map((file) => createMomentAsset(file, moment.id, panelId)))
-    await replaceMomentAssets(moment.id, assets, panelId)
+    if (selected.length > boardLimits.maxImageCount) throw new Error(`A board can contain at most ${boardLimits.maxImageCount} images.`)
+    const assets = await Promise.all(selected.map((file) => createBoardAsset(file, board.id, panelId)))
+    await replaceBoardAssets(board.id, assets, panelId)
     const nextImages = await Promise.all(assets.map(createImageItemFromAsset))
     nextImages.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
     const state = getSlideshowPanelRuntimeState(panelId)
@@ -1176,11 +1176,11 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     state.status = nextImages.length ? `${folderName} · ${nextImages.length} images` : 'No supported images were selected.'
     state.error = null
     state.currentIndex = 0
-    const nextSettings = settingsForMomentAssets(settingsOf(panelId), folderName)
+    const nextSettings = settingsForBoardAssets(settingsOf(panelId), folderName)
     state.sourceKey = imageSourceKey(nextSettings.imageSource)
     writeSettings(panelId, nextSettings)
     touch()
-  }, [moment, settingsOf, touch, writeSettings])
+  }, [board, settingsOf, touch, writeSettings])
 
   const loadImagesFromHandle = useCallback(async (handle: FileSystemDirectoryHandle, panelId: string) => {
     const files: File[] = []
@@ -1189,7 +1189,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
   }, [replaceImages])
 
   const selectFolder = useCallback(async (panelId: string) => {
-    if (!moment) return 'fallback' as const
+    if (!board) return 'fallback' as const
     if (!window.showDirectoryPicker) {
       getSlideshowPanelRuntimeState(panelId).error = 'Folder selection is unavailable in this browser. Use the file picker instead.'
       touch()
@@ -1198,7 +1198,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     const openedAt = performance.now()
     try {
       const handle = await window.showDirectoryPicker()
-      await savePanelDirectoryHandle(moment.id, panelId, handle)
+      await savePanelDirectoryHandle(board.id, panelId, handle)
       await loadImagesFromHandle(handle, panelId)
       return 'selected' as const
     } catch (caught) {
@@ -1213,10 +1213,10 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       touch()
       return 'fallback' as const
     }
-  }, [loadImagesFromHandle, moment, touch])
+  }, [loadImagesFromHandle, board, touch])
 
   const selectBundledCollection = useCallback(async (collectionId: string, panelId: string) => {
-    if (!moment) throw new Error('Open a moment before selecting images.')
+    if (!board) throw new Error('Open a board before selecting images.')
     const state = getSlideshowPanelRuntimeState(panelId)
     try {
       const nextImages = await createImageItemsFromBundledCollection(collectionId)
@@ -1246,10 +1246,10 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       touch()
       return false
     }
-  }, [schedulePanelAdvance, moment, settingsOf, touch, writeSettings])
+  }, [schedulePanelAdvance, board, settingsOf, touch, writeSettings])
 
   const selectCuratedCollection = useCallback(async (collectionSlug: string, title: string, panelId: string) => {
-    if (!moment) throw new Error('Open a moment before selecting images.')
+    if (!board) throw new Error('Open a board before selecting images.')
     const state = getSlideshowPanelRuntimeState(panelId)
     if (!configuredImageCollectionsBaseUrl) {
       state.error = 'Image collections are not available right now.'
@@ -1284,11 +1284,11 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       touch()
       return false
     }
-  }, [schedulePanelAdvance, moment, settingsOf, touch, writeSettings])
+  }, [schedulePanelAdvance, board, settingsOf, touch, writeSettings])
 
   const restoreFolder = useCallback(async (panelId: string) => {
-    if (!moment) return
-    const stored = await getPanelDirectoryHandle(moment.id, panelId)
+    if (!board) return
+    const stored = await getPanelDirectoryHandle(board.id, panelId)
     if (!stored) return
     try {
       if (!(await ensureReadPermission(stored.handle))) {
@@ -1301,10 +1301,10 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
       getSlideshowPanelRuntimeState(panelId).error = caught instanceof Error ? caught.message : 'Could not reopen the image folder.'
       touch()
     }
-  }, [loadImagesFromHandle, moment, touch])
+  }, [loadImagesFromHandle, board, touch])
 
   const resetFolder = useCallback(async (panelId: string) => {
-    if (!moment) return
+    if (!board) return
     const state = getSlideshowPanelRuntimeState(panelId)
     const current = settingsOf(panelId)
     if (state.timerId !== null) window.clearTimeout(state.timerId)
@@ -1312,8 +1312,8 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     state.isPlaying = false
     state.currentIndex = 0
     if (current.imageSource.type === 'session-assets') {
-      await replaceMomentAssets(moment.id, [], panelId)
-      await clearPanelDirectoryHandle(moment.id, panelId)
+      await replaceBoardAssets(board.id, [], panelId)
+      await clearPanelDirectoryHandle(board.id, panelId)
     }
     releaseImageItems(state.images)
     state.images = []
@@ -1323,7 +1323,7 @@ function useSlideshowState(moment: Moment | null, panels: PanelsState): Slidesho
     state.sourceKey = imageSourceKey(cleared.imageSource)
     writeSettings(panelId, cleared)
     touch()
-  }, [moment, settingsOf, touch, writeSettings])
+  }, [board, settingsOf, touch, writeSettings])
 
   const stop = useCallback((panelId?: string) => {
     if (!panelId) return
@@ -1418,7 +1418,7 @@ interface SpotifyPlaylistSearchPage {
  * search is still wanted, and that is only observable from inside this hook —
  * the panel sees the answer, never the race that chose it.
  */
-export function useSpotifyState(moment: Moment | null, panels: PanelsState): SpotifyState {
+export function useSpotifyState(board: Board | null, panels: PanelsState): SpotifyState {
   const [tokens, setTokens] = useState<SpotifyTokens | null>(loadSpotifyTokens)
   const [playlists, setPlaylists] = useState<SpotifyPlaylistSummary[]>([])
   const [tracks, setTracks] = useState<SpotifyTrackSummary[]>([])
@@ -1427,7 +1427,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   // Counts every deliberate change to the held song: chosen, cleared, or
   // superseded by playing something. A lookup still in flight when that
   // happens is answering a question about an earlier state — the visitor may
-  // have opened another moment, cleared the search or picked something else —
+  // have opened another board, cleared the search or picked something else —
   // and must not put its answer back.
   const selectedTrackEpochRef = useRef(0)
   const changeSelectedTrack = useCallback((next: SpotifyTrackSummary | null) => {
@@ -1483,7 +1483,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     setTracks([])
     setTrack(null)
     changeSelectedTrack(null)
-  }, [moment?.id, changeSelectedTrack])
+  }, [board?.id, changeSelectedTrack])
 
   useEffect(() => {
     saveSpotifyTokens(tokens)
@@ -1577,14 +1577,14 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
   const spotifyPanel = panels.all.find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
   // The user chose the playlist: history. The app filling in artwork it
   // looked up: not history, or Undo would take the picture away again.
-  const setMomentPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string, options?: PanelWriteOptions) => {
+  const setBoardPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string, options?: PanelWriteOptions) => {
     const current = panelsRef.current
     const panel = (panelId ? current.get(panelId) : undefined) ?? current.all.find((candidate) => candidate.type === 'spotify')
     if (panel?.type === 'spotify') current.updateConfig<'spotify'>(panel.id, { playlist: next }, options)
   }, [])
 
   // A playlist saved before the panel showed artwork - or restored from an
-  // exported moment - has a name but no image. Look the artwork up once so the
+  // exported board - has a name but no image. Look the artwork up once so the
   // panel can still show which playlist is loaded.
   const savedPlaylist = spotifyPanel?.config.playlist
   const playlistMissingArtwork = savedPlaylist?.id && !savedPlaylist.image ? savedPlaylist.id : null
@@ -1605,13 +1605,13 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
       try {
         // Artwork is public, so this works before anyone connects too: the
         // catalog endpoint answers the same question with the application's
-        // credentials. An imported moment therefore shows its cover either way.
+        // credentials. An imported board therefore shows its cover either way.
         const summary = tokens
           ? mapPlaylist(await spotifyFetch<SpotifyPlaylistApiItem>(`/playlists/${playlistMissingArtwork}`, (await ensureFreshTokens()).accessToken))
           : (await fetchCuratedPlaylists([playlistMissingArtwork]))[0]
         answered = true
         if (cancelled || !summary?.image) return
-        setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, undefined, { history: 'ignore' })
+        setBoardPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, undefined, { history: 'ignore' })
       } catch {
         // Artwork is decoration: a failed lookup must not interrupt playback.
         // Nor is it final. Forgetting the attempt lets the next thing that
@@ -1626,7 +1626,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
       // replaces this one must be free to make it.
       if (!answered) artworkLookupsRef.current.delete(lookupKey)
     }
-  }, [ensureFreshTokens, playlistMissingArtwork, setMomentPlaylist, tokens])
+  }, [ensureFreshTokens, playlistMissingArtwork, setBoardPlaylist, tokens])
 
   const login = useCallback(async () => startSpotifyLogin(), [])
   const clearSearchResults = useCallback(() => {
@@ -1783,14 +1783,14 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
     // Playback has been accepted, so whatever song was being held for Play is
-    // superseded. The player only reports what is playing some moments later,
+    // superseded. The player only reports what is playing some boards later,
     // and until it does the held song would still outrank this in the panel.
     changeSelectedTrack(null)
-    setMomentPlaylist(selected, panelId)
+    setBoardPlaylist(selected, panelId)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
     setStatus(`Playing ${summary.name}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, requestSpotify, setMomentPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, setBoardPlaylist])
 
   /**
    * Choosing a playlist, which is not the same as playing it. A visitor who
@@ -1799,7 +1799,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
    * separately rather than smuggled into the click that chose the playlist.
    */
   const selectPlaylist = useCallback((summary: SpotifyPlaylistSummary, panelId?: string) => {
-    setMomentPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, panelId)
+    setBoardPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, panelId)
     // The newest choice is the one that counts. A song chosen earlier outranks
     // the panel's playlist wherever the panel decides what is chosen, so it has
     // to go, or the panel keeps describing — and, after connecting, plays — the
@@ -1807,7 +1807,7 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     changeSelectedTrack(null)
     setStatus(`${summary.name} is ready.`)
     setError(null)
-  }, [setMomentPlaylist])
+  }, [setBoardPlaylist])
 
   const selectTrack = useCallback((summary: SpotifyTrackSummary | null) => {
     changeSelectedTrack(summary)
@@ -1834,13 +1834,13 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ context_uri: selected.uri }) }))
     // Playback has been accepted, so whatever song was being held for Play is
-    // superseded. The player only reports what is playing some moments later,
+    // superseded. The player only reports what is playing some boards later,
     // and until it does the held song would still outrank this in the panel.
     changeSelectedTrack(null)
-    setMomentPlaylist(selected, panelId)
+    setBoardPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, requestSpotify, panels, setMomentPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, panels, setBoardPlaylist])
 
   const playTrack = useCallback(async (summary: SpotifyTrackSummary, _panelId?: string) => {
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
@@ -1849,8 +1849,8 @@ export function useSpotifyState(moment: Moment | null, panels: PanelsState): Spo
     await requestSpotify(() => spotifyFetch<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, fresh.accessToken, { method: 'PUT', body: JSON.stringify({ uris: [summary.uri] }) }))
     // Playback has been accepted, and this is now the song Play is for. It has
     // to stay that way until the player reports what is playing, which it does
-    // some moments later: cleared here, a second press of Play in that gap would
-    // find nothing held and fall through to the moment's saved playlist,
+    // some boards later: cleared here, a second press of Play in that gap would
+    // find nothing held and fall through to the board's saved playlist,
     // replacing the song that was just started. Held, a second press only asks
     // for the same song again. The panel lets it go when the player reports.
     changeSelectedTrack(summary)
@@ -1895,7 +1895,7 @@ interface NotesPanelRuntimeState {
   markdownStale: boolean
   /**
    * The panel's mounted editor and the note it holds. The note matters: for
-   * a moment after the panel is pointed at a different note, the editor
+   * a board after the panel is pointed at a different note, the editor
    * still standing here is the one for the note being left.
    */
   editor: { noteId: string, handle: NotesEditorHandle } | null
@@ -2020,8 +2020,8 @@ function isSupportedImageFile(file: File) {
   return file.type.startsWith('image/') || supportedImagePattern.test(file.name)
 }
 
-async function createMomentAsset(file: File, momentId: string, panelId?: string) {
-  if (file.size > momentLimits.maxImageBytes) throw new Error(`${file.name} exceeds the 25 MB per-image limit.`)
+async function createBoardAsset(file: File, boardId: string, panelId?: string) {
+  if (file.size > boardLimits.maxImageBytes) throw new Error(`${file.name} exceeds the 25 MB per-image limit.`)
   const mimeType = normaliseImageMimeType(file)
   if (!mimeType) throw new Error(`${file.name} is not a supported image type.`)
   const url = URL.createObjectURL(file)
@@ -2029,7 +2029,7 @@ async function createMomentAsset(file: File, momentId: string, panelId?: string)
   URL.revokeObjectURL(url)
   return {
     id: createId('image'),
-    momentId,
+    boardId,
     ...(panelId ? { panelId } : {}),
     filename: file.name,
     name: file.webkitRelativePath || file.name,
@@ -2042,7 +2042,7 @@ async function createMomentAsset(file: File, momentId: string, panelId?: string)
   }
 }
 
-async function createImageItemFromAsset(asset: Awaited<ReturnType<typeof getMomentAssets>>[number]) {
+async function createImageItemFromAsset(asset: Awaited<ReturnType<typeof getBoardAssets>>[number]) {
   const url = URL.createObjectURL(asset.blob)
   return { ...asset, url, urlKind: 'object-url' as const }
 }

@@ -27,7 +27,7 @@ import type { Panel, PanelType } from '../types'
  *
  * Any other tool shows a link and the title, which is the predictable
  * degradation the checklist asks for; this app reads the line back into an
- * embed, so a note survives the Markdown-only moment bundle intact.
+ * embed, so a note survives the Markdown-only board bundle intact.
  */
 
 /** The drag payload's MIME type: a panel offered to a note. */

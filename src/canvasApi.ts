@@ -38,9 +38,9 @@ export interface PanelDescription {
 }
 
 export interface CanvasDescription {
-  moment: { id: string; name: string; themeId: string | null } | null
+  board: { id: string; name: string; themeId: string | null } | null
   /** The theme on screen and where the choice came from; see themes/resolve.ts. */
-  theme: { id: string; name: string; mode: 'light' | 'dark'; source: 'moment' | 'global' | 'fallback'; globalThemeId: string }
+  theme: { id: string; name: string; mode: 'light' | 'dark'; source: 'board' | 'global' | 'fallback'; globalThemeId: string }
   panelTypes: Array<{ type: PanelType; label: string; singleton: boolean }>
   panels: PanelDescription[]
 }
@@ -69,7 +69,7 @@ export type CanvasCommand =
   | { kind: 'spotify.loadPlaylistUrl'; panelId: string; url: string }
   | { kind: 'spotify.togglePlay'; panelId: string }
   | { kind: 'appearance.setGlobalTheme'; themeId: string }
-  | { kind: 'appearance.setMomentTheme'; themeId: string | null }
+  | { kind: 'appearance.setBoardTheme'; themeId: string | null }
   /** A theme definition (the contents of a .theme.json file) as data; validated like a file import. */
   | { kind: 'appearance.importTheme'; definition: unknown }
   | { kind: 'appearance.deleteTheme'; themeId: string }
@@ -89,9 +89,9 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
   return {
     describe() {
       const state = getState()
-      const moment = state.moments.activeMoment
+      const board = state.boards.activeBoard
       return {
-        moment: moment ? { id: moment.id, name: moment.name, themeId: moment.themeId ?? null } : null,
+        board: board ? { id: board.id, name: board.name, themeId: board.themeId ?? null } : null,
         theme: {
           id: state.appearance.effective.themeId,
           name: state.appearance.effective.definition.name,
@@ -134,7 +134,7 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
 
     async dispatch(command) {
       const state = getState()
-      if (state.moments.isOperationPending()) throw new Error('Please wait for the current moment operation to finish.')
+      if (state.boards.isOperationPending()) throw new Error('Please wait for the current board operation to finish.')
       switch (command.kind) {
         case 'panel.update': {
           const shape = requirePanel(command.panelId)
@@ -249,8 +249,8 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
         case 'appearance.setGlobalTheme':
           await state.appearance.setGlobalTheme(command.themeId)
           return
-        case 'appearance.setMomentTheme':
-          await state.moments.setTheme(command.themeId)
+        case 'appearance.setBoardTheme':
+          await state.boards.setTheme(command.themeId)
           return
         case 'appearance.importTheme':
           await state.appearance.importThemeDefinition(command.definition)

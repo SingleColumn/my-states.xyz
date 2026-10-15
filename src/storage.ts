@@ -1,10 +1,10 @@
 import { DBSchema, deleteDB, openDB } from 'idb'
 import type {
   CanvasState,
-  Moment,
-  MomentDraft,
-  MomentImage,
-  MomentSummary,
+  Board,
+  BoardDraft,
+  BoardImage,
+  BoardSummary,
   Note,
   Panel,
   PanelType,
@@ -14,10 +14,10 @@ import { createId } from './utils'
 import { getPanelDefinition } from './panelRegistry'
 import { normalizeDraftPanel } from './panelInput'
 import { documentFromDraft } from './panelStore'
-import { MOMENT_SCHEMA_VERSION } from './momentSchema'
+import { BOARD_SCHEMA_VERSION } from './boardSchema'
 import { DEFAULT_THEME_ID, isBuiltInThemeId } from './themes/registry'
 import type { AppearanceSettings, StoredTheme, ThemeDefinition, ThemeModePreference } from './themes/types'
-export { MOMENT_SCHEMA_VERSION } from './momentSchema'
+export { BOARD_SCHEMA_VERSION } from './boardSchema'
 export { normalizeSlideshowSettings } from './panelRegistry'
 
 export { DEFAULT_SLIDESHOW_ZOOM, defaultSlideshowSettings, defaultSpotifyPlaylistReference } from './panelRegistry'
@@ -37,7 +37,7 @@ export { DEFAULT_SLIDESHOW_ZOOM, defaultSlideshowSettings, defaultSpotifyPlaylis
  */
 const DB_NAME = 'my-states'
 const DB_VERSION = 2
-const ACTIVE_MOMENT_KEY = 'active-moment-id'
+const ACTIVE_BOARD_KEY = 'active-board-id'
 const GLOBAL_THEME_KEY = 'global-theme-id'
 const THEME_MODE_KEY = 'theme-mode-preference'
 // Named before the app was. Kept so a Spotify login survives this build.
@@ -49,14 +49,14 @@ const previousGeneration = {
   localStorageKeys: ['mic:canvas', 'mic:slideshow', 'mic:spotify-playlist', 'mic:last-note-id'],
 }
 
-export const momentLimits = {
+export const boardLimits = {
   maxImageCount: 200,
   maxImageBytes: 25 * 1024 * 1024,
   maxTotalImageBytes: 250 * 1024 * 1024,
   maxArchiveBytes: 260 * 1024 * 1024,
 } as const
 
-interface MomentAssetRecord extends MomentImage {
+interface BoardAssetRecord extends BoardImage {
   blob: Blob
 }
 
@@ -69,29 +69,29 @@ export function createPanel<Type extends PanelType>(type: Type): Panel<Type> {
   return { id: createId('panel'), type, config: getPanelDefinition(type).createConfig(), visible: true, focusView: false } as Panel<Type>
 }
 
-// A new moment keeps the established three-panel workspace. Optional panel
+// A new board keeps the established three-panel workspace. Optional panel
 // kinds such as Video are added through the registry-driven Add panel menu.
 const DEFAULT_PANEL_TYPES = ['slideshow', 'notes', 'spotify'] as const satisfies readonly PanelType[]
 
-/** The core panels a brand-new moment starts with. */
+/** The core panels a brand-new board starts with. */
 export function createDefaultPanels(): Panel[] {
   return DEFAULT_PANEL_TYPES.map((type) => createPanel(type))
 }
 
-export interface ImportedMomentContent {
+export interface ImportedBoardContent {
   name: string
-  /** The theme the archive pinned, installed or not; see `Moment.themeId`. */
+  /** The theme the archive pinned, installed or not; see `Board.themeId`. */
   themeId?: string
   panels: Panel[]
   canvas: CanvasState | null
   notes: Array<Pick<Note, 'id' | 'title' | 'content' | 'createdAt' | 'updatedAt'>>
-  assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>
+  assets: Array<Omit<BoardImage, 'boardId'> & { blob: Blob }>
 }
 
 interface MyStatesDb extends DBSchema {
-  moments: {
+  boards: {
     key: string
-    value: Moment
+    value: Board
     indexes: {
       'by-updated': number
     }
@@ -100,27 +100,27 @@ interface MyStatesDb extends DBSchema {
     key: string
     value: Note
     indexes: {
-      'by-moment-updated': [string, number]
+      'by-board-updated': [string, number]
     }
   }
   assets: {
     key: string
-    value: MomentAssetRecord
+    value: BoardAssetRecord
     indexes: {
-      'by-moment': string
+      'by-board': string
     }
   }
   directoryHandles: {
     key: string
     value: {
       id: string
-      momentId: string
+      boardId: string
       panelId: string
       name: string
       handle: FileSystemDirectoryHandle
     }
     indexes: {
-      'by-moment': string
+      'by-board': string
     }
   }
   preferences: {
@@ -149,10 +149,10 @@ function reportStorageStatus(status: string | null) {
 const dbPromise = openDB<MyStatesDb>(DB_NAME, DB_VERSION, {
   upgrade(db, oldVersion) {
     if (oldVersion < 1) {
-      db.createObjectStore('moments', { keyPath: 'id' }).createIndex('by-updated', 'updatedAt')
-      db.createObjectStore('notes', { keyPath: 'id' }).createIndex('by-moment-updated', ['momentId', 'updatedAt'])
-      db.createObjectStore('assets', { keyPath: 'id' }).createIndex('by-moment', 'momentId')
-      db.createObjectStore('directoryHandles', { keyPath: 'id' }).createIndex('by-moment', 'momentId')
+      db.createObjectStore('boards', { keyPath: 'id' }).createIndex('by-updated', 'updatedAt')
+      db.createObjectStore('notes', { keyPath: 'id' }).createIndex('by-board-updated', ['boardId', 'updatedAt'])
+      db.createObjectStore('assets', { keyPath: 'id' }).createIndex('by-board', 'boardId')
+      db.createObjectStore('directoryHandles', { keyPath: 'id' }).createIndex('by-board', 'boardId')
       db.createObjectStore('preferences', { keyPath: 'key' })
     }
     if (oldVersion < 2) {
@@ -195,18 +195,18 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 /**
- * A moment has its document from creation: the draft (a new moment's
+ * A board has its document from creation: the draft (a new board's
  * defaults, or an imported archive) is normalised, then built into a real
  * tldraw document directly, with no editor and no intermediate stored
  * shape. The canvas loads it exactly as it would one of its own saves.
  */
-function makeMoment(name: string, draft: MomentDraft = { panels: createDefaultPanels(), canvas: null }, themeId?: string): Moment {
+function makeBoard(name: string, draft: BoardDraft = { panels: createDefaultPanels(), canvas: null }, themeId?: string): Board {
   const now = Date.now()
   const normalized = { ...draft, panels: draft.panels.map(normalizeDraftPanel) }
   return {
-    id: createId('moment'),
-    name: normalizeMomentName(name),
-    schemaVersion: MOMENT_SCHEMA_VERSION,
+    id: createId('board'),
+    name: normalizeBoardName(name),
+    schemaVersion: BOARD_SCHEMA_VERSION,
     createdAt: now,
     updatedAt: now,
     camera: normalized.canvas?.camera ?? null,
@@ -215,20 +215,20 @@ function makeMoment(name: string, draft: MomentDraft = { panels: createDefaultPa
   }
 }
 
-/** `themeId` is present only when set: a moment that follows the global theme stays byte-identical to one written before themes existed. */
-function withThemeId(themeId: string | null | undefined): Pick<Moment, 'themeId'> {
+/** `themeId` is present only when set: a board that follows the global theme stays byte-identical to one written before themes existed. */
+function withThemeId(themeId: string | null | undefined): Pick<Board, 'themeId'> {
   return themeId ? { themeId } : {}
 }
 
-let initialization: Promise<{ moments: MomentSummary[]; activeMomentId: string }> | null = null
+let initialization: Promise<{ boards: BoardSummary[]; activeBoardId: string }> | null = null
 
 /**
  * Runs once per page. The work below is check-then-create, and React's
  * development double-invoke of effects (or two callers in one page) would
- * otherwise both find no moments and both create "A new moment". One
+ * otherwise both find no boards and both create "A new board". One
  * promise is shared; a failure clears it so a reload can retry.
  */
-export function initializeMoments() {
+export function initializeBoards() {
   if (!initialization) {
     initialization = runInitialization().catch((error) => {
       initialization = null
@@ -242,56 +242,56 @@ async function runInitialization() {
   const db = await dbPromise
   discardPreviousGeneration()
 
-  let moments = await getMomentSummaries()
-  if (!moments.length) {
-    const moment = await createMoment('A new moment')
-    moments = [moment]
+  let boards = await getBoardSummaries()
+  if (!boards.length) {
+    const board = await createBoard('A new board')
+    boards = [board]
   }
 
-  const activePreference = await db.get('preferences', ACTIVE_MOMENT_KEY)
-  const activeMomentId = moments.some((moment) => moment.id === activePreference?.value)
-    ? activePreference?.value ?? moments[0].id
-    : moments[0].id
+  const activePreference = await db.get('preferences', ACTIVE_BOARD_KEY)
+  const activeBoardId = boards.some((board) => board.id === activePreference?.value)
+    ? activePreference?.value ?? boards[0].id
+    : boards[0].id
 
-  if (activePreference?.value !== activeMomentId) {
-    await db.put('preferences', { key: ACTIVE_MOMENT_KEY, value: activeMomentId })
+  if (activePreference?.value !== activeBoardId) {
+    await db.put('preferences', { key: ACTIVE_BOARD_KEY, value: activeBoardId })
   }
 
-  return { moments, activeMomentId }
+  return { boards, activeBoardId }
 }
 
-export async function getMoment(momentId: string) {
+export async function getBoard(boardId: string) {
   const db = await dbPromise
-  const moment = await db.get('moments', momentId)
-  return moment ? checkMomentSchema(moment) : undefined
+  const board = await db.get('boards', boardId)
+  return board ? checkBoardSchema(board) : undefined
 }
 
-export async function createMoment(name: string) {
+export async function createBoard(name: string) {
   const db = await dbPromise
-  const moment = makeMoment(name)
-  await db.put('moments', moment)
-  return moment
+  const board = makeBoard(name)
+  await db.put('boards', board)
+  return board
 }
 
 /**
- * The canvas has produced the document for a moment; the draft has done its
+ * The canvas has produced the document for a board; the draft has done its
  * job. Read and replace in one transaction so a slow save cannot overwrite a
  * rename or a deletion that landed in between.
  */
-export async function saveMomentDocument(momentId: string, document: Moment['document'], camera: Moment['camera']) {
+export async function saveBoardDocument(boardId: string, document: Board['document'], camera: Board['camera']) {
   const db = await dbPromise
-  const tx = db.transaction('moments', 'readwrite')
+  const tx = db.transaction('boards', 'readwrite')
   // Observe tx.done even if an individual request rejects first.
   const done = tx.done
   void done.catch(() => {})
-  const current = await tx.store.get(momentId)
-  if (!current) throw new Error('This moment no longer exists. Your changes have not been saved.')
-  if (current.schemaVersion > MOMENT_SCHEMA_VERSION) throw new Error('This moment needs a newer version of my-states.')
+  const current = await tx.store.get(boardId)
+  if (!current) throw new Error('This board no longer exists. Your changes have not been saved.')
+  if (current.schemaVersion > BOARD_SCHEMA_VERSION) throw new Error('This board needs a newer version of my-states.')
   // Every field the record has is named here: a field left out would be
   // dropped by the next canvas save, silently, 300 ms after any drag.
-  const next: Moment = {
+  const next: Board = {
     id: current.id, name: current.name, createdAt: current.createdAt,
-    schemaVersion: MOMENT_SCHEMA_VERSION, document, camera, updatedAt: Date.now(),
+    schemaVersion: BOARD_SCHEMA_VERSION, document, camera, updatedAt: Date.now(),
     ...withThemeId(current.themeId),
   }
   await tx.store.put(next)
@@ -300,70 +300,70 @@ export async function saveMomentDocument(momentId: string, document: Moment['doc
 }
 
 /** Rename only metadata, in the same transaction as its read. A slow rename
- * must never replace a newer canvas with an older whole-moment object. */
-export async function renameMoment(momentId: string, name: string) {
+ * must never replace a newer canvas with an older whole-board object. */
+export async function renameBoard(boardId: string, name: string) {
   const db = await dbPromise
-  const tx = db.transaction('moments', 'readwrite')
+  const tx = db.transaction('boards', 'readwrite')
   const done = tx.done
   void done.catch(() => {})
-  const current = await tx.store.get(momentId)
-  if (!current) throw new Error('This moment no longer exists.')
-  const next = { ...current, name: normalizeMomentName(name), updatedAt: Date.now() }
+  const current = await tx.store.get(boardId)
+  if (!current) throw new Error('This board no longer exists.')
+  const next = { ...current, name: normalizeBoardName(name), updatedAt: Date.now() }
   await tx.store.put(next)
   await done
   return next
 }
 
 /**
- * Pins a theme to a moment, or with null returns it to the global theme.
+ * Pins a theme to a board, or with null returns it to the global theme.
  * Metadata only, in the same transaction as its read, for the same reason
  * as rename. The id is stored whether or not the theme is installed.
  */
-export async function setMomentTheme(momentId: string, themeId: string | null) {
+export async function setBoardTheme(boardId: string, themeId: string | null) {
   const db = await dbPromise
-  const tx = db.transaction('moments', 'readwrite')
+  const tx = db.transaction('boards', 'readwrite')
   const done = tx.done
   void done.catch(() => {})
-  const current = await tx.store.get(momentId)
-  if (!current) throw new Error('This moment no longer exists.')
+  const current = await tx.store.get(boardId)
+  if (!current) throw new Error('This board no longer exists.')
   const { themeId: _previous, ...rest } = current
-  const next: Moment = { ...rest, ...withThemeId(themeId), updatedAt: Date.now() }
+  const next: Board = { ...rest, ...withThemeId(themeId), updatedAt: Date.now() }
   await tx.store.put(next)
   await done
   return next
 }
 
-export async function setActiveMomentId(momentId: string) {
+export async function setActiveBoardId(boardId: string) {
   const db = await dbPromise
-  await db.put('preferences', { key: ACTIVE_MOMENT_KEY, value: momentId })
+  await db.put('preferences', { key: ACTIVE_BOARD_KEY, value: boardId })
 }
 
-export async function deleteMoment(momentId: string) {
+export async function deleteBoard(boardId: string) {
   const db = await dbPromise
-  const tx = db.transaction(['moments', 'notes', 'assets', 'directoryHandles', 'preferences'], 'readwrite')
-  const noteIds = await tx.objectStore('notes').index('by-moment-updated').getAllKeys(IDBKeyRange.bound([momentId, 0], [momentId, Number.MAX_SAFE_INTEGER]))
-  const assetIds = await tx.objectStore('assets').index('by-moment').getAllKeys(momentId)
-  const handleIds = await tx.objectStore('directoryHandles').index('by-moment').getAllKeys(momentId)
+  const tx = db.transaction(['boards', 'notes', 'assets', 'directoryHandles', 'preferences'], 'readwrite')
+  const noteIds = await tx.objectStore('notes').index('by-board-updated').getAllKeys(IDBKeyRange.bound([boardId, 0], [boardId, Number.MAX_SAFE_INTEGER]))
+  const assetIds = await tx.objectStore('assets').index('by-board').getAllKeys(boardId)
+  const handleIds = await tx.objectStore('directoryHandles').index('by-board').getAllKeys(boardId)
 
   await Promise.all([
     ...noteIds.map((id) => tx.objectStore('notes').delete(id)),
     ...assetIds.map((id) => tx.objectStore('assets').delete(id)),
     ...handleIds.map((id) => tx.objectStore('directoryHandles').delete(id)),
-    tx.objectStore('moments').delete(momentId),
+    tx.objectStore('boards').delete(boardId),
   ])
 
-  const active = await tx.objectStore('preferences').get(ACTIVE_MOMENT_KEY)
-  if (active?.value === momentId) {
-    await tx.objectStore('preferences').delete(ACTIVE_MOMENT_KEY)
+  const active = await tx.objectStore('preferences').get(ACTIVE_BOARD_KEY)
+  if (active?.value === boardId) {
+    await tx.objectStore('preferences').delete(ACTIVE_BOARD_KEY)
   }
   await tx.done
 }
 
-export async function importMomentContent(content: ImportedMomentContent) {
+export async function importBoardContent(content: ImportedBoardContent) {
   validateAssets(content.assets)
   const sourceNoteIds = new Set<string>()
   for (const note of content.notes) {
-    if (!note.id || sourceNoteIds.has(note.id)) throw new Error('The moment bundle contains duplicate note IDs.')
+    if (!note.id || sourceNoteIds.has(note.id)) throw new Error('The board bundle contains duplicate note IDs.')
     sourceNoteIds.add(note.id)
   }
 
@@ -381,16 +381,16 @@ export async function importMomentContent(content: ImportedMomentContent) {
     const activeNoteId = panel.config.activeNoteId ? noteIdMap.get(panel.config.activeNoteId) ?? null : null
     return { ...panel, id, config: { activeNoteId } }
   })
-  const moment = makeMoment(content.name, { panels, canvas: remapLayouts(content.canvas, panelIdMap) }, content.themeId)
+  const board = makeBoard(content.name, { panels, canvas: remapLayouts(content.canvas, panelIdMap) }, content.themeId)
 
-  const tx = (await dbPromise).transaction(['moments', 'notes', 'assets'], 'readwrite')
-  await tx.objectStore('moments').put(moment)
+  const tx = (await dbPromise).transaction(['boards', 'notes', 'assets'], 'readwrite')
+  await tx.objectStore('boards').put(board)
 
   for (const note of content.notes) {
     await tx.objectStore('notes').put({
       ...note,
       id: noteIdMap.get(note.id) ?? createId('note'),
-      momentId: moment.id,
+      boardId: board.id,
     })
   }
 
@@ -400,28 +400,28 @@ export async function importMomentContent(content: ImportedMomentContent) {
     await tx.objectStore('assets').put({
       ...asset,
       id: createId('image'),
-      momentId: moment.id,
+      boardId: board.id,
       ...(asset.panelId && panelIdMap.has(asset.panelId) ? { panelId: panelIdMap.get(asset.panelId)! } : {}),
       ...(panelIds?.length ? { panelIds } : {}),
     })
   }
 
   await tx.done
-  return moment
+  return board
 }
 
-export async function getMomentSummaries(): Promise<MomentSummary[]> {
+export async function getBoardSummaries(): Promise<BoardSummary[]> {
   // Listing is metadata-only. One damaged or newer unopened document must
-  // not prevent a user from finding the other moments.
+  // not prevent a user from finding the other boards.
   const db = await dbPromise
-  return (await db.getAllFromIndex('moments', 'by-updated'))
-    .map(({ id, name, updatedAt, themeId }): MomentSummary => ({ id, name, updatedAt, ...withThemeId(themeId) }))
+  return (await db.getAllFromIndex('boards', 'by-updated'))
+    .map(({ id, name, updatedAt, themeId }): BoardSummary => ({ id, name, updatedAt, ...withThemeId(themeId) }))
     .sort((left, right) => right.updatedAt - left.updatedAt)
 }
 
-export async function getNotes(momentId: string) {
+export async function getNotes(boardId: string) {
   const db = await dbPromise
-  const notes = await db.getAllFromIndex('notes', 'by-moment-updated', IDBKeyRange.bound([momentId, 0], [momentId, Number.MAX_SAFE_INTEGER]))
+  const notes = await db.getAllFromIndex('notes', 'by-board-updated', IDBKeyRange.bound([boardId, 0], [boardId, Number.MAX_SAFE_INTEGER]))
   return notes.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -435,29 +435,29 @@ export async function deleteNote(id: string) {
   await db.delete('notes', id)
 }
 
-export async function getMomentAssets(momentId: string, panelId?: string) {
+export async function getBoardAssets(boardId: string, panelId?: string) {
   const db = await dbPromise
-  const assets = await db.getAllFromIndex('assets', 'by-moment', momentId)
+  const assets = await db.getAllFromIndex('assets', 'by-board', boardId)
   return panelId
     ? assets.filter((asset) => asset.panelIds?.includes(panelId) || (!asset.panelIds?.length && (!asset.panelId || asset.panelId === panelId)))
     : assets
 }
 
-export async function saveMomentAssets(momentId: string, assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>, panelId?: string) {
+export async function saveBoardAssets(boardId: string, assets: Array<Omit<BoardImage, 'boardId'> & { blob: Blob }>, panelId?: string) {
   validateAssets(assets)
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
   for (const asset of assets) {
-    await tx.store.put({ ...asset, momentId, ...(panelId ? { panelId } : {}) })
+    await tx.store.put({ ...asset, boardId, ...(panelId ? { panelId } : {}) })
   }
   await tx.done
 }
 
-export async function replaceMomentAssets(momentId: string, assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>, panelId?: string) {
+export async function replaceBoardAssets(boardId: string, assets: Array<Omit<BoardImage, 'boardId'> & { blob: Blob }>, panelId?: string) {
   validateAssets(assets)
   const db = await dbPromise
   const tx = db.transaction('assets', 'readwrite')
-  const existing = await tx.store.index('by-moment').getAll(momentId)
+  const existing = await tx.store.index('by-board').getAll(boardId)
   for (const asset of existing) {
     if (!panelId) {
       await tx.store.delete(asset.id)
@@ -472,7 +472,7 @@ export async function replaceMomentAssets(momentId: string, assets: Array<Omit<M
     if (!asset.panelIds?.length && (!asset.panelId || asset.panelId === panelId)) await tx.store.delete(asset.id)
   }
   for (const asset of assets) {
-    await tx.store.put({ ...asset, momentId, ...(panelId ? { panelId } : {}) })
+    await tx.store.put({ ...asset, boardId, ...(panelId ? { panelId } : {}) })
   }
   await tx.done
 }
@@ -595,9 +595,9 @@ export function saveSpotifyTokens(tokens: SpotifyTokens | null) {
   window.localStorage.setItem(SPOTIFY_TOKENS_KEY, JSON.stringify(tokens))
 }
 
-function validateAssets(assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>) {
-  if (assets.length > momentLimits.maxImageCount) {
-    throw new Error(`A moment can contain at most ${momentLimits.maxImageCount} images.`)
+function validateAssets(assets: Array<Omit<BoardImage, 'boardId'> & { blob: Blob }>) {
+  if (assets.length > boardLimits.maxImageCount) {
+    throw new Error(`A board can contain at most ${boardLimits.maxImageCount} images.`)
   }
 
   let total = 0
@@ -605,25 +605,25 @@ function validateAssets(assets: Array<Omit<MomentImage, 'momentId'> & { blob: Bl
     if (asset.panelIds !== undefined && (!Array.isArray(asset.panelIds) || asset.panelIds.some((panelId) => typeof panelId !== 'string'))) {
       throw new Error(`${asset.filename} has invalid panel references.`)
     }
-    if (asset.blob.size > momentLimits.maxImageBytes) {
-      throw new Error(`${asset.filename} exceeds the ${formatBytes(momentLimits.maxImageBytes)} per-image limit.`)
+    if (asset.blob.size > boardLimits.maxImageBytes) {
+      throw new Error(`${asset.filename} exceeds the ${formatBytes(boardLimits.maxImageBytes)} per-image limit.`)
     }
     total += asset.blob.size
   }
 
-  if (total > momentLimits.maxTotalImageBytes) {
-    throw new Error(`Images exceed the ${formatBytes(momentLimits.maxTotalImageBytes)} per-moment limit.`)
+  if (total > boardLimits.maxTotalImageBytes) {
+    throw new Error(`Images exceed the ${formatBytes(boardLimits.maxTotalImageBytes)} per-board limit.`)
   }
 }
 
 /**
- * Reading never rewrites a stored moment. A moment written by a newer build
+ * Reading never rewrites a stored board. A board written by a newer build
  * is refused as such, so that build's data is left for it to read.
  */
-function checkMomentSchema(moment: Moment): Moment {
-  if (moment.schemaVersion > MOMENT_SCHEMA_VERSION) throw new Error('This moment needs a newer version of my-states. Its stored data has not been changed.')
-  if (moment.schemaVersion !== MOMENT_SCHEMA_VERSION) throw new Error('This moment has an unsupported format. Its stored data has not been changed.')
-  return moment
+function checkBoardSchema(board: Board): Board {
+  if (board.schemaVersion > BOARD_SCHEMA_VERSION) throw new Error('This board needs a newer version of my-states. Its stored data has not been changed.')
+  if (board.schemaVersion !== BOARD_SCHEMA_VERSION) throw new Error('This board has an unsupported format. Its stored data has not been changed.')
+  return board
 }
 
 /** At most one panel of a singleton kind (the registry says which kinds are singleton); later ones are dropped. */
@@ -637,21 +637,21 @@ function enforceSingletonPanels(panels: Panel[]): Panel[] {
   })
 }
 
-const panelDirectoryKey = (momentId: string, panelId: string) => `${momentId}:${panelId}`
+const panelDirectoryKey = (boardId: string, panelId: string) => `${boardId}:${panelId}`
 
-export async function savePanelDirectoryHandle(momentId: string, panelId: string, handle: FileSystemDirectoryHandle) {
+export async function savePanelDirectoryHandle(boardId: string, panelId: string, handle: FileSystemDirectoryHandle) {
   const db = await dbPromise
-  await db.put('directoryHandles', { id: panelDirectoryKey(momentId, panelId), momentId, panelId, name: handle.name, handle })
+  await db.put('directoryHandles', { id: panelDirectoryKey(boardId, panelId), boardId, panelId, name: handle.name, handle })
 }
 
-export async function getPanelDirectoryHandle(momentId: string, panelId: string) {
+export async function getPanelDirectoryHandle(boardId: string, panelId: string) {
   const db = await dbPromise
-  return db.get('directoryHandles', panelDirectoryKey(momentId, panelId))
+  return db.get('directoryHandles', panelDirectoryKey(boardId, panelId))
 }
 
-export async function clearPanelDirectoryHandle(momentId: string, panelId: string) {
+export async function clearPanelDirectoryHandle(boardId: string, panelId: string) {
   const db = await dbPromise
-  await db.delete('directoryHandles', panelDirectoryKey(momentId, panelId))
+  await db.delete('directoryHandles', panelDirectoryKey(boardId, panelId))
 }
 
 /** Layouts follow their panels' reissued ids; a layout for no panel is dropped. */
@@ -674,8 +674,8 @@ function remapLayouts(canvas: CanvasState | null, panelIdMap: Map<string, string
   }
 }
 
-function normalizeMomentName(name: string) {
-  return name.trim().slice(0, 80) || 'Untitled moment'
+function normalizeBoardName(name: string) {
+  return name.trim().slice(0, 80) || 'Untitled board'
 }
 
 function formatBytes(bytes: number) {

@@ -64,7 +64,7 @@ export function CanvasViewControls({
   function handleAddPanel(event: React.ChangeEvent<HTMLSelectElement>) {
     const panelType = event.target.value as PanelType | ''
     setPanelTypeToAdd('')
-    // Video panels remain supported for saved moments, but are temporarily
+    // Video panels remain supported for saved boards, but are temporarily
     // unavailable as a new-panel choice in the user interface.
     if (panelType && panelType !== 'video') onAddPanel(panelType)
   }

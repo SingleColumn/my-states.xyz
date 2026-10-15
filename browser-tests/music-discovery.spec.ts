@@ -234,11 +234,11 @@ test.describe('the Music panel, before Spotify is connected', () => {
     expect(measured.gap / zoom - measured.reach).toBeGreaterThanOrEqual(measured.betweenButtons - 0.5)
   })
 
-  // The moment saves a playlist so it is there to play once connected. Until
+  // The board saves a playlist so it is there to play once connected. Until
   // then it is a name that cannot be played and that this visitor did not just
   // choose, so it stays out of sight -- and out of the button's glow -- until
   // they choose one now.
-  test('keeps a playlist saved in the moment out of sight until one is chosen now', async ({ page }) => {
+  test('keeps a playlist saved in the board out of sight until one is chosen now', async ({ page }) => {
     await withDiscovery(page)
     const { shape, music } = await openMusicPanel(page)
     await dispatch(page, {
@@ -246,7 +246,7 @@ test.describe('the Music panel, before Spotify is connected', () => {
       panelId: music.panelId,
       config: { playlist: { id: 's1', uri: 'spotify:playlist:s1', name: 'Saved Earlier', url: 'https://open.spotify.com/playlist/s1', image: null } },
     })
-    // The moment does hold it...
+    // The board does hold it...
     await expect.poll(async () => (await describeCanvas(page)).panels.find((panel) => panel.panelId === music.panelId)?.config)
       .toMatchObject({ playlist: { id: 's1', name: 'Saved Earlier' } })
 
@@ -357,18 +357,18 @@ test.describe('the Music panel, coming back from connecting Spotify', () => {
   /**
    * What the app leaves in this tab's storage when it sends the visitor to
    * Spotify, and then the page coming back. The ids are the app's own, read from
-   * the open moment: a context belongs to one panel in one moment, and only the
-   * real ones are restored. `momentId` says whose it is claimed to be.
+   * the open board: a context belongs to one panel in one board, and only the
+   * real ones are restored. `boardId` says whose it is claimed to be.
    */
-  async function comeBack(page: Page, whose: { momentId?: string } = {}) {
+  async function comeBack(page: Page, whose: { boardId?: string } = {}) {
     await openApp(page)
-    // The reload below has to find this same moment, so let its first save land.
+    // The reload below has to find this same board, so let its first save land.
     await expectCanvasSaved(page)
     const canvas = await describeCanvas(page)
     const music = await panelOfType(page, 'spotify')
     await page.evaluate(
       (context) => window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify(context)),
-      { panelId: music.panelId, momentId: whose.momentId ?? canvas.moment!.id, choice: null, query: 'rain', searchType: 'playlists' },
+      { panelId: music.panelId, boardId: whose.boardId ?? canvas.board!.id, choice: null, query: 'rain', searchType: 'playlists' },
     )
     await page.reload()
     await waitForCanvas(page)
@@ -390,13 +390,13 @@ test.describe('the Music panel, coming back from connecting Spotify', () => {
     expect(await page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
   })
 
-  // Another tab can open a different moment while this one is at Spotify, and the
+  // Another tab can open a different board while this one is at Spotify, and the
   // page that comes back opens whichever is active in storage every tab shares.
-  // What this tab saved belongs to the moment it was saved in.
-  test('does not restore into a moment it was not saved for', async ({ page }) => {
+  // What this tab saved belongs to the board it was saved in.
+  test('does not restore into a board it was not saved for', async ({ page }) => {
     const spotifyCalls = await connectedSpotify(page)
 
-    const shape = await comeBack(page, { momentId: 'moment_opened_in_another_tab' })
+    const shape = await comeBack(page, { boardId: 'board_opened_in_another_tab' })
 
     // The context has been read and used up; the panel has decided what to do with it.
     await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
@@ -448,7 +448,7 @@ test.describe("the dev server's copy of the Spotify API", () => {
 // gone; the search and a chosen playlist now come back. A song cannot, since it
 // was only ever held in memory.
 test.describe('the Music panel, after a sign-in that did not succeed', () => {
-  /** A playlist chosen and saved in the moment, and what the app left behind when it sent the visitor to Spotify. */
+  /** A playlist chosen and saved in the board, and what the app left behind when it sent the visitor to Spotify. */
   async function leaveForSpotify(page: Page) {
     await withDiscovery(page)
     await openApp(page)
@@ -458,12 +458,12 @@ test.describe('the Music panel, after a sign-in that did not succeed', () => {
       panelId: music.panelId,
       config: { playlist: { id: 'r1', uri: 'spotify:playlist:r1', name: 'Rain on Glass', url: 'https://open.spotify.com/playlist/r1', image: null } },
     })
-    // The visit to /callback below reloads the page, and has to find this moment again.
+    // The visit to /callback below reloads the page, and has to find this board again.
     await expectCanvasSaved(page)
     const canvas = await describeCanvas(page)
     await page.evaluate(
       (context) => window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify(context)),
-      { panelId: music.panelId, momentId: canvas.moment!.id, choice: { kind: 'playlist', spotifyId: 'r1' }, query: 'rain', searchType: 'playlists' },
+      { panelId: music.panelId, boardId: canvas.board!.id, choice: { kind: 'playlist', spotifyId: 'r1' }, query: 'rain', searchType: 'playlists' },
     )
     return music.panelId
   }

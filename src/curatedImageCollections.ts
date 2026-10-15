@@ -116,7 +116,7 @@ export async function createImageItemsFromCuratedCollection(
   if (!collection) return null
   return collection.items.map((item) => ({
     id: `curated-${item.id}`,
-    momentId: null,
+    boardId: null,
     filename: item.filename,
     name: item.filename,
     mimeType: item.mimeType,

@@ -2,35 +2,35 @@ import './test/setup'
 import { openDB } from 'idb'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { describe, expect, it, vi } from 'vitest'
-import { duplicateMoment, exportMomentArchive, importMomentArchive, peekMomentArchiveName } from './momentArchive'
+import { duplicateBoard, exportBoardArchive, importBoardArchive, peekBoardArchiveName } from './boardArchive'
 import {
   createDefaultPanels,
-  createMoment,
+  createBoard,
   defaultSlideshowSettings,
   getNotes,
-  getMoment,
-  getMomentAssets,
-  getMomentSummaries,
-  importMomentContent,
-  saveMomentAssets,
+  getBoard,
+  getBoardAssets,
+  getBoardSummaries,
+  importBoardContent,
+  saveBoardAssets,
   saveSpotifyTokens,
-  momentLimits,
-  MOMENT_SCHEMA_VERSION,
+  boardLimits,
+  BOARD_SCHEMA_VERSION,
   getStoredTheme,
   importStoredTheme,
-  setMomentTheme,
+  setBoardTheme,
 } from './storage'
 import type { ThemeDefinition } from './themes/types'
 import { documentFromDraft, draftFromDocument } from './panelStore'
-import type { CanvasState, Moment, Panel } from './types'
+import type { CanvasState, Board, Panel } from './types'
 
-// Archives carry a moment as a draft: its own document, read back out.
-const draftOf = (moment: Moment | undefined) => moment && draftFromDocument(moment.document, moment.camera)
-const panelsOf = (moment: Moment | undefined) => draftOf(moment)?.panels ?? []
+// Archives carry a board as a draft: its own document, read back out.
+const draftOf = (board: Board | undefined) => board && draftFromDocument(board.document, board.camera)
+const panelsOf = (board: Board | undefined) => draftOf(board)?.panels ?? []
 
-/** A stored moment with these panels, the way an import produces one. */
-function storeMoment(name: string, panels: Panel[], canvas: CanvasState | null = null, notes: Parameters<typeof importMomentContent>[0]['notes'] = []) {
-  return importMomentContent({ name, panels, canvas, notes, assets: [] })
+/** A stored board with these panels, the way an import produces one. */
+function storeBoard(name: string, panels: Panel[], canvas: CanvasState | null = null, notes: Parameters<typeof importBoardContent>[0]['notes'] = []) {
+  return importBoardContent({ name, panels, canvas, notes, assets: [] })
 }
 
 const slideshowIn = (panels: Panel[]) => panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')!
@@ -39,15 +39,15 @@ async function createCompleteArchive() {
   const now = Date.now()
   const note = { id: 'note_source', title: 'Lyrics', content: '# A portable note\n\nSaved without credentials.', createdAt: now, updatedAt: now }
   const panels = createDefaultPanels().map((panel): Panel => panel.type === 'notes' ? { ...panel, config: { activeNoteId: note.id } } : panel.type === 'slideshow' ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' }, intervalMs: 3500, shuffle: true } } : panel.type === 'spotify' ? { ...panel, config: { playlist: { id: 'playlist_123', uri: 'spotify:playlist:playlist_123', name: 'Focus', url: 'https://open.spotify.com/playlist/playlist_123' } } } : panel)
-  const moment = await storeMoment('Archive source', panels, {
+  const board = await storeBoard('Archive source', panels, {
     camera: { x: 120, y: -80, z: 1.25 },
     panels: [{ panelId: panels.find((panel) => panel.type === 'notes')!.id, x: 1, y: 2, w: 300, h: 400, rotation: 0.25, order: 2 }],
   }, [note])
-  await saveMomentAssets(moment.id, [
+  await saveBoardAssets(board.id, [
     makeAsset('image_one', 'cover.png', new Uint8Array([137, 80, 78, 71])),
     makeAsset('image_two', 'scene.webp', new Uint8Array([82, 73, 70, 70])),
   ])
-  return exportMomentArchive(moment.id)
+  return exportBoardArchive(board.id)
 }
 
 function makeAsset(id: string, filename: string, bytes: Uint8Array) {
@@ -84,58 +84,58 @@ function manifest(entries: Record<string, Uint8Array>) {
 
 const customTheme = (id: string, name = 'Custom'): ThemeDefinition => ({ schemaVersion: 1, id, name, version: '1.0.0', modes: { dark: { foundation: { color: { accent: '#f0f' } } } } })
 
-describe('the theme a moment archive carries', () => {
-  it('carries nothing for a moment that follows the global theme, and imports one as such', async () => {
-    const entries = await archiveEntries(await exportMomentArchive((await createMoment('Follows global')).id))
+describe('the theme a board archive carries', () => {
+  it('carries nothing for a board that follows the global theme, and imports one as such', async () => {
+    const entries = await archiveEntries(await exportBoardArchive((await createBoard('Follows global')).id))
     expect('theme' in manifest(entries)).toBe(false)
-    const { moment, theme } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect('themeId' in (await getMoment(moment.id))!).toBe(false)
+    const { board, theme } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
+    expect('themeId' in (await getBoard(board.id))!).toBe(false)
     expect(theme).toBeUndefined()
   })
 
   it('carries a built-in theme by id alone', async () => {
-    const source = await createMoment('Pinned to a built-in')
-    await setMomentTheme(source.id, 'terminal')
-    const entries = await archiveEntries(await exportMomentArchive(source.id))
+    const source = await createBoard('Pinned to a built-in')
+    await setBoardTheme(source.id, 'terminal')
+    const entries = await archiveEntries(await exportBoardArchive(source.id))
     expect(manifest(entries).theme).toEqual({ id: 'terminal' })
-    const { moment } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect((await getMoment(moment.id))?.themeId).toBe('terminal')
+    const { board } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
+    expect((await getBoard(board.id))?.themeId).toBe('terminal')
   })
 
-  it('embeds an imported theme and installs it on import, so the moment looks the same elsewhere', async () => {
+  it('embeds an imported theme and installs it on import, so the board looks the same elsewhere', async () => {
     await importStoredTheme(customTheme('travelling'))
-    const source = await createMoment('Pinned to an import')
-    await setMomentTheme(source.id, 'travelling')
-    const entries = await archiveEntries(await exportMomentArchive(source.id))
+    const source = await createBoard('Pinned to an import')
+    await setBoardTheme(source.id, 'travelling')
+    const entries = await archiveEntries(await exportBoardArchive(source.id))
     expect(manifest(entries).theme).toEqual({ id: 'travelling', definition: customTheme('travelling') })
 
     // Same library: the identical theme is recognised, not duplicated.
-    const same = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
+    const same = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
     expect(same.theme).toEqual({ name: 'Custom', outcome: 'existing' })
-    expect((await getMoment(same.moment.id))?.themeId).toBe('travelling')
+    expect((await getBoard(same.board.id))?.themeId).toBe('travelling')
 
     // A different theme already holds the id: the embedded one is filed
-    // under a new id and the moment pins that, never replacing the local one.
+    // under a new id and the board pins that, never replacing the local one.
     const withNotes = { ...manifest(entries), theme: { id: 'travelling', definition: customTheme('travelling', 'A stranger') } }
     entries['manifest.json'] = strToU8(JSON.stringify(withNotes))
-    const renamed = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
+    const renamed = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
     expect(renamed.theme).toEqual({ name: 'A stranger', outcome: 'renamed' })
-    expect((await getMoment(renamed.moment.id))?.themeId).toBe('travelling-2')
+    expect((await getBoard(renamed.board.id))?.themeId).toBe('travelling-2')
     expect((await getStoredTheme('travelling'))?.definition.name).toBe('Custom')
     expect((await getStoredTheme('travelling-2'))?.definition.name).toBe('A stranger')
   })
 
   it('keeps the id of a pinned theme that is not installed, on export and on import', async () => {
-    const source = await createMoment('Pinned to a missing theme')
-    await setMomentTheme(source.id, 'somewhere-else')
-    const entries = await archiveEntries(await exportMomentArchive(source.id))
+    const source = await createBoard('Pinned to a missing theme')
+    await setBoardTheme(source.id, 'somewhere-else')
+    const entries = await archiveEntries(await exportBoardArchive(source.id))
     expect(manifest(entries).theme).toEqual({ id: 'somewhere-else' })
-    const { moment } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect((await getMoment(moment.id))?.themeId).toBe('somewhere-else')
+    const { board } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
+    expect((await getBoard(board.id))?.themeId).toBe('somewhere-else')
   })
 
   it('refuses a theme reference that is malformed, invalid, or filed under a different id', async () => {
-    const entries = await archiveEntries(await exportMomentArchive((await createMoment('Bad theme')).id))
+    const entries = await archiveEntries(await exportBoardArchive((await createBoard('Bad theme')).id))
     const base = manifest(entries)
     for (const theme of [
       { id: 'Not An Id' },
@@ -144,19 +144,19 @@ describe('the theme a moment archive carries', () => {
       { id: 'x', definition: { ...customTheme('x'), modes: { dark: { components: { canvas: { backdrop: 'url(https://evil)' } } } } } },
     ]) {
       entries['manifest.json'] = strToU8(JSON.stringify({ ...base, theme }))
-      await expect(importMomentArchive(asFile(new Blob([zipSync(entries)]))), JSON.stringify(theme)).rejects.toThrow()
+      await expect(importBoardArchive(asFile(new Blob([zipSync(entries)]))), JSON.stringify(theme)).rejects.toThrow()
     }
   })
 })
 
-describe('portable moment archives', () => {
+describe('portable board archives', () => {
   it('exports and imports multiple slideshow panels independently', async () => {
     const panels = createDefaultPanels()
     const slideshow = slideshowIn(panels)
     const duplicate: Panel = { ...slideshow, id: 'slideshow_duplicate', config: { ...slideshow.config, currentIndex: 3, shuffle: true } }
-    const source = await storeMoment('Duplicate archive panels', [...panels, duplicate])
-    const { moment: imported } = await importMomentArchive(asFile(await exportMomentArchive(source.id)))
-    const slideshowPanels = panelsOf(await getMoment(imported.id)).filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+    const source = await storeBoard('Duplicate archive panels', [...panels, duplicate])
+    const { board: imported } = await importBoardArchive(asFile(await exportBoardArchive(source.id)))
+    const slideshowPanels = panelsOf(await getBoard(imported.id)).filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     expect(slideshowPanels).toHaveLength(2)
     expect(new Set(slideshowPanels.map((panel) => panel.id)).size).toBe(2)
     expect(slideshowPanels.map((panel) => panel.config.currentIndex)).toEqual(expect.arrayContaining([0, 3]))
@@ -174,11 +174,11 @@ describe('portable moment archives', () => {
     expect(JSON.stringify(exportedManifest)).not.toContain('refresh-secret')
     expect(Object.values(entries).map((entry) => strFromU8(entry)).join('')).not.toContain('access-secret')
 
-    const { moment: imported } = await importMomentArchive(asFile(archive))
+    const { board: imported } = await importBoardArchive(asFile(archive))
     const [stored, notes, assets] = await Promise.all([
-      getMoment(imported.id),
+      getBoard(imported.id),
       getNotes(imported.id),
-      getMomentAssets(imported.id),
+      getBoardAssets(imported.id),
     ])
 
     expect(draftOf(stored)?.canvas?.camera).toEqual({ x: 120, y: -80, z: 1.25 })
@@ -197,11 +197,11 @@ describe('portable moment archives', () => {
     expect(await assets[0].blob.arrayBuffer()).toBeInstanceOf(ArrayBuffer)
   })
 
-  it('round-trips a moment without notes, images, or a Spotify playlist', async () => {
-    const source = await createMoment('Empty archive')
-    const archive = await exportMomentArchive(source.id)
-    const { moment: imported } = await importMomentArchive(asFile(archive))
-    const [stored, notes, assets] = await Promise.all([getMoment(imported.id), getNotes(imported.id), getMomentAssets(imported.id)])
+  it('round-trips a board without notes, images, or a Spotify playlist', async () => {
+    const source = await createBoard('Empty archive')
+    const archive = await exportBoardArchive(source.id)
+    const { board: imported } = await importBoardArchive(asFile(archive))
+    const [stored, notes, assets] = await Promise.all([getBoard(imported.id), getNotes(imported.id), getBoardAssets(imported.id)])
 
     expect(panelsOf(stored).find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')?.config.playlist).toEqual({ id: null, uri: null, name: null, url: null })
     expect(notes).toEqual([])
@@ -213,24 +213,24 @@ describe('portable moment archives', () => {
     const previous = manifest(entries)
     previous.formatVersion = 2
     entries['manifest.json'] = strToU8(JSON.stringify(previous))
-    const { moment } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect(await getMoment(moment.id)).toBeTruthy()
+    const { board } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
+    expect(await getBoard(board.id)).toBeTruthy()
   })
 
   it('exports and imports a bundled collection reference without copying image blobs', async () => {
-    const source = await storeMoment('Sample archive', createDefaultPanels().map((panel): Panel => panel.type === 'slideshow' ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'eightbitstrana', imageSource: { type: 'bundled', collectionId: 'eightbitstrana' } } } : panel))
-    await saveMomentAssets(source.id, [makeAsset('inactive_local', 'inactive.png', new Uint8Array([1, 2, 3]))])
+    const source = await storeBoard('Sample archive', createDefaultPanels().map((panel): Panel => panel.type === 'slideshow' ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'eightbitstrana', imageSource: { type: 'bundled', collectionId: 'eightbitstrana' } } } : panel))
+    await saveBoardAssets(source.id, [makeAsset('inactive_local', 'inactive.png', new Uint8Array([1, 2, 3]))])
 
-    const archive = await exportMomentArchive(source.id)
+    const archive = await exportBoardArchive(source.id)
     const entries = await archiveEntries(archive)
     const exportedManifest = manifest(entries)
     expect(slideshowIn(exportedManifest.panels).config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
     expect(exportedManifest.images).toEqual([])
     expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toEqual([])
 
-    const { moment: imported } = await importMomentArchive(asFile(archive))
-    expect(slideshowIn(panelsOf(await getMoment(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
-    expect(await getMomentAssets(imported.id)).toEqual([])
+    const { board: imported } = await importBoardArchive(asFile(archive))
+    expect(slideshowIn(panelsOf(await getBoard(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'eightbitstrana' })
+    expect(await getBoardAssets(imported.id)).toEqual([])
   })
 
   it('embeds curated images once, preserves attribution, and restores each panel from session assets', async () => {
@@ -240,7 +240,7 @@ describe('portable moment archives', () => {
     const curatedPanels = [...panels, second].map((panel): Panel => panel.type === 'slideshow'
       ? { ...panel, config: { ...panel.config, folderName: 'Autumn', imageSource: { type: 'curated', collectionSlug: 'autumn' } } }
       : panel)
-    const source = await storeMoment('Curated archive', curatedPanels)
+    const source = await storeBoard('Curated archive', curatedPanels)
     const baseUrl = 'https://cdn.example/export'
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
@@ -265,7 +265,7 @@ describe('portable moment archives', () => {
       return new Response('', { status: 404 })
     }) as unknown as typeof fetch
 
-    const archive = await exportMomentArchive(source.id, { fetcher, curatedBaseUrl: baseUrl })
+    const archive = await exportBoardArchive(source.id, { fetcher, curatedBaseUrl: baseUrl })
     const entries = await archiveEntries(archive)
     const exportedManifest = manifest(entries)
     expect(exportedManifest.images).toHaveLength(1)
@@ -276,29 +276,29 @@ describe('portable moment archives', () => {
     expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toHaveLength(1)
     expect(exportedManifest.panels.filter((panel) => panel.type === 'slideshow').every((panel) => panel.config.imageSource.type === 'session-assets')).toBe(true)
 
-    const { moment: imported } = await importMomentArchive(asFile(archive))
-    const importedPanels = panelsOf(await getMoment(imported.id)).filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+    const { board: imported } = await importBoardArchive(asFile(archive))
+    const importedPanels = panelsOf(await getBoard(imported.id)).filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     expect(importedPanels).toHaveLength(2)
     expect(importedPanels.every((panel) => panel.config.imageSource.type === 'session-assets' && panel.config.folderName === 'Autumn')).toBe(true)
-    expect(await getMomentAssets(imported.id)).toHaveLength(1)
+    expect(await getBoardAssets(imported.id)).toHaveLength(1)
     for (const panel of importedPanels) {
-      expect(await getMomentAssets(imported.id, panel.id)).toEqual([
+      expect(await getBoardAssets(imported.id, panel.id)).toEqual([
         expect.objectContaining({ attribution: { creator: 'rbnks', creatorUrl: 'https://www.instagram.com/rbnks/', sourceUrl: 'https://www.instagram.com/p/example/' } }),
       ])
     }
   })
 
   it('imports an unavailable bundled collection reference without crashing or substituting it', async () => {
-    const source = await createMoment('Unavailable sample')
-    const entries = await archiveEntries(await exportMomentArchive(source.id))
+    const source = await createBoard('Unavailable sample')
+    const entries = await archiveEntries(await exportBoardArchive(source.id))
     const sourceManifest = manifest(entries)
     slideshowIn(sourceManifest.panels).config.imageSource = { type: 'bundled', collectionId: 'removed-sample' }
     slideshowIn(sourceManifest.panels).config.folderName = 'removed-sample'
     entries['manifest.json'] = strToU8(JSON.stringify(sourceManifest))
 
-    const { moment: imported } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect(slideshowIn(panelsOf(await getMoment(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
-    expect(await getMomentAssets(imported.id)).toEqual([])
+    const { board: imported } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
+    expect(slideshowIn(panelsOf(await getBoard(imported.id))).config.imageSource).toEqual({ type: 'bundled', collectionId: 'removed-sample' })
+    expect(await getBoardAssets(imported.id)).toEqual([])
   })
 
   it('rejects corrupt, incomplete, unsafe, unsupported, and oversized archives', async () => {
@@ -306,21 +306,21 @@ describe('portable moment archives', () => {
     const entries = await archiveEntries(archive)
     const sourceManifest = manifest(entries)
 
-    await expect(importMomentArchive(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).rejects.toThrow('manifest.json is not valid JSON')
-    await expect(importMomentArchive(asFile(new Blob([zipSync({ '../manifest.json': strToU8('{}') })])))).rejects.toThrow('unsafe file path: "../manifest.json"')
+    await expect(importBoardArchive(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).rejects.toThrow('manifest.json is not valid JSON')
+    await expect(importBoardArchive(asFile(new Blob([zipSync({ '../manifest.json': strToU8('{}') })])))).rejects.toThrow('unsafe file path: "../manifest.json"')
 
     const missingImage = { ...entries }
     delete missingImage[sourceManifest.images[0].path]
-    await expect(importMomentArchive(asFile(new Blob([zipSync(missingImage)])))).rejects.toThrow('missing or duplicate image file')
+    await expect(importBoardArchive(asFile(new Blob([zipSync(missingImage)])))).rejects.toThrow('missing or duplicate image file')
 
     const unsupportedImage = { ...entries }
     const unsupportedManifest = manifest(unsupportedImage)
     unsupportedManifest.images[0].mimeType = 'image/tiff'
     unsupportedImage['manifest.json'] = strToU8(JSON.stringify(unsupportedManifest))
-    await expect(importMomentArchive(asFile(new Blob([zipSync(unsupportedImage)])))).rejects.toThrow('invalid image')
+    await expect(importBoardArchive(asFile(new Blob([zipSync(unsupportedImage)])))).rejects.toThrow('invalid image')
 
-    const oversized = { size: momentLimits.maxArchiveBytes + 1, arrayBuffer: vi.fn() } as unknown as File
-    await expect(importMomentArchive(oversized)).rejects.toThrow('exceeds the 260 MB limit')
+    const oversized = { size: boardLimits.maxArchiveBytes + 1, arrayBuffer: vi.fn() } as unknown as File
+    await expect(importBoardArchive(oversized)).rejects.toThrow('exceeds the 260 MB limit')
 
     // A negative index or a sub-100ms interval would reach the canvas
     // uncorrected (AppState.tsx only resets an index the image count has
@@ -330,20 +330,20 @@ describe('portable moment archives', () => {
     const outOfBoundsIndexManifest = manifest(outOfBoundsIndex)
     slideshowIn(outOfBoundsIndexManifest.panels).config.currentIndex = -1
     outOfBoundsIndex['manifest.json'] = strToU8(JSON.stringify(outOfBoundsIndexManifest))
-    await expect(importMomentArchive(asFile(new Blob([zipSync(outOfBoundsIndex)])))).rejects.toThrow()
+    await expect(importBoardArchive(asFile(new Blob([zipSync(outOfBoundsIndex)])))).rejects.toThrow()
 
     const tooFastInterval = { ...entries }
     const tooFastIntervalManifest = manifest(tooFastInterval)
     slideshowIn(tooFastIntervalManifest.panels).config.intervalMs = 1
     tooFastInterval['manifest.json'] = strToU8(JSON.stringify(tooFastIntervalManifest))
-    await expect(importMomentArchive(asFile(new Blob([zipSync(tooFastInterval)])))).rejects.toThrow()
+    await expect(importBoardArchive(asFile(new Blob([zipSync(tooFastInterval)])))).rejects.toThrow()
   })
 
-  it('sanitizes a Notes panel pointing at a note the moment no longer has, rather than exporting a backup that cannot be restored', async () => {
+  it('sanitizes a Notes panel pointing at a note the board no longer has, rather than exporting a backup that cannot be restored', async () => {
     // Two Notes panels can end up pointing at the same note; deleting it
     // through one panel does not clear the other's reference (a separate,
     // pre-existing bug). Simulate that state directly, at the document
-    // level (the only level a moment is ever stored at), since import's own
+    // level (the only level a board is ever stored at), since import's own
     // remap would otherwise heal it before this code ever saw it.
     const defaultPanels = createDefaultPanels()
     const notesPanel = defaultPanels.find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
@@ -352,66 +352,66 @@ describe('portable moment archives', () => {
       { ...notesPanel, config: { activeNoteId: 'ghost-note' } },
       { ...notesPanel, id: 'notes-panel-two', config: { activeNoteId: 'ghost-note' } },
     ]
-    const moment: Moment = {
+    const board: Board = {
       id: 'dangling-reference',
       name: 'Dangling reference',
-      schemaVersion: MOMENT_SCHEMA_VERSION,
+      schemaVersion: BOARD_SCHEMA_VERSION,
       createdAt: 1,
       updatedAt: 2,
       camera: null,
       document: documentFromDraft({ panels: danglingPanels, canvas: null }),
     }
     const db = await openDB('my-states')
-    await db.put('moments', moment)
+    await db.put('boards', board)
     db.close()
 
-    const entries = await archiveEntries(await exportMomentArchive(moment.id))
+    const entries = await archiveEntries(await exportBoardArchive(board.id))
     const exportedManifest = manifest(entries)
     const notesPanels = exportedManifest.panels.filter((panel): panel is Panel<'notes'> => panel.type === 'notes')
     expect(notesPanels).toHaveLength(2)
     expect(notesPanels.every((panel) => panel.config.activeNoteId === null)).toBe(true)
 
-    const { moment: imported } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
-    expect(panelsOf(await getMoment(imported.id)).filter((panel) => panel.type === 'notes')).toHaveLength(2)
+    const { board: imported } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
+    expect(panelsOf(await getBoard(imported.id)).filter((panel) => panel.type === 'notes')).toHaveLength(2)
   })
 
   it('refuses a file from the earlier format with a message that says which version wrote it', async () => {
-    const entries = await archiveEntries(await exportMomentArchive((await createMoment('Current format')).id))
+    const entries = await archiveEntries(await exportBoardArchive((await createBoard('Current format')).id))
     const older = { ...manifest(entries), formatVersion: 1 }
     entries['manifest.json'] = strToU8(JSON.stringify(older))
-    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('exported by an earlier version of my-states')
+    await expect(importBoardArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('exported by an earlier version of my-states')
 
     const unknown = { ...manifest(entries), formatVersion: 99 }
     entries['manifest.json'] = strToU8(JSON.stringify(unknown))
-    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('unsupported format version')
+    await expect(importBoardArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('unsupported format version')
   })
 })
 
 describe('directory-marker entries', () => {
-  it('imports a moment fine when the archive was re-zipped with an empty directory entry, the way Explorer\'s "Compress to ZIP file" writes one for a subfolder', async () => {
+  it('imports a board fine when the archive was re-zipped with an empty directory entry, the way Explorer\'s "Compress to ZIP file" writes one for a subfolder', async () => {
     const entries = await archiveEntries(await createCompleteArchive())
     entries['notes/'] = new Uint8Array(0)
     entries['images/'] = new Uint8Array(0)
 
-    const { moment: imported } = await importMomentArchive(asFile(new Blob([zipSync(entries)])))
+    const { board: imported } = await importBoardArchive(asFile(new Blob([zipSync(entries)])))
     expect(await getNotes(imported.id)).toHaveLength(1)
-    expect(await getMomentAssets(imported.id)).toHaveLength(2)
+    expect(await getBoardAssets(imported.id)).toHaveLength(2)
   })
 
   it('still rejects an entry named like a directory that unexpectedly carries content, naming its path', async () => {
     const entries = await archiveEntries(await createCompleteArchive())
     entries['notes/'] = strToU8('a real file masquerading as the notes folder')
-    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('"notes/"')
+    await expect(importBoardArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('"notes/"')
   })
 
   it('names every path in an archive that carries a file its manifest does not reference', async () => {
     const entries = await archiveEntries(await createCompleteArchive())
     entries['images/stowaway.png'] = strToU8('not referenced by the manifest')
-    await expect(importMomentArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('"images/stowaway.png"')
+    await expect(importBoardArchive(asFile(new Blob([zipSync(entries)])))).rejects.toThrow('"images/stowaway.png"')
   })
 })
 
-describe('duplicateMoment', () => {
+describe('duplicateBoard', () => {
   it('makes an independent copy under a new identity, keeping panels, canvas, notes, assets and the pinned theme, and leaves the source untouched', async () => {
     const now = Date.now()
     const note = { id: 'note_dup', title: 'Original note', content: 'Body text', createdAt: now, updatedAt: now }
@@ -420,17 +420,17 @@ describe('duplicateMoment', () => {
       : panel.type === 'slideshow'
         ? { ...panel, config: { ...panel.config, imageSource: { type: 'session-assets' } } }
         : panel)
-    const source = await storeMoment('Original', sourcePanels, { camera: { x: 5, y: 6, z: 1 }, panels: [] }, [note])
-    await setMomentTheme(source.id, 'terminal')
-    await saveMomentAssets(source.id, [makeAsset('asset_dup', 'pic.png', new Uint8Array([9, 9, 9]))])
+    const source = await storeBoard('Original', sourcePanels, { camera: { x: 5, y: 6, z: 1 }, panels: [] }, [note])
+    await setBoardTheme(source.id, 'terminal')
+    await saveBoardAssets(source.id, [makeAsset('asset_dup', 'pic.png', new Uint8Array([9, 9, 9]))])
 
-    // storeMoment is importMomentContent under the hood, so it already
+    // storeBoard is importBoardContent under the hood, so it already
     // reissued the note's id (and the panel ids) once, on the way in; read
     // back what actually landed rather than assuming 'note_dup' survived.
     const sourceNotes = await getNotes(source.id)
     const sourceNotesPanel = panelsOf(source).find((panel): panel is Panel<'notes'> => panel.type === 'notes')!
 
-    const copy = await duplicateMoment(source.id, 'Original (copy)')
+    const copy = await duplicateBoard(source.id, 'Original (copy)')
 
     expect(copy.id).not.toBe(source.id)
     expect(copy.name).toBe('Original (copy)')
@@ -447,42 +447,42 @@ describe('duplicateMoment', () => {
     expect(copiedNotes[0].content).toBe('Body text')
     expect(copiedNotesPanel.config.activeNoteId).toBe(copiedNotes[0].id)
 
-    const copiedAssets = await getMomentAssets(copy.id)
+    const copiedAssets = await getBoardAssets(copy.id)
     expect(copiedAssets).toHaveLength(1)
     expect(copiedAssets[0].id).not.toBe('asset_dup')
     expect(copiedAssets[0].filename).toBe('pic.png')
 
-    expect(await getMoment(source.id)).toBeDefined()
+    expect(await getBoard(source.id)).toBeDefined()
     expect(await getNotes(source.id)).toEqual(sourceNotes)
   })
 
-  it('does not go through a zip at all, so a moment that could not be exported (over a size limit) can still be duplicated', async () => {
+  it('does not go through a zip at all, so a board that could not be exported (over a size limit) can still be duplicated', async () => {
     // The note-size ceiling is an export-only, zip-file concern; duplicating
     // stays a direct database copy and is not bound by it.
     const bigNote = { id: 'note_big', title: 'Big', content: 'x'.repeat(1024), createdAt: Date.now(), updatedAt: Date.now() }
     const panels = createDefaultPanels().map((panel): Panel => panel.type === 'notes' ? { ...panel, config: { activeNoteId: bigNote.id } } : panel)
-    const source = await storeMoment('Has a note', panels, null, [bigNote])
-    const copy = await duplicateMoment(source.id, 'Has a note (copy)')
+    const source = await storeBoard('Has a note', panels, null, [bigNote])
+    const copy = await duplicateBoard(source.id, 'Has a note (copy)')
     expect((await getNotes(copy.id))[0].content).toBe(bigNote.content)
   })
 })
 
-describe('peekMomentArchiveName', () => {
+describe('peekBoardArchiveName', () => {
   it('reads the name an archive would import under, without importing anything', async () => {
-    // createCompleteArchive() stores its own source moment to build the
+    // createCompleteArchive() stores its own source board to build the
     // archive from; the "no side effect" claim under test is peek's alone,
     // so the baseline is taken after that, not before.
     const blob = await createCompleteArchive()
-    const before = await getMomentSummaries()
-    const name = await peekMomentArchiveName(asFile(blob))
+    const before = await getBoardSummaries()
+    const name = await peekBoardArchiveName(asFile(blob))
     expect(name).toBe('Archive source')
-    expect(await getMomentSummaries()).toEqual(before)
+    expect(await getBoardSummaries()).toEqual(before)
   })
 
   it('resolves to null, rather than throwing, for a file that is not a readable archive', async () => {
-    expect(await peekMomentArchiveName(asFile(new Blob(['not a zip'])))).toBeNull()
-    expect(await peekMomentArchiveName(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).toBeNull()
-    expect(await peekMomentArchiveName(asFile(new Blob([zipSync({})])))).toBeNull()
+    expect(await peekBoardArchiveName(asFile(new Blob(['not a zip'])))).toBeNull()
+    expect(await peekBoardArchiveName(asFile(new Blob([zipSync({ 'manifest.json': strToU8('{not json') })])))).toBeNull()
+    expect(await peekBoardArchiveName(asFile(new Blob([zipSync({})])))).toBeNull()
   })
 })
 

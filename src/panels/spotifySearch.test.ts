@@ -19,7 +19,7 @@ import { SpotifyPanel } from './SpotifyPanel'
 const searchDebounceMs = 300
 
 type PanelPlaylist = { id: string | null; name: string | null; uri: string | null; url: string | null; image: string | null }
-const panel = vi.hoisted(() => ({ focusView: false, momentId: 'moment_1', playlist: null as unknown as PanelPlaylist }))
+const panel = vi.hoisted(() => ({ focusView: false, boardId: 'board_1', playlist: null as unknown as PanelPlaylist }))
 const spotify = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
 }))
@@ -55,7 +55,7 @@ vi.mock('../spotifyCatalog', () => ({
 vi.mock('../AppState', () => ({
   useAppState: () => ({
     spotify: spotify.state,
-    moments: { activeMoment: { id: panel.momentId } },
+    boards: { activeBoard: { id: panel.boardId } },
     panels: {
       get: () => ({
         id: 'panel_music',
@@ -84,7 +84,7 @@ function mountPanel(overrides: Record<string, unknown> = {}, options: { strict?:
   const clearSearchResults = vi.fn()
   const playPlaylist = vi.fn(async () => {})
   const playTrack = vi.fn(async () => {})
-  // As in the app, choosing a playlist writes it into the moment's panel.
+  // As in the app, choosing a playlist writes it into the board's panel.
   const selectPlaylist = vi.fn((summary: { id: string; name: string; uri: string; url: string; image: string | null }) => {
     panel.playlist = { id: summary.id, name: summary.name, uri: summary.uri, url: summary.url, image: summary.image }
   })
@@ -174,7 +174,7 @@ const nothingChosen: PanelPlaylist = { id: null, name: null, uri: null, url: nul
 
 beforeEach(() => {
   panel.focusView = false
-  panel.momentId = 'moment_1'
+  panel.boardId = 'board_1'
   panel.playlist = { ...deepFocus }
   curated.entries = []
   curated.shuffled = []
@@ -380,11 +380,11 @@ describe('Music panel playlist link', () => {
   })
 })
 
-// The moment saves a playlist so that it is there to play when the panel is
+// The board saves a playlist so that it is there to play when the panel is
 // connected. Until then it is a name that cannot be played and that this
 // visitor did not just choose, so it is kept out of sight rather than left to
 // raise a question with no good answer.
-describe('Music panel and the playlist saved in the moment', () => {
+describe('Music panel and the playlist saved in the board', () => {
   const footerName = () => document.querySelector('.card-footer-meta')?.textContent
 
   it('does not show it before Spotify is connected', () => {
@@ -454,12 +454,12 @@ describe('Music panel and the playlist saved in the moment', () => {
     expect(document.querySelector('.loaded-playlist')).toBeNull()
   })
 
-  it('forgets what was chosen when another moment is opened', () => {
+  it('forgets what was chosen when another board is opened', () => {
     const { rerender } = mountAnonymousPanel({ playlists: [rainResult] })
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
     expect(document.querySelector('.loaded-playlist')).not.toBeNull()
 
-    panel.momentId = 'moment_2'
+    panel.boardId = 'board_2'
     panel.playlist = { id: 'other', name: 'Saved Elsewhere', uri: 'spotify:playlist:other', url: null, image: null }
     rerender()
 
@@ -569,7 +569,7 @@ describe('Music panel before Spotify is connected', () => {
     expect(login).toHaveBeenCalled()
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
       panelId: 'panel_music',
-      momentId: 'moment_1',
+      boardId: 'board_1',
       choice: { kind: 'playlist', spotifyId: 'p1' },
       query: 'rain',
       searchType: 'playlists',
@@ -577,8 +577,8 @@ describe('Music panel before Spotify is connected', () => {
   })
 
   // What the visitor cannot see, they did not choose: a playlist saved in the
-  // moment is not carried across the redirect as if it were theirs.
-  it('does not remember a playlist that was only saved in the moment', () => {
+  // board is not carried across the redirect as if it were theirs.
+  it('does not remember a playlist that was only saved in the board', () => {
     mountAnonymousPanel()
     typeSearch('rain')
 
@@ -637,7 +637,7 @@ describe('Music panel before Spotify is connected', () => {
 
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
       panelId: 'panel_music',
-      momentId: 'moment_1',
+      boardId: 'board_1',
       choice: null,
       query: 'rain',
       searchType: 'playlists',
@@ -678,7 +678,7 @@ describe('Music panel before Spotify is connected', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  // The glow follows a click, not a state. A playlist saved in the moment days
+  // The glow follows a click, not a state. A playlist saved in the board days
   // ago is not news, and a button that glows at every visit is only noise.
   describe('the glow on Connect Spotify', () => {
     const rain = { id: 'p1', name: 'Rain on Glass', uri: 'spotify:playlist:p1', url: '', image: null, owner: 'Someone', trackCount: 40 }
@@ -817,10 +817,10 @@ describe('Music panel before Spotify is connected', () => {
 // a browser will not start sound without a click -- so the panel says so, and
 // the player's own Play button is the one to press: no second Play beside it.
 describe('Music panel on returning from connecting Spotify', () => {
-  function leaveAnIntent(kind: 'playlist' | 'track' = 'playlist', extra: { query?: string; searchType?: 'playlists' | 'tracks'; panelId?: string; momentId?: string | null } = {}) {
+  function leaveAnIntent(kind: 'playlist' | 'track' = 'playlist', extra: { query?: string; searchType?: 'playlists' | 'tracks'; panelId?: string; boardId?: string | null } = {}) {
     window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({
       panelId: extra.panelId ?? 'panel_music',
-      ...(extra.momentId === null ? {} : { momentId: extra.momentId ?? 'moment_1' }),
+      ...(extra.boardId === null ? {} : { boardId: extra.boardId ?? 'board_1' }),
       choice: { kind, spotifyId: kind === 'track' ? 't1' : 'playlist_1' },
       query: extra.query ?? '',
       searchType: extra.searchType ?? 'playlists',
@@ -931,13 +931,13 @@ describe('Music panel on returning from connecting Spotify', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  // Found in review: the page that comes back opens whichever moment is active
+  // Found in review: the page that comes back opens whichever board is active
   // in storage shared by every tab, and another tab may have opened a different
   // one while this tab was at Spotify. What this tab saved is for the panel and
-  // moment it was saved in, and for no other.
-  describe('when the page comes back to a different panel or moment', () => {
-    it('restores into the panel and moment it was saved for', async () => {
-      leaveAnIntent('playlist', { query: 'rain', momentId: 'moment_1' })
+  // board it was saved in, and for no other.
+  describe('when the page comes back to a different panel or board', () => {
+    it('restores into the panel and board it was saved for', async () => {
+      leaveAnIntent('playlist', { query: 'rain', boardId: 'board_1' })
       mountPanel()
       await act(async () => { await Promise.resolve() })
 
@@ -945,8 +945,8 @@ describe('Music panel on returning from connecting Spotify', () => {
       expect(screen.getByRole('status').textContent).toContain('Press play to start')
     })
 
-    it('does not restore into a different moment', async () => {
-      leaveAnIntent('track', { query: 'rain', momentId: 'moment_elsewhere' })
+    it('does not restore into a different board', async () => {
+      leaveAnIntent('track', { query: 'rain', boardId: 'board_elsewhere' })
       const { lookupTrack } = mountPanel()
       await act(async () => { await Promise.resolve() })
 
@@ -965,8 +965,8 @@ describe('Music panel on returning from connecting Spotify', () => {
       expect(lookupTrack).not.toHaveBeenCalled()
     })
 
-    it('still restores a context written without a moment, for the panel it names', async () => {
-      leaveAnIntent('playlist', { query: 'rain', momentId: null })
+    it('still restores a context written without a board, for the panel it names', async () => {
+      leaveAnIntent('playlist', { query: 'rain', boardId: null })
       mountPanel()
       await act(async () => { await Promise.resolve() })
 
@@ -975,7 +975,7 @@ describe('Music panel on returning from connecting Spotify', () => {
 
     // It has been taken either way: a second panel mounting later must not find it.
     it('uses the context up whether or not it was restored', async () => {
-      leaveAnIntent('track', { query: 'rain', momentId: 'moment_elsewhere' })
+      leaveAnIntent('track', { query: 'rain', boardId: 'board_elsewhere' })
       mountPanel()
       await act(async () => { await Promise.resolve() })
 
@@ -984,7 +984,7 @@ describe('Music panel on returning from connecting Spotify', () => {
   })
 
   // Found in review: until the song has been looked up again there is nothing to
-  // play it with, and the panel fell back to the moment's saved playlist -- named
+  // play it with, and the panel fell back to the board's saved playlist -- named
   // it, and started it on Play -- when the visitor had asked for a song.
   describe('while the song they chose is being looked up again', () => {
     const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
@@ -1056,15 +1056,15 @@ describe('Music panel on returning from connecting Spotify', () => {
   })
 
   // Found in review: the prompt is about what was chosen before leaving for
-  // Spotify, in the moment it was chosen in. Another moment must not show it
+  // Spotify, in the board it was chosen in. Another board must not show it
   // beside its own saved playlist, for music nobody picked there.
-  it('stops saying "press play" when another moment is opened', async () => {
+  it('stops saying "press play" when another board is opened', async () => {
     leaveAnIntent('playlist')
     const { rerender } = mountPanel()
     await act(async () => { await Promise.resolve() })
     expect(screen.getByRole('status').textContent).toContain('Press play to start')
 
-    panel.momentId = 'moment_2'
+    panel.boardId = 'board_2'
     rerender()
 
     expect(screen.queryByRole('status')).toBeNull()
@@ -1276,7 +1276,7 @@ describe('Music panel suggestions', () => {
 // Cancelling at Spotify, or a code that cannot be exchanged, brings the visitor
 // back signed out on a page that has reloaded, with the search and their choice
 // gone. What can be given back is: the search, and a playlist (saved in the
-// moment when clicked, so it only has to be shown again). A song cannot be: it
+// board when clicked, so it only has to be shown again). A song cannot be: it
 // was only ever held in memory. Found in review.
 describe('Music panel after a sign-in that did not succeed', () => {
   function leaveContext(extra: {
@@ -1285,12 +1285,12 @@ describe('Music panel after a sign-in that did not succeed', () => {
     query?: string
     searchType?: 'playlists' | 'tracks'
     panelId?: string
-    momentId?: string
+    boardId?: string
   } = {}) {
     const kind = extra.kind === undefined ? 'playlist' : extra.kind
     window.sessionStorage.setItem('mic:spotify-return-context', JSON.stringify({
       panelId: extra.panelId ?? 'panel_music',
-      momentId: extra.momentId ?? 'moment_1',
+      boardId: extra.boardId ?? 'board_1',
       choice: kind === null ? null : { kind, spotifyId: extra.spotifyId ?? (kind === 'track' ? 't1' : 'playlist_1') },
       query: extra.query ?? 'rain',
       searchType: extra.searchType ?? 'playlists',
@@ -1320,7 +1320,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
     expect(searchTracks).toHaveBeenCalledWith('xtal')
   })
 
-  // Saved in the moment when it was clicked, and hidden until chosen this visit:
+  // Saved in the board when it was clicked, and hidden until chosen this visit:
   // the visitor sees nothing chosen unless it is shown again.
   it('shows the playlist that was chosen again, with what happens next', async () => {
     leaveContext({ spotifyId: 'playlist_1' })
@@ -1361,8 +1361,8 @@ describe('Music panel after a sign-in that did not succeed', () => {
     expect(storedContext()).toBeNull()
   })
 
-  it('does not restore what was saved for another moment or another panel', async () => {
-    leaveContext({ momentId: 'moment_elsewhere' })
+  it('does not restore what was saved for another board or another panel', async () => {
+    leaveContext({ boardId: 'board_elsewhere' })
     failedSignIn()
     await act(async () => { await Promise.resolve() })
     expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('')
@@ -1378,7 +1378,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
   })
 
   // The other half of the rule. A sign-in that is about to succeed also opens
-  // signed out for a moment, and must find its context still there.
+  // signed out for a board, and must find its context still there.
   it('leaves the context alone when the sign-in has not been reported as failed', async () => {
     leaveContext({ query: 'rain' })
     mountAnonymousPanel()
@@ -1389,7 +1389,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
   })
 
   // Found by running the real page: in development React runs every effect twice
-  // on mount, and the reset that runs when a moment changes ran the second time
+  // on mount, and the reset that runs when a board changes ran the second time
   // after the context had been used up, and wiped what had just been restored.
   it('keeps what it gave back when React runs the effects twice, as it does in development', async () => {
     leaveContext({ query: 'rain', spotifyId: 'playlist_1' })

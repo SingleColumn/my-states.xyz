@@ -95,7 +95,7 @@ function PanelMenu({ label, sections, defaultOpen = false }: { label: string; se
   const menuRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  // Same closing rules as the moment toolbar's menu: a press anywhere else,
+  // Same closing rules as the board toolbar's menu: a press anywhere else,
   // or Escape. The document listener sees presses on the canvas too, because
   // the panel shell marks its pointer events handled rather than stopping them.
   useEffect(() => {

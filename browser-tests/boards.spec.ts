@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   addPanelFromToolbar,
   clickAt,
-  createMomentFromToolbar,
+  createBoardFromToolbar,
   describeCanvas,
   dispatch,
   dragLocator,
@@ -10,8 +10,8 @@ import {
   expectCanvasSaved,
   geometryOf,
   loadSampleImages,
-  momentPicker,
-  momentPickerNames,
+  boardPicker,
+  boardPickerNames,
   noteBodyOf,
   openApp,
   panelById,
@@ -19,14 +19,14 @@ import {
   readStorage,
   selectPanel,
   shapeOf,
-  switchMoment,
+  switchBoard,
   titleOf,
   waitForCanvas,
   type PanelDescription,
 } from './helpers'
 
 /**
- * The moment lifecycle, as the save-safety checklist that used to be run by
+ * The board lifecycle, as the save-safety checklist that used to be run by
  * hand before each release: what a fresh profile opens with, what survives
  * a reload, what an export carries and an import brings back, and what the
  * page does when it is being left or asked for two things at once.
@@ -44,11 +44,11 @@ function persistedShape(panel: PanelDescription) {
   return { type, x, y, w, h, visible, focusView, order, config, note: note ? { title: note.title, content: note.content } : note }
 }
 
-test('a fresh profile opens one moment with three panels and a clean report', async ({ page }) => {
+test('a fresh profile opens one board with three panels and a clean report', async ({ page }) => {
   const { pageErrors } = await openApp(page)
   const canvas = await describeCanvas(page)
-  expect(canvas.moment?.name).toBe('A new moment')
-  expect(await momentPickerNames(page)).toEqual(['A new moment'])
+  expect(canvas.board?.name).toBe('A new board')
+  expect(await boardPickerNames(page)).toEqual(['A new board'])
   expect(canvas.panels.map((panel) => panel.type)).toEqual(['slideshow', 'notes', 'spotify'])
   expect(canvas.panels.every((panel) => panel.visible && !panel.focusView)).toBe(true)
   await expectArchitectureReportPass(page)
@@ -108,10 +108,10 @@ test('panels, hiding, settings and stacking order survive a reload', async ({ pa
   await expectArchitectureReportPass(page)
 })
 
-test('export writes a .moment.zip and import brings the moment back, listed in the picker at once', async ({ page }, testInfo) => {
+test('export writes a .board.zip and import brings the board back, listed in the picker at once', async ({ page }, testInfo) => {
   await openApp(page)
-  const source = (await describeCanvas(page)).moment
-  if (!source) throw new Error('No moment is open')
+  const source = (await describeCanvas(page)).board
+  if (!source) throw new Error('No board is open')
 
   // Something worth carrying: a note, a moved panel, a hidden one.
   const notes = await panelOfType(page, 'notes')
@@ -127,64 +127,64 @@ test('export writes a .moment.zip and import brings the moment back, listed in t
   const exported = (await describeCanvas(page)).panels.map(persistedShape)
 
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export moment' }).click()
+  await page.getByRole('button', { name: 'Export board' }).click()
   const download = await downloading
-  expect(download.suggestedFilename()).toMatch(/\.moment\.zip$/)
+  expect(download.suggestedFilename()).toMatch(/\.board\.zip$/)
   const archivePath = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(archivePath)
 
-  // A moment named exactly like the source is already open, so re-importing
+  // A board named exactly like the source is already open, so re-importing
   // this file offers a new name; typing the original name back is how a
   // genuine same-named duplicate -- what this round trip is testing -- is
   // still produced deliberately.
   page.once('dialog', (dialog) => void dialog.accept(source.name))
-  await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
-  await expect.poll(async () => (await describeCanvas(page)).moment?.id).not.toBe(source.id)
-  const imported = (await describeCanvas(page)).moment
-  if (!imported) throw new Error('No moment is open after the import')
+  await page.locator('.board-toolbar input[type="file"]').setInputFiles(archivePath)
+  await expect.poll(async () => (await describeCanvas(page)).board?.id).not.toBe(source.id)
+  const imported = (await describeCanvas(page)).board
+  if (!imported) throw new Error('No board is open after the import')
   expect(imported.name).toBe(source.name)
 
-  // The picker lists the imported moment straight away, and has it selected.
+  // The picker lists the imported board straight away, and has it selected.
   // (A regression here once left it out until the next create or delete.)
-  await expect(momentPicker(page)).toHaveValue(imported.id)
-  const listed = await momentPicker(page).locator('option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value))
+  await expect(boardPicker(page)).toHaveValue(imported.id)
+  const listed = await boardPicker(page).locator('option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value))
   expect(listed.sort()).toEqual([source.id, imported.id].sort())
-  expect(await momentPickerNames(page)).toEqual([source.name, source.name])
+  expect(await boardPickerNames(page)).toEqual([source.name, source.name])
 
   await waitForCanvas(page)
   await expect.poll(async () => (await describeCanvas(page)).panels.map(persistedShape)).toEqual(exported)
   await expectArchitectureReportPass(page)
 })
 
-test('Duplicate moment makes an independent, already-open copy named "(copy)", never asking', async ({ page }) => {
+test('Duplicate board makes an independent, already-open copy named "(copy)", never asking', async ({ page }) => {
   await openApp(page)
-  const source = (await describeCanvas(page)).moment
-  if (!source) throw new Error('No moment is open')
+  const source = (await describeCanvas(page)).board
+  if (!source) throw new Error('No board is open')
   const sourcePanels = (await describeCanvas(page)).panels.map(persistedShape)
 
-  await page.getByRole('button', { name: 'Duplicate moment' }).click()
-  await expect.poll(async () => (await describeCanvas(page)).moment?.id).not.toBe(source.id)
-  const duplicate = (await describeCanvas(page)).moment
-  if (!duplicate) throw new Error('No moment is open after duplicating')
+  await page.getByRole('button', { name: 'Duplicate board' }).click()
+  await expect.poll(async () => (await describeCanvas(page)).board?.id).not.toBe(source.id)
+  const duplicate = (await describeCanvas(page)).board
+  if (!duplicate) throw new Error('No board is open after duplicating')
   expect(duplicate.name).toBe(`${source.name} (copy)`)
   expect((await describeCanvas(page)).panels.map(persistedShape)).toEqual(sourcePanels)
-  expect((await momentPickerNames(page)).sort()).toEqual([source.name, duplicate.name].sort())
+  expect((await boardPickerNames(page)).sort()).toEqual([source.name, duplicate.name].sort())
   await expectArchitectureReportPass(page)
 })
 
-test('importing an archive whose name collides with an existing moment offers a new name, suggesting one free', async ({ page }, testInfo) => {
+test('importing an archive whose name collides with an existing board offers a new name, suggesting one free', async ({ page }, testInfo) => {
   await openApp(page)
-  await createMomentFromToolbar(page, 'Kept aside')
+  await createBoardFromToolbar(page, 'Kept aside')
 
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export moment' }).click()
+  await page.getByRole('button', { name: 'Export board' }).click()
   const download = await downloading
   const archivePath = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(archivePath)
 
-  // Switch away, so the collision is with a moment other than the one open
-  // -- the warning is not limited to re-importing the currently open moment.
-  await switchMoment(page, 'A new moment')
+  // Switch away, so the collision is with a board other than the one open
+  // -- the warning is not limited to re-importing the currently open board.
+  await switchBoard(page, 'A new board')
 
   page.once('dialog', (dialog) => {
     expect(dialog.type()).toBe('prompt')
@@ -192,37 +192,37 @@ test('importing an archive whose name collides with an existing moment offers a 
     expect(dialog.defaultValue()).toBe('Kept aside (copy)')
     void dialog.accept('Kept aside, imported')
   })
-  await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
+  await page.locator('.board-toolbar input[type="file"]').setInputFiles(archivePath)
 
   // The import is opened under the chosen name, not the colliding one --
-  // the picker never carries two moments with the same name for this.
-  await expect.poll(async () => (await describeCanvas(page)).moment?.name).toBe('Kept aside, imported')
-  const names = await momentPickerNames(page)
-  expect(names.sort()).toEqual(['A new moment', 'Kept aside', 'Kept aside, imported'].sort())
+  // the picker never carries two boards with the same name for this.
+  await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe('Kept aside, imported')
+  const names = await boardPickerNames(page)
+  expect(names.sort()).toEqual(['A new board', 'Kept aside', 'Kept aside, imported'].sort())
   expect(new Set(names).size).toBe(names.length)
   await expectArchitectureReportPass(page)
 })
 
 test('declining the rename-or-import prompt for a colliding name adds nothing', async ({ page }, testInfo) => {
   await openApp(page)
-  await createMomentFromToolbar(page, 'Kept aside')
+  await createBoardFromToolbar(page, 'Kept aside')
 
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export moment' }).click()
+  await page.getByRole('button', { name: 'Export board' }).click()
   const download = await downloading
   const archivePath = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(archivePath)
 
-  await switchMoment(page, 'A new moment')
-  const before = await momentPickerNames(page)
+  await switchBoard(page, 'A new board')
+  const before = await boardPickerNames(page)
 
   let dialogMessage = ''
   page.once('dialog', (dialog) => { dialogMessage = dialog.message(); void dialog.dismiss() })
-  await page.locator('.moment-toolbar input[type="file"]').setInputFiles(archivePath)
+  await page.locator('.board-toolbar input[type="file"]').setInputFiles(archivePath)
   await expect.poll(() => dialogMessage).toContain('"Kept aside"')
-  // Declined: the open moment and the picker are unchanged.
-  await expect.poll(async () => (await describeCanvas(page)).moment?.name).toBe('A new moment')
-  expect(await momentPickerNames(page)).toEqual(before)
+  // Declined: the open board and the picker are unchanged.
+  await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe('A new board')
+  expect(await boardPickerNames(page)).toEqual(before)
 })
 
 test.describe('the flush the page runs when it is hidden or left', () => {
@@ -256,8 +256,8 @@ test.describe('the flush the page runs when it is hidden or left', () => {
     return { notes, movedTo: { x: notes.x - 175, y: notes.y + 125 } }
   }
 
-  async function expectFlushedToStorage(page: Page, momentId: string, panelId: string, movedTo: { x: number; y: number }) {
-    await expect.poll(() => readStorage(page, momentId)).toMatchObject({
+  async function expectFlushedToStorage(page: Page, boardId: string, panelId: string, movedTo: { x: number; y: number }) {
+    await expect.poll(() => readStorage(page, boardId)).toMatchObject({
       found: true,
       panels: expect.arrayContaining([expect.objectContaining({ panelId, x: movedTo.x, y: movedTo.y })]),
       notes: expect.arrayContaining([expect.objectContaining({ content: expect.stringContaining('Written just before leaving.') })]),
@@ -272,21 +272,21 @@ test.describe('the flush the page runs when it is hidden or left', () => {
 
   test('the pagehide handler writes the pending edit to storage', async ({ page }) => {
     await openApp(page)
-    const momentId = (await describeCanvas(page)).moment?.id ?? ''
+    const boardId = (await describeCanvas(page)).board?.id ?? ''
     const { notes, movedTo } = await editWithClockFrozen(page)
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
-    await expectFlushedToStorage(page, momentId, notes.panelId, movedTo)
+    await expectFlushedToStorage(page, boardId, notes.panelId, movedTo)
   })
 
   test('the tab-hidden handler writes the pending edit to storage', async ({ page }) => {
     await openApp(page)
-    const momentId = (await describeCanvas(page)).moment?.id ?? ''
+    const boardId = (await describeCanvas(page)).board?.id ?? ''
     const { notes, movedTo } = await editWithClockFrozen(page)
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await expectFlushedToStorage(page, momentId, notes.panelId, movedTo)
+    await expectFlushedToStorage(page, boardId, notes.panelId, movedTo)
   })
 
   // Known to fail (2026-09-15): probed at 0, 50 and 150ms after the edit the
@@ -305,20 +305,20 @@ test.describe('the flush the page runs when it is hidden or left', () => {
   })
 })
 
-test('a canvas command during a moment switch is refused, and the switch completes', async ({ page }) => {
+test('a canvas command during a board switch is refused, and the switch completes', async ({ page }) => {
   await openApp(page)
-  const first = (await describeCanvas(page)).moment?.name ?? ''
-  await createMomentFromToolbar(page, 'Second moment')
+  const first = (await describeCanvas(page)).board?.name ?? ''
+  await createBoardFromToolbar(page, 'Second board')
   const secondLayout = (await describeCanvas(page)).panels.map(persistedShape)
   const secondNotes = await panelOfType(page, 'notes')
 
   // Slow the store down so the switch is observably in progress: every read
-  // of a moment record waits a second and a half before answering.
+  // of a board record waits a second and a half before answering.
   await page.evaluate(() => {
     const originalGet = IDBObjectStore.prototype.get
     IDBObjectStore.prototype.get = function (this: IDBObjectStore, ...args: [IDBValidKey | IDBKeyRange]) {
       const request = originalGet.apply(this, args)
-      if (this.name !== 'moments' || this.transaction.mode !== 'readonly') return request
+      if (this.name !== 'boards' || this.transaction.mode !== 'readonly') return request
       return new Promise((resolve, reject) => {
         request.onsuccess = () => setTimeout(() => resolve(request.result), 1500)
         request.onerror = () => reject(request.error)
@@ -326,16 +326,16 @@ test('a canvas command during a moment switch is refused, and the switch complet
     }
   })
 
-  await momentPicker(page).selectOption({ label: first })
+  await boardPicker(page).selectOption({ label: first })
   await expect(dispatch(page, { kind: 'panel.move', panelId: secondNotes.panelId, x: 0, y: 0 }))
-    .rejects.toThrow('Please wait for the current moment operation to finish.')
+    .rejects.toThrow('Please wait for the current board operation to finish.')
 
-  await expect.poll(async () => (await describeCanvas(page)).moment?.name, { timeout: 15_000 }).toBe(first)
+  await expect.poll(async () => (await describeCanvas(page)).board?.name, { timeout: 15_000 }).toBe(first)
   await waitForCanvas(page)
   expect((await describeCanvas(page)).panels).toHaveLength(3)
-  // The refused command left the other moment exactly as it was.
-  await momentPicker(page).selectOption({ label: 'Second moment' })
-  await expect.poll(async () => (await describeCanvas(page)).moment?.name, { timeout: 15_000 }).toBe('Second moment')
+  // The refused command left the other board exactly as it was.
+  await boardPicker(page).selectOption({ label: 'Second board' })
+  await expect.poll(async () => (await describeCanvas(page)).board?.name, { timeout: 15_000 }).toBe('Second board')
   await waitForCanvas(page)
   expect((await describeCanvas(page)).panels.map(persistedShape)).toEqual(secondLayout)
   await expectArchitectureReportPass(page)

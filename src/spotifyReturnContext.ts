@@ -8,7 +8,7 @@
  * carries just enough to put the panel back as they left it: what was typed,
  * what kind of search it was, and what they had picked.
  *
- * sessionStorage, not a moment and not localStorage: it is about one
+ * sessionStorage, not a board and not localStorage: it is about one
  * interrupted action in one tab, it is read once, and it is thrown away
  * whether or not the visitor came back. It never holds a token — the search
  * words, a panel id, and a public Spotify id are the whole of it. The search
@@ -26,12 +26,12 @@ export type SpotifyReturnSearchType = 'playlists' | 'tracks'
 export interface SpotifyReturnContext {
   panelId: string
   /**
-   * The moment the panel was in. The panel id alone is not enough to say whose
-   * this is: the browser opens whichever moment is active when the page comes
+   * The board the panel was in. The panel id alone is not enough to say whose
+   * this is: the browser opens whichever board is active when the page comes
    * back, and another tab may have changed that while this one was at Spotify.
    * Null for a context written without one.
    */
-  momentId: string | null
+  boardId: string | null
   /** What they had picked when they left, if anything. */
   choice: { kind: 'playlist' | 'track'; spotifyId: string } | null
   /** What was in the search box, so the results they were looking at can be found again. */
@@ -61,12 +61,12 @@ export function takeReturnContext(storage: Storage | null = sessionStorageOrNull
     if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
-    const { panelId, momentId, choice, query, searchType } = parsed as Partial<Record<keyof SpotifyReturnContext, unknown>>
+    const { panelId, boardId, choice, query, searchType } = parsed as Partial<Record<keyof SpotifyReturnContext, unknown>>
     if (typeof panelId !== 'string') return null
 
     return {
       panelId,
-      momentId: typeof momentId === 'string' ? momentId : null,
+      boardId: typeof boardId === 'string' ? boardId : null,
       choice: readChoice(choice),
       query: typeof query === 'string' ? query.slice(0, maxRememberedQueryLength) : '',
       searchType: searchType === 'tracks' ? 'tracks' : 'playlists',

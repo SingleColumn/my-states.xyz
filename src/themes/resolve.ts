@@ -2,8 +2,8 @@ import type { AppearanceSettings, EffectiveTheme, ThemeDefinition, ThemeModeName
 import { modesOf } from './validate'
 
 export interface ResolveThemeInput {
-  /** The open moment's pinned theme, if it has one. */
-  momentThemeId: string | null | undefined
+  /** The open board's pinned theme, if it has one. */
+  boardThemeId: string | null | undefined
   appearance: AppearanceSettings
   /** True when the operating system prefers dark. */
   systemPrefersDark: boolean
@@ -13,22 +13,22 @@ export interface ResolveThemeInput {
 }
 
 /**
- * Which theme is on screen, decided in one place. A moment's own choice
+ * Which theme is on screen, decided in one place. A board's own choice
  * wins while that theme is installed; then the app setting; then the
  * built-in default, which is always installed. A pinned theme that is not
  * installed is reported, not cleared: it may be imported later.
  */
 export function resolveEffectiveTheme(input: ResolveThemeInput): EffectiveTheme {
-  const { momentThemeId, appearance, themes, defaultThemeId } = input
+  const { boardThemeId, appearance, themes, defaultThemeId } = input
   const fallback = themes.get(defaultThemeId)
   if (!fallback) throw new Error(`The default theme "${defaultThemeId}" is not installed.`)
 
-  const pinned = momentThemeId ? themes.get(momentThemeId) : undefined
+  const pinned = boardThemeId ? themes.get(boardThemeId) : undefined
   const global = themes.get(appearance.globalThemeId)
-  const missingThemeId = momentThemeId && !pinned ? momentThemeId : undefined
+  const missingThemeId = boardThemeId && !pinned ? boardThemeId : undefined
 
   const chosen = pinned
-    ? { themeId: momentThemeId!, source: 'moment' as const, definition: pinned }
+    ? { themeId: boardThemeId!, source: 'board' as const, definition: pinned }
     : global
       ? { themeId: appearance.globalThemeId, source: 'global' as const, definition: global }
       : { themeId: defaultThemeId, source: 'fallback' as const, definition: fallback }

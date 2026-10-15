@@ -9,7 +9,7 @@ const themes = mergeLibrary([stored])
 
 function resolveWith(overrides: Partial<ResolveThemeInput>) {
   return resolveEffectiveTheme({
-    momentThemeId: undefined,
+    boardThemeId: undefined,
     appearance: { globalThemeId: DEFAULT_THEME_ID, modePreference: 'system' },
     systemPrefersDark: true,
     themes,
@@ -23,28 +23,28 @@ describe('resolveEffectiveTheme', () => {
     expect(resolveWith({})).toMatchObject({ themeId: 'midnight', source: 'global', mode: 'dark' })
   })
 
-  it('shows the global choice for a moment that follows Global', () => {
+  it('shows the global choice for a board that follows Global', () => {
     expect(resolveWith({ appearance: { globalThemeId: 'terminal', modePreference: 'system' } })).toMatchObject({ themeId: 'terminal', source: 'global' })
   })
 
-  it('lets a moment override the global choice', () => {
-    expect(resolveWith({ momentThemeId: 'custom', appearance: { globalThemeId: 'terminal', modePreference: 'system' } })).toMatchObject({ themeId: 'custom', source: 'moment' })
+  it('lets a board override the global choice', () => {
+    expect(resolveWith({ boardThemeId: 'custom', appearance: { globalThemeId: 'terminal', modePreference: 'system' } })).toMatchObject({ themeId: 'custom', source: 'board' })
   })
 
-  it('follows a global change when the moment follows Global, and ignores it when the moment overrides', () => {
+  it('follows a global change when the board follows Global, and ignores it when the board overrides', () => {
     const following = (globalThemeId: string) => resolveWith({ appearance: { globalThemeId, modePreference: 'system' } }).themeId
     expect([following('paper'), following('terminal')]).toEqual(['paper', 'terminal'])
-    const overriding = (globalThemeId: string) => resolveWith({ momentThemeId: 'custom', appearance: { globalThemeId, modePreference: 'system' } }).themeId
+    const overriding = (globalThemeId: string) => resolveWith({ boardThemeId: 'custom', appearance: { globalThemeId, modePreference: 'system' } }).themeId
     expect([overriding('paper'), overriding('terminal')]).toEqual(['custom', 'custom'])
   })
 
   it('falls back to the global theme when the pinned one is missing, and reports the id without clearing it', () => {
-    expect(resolveWith({ momentThemeId: 'gone', appearance: { globalThemeId: 'paper', modePreference: 'system' } }))
+    expect(resolveWith({ boardThemeId: 'gone', appearance: { globalThemeId: 'paper', modePreference: 'system' } }))
       .toMatchObject({ themeId: 'paper', source: 'global', missingThemeId: 'gone' })
   })
 
   it('falls back to the built-in default when the global theme is missing too', () => {
-    expect(resolveWith({ momentThemeId: 'gone', appearance: { globalThemeId: 'gone-too', modePreference: 'system' } }))
+    expect(resolveWith({ boardThemeId: 'gone', appearance: { globalThemeId: 'gone-too', modePreference: 'system' } }))
       .toMatchObject({ themeId: DEFAULT_THEME_ID, source: 'fallback', missingThemeId: 'gone' })
   })
 
@@ -75,8 +75,8 @@ describe('resolveMode', () => {
   })
 
   it('re-resolves when the system preference changes at runtime', () => {
-    const before = resolveWith({ momentThemeId: 'custom', systemPrefersDark: false }).mode
-    const after = resolveWith({ momentThemeId: 'custom', systemPrefersDark: true }).mode
+    const before = resolveWith({ boardThemeId: 'custom', systemPrefersDark: false }).mode
+    const after = resolveWith({ boardThemeId: 'custom', systemPrefersDark: true }).mode
     expect([before, after]).toEqual(['light', 'dark'])
   })
 })

@@ -61,7 +61,7 @@ interface PanelSelection {
 
 export function SpotifyPanel({ panelId }: { panelId: string }) {
   const posthog = usePostHog()
-  const { spotify, moments, panels } = useAppState()
+  const { spotify, boards, panels } = useAppState()
   const commands = usePanelCommands()
   const found = panels.get(panelId)
   const panel = found?.type === 'spotify' ? (found as Panel<'spotify'>) : undefined
@@ -112,7 +112,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
 
   useEffect(() => {
     setPlaylistUrl(panelPlaylist.url ?? '')
-  }, [moments.activeMoment?.id, panelPlaylist.url])
+  }, [boards.activeBoard?.id, panelPlaylist.url])
 
   // A keyboard's dedicated volume keys reach the page as keydown events
   // (code "AudioVolume*"), separate from the OS volume they also adjust.
@@ -188,7 +188,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   }, [query, searchType, spotify.tokens])
 
   // The suggestions this page session offers. Chosen once, in a module that
-  // holds the choice, so that a rerender, a resize, a change of moment or
+  // holds the choice, so that a rerender, a resize, a change of board or
   // tldraw redrawing the canvas all leave the same six cards in place.
   const [suggestions, setSuggestions] = useState<CuratedSpotifyPlaylist[]>(getSessionSuggestions)
   const [suggestionSummaries, setSuggestionSummaries] = useState<SpotifyPlaylistSummary[]>([])
@@ -229,7 +229,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // than facing an empty box and no sign of what they had chosen. The words
   // they had typed come back and the search runs again, so the results — with
   // their playlist marked among them — are on screen when they arrive. A
-  // playlist needs nothing else: the panel's reference is part of the moment
+  // playlist needs nothing else: the panel's reference is part of the board
   // and outlived the redirect. A song is only ever a runtime choice, so it is
   // looked up again by its id.
   //
@@ -242,60 +242,60 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // Connect Spotify button over again.
   const [invitations, setInvitations] = useState(0)
   // Whether a playlist has been chosen in this panel during this visit. The
-  // moment's saved playlist is not that: it was chosen on some other day, or
-  // arrived with an imported moment.
+  // board's saved playlist is not that: it was chosen on some other day, or
+  // arrived with an imported board.
   const [chosenPlaylistThisVisit, setChosenPlaylistThisVisit] = useState(false)
   // The playlist that was chosen before a sign-in that did not succeed, given
-  // back by id rather than as a yes-or-no. Whether it is the one the moment has
+  // back by id rather than as a yes-or-no. Whether it is the one the board has
   // saved cannot be settled when it is restored: on a page that has just
-  // reloaded the moment's data can reach the panel a moment later. Held as an
+  // reloaded the board's data can reach the panel a board later. Held as an
   // id, the comparison is made on every render and holds whenever it arrives.
   const [restoredPlaylistId, setRestoredPlaylistId] = useState<string | null>(null)
   // A song chosen before connecting is looked up again on the way back, and
   // until that answers there is nothing to play it with. Without this the
-  // panel falls back to the moment's saved playlist in the meantime — names it,
+  // panel falls back to the board's saved playlist in the meantime — names it,
   // and starts it on Play — when the visitor asked for a song.
   const [restoringSong, setRestoringSong] = useState(false)
 
-  // Not connected, the playlist saved in the moment is a name that cannot be
+  // Not connected, the playlist saved in the board is a name that cannot be
   // played and that this visitor did not just choose. Showing it invites a
   // question with no good answer, so it stays out of sight until they choose
   // one now — or connect, when it is theirs to play and is shown as ever.
-  // Everything that names "the playlist" reads this rather than the moment.
+  // Everything that names "the playlist" reads this rather than the board.
   const playlistWasChosen = chosenPlaylistThisVisit || (restoredPlaylistId !== null && restoredPlaylistId === panelPlaylist.id)
   const shownPlaylist = connected || playlistWasChosen ? panelPlaylist : defaultSpotifyPlaylistReference
 
-  // A different moment has a different saved playlist, and nothing chosen in
+  // A different board has a different saved playlist, and nothing chosen in
   // the last one carries over to it.
   //
   // Only a change counts. React's development mode runs every effect twice when
   // a component mounts, and this one runs before the effects that give back
   // what the visitor was doing on the way back from Spotify: run again, it wiped
   // what they had just restored, and the context they read it from was already
-  // used up. So it remembers which moment it last saw and does nothing when the
-  // moment is the same.
-  const lastMomentIdRef = useRef(moments.activeMoment?.id)
+  // used up. So it remembers which board it last saw and does nothing when the
+  // board is the same.
+  const lastBoardIdRef = useRef(boards.activeBoard?.id)
   useEffect(() => {
-    if (lastMomentIdRef.current === moments.activeMoment?.id) return
-    lastMomentIdRef.current = moments.activeMoment?.id
+    if (lastBoardIdRef.current === boards.activeBoard?.id) return
+    lastBoardIdRef.current = boards.activeBoard?.id
     setChosenPlaylistThisVisit(false)
     setRestoredPlaylistId(null)
     setInvitations(0)
     setRestoringSong(false)
     // The "press play to start…" prompt is about what was chosen before leaving
-    // for Spotify, in the moment it was chosen in. Left standing, another moment
+    // for Spotify, in the board it was chosen in. Left standing, another board
     // would show it beside its own saved playlist: music nobody picked there.
     setCameBackToPlay(false)
-  }, [moments.activeMoment?.id])
+  }, [boards.activeBoard?.id])
 
   // Whose is a context? It was read from this tab's own storage, but the page
-  // that came back opens whichever moment is active in storage shared by every
+  // that came back opens whichever board is active in storage shared by every
   // tab, and another tab may have opened a different one while this tab was at
-  // Spotify. A context for another panel or moment is not this panel's to
-  // restore — its query and song would land in the wrong moment. Whatever reads
+  // Spotify. A context for another panel or board is not this panel's to
+  // restore — its query and song would land in the wrong board. Whatever reads
   // one has already taken it, so one that is not ours is simply dropped.
   const isOurContext = (context: SpotifyReturnContext) =>
-    context.panelId === panelId && (context.momentId === null || context.momentId === moments.activeMoment?.id)
+    context.panelId === panelId && (context.boardId === null || context.boardId === boards.activeBoard?.id)
 
   useEffect(() => {
     if (!connected) return
@@ -318,14 +318,14 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // not connected, on a page that has reloaded: the search, its results and
   // what they had chosen are gone. Some of that can be given back, and is.
   //
-  // The search text and type can. A playlist can: it was saved in the moment as
+  // The search text and type can. A playlist can: it was saved in the board as
   // soon as it was clicked, so it only has to be made visible again, which it is
   // once it is the one that was chosen (see restoredPlaylistId). A song cannot: it was only ever held in
   // memory, and cannot be found again without a sign-in, so it stays gone.
   //
   // This waits to be told the sign-in failed rather than restoring whenever the
   // panel opens signed out, because a sign-in that is about to succeed also
-  // opens signed out for a moment, and must find its context still there.
+  // opens signed out for a board, and must find its context still there.
   useEffect(() => {
     if (!spotify.signInFailed || connected) return
     const context = takeReturnContext()
@@ -371,7 +371,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         ? 'no-matches'
         : 'results'
 
-  // Suggestions are what fills an empty panel, so they give way the moment
+  // Suggestions are what fills an empty panel, so they give way the board
   // there is a search to answer, and again once something is playing and the
   // panel has a job of its own.
   const showSuggestions = !searchHidden && searchState === 'waiting' && suggestionCards.length > 0 && !spotify.track
@@ -382,7 +382,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // line saying what happens next — not with a second button: there is one way
   // to connect Spotify in this panel, and it is always the same one.
   // Connected, a click plays and there is nothing to explain — except for the
-  // moment someone comes back from connecting, when the choice they made
+  // board someone comes back from connecting, when the choice they made
   // before leaving is waiting for them to press Play.
   const showChosenNote = !focusView && !searchHidden && selection !== null && !spotify.track
     && (!connected || cameBackToPlay)
@@ -485,7 +485,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     setInvitations(0)
   }
 
-  // A new moment starts this panel short. Using it makes room: typing, a
+  // A new board starts this panel short. Using it makes room: typing, a
   // search or choice restored after coming back from Spotify, or being
   // connected already all mean the panel is in use.
   const inUse = query.trim() !== '' || selection !== null || connected
@@ -510,7 +510,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // id — and none of it is sent anywhere.
       rememberReturnContext({
         panelId,
-        momentId: moments.activeMoment?.id ?? null,
+        boardId: boards.activeBoard?.id ?? null,
         choice: selection ? { kind: selection.kind, spotifyId: selection.id } : null,
         query,
         searchType,
@@ -556,7 +556,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
 
   // Someone has just clicked something that cannot be played until Spotify is
   // connected: the button that fixes that is where the eye should go next. It
-  // follows the click, not the state — a playlist saved in the moment, chosen
+  // follows the click, not the state — a playlist saved in the board, chosen
   // days ago, is not news, and a button that glows at every visit is noise.
   // The count is the key, so each new click starts the glow again.
   const invitingToConnect = !connected && showChosenNote && invitations > 0

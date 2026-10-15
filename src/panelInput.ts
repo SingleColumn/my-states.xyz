@@ -3,13 +3,13 @@ import type { Panel } from './types'
 
 /**
  * A panel that arrives from outside the canvas: an archive being imported,
- * or a new moment's defaults. Its identity and flags are checked here; its
+ * or a new board's defaults. Its identity and flags are checked here; its
  * configuration is the registry's own concern (`normalizeConfig`), so a new
  * panel type needs no branch in this file.
  */
 export function normalizeDraftPanel(value: unknown): Panel {
   const panel = record(value)
-  if (!isPanelType(panel.type)) throw new Error('This moment contains an unsupported panel type.')
+  if (!isPanelType(panel.type)) throw new Error('This board contains an unsupported panel type.')
   if (typeof panel.id !== 'string' || !panel.id) throw new Error('A saved panel is missing its identity.')
   for (const flag of ['visible', 'focusView']) {
     if (panel[flag] !== undefined && typeof panel[flag] !== 'boolean') throw new Error(`Invalid saved panel ${flag}.`)

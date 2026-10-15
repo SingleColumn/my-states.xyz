@@ -228,7 +228,7 @@ async function respond(work: () => Promise<HandlerResult>): Promise<HandlerResul
         console.error('[spotify] Spotify rate-limited the application token.')
         return {
           status: 429,
-          body: { error: 'Spotify is busy. Try again in a moment.' },
+          body: { error: 'Spotify is busy. Try again in a board.' },
           headers: caught.retryAfterSeconds === null ? undefined : { 'Retry-After': String(caught.retryAfterSeconds) },
         }
       }

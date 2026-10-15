@@ -7,7 +7,7 @@ describe('durable save queue', () => {
     const report = vi.fn()
     const write = vi.fn().mockRejectedValueOnce(error).mockResolvedValue(undefined)
     const queue = new SaveQueue(report)
-    queue.enqueue('moment', write)
+    queue.enqueue('board', write)
     await expect(queue.flush()).rejects.toThrow('Disk full')
     expect(queue.hasPending).toBe(true)
     expect(report).toHaveBeenCalledWith(error)
@@ -21,23 +21,23 @@ describe('durable save queue', () => {
     const first = new Promise<void>((resolve) => { complete = resolve })
     const writes: string[] = []
     const queue = new SaveQueue(vi.fn())
-    queue.enqueue('moment', async () => { writes.push('old'); await first })
-    queue.enqueue('moment', async () => { writes.push('new') })
+    queue.enqueue('board', async () => { writes.push('old'); await first })
+    queue.enqueue('board', async () => { writes.push('new') })
     complete()
     await queue.flush()
     expect(writes).toEqual(['old', 'new'])
     expect(queue.hasPending).toBe(false)
   })
 
-  it('coalesces waiting snapshots without dropping another moment or note', async () => {
+  it('coalesces waiting snapshots without dropping another board or note', async () => {
     let complete!: () => void
     const first = new Promise<void>((resolve) => { complete = resolve })
     const writes: string[] = []
     const queue = new SaveQueue(vi.fn())
     queue.enqueue('first', () => first)
-    queue.enqueue('moment', async () => { writes.push('superseded') })
+    queue.enqueue('board', async () => { writes.push('superseded') })
     queue.enqueue('note', async () => { writes.push('note') })
-    queue.enqueue('moment', async () => { writes.push('latest') })
+    queue.enqueue('board', async () => { writes.push('latest') })
     complete()
     await queue.flush()
     expect(writes).toEqual(['latest', 'note'])

@@ -132,7 +132,7 @@ function split(value: string): MdNode[] {
 
 /**
  * Teaches remark to write the mark. Called from the editor's config, the
- * last moment the stringify options can be changed.
+ * last board the stringify options can be changed.
  */
 export function configureHighlightStringify(ctx: Ctx) {
   const options = ctx.get(remarkStringifyOptionsCtx)

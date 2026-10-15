@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
-import { createMomentFromToolbar, describeCanvas, expectArchitectureReportPass, openApp, switchMoment, waitForCanvas } from './helpers'
+import { createBoardFromToolbar, describeCanvas, expectArchitectureReportPass, openApp, switchBoard, waitForCanvas } from './helpers'
 
 /**
  * Themes, end to end: Settings > Appearance sets the global theme, the
- * moment toolbar pins one to a moment or returns it to Global, an import
+ * board toolbar pins one to a board or returns it to Global, an import
  * goes through the validator, and the page repaints from the custom
  * properties the theme compiles to. The oracle for "which theme is on
  * screen" is `describe().theme`; the oracle for "the page repainted" is the
@@ -32,7 +32,7 @@ async function themeOnScreen(page: Page) {
   })
 }
 
-const momentThemePicker = (page: Page) => page.getByRole('combobox', { name: 'Theme for this moment' })
+const boardThemePicker = (page: Page) => page.getByRole('combobox', { name: 'Theme for this board' })
 
 async function openSettings(page: Page) {
   await page.getByRole('button', { name: 'Settings' }).click()
@@ -56,7 +56,7 @@ async function importTheme(page: Page, filename: string, json: string) {
 
 const settingsNotice = (page: Page) => page.locator('.app-settings-notice')
 const globalThemePicker = (page: Page) => page.getByLabel('Theme', { exact: true })
-/** An option of the Settings theme picker by its exact text; the moment picker lists the same names. */
+/** An option of the Settings theme picker by its exact text; the board picker lists the same names. */
 const globalThemeOption = (page: Page, text: string) => globalThemePicker(page).locator('option', { hasText: new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) })
 
 test('a fresh profile shows the built-in default, from Settings, in dark mode', async ({ page }) => {
@@ -65,8 +65,8 @@ test('a fresh profile shows the built-in default, from Settings, in dark mode', 
     id: 'midnight', name: 'Midnight', source: 'global', globalThemeId: 'midnight', mode: 'dark',
     rootTheme: 'midnight', rootMode: 'dark', canvas: '#101114', tldrawBackground: '#101114', tldrawScheme: 'dark', headerStyle: 'plain',
   })
-  await expect(momentThemePicker(page)).toHaveValue('')
-  await expect(momentThemePicker(page).locator('option').first()).toHaveText('Global (Midnight)')
+  await expect(boardThemePicker(page)).toHaveValue('')
+  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Midnight)')
   expect(pageErrors).toEqual([])
 })
 
@@ -76,7 +76,7 @@ test('the global theme is chosen in Settings, repaints the page and tldraw, and 
   await globalThemePicker(page).selectOption('terminal')
   await closeSettings(page)
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'global', canvas: '#050807', tldrawBackground: '#050807', rootTheme: 'terminal' })
-  await expect(momentThemePicker(page).locator('option').first()).toHaveText('Global (Terminal)')
+  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Terminal)')
   await expect(page.getByRole('button', { name: 'Settings' })).toHaveAttribute('title', 'Settings. Theme: Terminal')
 
   await page.reload()
@@ -84,46 +84,46 @@ test('the global theme is chosen in Settings, repaints the page and tldraw, and 
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'global', canvas: '#050807' })
 })
 
-test('a moment follows Global until it pins a theme, and the pin survives a canvas save and a reload', async ({ page }) => {
+test('a board follows Global until it pins a theme, and the pin survives a canvas save and a reload', async ({ page }) => {
   await openApp(page)
-  const picker = momentThemePicker(page)
+  const picker = boardThemePicker(page)
   await picker.selectOption('paper')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'moment', mode: 'light', canvas: '#f3eee4', tldrawScheme: 'light', colorScheme: 'light', headerStyle: 'underline' })
-  await expect.poll(async () => (await describeCanvas(page)).moment?.themeId).toBe('paper')
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'board', mode: 'light', canvas: '#f3eee4', tldrawScheme: 'light', colorScheme: 'light', headerStyle: 'underline' })
+  await expect.poll(async () => (await describeCanvas(page)).board?.themeId).toBe('paper')
 
   // A canvas write triggers the debounced document save, which rebuilds the
-  // moment record; the pin must come through it.
+  // board record; the pin must come through it.
   const notes = (await describeCanvas(page)).panels.find((panel) => panel.type === 'notes')!
   await page.evaluate((command) => window.myStates!.dispatch(command), { kind: 'panel.move' as const, panelId: notes.panelId, x: notes.x + 40, y: notes.y })
   await page.waitForTimeout(600)
   await page.reload()
   await waitForCanvas(page)
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'moment' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'board' })
   await expect(picker).toHaveValue('paper')
 
   await picker.selectOption('')
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', mode: 'dark', tldrawScheme: 'dark', headerStyle: 'plain' })
-  await expect.poll(async () => (await describeCanvas(page)).moment?.themeId).toBeNull()
+  await expect.poll(async () => (await describeCanvas(page)).board?.themeId).toBeNull()
   await expectArchitectureReportPass(page)
 })
 
-test('changing the global theme reaches a moment on Global and not one with its own theme', async ({ page }) => {
+test('changing the global theme reaches a board on Global and not one with its own theme', async ({ page }) => {
   await openApp(page)
-  await createMomentFromToolbar(page, 'Pinned')
-  await momentThemePicker(page).selectOption('terminal')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'moment' })
+  await createBoardFromToolbar(page, 'Pinned')
+  await boardThemePicker(page).selectOption('terminal')
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'board' })
 
   await openSettings(page)
   await globalThemePicker(page).selectOption('paper')
-  await expect(page.getByRole('dialog', { name: 'Settings' })).toContainText('The open moment uses its own theme, Terminal')
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toContainText('The open board uses its own theme, Terminal')
   await closeSettings(page)
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'moment', globalThemeId: 'paper' })
-  await expect(momentThemePicker(page).locator('option').first()).toHaveText('Global (Paper)')
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'board', globalThemeId: 'paper' })
+  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Paper)')
 
-  await switchMoment(page, 'A new moment')
+  await switchBoard(page, 'A new board')
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'global', mode: 'light' })
-  await switchMoment(page, 'Pinned')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'moment', mode: 'dark' })
+  await switchBoard(page, 'Pinned')
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'board', mode: 'dark' })
 })
 
 test('a theme file is imported, listed, selectable, and deleted with a fallback', async ({ page }) => {
@@ -136,28 +136,28 @@ test('a theme file is imported, listed, selectable, and deleted with a fallback'
   await globalThemePicker(page).selectOption('ember')
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'ember', source: 'global', canvas: '#2a0a00', tldrawBackground: '#2a0a00' })
   await closeSettings(page)
-  await momentThemePicker(page).selectOption('ember')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'ember', source: 'moment' })
+  await boardThemePicker(page).selectOption('ember')
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'ember', source: 'board' })
 
   await page.reload()
   await waitForCanvas(page)
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'ember', source: 'moment', globalThemeId: 'ember' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'ember', source: 'board', globalThemeId: 'ember' })
 
   await openSettings(page)
   page.once('dialog', (dialog) => {
-    expect(dialog.message()).toContain('One moment uses this theme')
+    expect(dialog.message()).toContain('One board uses this theme')
     void dialog.accept()
   })
   await page.getByRole('button', { name: 'Delete theme Ember' }).click()
   await expect(settingsNotice(page)).toContainText('"Ember" was deleted')
   await expect(globalThemeOption(page, 'Ember (imported)')).toHaveCount(0)
-  // The global choice fell back to the default; the moment keeps its pinned
+  // The global choice fell back to the default; the board keeps its pinned
   // id and shows the global theme in the meantime.
   await expect(globalThemePicker(page)).toHaveValue('midnight')
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', canvas: '#101114' })
-  await expect.poll(async () => (await describeCanvas(page)).moment?.themeId).toBe('ember')
+  await expect.poll(async () => (await describeCanvas(page)).board?.themeId).toBe('ember')
   await closeSettings(page)
-  await expect(momentThemePicker(page).locator('option', { hasText: 'ember (not installed)' })).toBeAttached()
+  await expect(boardThemePicker(page).locator('option', { hasText: 'ember (not installed)' })).toBeAttached()
 })
 
 test('built-in themes cannot be deleted and an invalid file is refused with its problems listed', async ({ page }) => {

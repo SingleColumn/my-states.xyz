@@ -17,12 +17,12 @@ export interface PanelDefinition<Type extends PanelType> {
   type: Type
   /** The word the user sees: on the panel, in menus, in the report. */
   label: string
-  /** At most one on a moment. Duplicating or adding a second is refused. */
+  /** At most one on a board. Duplicating or adding a second is refused. */
   singleton: boolean
   /** Where a new panel of this kind lands and how big it is. */
   defaultLayout: { x: number; y: number; w: number; h: number }
   /**
-   * The height a panel has in a brand-new moment, when it is shorter than its
+   * The height a panel has in a brand-new board, when it is shorter than its
    * default height. The panel grows to the default once someone uses it.
    * Null starts at the default height.
    */
@@ -36,7 +36,7 @@ export interface PanelDefinition<Type extends PanelType> {
   /**
    * Projects arbitrary input onto this type's known keys and validates the
    * result: a missing key takes its default, a malformed known value
-   * throws. The one place a panel from outside the canvas (a new moment's
+   * throws. The one place a panel from outside the canvas (a new board's
    * defaults, an imported archive) becomes trustworthy.
    */
   normalizeConfig(value: unknown): PanelConfigs[Type]
@@ -259,7 +259,7 @@ const video: PanelDefinition<'video'> = {
 
 export const panelRegistry: { readonly [K in PanelType]: PanelDefinition<K> } = { slideshow, notes, spotify, video }
 
-/** In the order a new moment lays them out, left to right. */
+/** In the order a new board lays them out, left to right. */
 export const PANEL_TYPES = Object.keys(panelRegistry) as readonly PanelType[]
 
 export function getPanelDefinition<Type extends PanelType>(type: Type): PanelDefinition<Type> {

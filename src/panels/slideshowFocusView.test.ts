@@ -10,7 +10,7 @@ import { SlideshowPanel } from './SlideshowPanel'
 const panel = vi.hoisted(() => ({ focusView: false }))
 const slideshowRuntime = vi.hoisted(() => ({ playing: true, setIsPlaying: vi.fn() }))
 
-const image = { id: 'image_1', momentId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
+const image = { id: 'image_1', boardId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
 
 // The header's menu is closed until clicked, and a static render cannot
 // click, so the real header is rendered with its menu open.
@@ -41,7 +41,7 @@ vi.mock('../AppState', () => ({
       next: () => {},
       previous: () => {},
     },
-    moments: { activeMoment: { id: 'moment_focus' } },
+    boards: { activeBoard: { id: 'board_focus' } },
     panels: {
       get: () => ({
         id: 'panel_images',

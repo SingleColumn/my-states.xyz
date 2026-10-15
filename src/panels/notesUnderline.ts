@@ -104,7 +104,7 @@ function isTag(node: MdNode, tag: string) {
 
 /**
  * Teaches remark to write the mark back out. Called from the editor's
- * config, which is the last moment the stringify options can be changed:
+ * config, which is the last board the stringify options can be changed:
  * the remark instance is built from them once, after config and before the
  * editor exists.
  */

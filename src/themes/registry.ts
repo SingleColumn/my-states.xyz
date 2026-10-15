@@ -11,7 +11,7 @@ import ukiyo from './builtin/ukiyo.theme.json'
 
 /**
  * The built-in themes ship in the bundle and are never written to the
- * database, so an update to one reaches every moment that pins it and there
+ * database, so an update to one reaches every board that pins it and there
  * is no stale copy to migrate. The library the app shows is these plus
  * whatever the user imported, merged by `mergeLibrary`.
  *

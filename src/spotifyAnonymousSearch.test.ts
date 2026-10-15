@@ -318,8 +318,8 @@ describe('Choosing a playlist', () => {
 
   // A playlist reference is public metadata about a playlist. Nothing that
   // could identify a visitor, and nothing that could authorise anything, is
-  // allowed into what a moment keeps.
-  it('keeps nothing but public metadata in what the moment stores', async () => {
+  // allowed into what a board keeps.
+  it('keeps nothing but public metadata in what the board stores', async () => {
     session.tokens = { accessToken: 'user-token', refreshToken: 'refresh', expiresAt: Date.now() + 600_000 }
     const { panels, updateConfig } = panelsStub()
     const { result } = await mountSpotifyState(panels)
@@ -344,7 +344,7 @@ describe('Choosing a playlist', () => {
 
     act(() => { result.current.selectTrack(song) })
     expect(result.current.selectedTrack).toEqual(song)
-    // A song is a step on the way to a playlist, so it is not what a moment
+    // A song is a step on the way to a playlist, so it is not what a board
     // is reopened on: nothing is written to the panel.
     expect(updateConfig).not.toHaveBeenCalled()
 
@@ -391,7 +391,7 @@ describe('Choosing a playlist', () => {
 })
 
 // A playlist saved before the panel showed artwork, or arriving with an
-// imported moment, has a name and no picture, and the panel looks the picture
+// imported board, has a name and no picture, and the panel looks the picture
 // up once. "Once" must not mean "once, even if that one attempt never got an
 // answer" -- and must not mean the app's attempt before connecting rules out
 // the visitor's own attempt after. Found in review.
@@ -467,7 +467,7 @@ describe('Looking up the artwork of a saved playlist', () => {
 })
 
 // Playing something is what supersedes a song held for Play. The player only
-// reports what is playing a moment later, and until it does the held song
+// reports what is playing a board later, and until it does the held song
 // outranks whatever was just started. selectPlaylist was covered first; the
 // connected paths that play directly go around it. Found in review.
 describe('A song held for Play, when something else is played', () => {
@@ -503,7 +503,7 @@ describe('A song held for Play, when something else is played', () => {
 
   // The song just started is what Play is for until the player reports it. If
   // it were cleared at once, a second press of Play in that gap would find
-  // nothing held and start the moment's saved playlist over it. Found in review.
+  // nothing held and start the board's saved playlist over it. Found in review.
   it('becomes the song that was just started, so a second Play cannot replace it', async () => {
     const result = await connectedWithASongHeld()
     const another = { ...song, id: 't2', uri: 'spotify:track:t2', name: 'Another' }
@@ -535,7 +535,7 @@ describe('A song held for Play, when something else is played', () => {
 
 // Coming back from Spotify with a song chosen, the panel looks the song up by its
 // id. That is a request, and requests can be overtaken: the visitor may open
-// another moment, clear the search or pick something else before it answers.
+// another board, clear the search or pick something else before it answers.
 // Its answer describes an earlier state and must not be put back. Found in review.
 describe('A song lookup that is overtaken', () => {
   const trackItem = {
@@ -556,7 +556,7 @@ describe('A song lookup that is overtaken', () => {
     spotifyApi.spotifyFetch.mockImplementation((path: string) => (path.startsWith('/tracks/') ? slow.promise : Promise.resolve(undefined)))
     const { panels } = panelsStub()
     const { useSpotifyState } = await import('./AppState')
-    const view = renderHook(({ momentId }: { momentId: string }) => useSpotifyState({ id: momentId } as never, panels), { initialProps: { momentId: 'm1' } })
+    const view = renderHook(({ boardId }: { boardId: string }) => useSpotifyState({ id: boardId } as never, panels), { initialProps: { boardId: 'm1' } })
     let lookup!: Promise<void>
     await act(async () => { lookup = view.result.current.lookupTrack('t1') })
     const finish = async () => { await act(async () => { slow.release(trackItem); await lookup }) }
@@ -569,10 +569,10 @@ describe('A song lookup that is overtaken', () => {
     expect(result.current.selectedTrack).toMatchObject({ id: 't1', name: 'Xtal' })
   })
 
-  it('is dropped when another moment was opened meanwhile', async () => {
+  it('is dropped when another board was opened meanwhile', async () => {
     const { result, rerender, finish } = await lookupStarted()
 
-    rerender({ momentId: 'm2' })
+    rerender({ boardId: 'm2' })
     await finish()
 
     expect(result.current.selectedTrack).toBeNull()
@@ -613,7 +613,7 @@ describe('A song lookup that is overtaken', () => {
 // A sign-in that leaves for Spotify can come back without succeeding: cancelled
 // there, refused, or with a code that cannot be exchanged. The panel gives back
 // what the visitor was doing only when it is told so, because a sign-in that is
-// about to succeed also opens signed out for a moment. Found in review.
+// about to succeed also opens signed out for a board. Found in review.
 describe('A sign-in that comes back without succeeding', () => {
   it('is not reported as failed to begin with', async () => {
     const { panels } = panelsStub()

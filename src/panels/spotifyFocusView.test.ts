@@ -47,7 +47,7 @@ vi.mock('../AppState', () => ({
       seek: async () => {},
       setVolume: async () => {},
     },
-    moments: { activeMoment: { id: 'moment_focus' } },
+    boards: { activeBoard: { id: 'board_focus' } },
     panels: {
       get: () => ({
         id: 'panel_music',
@@ -171,10 +171,10 @@ describe('Music panel focus view, before Spotify is connected', () => {
     expect(markup).toContain('Connect Spotify')
   })
 
-  // The moment saves a playlist so that it is there to play once connected.
+  // The board saves a playlist so that it is there to play once connected.
   // Until then it is a name that cannot be played and that this visitor did
   // not choose, so it is not put in front of them -- here or in the footer.
-  it('does not name the playlist the moment happens to have saved', () => {
+  it('does not name the playlist the board happens to have saved', () => {
     const markup = renderMusicPanel(true, false)
     expect(markup).not.toContain('Deep Focus')
     expect(markup).toContain('No playlist loaded')

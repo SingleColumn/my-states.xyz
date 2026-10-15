@@ -57,7 +57,7 @@ export async function createImageItemsFromBundledCollection(
     const filename = imageNameFromUrl(url)
     return {
       id: `bundled-${id}-${index}`,
-      momentId: null,
+      boardId: null,
       filename,
       name: filename,
       mimeType: mimeTypeFromFilename(filename),

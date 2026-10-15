@@ -1,13 +1,13 @@
 import { strFromU8, strToU8, Unzip, UnzipInflate, zipSync } from 'fflate'
 import {
   getNotes,
-  getMoment,
-  getMomentAssets,
+  getBoard,
+  getBoardAssets,
   getStoredTheme,
-  importMomentContent,
+  importBoardContent,
   importStoredTheme,
-  momentLimits,
-  type ImportedMomentContent,
+  boardLimits,
+  type ImportedBoardContent,
   type ThemeImportOutcome,
 } from './storage'
 import { draftFromDocument } from './panelStore'
@@ -18,10 +18,10 @@ import type { ThemeDefinition } from './themes/types'
 import { acceptEveryValue, THEME_ID_PATTERN, validateThemeDefinition, type SupportsCssValue } from './themes/validate'
 import type {
   CanvasState,
-  Moment,
+  Board,
   Note,
   Panel,
-  MomentImage,
+  BoardImage,
   ImageAttribution,
 } from './types'
 
@@ -34,8 +34,8 @@ import type {
  *
  * The optional `theme` field was added on 2026-09-15 without a version
  * change: a build without themes ignores an unknown manifest key, and a
- * manifest without the key means the moment follows the global theme, which
- * is what every earlier moment did. Version 3 adds shared image-to-panel
+ * manifest without the key means the board follows the global theme, which
+ * is what every earlier board did. Version 3 adds shared image-to-panel
  * references so a repeated curated image travels only once; version 2 stays
  * readable. Themes are inline because older builds reject unexpected files.
  */
@@ -54,22 +54,22 @@ const supportedImageTypes = new Set([
   'image/svg+xml',
 ])
 
-interface MomentManifest {
+interface BoardManifest {
   formatVersion: number
-  moment: {
+  board: {
     name: string
     createdAt: number
     updatedAt: number
   }
   /**
-   * The theme the moment pins. Absent: the moment follows the global theme.
+   * The theme the board pins. Absent: the board follows the global theme.
    * A built-in theme travels as its id alone, since every build has it; an
-   * imported one travels with its definition, so the moment looks the same
+   * imported one travels with its definition, so the board looks the same
    * in another browser. A pinned theme that was not installed at export
    * travels as its id, as the spec asks: it may be installed at the other end.
    */
   theme?: { id: string; definition?: ThemeDefinition }
-  /** The moment's draft: panels and their layout, in the app's own terms. */
+  /** The board's draft: panels and their layout, in the app's own terms. */
   panels: Panel[]
   canvas: CanvasState | null
   notes: Array<{
@@ -95,34 +95,34 @@ interface MomentManifest {
 }
 
 /**
- * A moment read out in the app's own interchange terms -- the same shape
- * `importMomentContent` takes -- plus the stored record it came from. The
- * one place a moment is turned from "a record in the database" into "data
- * that could become a different moment"; `exportMomentArchive` packages it
- * into a zip, `duplicateMoment` hands it straight back to storage.
+ * A board read out in the app's own interchange terms -- the same shape
+ * `importBoardContent` takes -- plus the stored record it came from. The
+ * one place a board is turned from "a record in the database" into "data
+ * that could become a different board"; `exportBoardArchive` packages it
+ * into a zip, `duplicateBoard` hands it straight back to storage.
  */
-async function buildMomentContent(
-  momentId: string,
+async function buildBoardContent(
+  boardId: string,
   snapshotCurated = false,
   fetcher: typeof fetch = fetch,
   curatedBaseUrl: string | null = configuredImageCollectionsBaseUrl,
-): Promise<{ moment: Moment; content: ImportedMomentContent }> {
-  const [moment, notes, assets] = await Promise.all([getMoment(momentId), getNotes(momentId), getMomentAssets(momentId)])
-  if (!moment) throw new Error('The selected moment no longer exists.')
-  // The archive carries a moment as a draft, in the app's own terms: the
+): Promise<{ board: Board; content: ImportedBoardContent }> {
+  const [board, notes, assets] = await Promise.all([getBoard(boardId), getNotes(boardId), getBoardAssets(boardId)])
+  if (!board) throw new Error('The selected board no longer exists.')
+  // The archive carries a board as a draft, in the app's own terms: the
   // tldraw document is the app's persistence format, not its interchange
   // format, so a change to tldraw's is not a change to the file.
-  const { panels: draftPanels, canvas } = draftFromDocument(moment.document, moment.camera)
+  const { panels: draftPanels, canvas } = draftFromDocument(board.document, board.camera)
   const noteIds = new Set(notes.map((note) => note.id))
   // A Notes panel can be left pointing at a note that no longer exists (a
   // second panel showing a note deleted through a different one). Import
-  // rejects that reference outright, so a moment carrying it must not be
+  // rejects that reference outright, so a board carrying it must not be
   // allowed to produce a copy it cannot itself restore.
   let panels = draftPanels.map((panel) => panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)
     ? { ...panel, config: { activeNoteId: null } }
     : panel)
   // Bundled files already ship with the app; inactive local assets are not duplicated.
-  let exportedAssets: ImportedMomentContent['assets'] = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
+  let exportedAssets: ImportedBoardContent['assets'] = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
   if (snapshotCurated && panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'curated')) {
     const snapshot = await snapshotCuratedCollections(panels, fetcher, curatedBaseUrl)
     panels = snapshot.panels
@@ -130,20 +130,20 @@ async function buildMomentContent(
   }
   validateExportContent(notes, exportedAssets)
 
-  const content: ImportedMomentContent = {
-    name: moment.name,
-    ...(moment.themeId ? { themeId: moment.themeId } : {}),
+  const content: ImportedBoardContent = {
+    name: board.name,
+    ...(board.themeId ? { themeId: board.themeId } : {}),
     panels,
     canvas,
     notes: notes.map(({ id, title, content: body, createdAt, updatedAt }) => ({ id, title, content: body, createdAt, updatedAt })),
     assets: exportedAssets,
   }
-  return { moment, content }
+  return { board, content }
 }
 
 async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch, curatedBaseUrl: string | null) {
   if (!curatedBaseUrl) {
-    throw new Error('This moment uses online image collections, but their source is not configured. The export was not created.')
+    throw new Error('This board uses online image collections, but their source is not configured. The export was not created.')
   }
   const catalog = await loadCuratedCollectionCatalog(curatedBaseUrl, fetcher)
   const collections = new Map(catalog.collections.map((collection) => [collection.id, collection]))
@@ -156,7 +156,7 @@ async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch
     if (panel.type !== 'slideshow' || panel.config.imageSource.type !== 'curated') return panel
     const collection = collections.get(panel.config.imageSource.collectionSlug)
     if (!collection) {
-      throw new Error(`The image collection "${panel.config.folderName ?? panel.config.imageSource.collectionSlug}" is no longer available, so this moment cannot be exported yet.`)
+      throw new Error(`The image collection "${panel.config.folderName ?? panel.config.imageSource.collectionSlug}" is no longer available, so this board cannot be exported yet.`)
     }
     for (const item of collection.items) {
       const existing = portable.get(item.id)
@@ -204,25 +204,25 @@ async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch
   return { panels: snapshotPanels, assets }
 }
 
-export async function exportMomentArchive(
-  momentId: string,
+export async function exportBoardArchive(
+  boardId: string,
   options: { fetcher?: typeof fetch; curatedBaseUrl?: string | null } = {},
 ) {
-  const { moment, content } = await buildMomentContent(
-    momentId,
+  const { board, content } = await buildBoardContent(
+    boardId,
     true,
     options.fetcher ?? fetch,
     options.curatedBaseUrl === undefined ? configuredImageCollectionsBaseUrl : options.curatedBaseUrl,
   )
-  const theme = moment.themeId ? await themeForArchive(moment.themeId) : undefined
+  const theme = board.themeId ? await themeForArchive(board.themeId) : undefined
 
   const files: Record<string, Uint8Array> = {}
-  const manifest: MomentManifest = {
+  const manifest: BoardManifest = {
     formatVersion: FORMAT_VERSION,
-    moment: {
-      name: moment.name,
-      createdAt: moment.createdAt,
-      updatedAt: moment.updatedAt,
+    board: {
+      name: board.name,
+      createdAt: board.createdAt,
+      updatedAt: board.updatedAt,
     },
     ...(theme ? { theme } : {}),
     panels: content.panels,
@@ -265,68 +265,68 @@ export async function exportMomentArchive(
 
   files['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2))
   const archive = zipSync(files, { level: 6 })
-  if (archive.byteLength > momentLimits.maxArchiveBytes) {
-    throw new Error('The compressed moment archive exceeds the 260 MB limit.')
+  if (archive.byteLength > boardLimits.maxArchiveBytes) {
+    throw new Error('The compressed board archive exceeds the 260 MB limit.')
   }
 
   return new Blob([archive], { type: 'application/zip' })
 }
 
 /**
- * A copy of a moment made without ever leaving the browser: no zip is
+ * A copy of a board made without ever leaving the browser: no zip is
  * produced or parsed, so none of the archive format's edge cases (a zip
  * tool's directory-marker entries among them) can apply to it. The copy
- * gets its own identity throughout -- `importMomentContent` reissues every
+ * gets its own identity throughout -- `importBoardContent` reissues every
  * id, the same as a file import -- and the name the caller gives it, which
  * is expected to already be free of collisions (see `nextDuplicateName`).
  */
-export async function duplicateMoment(momentId: string, name: string) {
-  const { content } = await buildMomentContent(momentId)
-  return importMomentContent({ ...content, name })
+export async function duplicateBoard(boardId: string, name: string) {
+  const { content } = await buildBoardContent(boardId)
+  return importBoardContent({ ...content, name })
 }
 
 /**
- * The name a moment archive would import under, read without importing it:
+ * The name a board archive would import under, read without importing it:
  * used to warn before an import would create a same-named duplicate in the
  * picker. Best effort -- any problem with the file is left for the real
  * import to diagnose properly, so this resolves to null rather than
  * throwing.
  */
-export async function peekMomentArchiveName(file: File): Promise<string | null> {
+export async function peekBoardArchiveName(file: File): Promise<string | null> {
   try {
-    if (file.size > momentLimits.maxArchiveBytes) return null
+    if (file.size > boardLimits.maxArchiveBytes) return null
     const files = extractArchive(new Uint8Array(await file.arrayBuffer()))
     const manifestBytes = files.get('manifest.json')
     if (!manifestBytes) return null
     const manifest = parseManifest(manifestBytes)
-    return isMomentMetadata(manifest.moment) ? manifest.moment.name : null
+    return isBoardMetadata(manifest.board) ? manifest.board.name : null
   } catch {
     return null
   }
 }
 
-export interface MomentArchiveImport {
-  moment: Awaited<ReturnType<typeof importMomentContent>>
+export interface BoardArchiveImport {
+  board: Awaited<ReturnType<typeof importBoardContent>>
   /** Set when the archive carried a theme definition: what happened to it. */
   theme?: { name: string; outcome: ThemeImportOutcome }
 }
 
-export async function importMomentArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue): Promise<MomentArchiveImport> {
-  if (file.size > momentLimits.maxArchiveBytes) {
+export async function importBoardArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue): Promise<BoardArchiveImport> {
+  if (file.size > boardLimits.maxArchiveBytes) {
     throw new Error('The selected archive exceeds the 260 MB limit.')
   }
 
   const files = extractArchive(new Uint8Array(await file.arrayBuffer()))
   const manifestBytes = files.get('manifest.json')
-  if (!manifestBytes) throw new Error('The moment archive is missing manifest.json.')
+  if (!manifestBytes) throw new Error('The board archive is missing manifest.json.')
 
   const manifest = parseManifest(manifestBytes)
   validateManifest(manifest, files, supportsCssValue)
 
   // An embedded theme is installed first, under whatever id is free, and
-  // the moment pins that id. The library is never overwritten by an import.
+  // the board pins that id. The library is never overwritten by an import.
   let themeId = manifest.theme?.id
-  let theme: MomentArchiveImport['theme']
+  let theme: BoardArchiveImport['theme']
   if (manifest.theme?.definition) {
     const installed = await importStoredTheme(manifest.theme.definition)
     themeId = installed.theme.id
@@ -355,28 +355,28 @@ export async function importMomentArchive(file: File, supportsCssValue: Supports
     blob: new Blob([toArrayBuffer(files.get(image.path)!)], { type: image.mimeType }),
   }))
 
-  const moment = await importMomentContent({
-    name: manifest.moment.name,
+  const board = await importBoardContent({
+    name: manifest.board.name,
     ...(themeId ? { themeId } : {}),
     panels: manifest.panels,
     canvas: manifest.canvas,
     notes,
     assets,
   })
-  return { moment, ...(theme ? { theme } : {}) }
+  return { board, ...(theme ? { theme } : {}) }
 }
 
-async function themeForArchive(themeId: string): Promise<MomentManifest['theme']> {
+async function themeForArchive(themeId: string): Promise<BoardManifest['theme']> {
   if (isBuiltInThemeId(themeId)) return { id: themeId }
   const stored = await getStoredTheme(themeId)
   return stored ? { id: themeId, definition: stored.definition } : { id: themeId }
 }
 
-export function downloadMomentArchive(blob: Blob, momentName: string) {
+export function downloadBoardArchive(blob: Blob, boardName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${safeFileStem(momentName)}.moment.zip`
+  link.download = `${safeFileStem(boardName)}.board.zip`
   link.rel = 'noopener'
   document.body.appendChild(link)
   link.click()
@@ -384,9 +384,9 @@ export function downloadMomentArchive(blob: Blob, momentName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-function validateExportContent(notes: Note[], assets: Array<Omit<MomentImage, 'momentId'> & { blob: Blob }>) {
-  if (notes.length > maxNoteCount) throw new Error(`A moment can contain at most ${maxNoteCount} notes.`)
-  if (assets.length > momentLimits.maxImageCount) throw new Error(`A moment can contain at most ${momentLimits.maxImageCount} images.`)
+function validateExportContent(notes: Note[], assets: Array<Omit<BoardImage, 'boardId'> & { blob: Blob }>) {
+  if (notes.length > maxNoteCount) throw new Error(`A board can contain at most ${maxNoteCount} notes.`)
+  if (assets.length > boardLimits.maxImageCount) throw new Error(`A board can contain at most ${boardLimits.maxImageCount} images.`)
 
   let noteBytes = 0
   let imageBytes = 0
@@ -395,15 +395,15 @@ function validateExportContent(notes: Note[], assets: Array<Omit<MomentImage, 'm
     if (bytes > maxNoteBytes) throw new Error(`The note "${note.title}" exceeds the 1 MB limit.`)
     noteBytes += bytes
   }
-  if (noteBytes > maxTotalNoteBytes) throw new Error('Notes exceed the 10 MB moment limit.')
+  if (noteBytes > maxTotalNoteBytes) throw new Error('Notes exceed the 10 MB board limit.')
 
   for (const asset of assets) {
     if (!supportedImageTypes.has(asset.mimeType)) throw new Error(`${asset.filename} has an unsupported image type.`)
     if (asset.blob.size !== asset.size) throw new Error(`${asset.filename} no longer matches its stored file size.`)
-    if (asset.size > momentLimits.maxImageBytes) throw new Error(`${asset.filename} exceeds the 25 MB per-image limit.`)
+    if (asset.size > boardLimits.maxImageBytes) throw new Error(`${asset.filename} exceeds the 25 MB per-image limit.`)
     imageBytes += asset.size
   }
-  if (imageBytes > momentLimits.maxTotalImageBytes) throw new Error('Images exceed the 250 MB moment limit.')
+  if (imageBytes > boardLimits.maxTotalImageBytes) throw new Error('Images exceed the 250 MB board limit.')
 }
 
 function extractArchive(source: Uint8Array) {
@@ -411,15 +411,15 @@ function extractArchive(source: Uint8Array) {
   let totalBytes = 0
   let fileCount = 0
   let failure: Error | null = null
-  const maxTotalBytes = momentLimits.maxTotalImageBytes + maxTotalNoteBytes + 1024 * 1024
-  const maxFileCount = momentLimits.maxImageCount + maxNoteCount + 1
+  const maxTotalBytes = boardLimits.maxTotalImageBytes + maxTotalNoteBytes + 1024 * 1024
+  const maxFileCount = boardLimits.maxImageCount + maxNoteCount + 1
 
   const unzip = new Unzip((entry) => {
     if (failure) return
     // A directory marker: many ordinary zip tools (Explorer's "Compress to
     // ZIP file" among them) write one whenever the thing being zipped
     // contains a subfolder. It carries no content and is none of the three
-    // shapes a moment archive uses, so an empty one is ignored rather than
+    // shapes a board archive uses, so an empty one is ignored rather than
     // rejected; one that unexpectedly carries bytes is treated as the
     // unexpected entry it would otherwise be.
     if (entry.name.endsWith('/')) {
@@ -431,7 +431,7 @@ function extractArchive(source: Uint8Array) {
       if (files.has(entry.name) || ++fileCount > maxFileCount) {
         throw new Error('The archive contains duplicate or too many files.')
       }
-      if (entry.originalSize !== undefined && entry.originalSize > momentLimits.maxTotalImageBytes) {
+      if (entry.originalSize !== undefined && entry.originalSize > boardLimits.maxTotalImageBytes) {
         throw new Error('The archive contains an oversized file.')
       }
 
@@ -439,13 +439,13 @@ function extractArchive(source: Uint8Array) {
       entry.ondata = (error, chunk, final) => {
         if (failure) return
         if (error) {
-          failure = new Error('The moment archive could not be read.')
+          failure = new Error('The board archive could not be read.')
           entry.terminate()
           return
         }
         totalBytes += chunk.byteLength
         if (totalBytes > maxTotalBytes) {
-          failure = new Error('The archive expands beyond the permitted moment size.')
+          failure = new Error('The archive expands beyond the permitted board size.')
           entry.terminate()
           return
         }
@@ -463,39 +463,39 @@ function extractArchive(source: Uint8Array) {
   try {
     unzip.push(source, true)
   } catch (caught) {
-    throw new Error(caught instanceof Error ? `The moment archive is invalid: ${caught.message}` : 'The moment archive is invalid.')
+    throw new Error(caught instanceof Error ? `The board archive is invalid: ${caught.message}` : 'The board archive is invalid.')
   }
 
   if (failure) throw failure
   return files
 }
 
-function parseManifest(bytes: Uint8Array): MomentManifest {
+function parseManifest(bytes: Uint8Array): BoardManifest {
   try {
-    return JSON.parse(strFromU8(bytes)) as MomentManifest
+    return JSON.parse(strFromU8(bytes)) as BoardManifest
   } catch {
     throw new Error('manifest.json is not valid JSON.')
   }
 }
 
-function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Array>, supportsCssValue: SupportsCssValue) {
-  if (!isRecord(manifest)) throw new Error('This moment archive uses an unsupported format version.')
+function validateManifest(manifest: BoardManifest, files: Map<string, Uint8Array>, supportsCssValue: SupportsCssValue) {
+  if (!isRecord(manifest)) throw new Error('This board archive uses an unsupported format version.')
   const formatVersion: unknown = manifest.formatVersion
   if (formatVersion === 1) {
     throw new Error('This file was exported by an earlier version of my-states and cannot be opened by this one.')
   }
   if (formatVersion !== FORMAT_VERSION && formatVersion !== OLDEST_SUPPORTED_FORMAT_VERSION) {
-    throw new Error('This moment archive uses an unsupported format version.')
+    throw new Error('This board archive uses an unsupported format version.')
   }
-  if (!isMomentMetadata(manifest.moment) || !isPanels(manifest.panels)) {
-    throw new Error('The moment manifest has invalid metadata.')
+  if (!isBoardMetadata(manifest.board) || !isPanels(manifest.panels)) {
+    throw new Error('The board manifest has invalid metadata.')
   }
   if (!isCanvasState(manifest.canvas) || !Array.isArray(manifest.notes) || !Array.isArray(manifest.images)) {
-    throw new Error('The moment manifest has invalid workspace data.')
+    throw new Error('The board manifest has invalid workspace data.')
   }
   if (manifest.theme !== undefined) validateManifestTheme(manifest.theme, supportsCssValue)
-  if (manifest.notes.length > maxNoteCount || manifest.images.length > momentLimits.maxImageCount) {
-    throw new Error('The moment archive exceeds the permitted number of notes or images.')
+  if (manifest.notes.length > maxNoteCount || manifest.images.length > boardLimits.maxImageCount) {
+    throw new Error('The board archive exceeds the permitted number of notes or images.')
   }
 
   const referencedPaths = new Set<string>(['manifest.json'])
@@ -541,7 +541,7 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
       throw new Error('The manifest references a missing or duplicate image file.')
     }
     const bytes = files.get(image.path)!.byteLength
-    if (image.size !== bytes || bytes > momentLimits.maxImageBytes) {
+    if (image.size !== bytes || bytes > boardLimits.maxImageBytes) {
       throw new Error('An image does not match its declared size or exceeds the per-image limit.')
     }
     imageBytes += bytes
@@ -549,8 +549,8 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
     referencedPaths.add(image.path)
   }
 
-  if (noteBytes > maxTotalNoteBytes || imageBytes > momentLimits.maxTotalImageBytes) {
-    throw new Error('The archive exceeds the permitted moment size.')
+  if (noteBytes > maxTotalNoteBytes || imageBytes > boardLimits.maxTotalImageBytes) {
+    throw new Error('The archive exceeds the permitted board size.')
   }
   for (const panel of manifest.panels) {
     if (panel.type === 'notes' && panel.config.activeNoteId !== null && !noteIds.has(panel.config.activeNoteId)) {
@@ -566,11 +566,11 @@ function validateManifest(manifest: MomentManifest, files: Map<string, Uint8Arra
 /** The theme reference goes through the same validator a theme file does; its id must match the id it is filed under. */
 function validateManifestTheme(theme: unknown, supportsCssValue: SupportsCssValue) {
   if (!isRecord(theme) || typeof theme.id !== 'string' || !THEME_ID_PATTERN.test(theme.id) || theme.id.length > 64) {
-    throw new Error('The moment manifest has an invalid theme reference.')
+    throw new Error('The board manifest has an invalid theme reference.')
   }
   if (theme.definition === undefined) return
   const definition = validateThemeDefinition(theme.definition, supportsCssValue)
-  if (definition.id !== theme.id) throw new Error('The moment manifest has an invalid theme reference.')
+  if (definition.id !== theme.id) throw new Error('The board manifest has an invalid theme reference.')
 }
 
 function validateArchivePath(path: string) {
@@ -582,7 +582,7 @@ function validateArchivePath(path: string) {
   }
 }
 
-function extensionForAsset(asset: Pick<MomentImage, 'mimeType'>) {
+function extensionForAsset(asset: Pick<BoardImage, 'mimeType'>) {
   return extensionForMimeType(asset.mimeType)
 }
 
@@ -605,7 +605,7 @@ function safeFileStem(name: string) {
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
     .replace(/\s+/g, ' ')
     .slice(0, 80)
-  return sanitized || 'untitled-moment'
+  return sanitized || 'untitled-board'
 }
 
 function createNoteArchivePath(title: string, usedPaths: Set<string>) {
@@ -690,7 +690,7 @@ function isSafeHttpsUrl(value: unknown): value is string {
   }
 }
 
-function isMomentMetadata(value: unknown): value is MomentManifest['moment'] {
+function isBoardMetadata(value: unknown): value is BoardManifest['board'] {
   return (
     isRecord(value) &&
     typeof value.name === 'string' &&

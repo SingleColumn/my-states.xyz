@@ -1,7 +1,7 @@
 import type { ImageItem, SlideshowSettings } from './types'
 import { DEFAULT_SLIDESHOW_ZOOM } from './storage'
 
-export function settingsForMomentAssets(settings: SlideshowSettings, folderName: string): SlideshowSettings {
+export function settingsForBoardAssets(settings: SlideshowSettings, folderName: string): SlideshowSettings {
   return { ...settings, folderName, imageSource: { type: 'session-assets' }, currentIndex: 0 }
 }
 
@@ -28,7 +28,7 @@ export function statusForImageSource(source: SlideshowSettings['imageSource'], i
       ? `${imageCount} images from this collection.`
       : 'No images are currently available in this collection.'
   }
-  return imageCount ? `${imageCount} images loaded from this moment.` : 'No supported images are available.'
+  return imageCount ? `${imageCount} images loaded from this board.` : 'No supported images are available.'
 }
 
 /* A person cancelling the folder dialog needs it to appear first, which takes

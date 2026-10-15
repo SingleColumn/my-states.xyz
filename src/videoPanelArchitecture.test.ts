@@ -2,11 +2,11 @@ import './test/setup'
 import { describe, expect, it } from 'vitest'
 import type { Editor, TLShapePartial } from 'tldraw'
 import { duplicatePanel } from './panelDuplication'
-import { exportMomentArchive, importMomentArchive } from './momentArchive'
+import { exportBoardArchive, importBoardArchive } from './boardArchive'
 import { getPanelDefinition, videoConfigValidator } from './panelRegistry'
 import { panelContentValidator, type PanelShape } from './panelShapeSchema'
 import { createPanelProps, documentFromDraft, draftFromDocument, updatePanelConfig } from './panelStore'
-import { createPanel, getMoment, importMomentContent } from './storage'
+import { createPanel, getBoard, importBoardContent } from './storage'
 import type { Panel } from './types'
 import { videoCatalog } from './videoCatalog'
 
@@ -65,20 +65,20 @@ describe('Video panel architecture', () => {
     expect(shapes[0].props.panel.config).not.toBe(shapes[1].props.panel.config)
   })
 
-  it('restores the selected id through ordinary moment persistence', async () => {
+  it('restores the selected id through ordinary board persistence', async () => {
     const panel: Panel<'video'> = { ...createPanel('video'), config: { selectedVideoId: firstVideoId } }
-    const moment = await importMomentContent({ name: 'Video persistence', panels: [panel], canvas: null, notes: [], assets: [] })
-    const restored = await getMoment(moment.id)
+    const board = await importBoardContent({ name: 'Video persistence', panels: [panel], canvas: null, notes: [], assets: [] })
+    const restored = await getBoard(board.id)
     const [storedPanel] = restored ? draftFromDocument(restored.document, restored.camera).panels : []
     expect(storedPanel).toMatchObject({ type: 'video', config: { selectedVideoId: firstVideoId } })
   })
 
-  it('round-trips the selected id through moment export and import', async () => {
+  it('round-trips the selected id through board export and import', async () => {
     const panel: Panel<'video'> = { ...createPanel('video'), config: { selectedVideoId: secondVideoId } }
-    const source = await importMomentContent({ name: 'Video archive source', panels: [panel], canvas: null, notes: [], assets: [] })
-    const archive = await exportMomentArchive(source.id)
-    const imported = await importMomentArchive(new File([archive], 'video.moment.zip', { type: 'application/zip' }))
-    const [storedPanel] = draftFromDocument(imported.moment.document, imported.moment.camera).panels
+    const source = await importBoardContent({ name: 'Video archive source', panels: [panel], canvas: null, notes: [], assets: [] })
+    const archive = await exportBoardArchive(source.id)
+    const imported = await importBoardArchive(new File([archive], 'video.board.zip', { type: 'application/zip' }))
+    const [storedPanel] = draftFromDocument(imported.board.document, imported.board.camera).panels
     expect(storedPanel).toMatchObject({ type: 'video', config: { selectedVideoId: secondVideoId } })
   })
 })

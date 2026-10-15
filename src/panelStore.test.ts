@@ -5,7 +5,7 @@ import { createPanelProps, documentFromDraft, draftFromDocument, panelFromShape,
 import { documentSchema, documentSchemaMatchesEditor, panelContentValidator, panelShapeProps } from './panelShapeSchema'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
 import { createPanel } from './storage'
-import type { MomentDraft, Panel } from './types'
+import type { BoardDraft, Panel } from './types'
 
 const propsValidator = T.object(panelShapeProps)
 Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
@@ -18,7 +18,7 @@ describe('panel shape schema', () => {
     }
   })
 
-  it('rejects what the old moment record would have persisted silently', () => {
+  it('rejects what the old board record would have persisted silently', () => {
     const slideshow = createPanelProps('slideshow')
     expect(() => panelContentValidator.validate({ type: 'slideshow', config: { ...slideshow.panel.config, currentIndex: 1.5 } })).toThrow()
     expect(() => panelContentValidator.validate({ type: 'slideshow', config: { ...slideshow.panel.config, imageSource: { type: 'folder' } } })).toThrow()
@@ -47,7 +47,7 @@ describe('panel shape schema', () => {
 })
 
 describe('the draft and the document', () => {
-  const draft: MomentDraft = {
+  const draft: BoardDraft = {
     panels: [
       { ...createPanel('spotify'), id: 'panel-music', focusView: true },
       { ...createPanel('slideshow'), id: 'panel-images', visible: false },

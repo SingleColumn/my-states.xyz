@@ -1,14 +1,14 @@
 import './test/setup'
 import { openDB } from 'idb'
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { Moment } from './types'
+import type { Board } from './types'
 import type { ThemeDefinition } from './themes/types'
 
-/** A moment record exactly as the version-1 database wrote it: no themeId. */
-const versionOneMoment = {
+/** A board record exactly as the version-1 database wrote it: no themeId. */
+const versionOneBoard = {
   id: 'from-v1', name: 'Written before themes', schemaVersion: 2, createdAt: 1, updatedAt: 2, camera: null,
   document: { store: {}, schema: { schemaVersion: 2, sequences: {} } },
-} as unknown as Moment
+} as unknown as Board
 
 const custom = (id: string, name = 'Custom'): ThemeDefinition => ({ schemaVersion: 1, id, name, version: '1.0.0', modes: { dark: { foundation: { color: { background: '#000' } } } } })
 
@@ -19,34 +19,34 @@ let storage: typeof import('./storage')
 beforeAll(async () => {
   const v1 = await openDB('my-states', 1, {
     upgrade(db) {
-      db.createObjectStore('moments', { keyPath: 'id' }).createIndex('by-updated', 'updatedAt')
-      db.createObjectStore('notes', { keyPath: 'id' }).createIndex('by-moment-updated', ['momentId', 'updatedAt'])
-      db.createObjectStore('assets', { keyPath: 'id' }).createIndex('by-moment', 'momentId')
-      db.createObjectStore('directoryHandles', { keyPath: 'id' }).createIndex('by-moment', 'momentId')
+      db.createObjectStore('boards', { keyPath: 'id' }).createIndex('by-updated', 'updatedAt')
+      db.createObjectStore('notes', { keyPath: 'id' }).createIndex('by-board-updated', ['boardId', 'updatedAt'])
+      db.createObjectStore('assets', { keyPath: 'id' }).createIndex('by-board', 'boardId')
+      db.createObjectStore('directoryHandles', { keyPath: 'id' }).createIndex('by-board', 'boardId')
       db.createObjectStore('preferences', { keyPath: 'key' })
     },
   })
-  await v1.put('moments', versionOneMoment)
-  await v1.put('preferences', { key: 'active-moment-id', value: 'from-v1' })
+  await v1.put('boards', versionOneBoard)
+  await v1.put('preferences', { key: 'active-board-id', value: 'from-v1' })
   v1.close()
   storage = await import('./storage')
-  await storage.initializeMoments()
+  await storage.initializeBoards()
 })
 
 describe('the version 2 database', () => {
   it('adds the themes store and keeps every version-1 store and record', async () => {
     const db = await openDB('my-states')
     expect(db.version).toBe(2)
-    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'directoryHandles', 'moments', 'notes', 'preferences', 'themes'])
-    expect(await db.get('moments', 'from-v1')).toEqual(versionOneMoment)
-    expect(await db.get('preferences', 'active-moment-id')).toEqual({ key: 'active-moment-id', value: 'from-v1' })
+    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'boards', 'directoryHandles', 'notes', 'preferences', 'themes'])
+    expect(await db.get('boards', 'from-v1')).toEqual(versionOneBoard)
+    expect(await db.get('preferences', 'active-board-id')).toEqual({ key: 'active-board-id', value: 'from-v1' })
     db.close()
   })
 
-  it('reads a moment written before themes as one that follows the global theme', async () => {
-    const moment = await storage.getMoment('from-v1')
-    expect(moment).toBeDefined()
-    expect('themeId' in moment!).toBe(false)
+  it('reads a board written before themes as one that follows the global theme', async () => {
+    const board = await storage.getBoard('from-v1')
+    expect(board).toBeDefined()
+    expect('themeId' in board!).toBe(false)
   })
 })
 
@@ -121,44 +121,44 @@ describe('the theme library', () => {
   })
 })
 
-describe('a moment and its theme', () => {
-  const snapshot = { store: {}, schema: { schemaVersion: 2, sequences: {} } } as Moment['document']
+describe('a board and its theme', () => {
+  const snapshot = { store: {}, schema: { schemaVersion: 2, sequences: {} } } as Board['document']
 
   it('starts out following the global theme', async () => {
-    const moment = await storage.createMoment('Plain')
-    expect('themeId' in moment).toBe(false)
+    const board = await storage.createBoard('Plain')
+    expect('themeId' in board).toBe(false)
   })
 
   it('pins a theme, keeps it across a canvas save, and unpins it', async () => {
-    const moment = await storage.createMoment('Pinned')
-    await storage.setMomentTheme(moment.id, 'terminal')
-    expect((await storage.getMoment(moment.id))?.themeId).toBe('terminal')
+    const board = await storage.createBoard('Pinned')
+    await storage.setBoardTheme(board.id, 'terminal')
+    expect((await storage.getBoard(board.id))?.themeId).toBe('terminal')
     // The document save rebuilds the record from an explicit field list; a
     // theme it forgot would vanish 300 ms after any drag.
-    await storage.saveMomentDocument(moment.id, snapshot, { x: 1, y: 2, z: 1 })
-    expect(await storage.getMoment(moment.id)).toMatchObject({ themeId: 'terminal', camera: { x: 1, y: 2, z: 1 } })
-    await storage.renameMoment(moment.id, 'Still pinned')
-    expect((await storage.getMoment(moment.id))?.themeId).toBe('terminal')
-    expect((await storage.getMomentSummaries()).find((summary) => summary.id === moment.id)?.themeId).toBe('terminal')
+    await storage.saveBoardDocument(board.id, snapshot, { x: 1, y: 2, z: 1 })
+    expect(await storage.getBoard(board.id)).toMatchObject({ themeId: 'terminal', camera: { x: 1, y: 2, z: 1 } })
+    await storage.renameBoard(board.id, 'Still pinned')
+    expect((await storage.getBoard(board.id))?.themeId).toBe('terminal')
+    expect((await storage.getBoardSummaries()).find((summary) => summary.id === board.id)?.themeId).toBe('terminal')
 
-    await storage.setMomentTheme(moment.id, null)
-    const unpinned = await storage.getMoment(moment.id)
+    await storage.setBoardTheme(board.id, null)
+    const unpinned = await storage.getBoard(board.id)
     expect('themeId' in unpinned!).toBe(false)
-    expect('themeId' in (await storage.getMomentSummaries()).find((summary) => summary.id === moment.id)!).toBe(false)
+    expect('themeId' in (await storage.getBoardSummaries()).find((summary) => summary.id === board.id)!).toBe(false)
   })
 
-  it('keeps a pinned id whether or not that theme is installed, and deleting the theme leaves the moment alone', async () => {
-    const moment = await storage.createMoment('Orphaned')
+  it('keeps a pinned id whether or not that theme is installed, and deleting the theme leaves the board alone', async () => {
+    const board = await storage.createBoard('Orphaned')
     await storage.importStoredTheme(custom('temporary'))
-    await storage.setMomentTheme(moment.id, 'temporary')
+    await storage.setBoardTheme(board.id, 'temporary')
     await storage.deleteStoredTheme('temporary')
-    expect((await storage.getMoment(moment.id))?.themeId).toBe('temporary')
+    expect((await storage.getBoard(board.id))?.themeId).toBe('temporary')
   })
 
-  it('imports a moment with the theme id it was given', async () => {
-    const imported = await storage.importMomentContent({ name: 'From archive', themeId: 'paper', panels: [], canvas: null, notes: [], assets: [] })
+  it('imports a board with the theme id it was given', async () => {
+    const imported = await storage.importBoardContent({ name: 'From archive', themeId: 'paper', panels: [], canvas: null, notes: [], assets: [] })
     expect(imported.themeId).toBe('paper')
-    const plain = await storage.importMomentContent({ name: 'From an older archive', panels: [], canvas: null, notes: [], assets: [] })
+    const plain = await storage.importBoardContent({ name: 'From an older archive', panels: [], canvas: null, notes: [], assets: [] })
     expect('themeId' in plain).toBe(false)
   })
 })
