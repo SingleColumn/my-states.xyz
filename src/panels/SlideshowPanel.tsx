@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Sparkles, Square, Trash2 } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
@@ -237,12 +237,6 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             onSelect: () => setIsImagePickerOpen((current) => !current),
           },
           { id: 'choose-folder', label: 'Choose a local folder', icon: <FolderOpen size={17} aria-hidden="true" />, onSelect: () => void chooseFolder() },
-          ...(panelSettings.imageSource.type === 'none' ? [] : [{
-            id: 'choose-collection',
-            label: 'Choose another collection',
-            icon: <Sparkles size={17} aria-hidden="true" />,
-            onSelect: () => { setIsImagePickerOpen(false); setCollectionBrowserMode('carousel'); setPanelView('browse-collections') },
-          }]),
           {
             id: 'collection-view',
             label: isBrowsingCollections && collectionBrowserMode === 'grid' ? 'Show collection carousel' : 'Show collection grid',
@@ -257,7 +251,11 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
               showCollectionGrid()
             },
           },
-          { id: 'clear', label: 'Clear images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) },
+          // Only a local folder has anything stored to remove. Clearing an online
+          // collection would just forget it, which browsing the collections already does.
+          ...(panelSettings.imageSource.type === 'session-assets'
+            ? [{ id: 'clear', label: 'Remove local images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) }]
+            : []),
           {
             id: 'focus-view',
             label: focusView ? 'Expand panel to full view' : 'Adjust panel to focus view',

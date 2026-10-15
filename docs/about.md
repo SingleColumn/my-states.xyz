@@ -68,7 +68,7 @@ The panel shows the playlist that is loaded, with its cover. To keep only the pl
 
 An empty Images panel browses the available image collections one cover at a time. Use the arrows to browse, or wait for the cover to change, then select the cover or **Use this collection**. To load supported images from your computer instead, open the panel menu (**…**) and select **Choose a local folder**. Where the browser cannot open a folder directly, the file picker is used instead.
 
-The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and **Clear images**, which removes the loaded images from the panel. **Show collection grid** displays six collections at a time so you can choose one directly, with page controls when more are available. After images are loaded, **Choose another collection** returns to the collection browser without clearing the current images until you make a new choice.
+The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and, when the images come from a local folder, **Remove local images**, which removes them from the panel. **Show collection grid** displays six collections at a time so you can choose one directly, with page controls when more are available, and **Show collection carousel** shows them one at a time. Opening either leaves the current images in place until you make a new choice.
 
 Below the picture, use **Previous image**, **Start slideshow** (which becomes **Pause slideshow**), **Next image**, **Stop slideshow** and **Shuffle images** to control the slideshow. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
 

@@ -67,7 +67,7 @@ test.describe('content: the widget owns it', () => {
     // as an ordinary click at every step rather than the start of a drag.
     const trigger = shape.getByRole('button', { name: /panel actions$/ })
     await dragLocator(page, trigger, { dx: 3, dy: 2 })
-    const item = page.getByRole('menuitem', { name: 'Choose another collection' })
+    const item = page.getByRole('menuitem', { name: 'Show collection grid' })
     await expect(item).toBeVisible()
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
 

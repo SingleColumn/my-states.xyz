@@ -134,7 +134,7 @@ describe('Images panel focus view', () => {
     expect(focused).not.toContain('aria-label="Next image"')
     expect(focused).not.toContain('aria-label="Stop slideshow"')
     expect(focused).not.toContain('Choose a local folder')
-    expect(focused).not.toContain('Clear images')
+    expect(focused).not.toContain('Remove local images')
     expect(focused).not.toContain('>Speed ')
     expect(focused).not.toContain('>Fade ')
     expect(focused).not.toContain('>Zoom ')
@@ -150,7 +150,7 @@ describe('Images panel focus view', () => {
     expect(full).toContain('>Zoom ')
     expect(full).toContain('card-footer')
     expect(full).toContain('>Choose a local folder<')
-    expect(full).toContain('>Clear images<')
+    expect(full).toContain('>Remove local images<')
   })
 
   it('offers the focus view toggle from the panel header, before the hide button', () => {
@@ -162,7 +162,7 @@ describe('Images panel focus view', () => {
     const markup = renderImagesPanel(false)
     expect(markup).not.toContain('slideshow-source-row')
     expect(markup).toContain('aria-label="Images panel actions"')
-    for (const label of ['Show loaded images', 'Choose a local folder', 'Choose another collection', 'Clear images']) {
+    for (const label of ['Show loaded images', 'Choose a local folder', 'Remove local images']) {
       // In the header menu means before the shared panel controls, and well
       // before the transport row down in the body.
       expect(markup).toContain(`>${label}<`)
