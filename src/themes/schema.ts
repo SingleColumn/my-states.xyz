@@ -62,6 +62,7 @@ export function buildThemeJsonSchema(): JsonSchema {
       author: { type: 'string', maxLength: THEME_VALUE_MAX_LENGTH, description: 'Who made the theme.' },
       description: { type: 'string', maxLength: THEME_VALUE_MAX_LENGTH, description: 'A sentence about the theme.' },
       derivedFrom: { type: 'string', maxLength: THEME_VALUE_MAX_LENGTH, description: 'The id of the theme this one was based on. Informational only.' },
+      inspiredBy: { type: 'string', maxLength: THEME_VALUE_MAX_LENGTH, description: 'Web address (http or https) of the published theme this one is inspired by or based on. Shown as a credit link. Leave empty or omit if none.' },
       modes: {
         type: 'object',
         description: 'The modes the theme supports. At least one of light or dark.',

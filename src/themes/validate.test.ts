@@ -14,6 +14,13 @@ function problemsOf(value: unknown, supports: SupportsCssValue = acceptEveryValu
 }
 
 describe('validateThemeDefinition', () => {
+  it('accepts an empty or http(s) inspiredBy and rejects anything else', () => {
+    expect(problemsOf({ ...minimal, inspiredBy: '' })).toEqual([])
+    expect(problemsOf({ ...minimal, inspiredBy: 'https://example.com/theme' })).toEqual([])
+    expect(problemsOf({ ...minimal, inspiredBy: 'javascript:alert(1)' })).toEqual([expect.stringContaining('inspiredBy must be empty or a web address')])
+    expect(problemsOf({ ...minimal, inspiredBy: 'not a url' })).toEqual([expect.stringContaining('inspiredBy')])
+  })
+
   it('accepts a minimal theme, a light-only, a dark-only and a dual-mode theme', () => {
     expect(problemsOf(minimal)).toEqual([])
     expect(problemsOf({ ...minimal, modes: { light: {} } })).toEqual([])

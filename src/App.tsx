@@ -22,6 +22,7 @@ import { buildPanelArchitectureReport, type PanelArchitectureReport } from './pa
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
 import { AppSettings } from './AppSettings'
+import { ThemeCredit } from './ThemeCredit'
 import type { Board, PanelLayout, PanelType } from './types'
 
 const shapeUtils = [PanelShapeUtil]
@@ -738,6 +739,7 @@ function AppContent() {
           />
         </AppChromePropsProvider>
       </PanelCommandsProvider>
+      <ThemeCredit url={appearance.effective.definition.inspiredBy} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
       <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />

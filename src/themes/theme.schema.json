@@ -49,6 +49,11 @@
       "maxLength": 512,
       "description": "The id of the theme this one was based on. Informational only."
     },
+    "inspiredBy": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Web address (http or https) of the published theme this one is inspired by or based on. Shown as a credit link. Leave empty or omit if none."
+    },
     "modes": {
       "type": "object",
       "description": "The modes the theme supports. At least one of light or dark.",

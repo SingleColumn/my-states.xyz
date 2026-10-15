@@ -25,6 +25,8 @@ export interface ThemeDefinition {
   description?: string
   /** Informational only: no runtime inheritance. */
   derivedFrom?: string
+  /** Web address of the published theme this one is inspired by or based on, shown as a credit link. Empty or absent: no credit. */
+  inspiredBy?: string
   modes: {
     light?: ThemeMode
     dark?: ThemeMode

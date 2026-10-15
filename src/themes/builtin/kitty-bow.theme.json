@@ -92,7 +92,7 @@
         },
         "editor": {
           "background": "#fff",
-          "border": "rgba(229, 57, 95, 0.18)",
+          "border": "rgba(229, 57, 95, 0.9)",
           "toolbarBackground": "#fff6f9"
         },
         "dialog": {

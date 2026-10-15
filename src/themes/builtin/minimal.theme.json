@@ -24,9 +24,9 @@
           "headingWeight": "500"
         },
         "shape": {
-          "radiusLarge": "3px",
-          "radiusMedium": "2px",
-          "radiusSmall": "1px"
+          "radiusLarge": "10px",
+          "radiusMedium": "6px",
+          "radiusSmall": "4px"
         },
         "depth": {
           "shadowSmall": "none",
@@ -145,9 +145,9 @@
           "headingWeight": "500"
         },
         "shape": {
-          "radiusLarge": "3px",
-          "radiusMedium": "2px",
-          "radiusSmall": "1px"
+          "radiusLarge": "10px",
+          "radiusMedium": "6px",
+          "radiusSmall": "4px"
         },
         "depth": {
           "shadowSmall": "none",

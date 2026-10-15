@@ -2968,6 +2968,14 @@ input[type="range"]:focus-visible {
   padding: 0;
 }
 
+/* No wash behind the page at full screen: the diagonal accent gradient is the
+   card's frame treatment, and there the frame is the whole window, so it only
+   distracts from the writing. What stays is the card's own opaque colour (the
+   last layer of --card-bg-gradient) and the theme's texture. */
+.canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode {
+  background: var(--panel-texture), var(--bg);
+}
+
 .notes-editor.is-writing {
   flex-direction: column;
   border: none;
@@ -4091,4 +4099,26 @@ input[type="range"]:focus-visible {
   width: var(--size-top-toolbar-control);
   justify-content: center;
   padding: 0;
+}
+
+/* Credit link for the published theme the current one is based on. Kept small
+   and quiet so it never competes with the board. */
+.theme-credit {
+  position: fixed;
+  left: 12px;
+  bottom: 8px;
+  z-index: var(--z-app-badge);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  text-decoration: none;
+}
+
+.theme-credit:hover,
+.theme-credit:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
 }

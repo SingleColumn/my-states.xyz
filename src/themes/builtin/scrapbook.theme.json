@@ -119,7 +119,7 @@
         },
         "editor": {
           "background": "#f5eddb",
-          "border": "rgba(61, 52, 39, 0.14)",
+          "border": "#8d8371",
           "toolbarBackground": "#ecdfc4"
         },
         "spotify": {

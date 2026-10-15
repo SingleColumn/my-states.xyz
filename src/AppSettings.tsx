@@ -3,6 +3,7 @@ import { FolderUp, Trash2, X } from 'lucide-react'
 import { useAppState } from './AppState'
 import { isPanelReportEnabled } from './panelReportFeature'
 import type { ThemeModePreference } from './themes/types'
+import { modesOf } from './themes/validate'
 
 interface AppSettingsProps {
   isOpen: boolean
@@ -97,7 +98,8 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
   }
 
   const { settings, effective, themes } = appearance
-  const activeTheme = themes.find((theme) => theme.id === settings.globalThemeId)
+  // The theme actually on screen (a board may pin its own), not just the global choice
+  const shownModes = modesOf(effective.definition)
   const boardOverrides = effective.source === 'board'
 
   return (
@@ -159,9 +161,9 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
               <fieldset className="app-settings-field app-settings-modes" disabled={busy}>
                 <legend>Mode</legend>
                 {modeLabels.map((mode) => {
-                  const supported = mode.value === 'system' || (activeTheme?.modes.includes(mode.value) ?? true)
+                  const supported = mode.value === 'system' || shownModes.includes(mode.value)
                   return (
-                    <label key={mode.value} className="app-settings-mode" title={supported ? mode.hint : `${activeTheme?.name ?? 'This theme'} has no ${mode.value} mode`}>
+                    <label key={mode.value} className="app-settings-mode" title={supported ? mode.hint : `${effective.definition.name} has no ${mode.value} mode`}>
                       <input
                         type="radio"
                         name="app-settings-mode"

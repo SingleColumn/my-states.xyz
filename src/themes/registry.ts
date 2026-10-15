@@ -8,6 +8,12 @@ import scrapbook from './builtin/scrapbook.theme.json'
 import minimal from './builtin/minimal.theme.json'
 import blueBeachhouse from './builtin/blue-beachhouse.theme.json'
 import ukiyo from './builtin/ukiyo.theme.json'
+import everforest from './builtin/everforest.theme.json'
+import gruvbox from './builtin/gruvbox.theme.json'
+import wasp from './builtin/wasp.theme.json'
+import shimmeringFocus from './builtin/shimmering-focus.theme.json'
+import ebullientworks from './builtin/ebullientworks.theme.json'
+import brutalism from './builtin/brutalism.theme.json'
 
 /**
  * The built-in themes ship in the bundle and are never written to the
@@ -19,10 +25,12 @@ import ukiyo from './builtin/ukiyo.theme.json'
  * the browser-only CSS value check): a built-in that would fail import is a
  * bug worth failing loudly on at startup.
  */
-export const builtInThemes: readonly ThemeDefinition[] = [midnight, paper, terminal, kittyBow, scrapbook, minimal, blueBeachhouse, ukiyo].map((definition) => validateThemeDefinition(definition, acceptEveryValue))
+export const builtInThemes: readonly ThemeDefinition[] = [midnight, paper, terminal, kittyBow, scrapbook, minimal, blueBeachhouse, ukiyo, everforest, gruvbox, wasp, shimmeringFocus, ebullientworks, brutalism].map((definition) => validateThemeDefinition(definition, acceptEveryValue))
 
 /** What a fresh profile shows, and what everything falls back to. Pinned by name, not by position in the list. */
 export const DEFAULT_THEME_ID = 'midnight'
+/** Dark unless the person chooses otherwise; a theme with no dark mode still falls back to the mode it has. */
+export const DEFAULT_MODE_PREFERENCE = 'dark' as const
 if (!builtInThemes.some((theme) => theme.id === DEFAULT_THEME_ID)) throw new Error(`The default theme "${DEFAULT_THEME_ID}" is not among the built-in themes.`)
 
 const builtInIds = new Set(builtInThemes.map((theme) => theme.id))

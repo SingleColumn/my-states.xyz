@@ -10,7 +10,7 @@ import {
   type ThemeImportOutcome,
 } from './storage'
 import { applyTheme } from './theme'
-import { DEFAULT_THEME_ID, mergeLibrary, toThemeEntry } from './themes/registry'
+import { DEFAULT_MODE_PREFERENCE, DEFAULT_THEME_ID, mergeLibrary, toThemeEntry } from './themes/registry'
 import { resolveEffectiveTheme } from './themes/resolve'
 import type { AppearanceSettings, EffectiveTheme, StoredTheme, ThemeEntry, ThemeModePreference } from './themes/types'
 import { parseThemeFile, validateThemeDefinition, type SupportsCssValue } from './themes/validate'
@@ -59,7 +59,7 @@ function useSystemPrefersDark(enabled: boolean) {
 
 export function useAppearanceState(activeBoard: Board | null): AppearanceState {
   const [stored, setStored] = useState<StoredTheme[]>([])
-  const [settings, setSettings] = useState<AppearanceSettings>({ globalThemeId: DEFAULT_THEME_ID, modePreference: 'system' })
+  const [settings, setSettings] = useState<AppearanceSettings>({ globalThemeId: DEFAULT_THEME_ID, modePreference: DEFAULT_MODE_PREFERENCE })
   const [isReady, setIsReady] = useState(false)
   const systemPrefersDark = useSystemPrefersDark(settings.modePreference === 'system')
 
@@ -124,8 +124,8 @@ export function useAppearanceState(activeBoard: Board | null): AppearanceState {
 
   const resetAppearance = useCallback(async () => {
     await setGlobalThemeId(DEFAULT_THEME_ID)
-    await setThemeModePreference('system')
-    setSettings({ globalThemeId: DEFAULT_THEME_ID, modePreference: 'system' })
+    await setThemeModePreference(DEFAULT_MODE_PREFERENCE)
+    setSettings({ globalThemeId: DEFAULT_THEME_ID, modePreference: DEFAULT_MODE_PREFERENCE })
   }, [])
 
   return useMemo<AppearanceState>(() => ({

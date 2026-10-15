@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "paper",
-  "name": "Paper",
+  "name": "Brown paper",
   "version": "2.0.0",
   "author": "my-states",
   "description": "A quiet notebook on a desk in soft daylight: pale sheets on a greyed linen ground, warm charcoal ink, one muted sage accent, faint ruled lines, a serif for titles over a plain sans, and no decoration that competes with the words.",
@@ -93,7 +93,8 @@
         },
         "editor": {
           "background": "#fffbf1",
-          "toolbarBackground": "#f3ecda"
+          "toolbarBackground": "#f3ecda",
+          "border": "#91887f"
         },
         "dialog": {
           "background": "#fbf6ea",

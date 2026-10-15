@@ -118,7 +118,7 @@ test('changing the global theme reaches a board on Global and not one with its o
   await expect(page.getByRole('dialog', { name: 'Settings' })).toContainText('The open board uses its own theme, Terminal')
   await closeSettings(page)
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'terminal', source: 'board', globalThemeId: 'paper' })
-  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Paper)')
+  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Brown paper)')
 
   await switchBoard(page, 'A new board')
   await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'global', mode: 'light' })
@@ -163,7 +163,7 @@ test('a theme file is imported, listed, selectable, and deleted with a fallback'
 test('built-in themes cannot be deleted and an invalid file is refused with its problems listed', async ({ page }) => {
   await openApp(page)
   await openSettings(page)
-  await expect(page.getByRole('button', { name: /Delete theme (Midnight|Paper|Terminal|Kitty Bow|Scrapbook)/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Delete theme (Midnight|Brown paper|Terminal|Kitty Bow|Scrapbook)/ })).toHaveCount(0)
 
   await importTheme(page, 'bad.theme.json', JSON.stringify({ schemaVersion: 1, id: 'Bad', name: 'Bad', version: '1', modes: { dark: { components: { canvas: { backdrop: 'url(https://example.com/x.png)' } } } } }))
   const status = settingsNotice(page)

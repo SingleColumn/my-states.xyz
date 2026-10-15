@@ -279,7 +279,7 @@
         },
         "editor": {
           "background": "#f3f6fa",
-          "border": "rgba(59, 90, 133, 0.22)",
+          "border": "#7b91ae",
           "toolbarBackground": "#d4dfec"
         },
         "typography": {

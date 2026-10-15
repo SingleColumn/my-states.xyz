@@ -15,7 +15,7 @@ import { getPanelDefinition } from './panelRegistry'
 import { normalizeDraftPanel } from './panelInput'
 import { documentFromDraft } from './panelStore'
 import { BOARD_SCHEMA_VERSION } from './boardSchema'
-import { DEFAULT_THEME_ID, isBuiltInThemeId } from './themes/registry'
+import { DEFAULT_MODE_PREFERENCE, DEFAULT_THEME_ID, isBuiltInThemeId } from './themes/registry'
 import type { AppearanceSettings, StoredTheme, ThemeDefinition, ThemeModePreference } from './themes/types'
 export { BOARD_SCHEMA_VERSION } from './boardSchema'
 export { normalizeSlideshowSettings } from './panelRegistry'
@@ -562,7 +562,7 @@ export async function getAppearanceSettings(): Promise<AppearanceSettings> {
   const [theme, mode] = await Promise.all([db.get('preferences', GLOBAL_THEME_KEY), db.get('preferences', THEME_MODE_KEY)])
   return {
     globalThemeId: theme?.value || DEFAULT_THEME_ID,
-    modePreference: mode && themeModePreferences.has(mode.value) ? mode.value as ThemeModePreference : 'system',
+    modePreference: mode && themeModePreferences.has(mode.value) ? mode.value as ThemeModePreference : DEFAULT_MODE_PREFERENCE,
   }
 }
 

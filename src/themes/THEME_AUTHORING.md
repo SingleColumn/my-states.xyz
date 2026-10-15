@@ -14,7 +14,7 @@ Read the four built-ins first: [`midnight`](builtin/midnight.theme.json) (every 
 
 ## 1. Decide the idea before the values
 
-Write the concept in one line first — *"a page on a desk"*, *"phosphor terminal"* — and derive every value from it. A theme that starts from a palette and no idea ends up as "generic pastel UI"; the critiques that improved Paper and Kitty Bow were all about missing *signifiers* (texture, type, shape), not wrong hues.
+Write the concept in one line first — *"a page on a desk"*, *"phosphor terminal"* — and derive every value from it. A theme that starts from a palette and no idea ends up as "generic pastel UI"; the critiques that improved Brown paper and Kitty Bow were all about missing *signifiers* (texture, type, shape), not wrong hues.
 
 For the idea, decide explicitly:
 
@@ -25,6 +25,7 @@ For the idea, decide explicitly:
 | What is the one attention colour? | `foundation.color.accent` (selection, glows, focus) |
 | Do the three panels have their own identities, or one? | `components.spotify/images/notes.accent` + `panelBackground` — or leave them to derive from the accent for a monochrome theme |
 | Is the interior of a panel a wash of its accent, or a plain surface? | `components.panel.contentBackground` — set it (e.g. white) when the accent should be *trim*, not a tint over everything |
+| Credit for a theme this is based on? | top-level `inspiredBy`: web address of the original theme (empty or omitted for none); shown as a small link bottom-left |
 | Rounded or square? | `foundation.shape.radiusLarge/Medium/Small` — the three rungs round or square the whole app; `0` for hard corners |
 | Heavy or airy type? Serif, sans, mono, rounded? | `typography.uiFont` (body), `headingFont` (titles), `monoFont` (code) |
 | Flat or deep? | `foundation.depth.shadow*` and `backdropBlur`; `"none"` is a legitimate value |

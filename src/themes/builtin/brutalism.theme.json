@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 1,
+  "id": "brutalism",
+  "name": "Brutalism",
+  "version": "1.0.0",
+  "author": "my-states",
+  "inspiredBy": "https://github.com/abrahambahez/Brutalism",
+  "description": "Based on the Brutalism theme: plain and unadorned, one flat blue-grey surface by day or deep night blue after dark, with violet links and no shadows.",
+  "modes": {
+    "light": {
+      "foundation": {
+        "color": {
+          "background": "#d5d6db",
+          "foreground": "#222222",
+          "muted": "#616161",
+          "faint": "#9699a3",
+          "accent": "#8a6bed",
+          "border": "#b9babd",
+          "danger": "#8c4351",
+          "selection": "#8a6bed"
+        },
+        "typography": {
+          "uiFont": "\"Archivo\", \"Segoe UI\", system-ui, Roboto, Helvetica, Arial, sans-serif",
+          "headingFont": "\"Archivo\", \"Segoe UI\", system-ui, Roboto, Helvetica, Arial, sans-serif",
+          "monoFont": "\"Hack Nerd Font\", Hack, Consolas, monospace",
+          "headingWeight": "700"
+        },
+        "shape": {
+          "radiusLarge": "10px",
+          "radiusMedium": "8px",
+          "radiusSmall": "4px"
+        },
+        "depth": {
+          "shadowSmall": "none",
+          "shadowMedium": "none",
+          "shadowLarge": "none",
+          "backdropBlur": "none"
+        }
+      },
+      "semantic": {
+        "surfacePrimary": "#d5d6db",
+        "surfaceElevated": "#d5d6db",
+        "surfaceOverlay": "#dcdde1",
+        "textPrimary": "#222222",
+        "textSecondary": "#616161",
+        "textMuted": "#616161",
+        "textFaint": "#9699a3",
+        "borderSubtle": "rgba(34, 34, 34, 0.1)",
+        "borderNormal": "rgba(34, 34, 34, 0.22)",
+        "borderStrong": "rgba(34, 34, 34, 0.42)",
+        "focusRing": "#8a6bed",
+        "interactive": "#cbccd1",
+        "interactiveHover": "#bfc0c8",
+        "interactiveActive": "#b1b3be",
+        "danger": "#8c4351",
+        "accentLift": "#34548a"
+      },
+      "components": {
+        "canvas": {
+          "background": "#d5d6db",
+          "backdrop": "#d5d6db",
+          "pattern": "none",
+          "gridColor": "rgba(34, 34, 34, 0.14)",
+          "gridSize": "32px",
+          "selectionStroke": "#8a6bed",
+          "selectionStrokeWidth": "1.5px"
+        },
+        "panel": {
+          "border": "#b9babd",
+          "divider": "#c3c4c8",
+          "frame": "#c3c4c8",
+          "shellBorder": "1px solid #b9babd",
+          "headerForeground": "#222222",
+          "footerForeground": "#9699a3",
+          "shadow": "none",
+          "backdropBlur": "none",
+          "contentBackground": "#d5d6db",
+          "headerStyle": "plain",
+          "density": "standard"
+        },
+        "button": {
+          "background": "rgba(34, 34, 34, 0.06)",
+          "border": "rgba(34, 34, 34, 0.2)",
+          "foreground": "#222222",
+          "backgroundHover": "#bfc0c8",
+          "backgroundActive": "#b1b3be",
+          "borderActive": "#8a6bed",
+          "foregroundActive": "#222222"
+        },
+        "control": {
+          "background": "#cbccd1",
+          "border": "rgba(34, 34, 34, 0.25)",
+          "borderHover": "#8a6bed",
+          "emptyBackground": "rgba(34, 34, 34, 0.08)",
+          "emptyBackgroundHover": "rgba(34, 34, 34, 0.16)",
+          "rangeAccent": "#8a6bed",
+          "rangeTrack": "rgba(34, 34, 34, 0.35)",
+          "rangeThumb": "#8a6bed",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "1.75"
+        },
+        "input": {
+          "background": "#e0e1e5",
+          "foreground": "#222222"
+        },
+        "menu": {
+          "background": "#dcdde1",
+          "surface": "#dcdde1"
+        },
+        "toolbar": {
+          "background": "#d5d6db",
+          "border": "#b9babd",
+          "foreground": "#222222",
+          "shadow": "none",
+          "backdropBlur": "none"
+        },
+        "toast": {
+          "background": "#dcdde1",
+          "border": "rgba(138, 107, 237, 0.5)",
+          "foreground": "#222222"
+        },
+        "dialog": {
+          "background": "#d5d6db",
+          "border": "#b9babd",
+          "backdrop": "rgba(0, 0, 0, 0.3)",
+          "shadow": "none"
+        },
+        "editor": {
+          "background": "#d5d6db",
+          "border": "#737375",
+          "toolbarBackground": "#d5d6db"
+        },
+        "typography": {
+          "scale": "standard"
+        },
+        "spotify": {
+          "accent": "#485e30",
+          "panelBackground": "#d5d6db",
+          "artworkShadow": "none",
+          "artworkPlaceholder": "#bfc0c8",
+          "artworkPlaceholderHighlight": "#b1b3be",
+          "playlistRowBackground": "rgba(34, 34, 34, 0.06)",
+          "playlistRowBackgroundHover": "rgba(34, 34, 34, 0.12)"
+        },
+        "images": {
+          "accent": "#965027",
+          "panelBackground": "#d5d6db",
+          "frameBorder": "1px solid rgba(34, 34, 34, 0.25)",
+          "frameShadow": "none",
+          "edge": "none"
+        },
+        "notes": {
+          "accent": "#34548a",
+          "panelBackground": "#d5d6db",
+          "titleForeground": "#222222",
+          "controlBackground": "#cbccd1",
+          "controlBackgroundHover": "#bfc0c8"
+        }
+      }
+    },
+    "dark": {
+      "foundation": {
+        "color": {
+          "background": "#1a1b26",
+          "foreground": "#dadada",
+          "muted": "#b9b9b9",
+          "faint": "#565f89",
+          "accent": "#8a6bed",
+          "border": "#595a5f",
+          "danger": "#f7768e",
+          "selection": "#8a6bed"
+        },
+        "typography": {
+          "uiFont": "\"Archivo\", \"Segoe UI\", system-ui, Roboto, Helvetica, Arial, sans-serif",
+          "headingFont": "\"Archivo\", \"Segoe UI\", system-ui, Roboto, Helvetica, Arial, sans-serif",
+          "monoFont": "\"Hack Nerd Font\", Hack, Consolas, monospace",
+          "headingWeight": "700"
+        },
+        "shape": {
+          "radiusLarge": "10px",
+          "radiusMedium": "8px",
+          "radiusSmall": "4px"
+        },
+        "depth": {
+          "shadowSmall": "none",
+          "shadowMedium": "none",
+          "shadowLarge": "none",
+          "backdropBlur": "none"
+        }
+      },
+      "semantic": {
+        "surfacePrimary": "#1a1b26",
+        "surfaceElevated": "#1a1b26",
+        "surfaceOverlay": "#22232f",
+        "textPrimary": "#dadada",
+        "textSecondary": "#b9b9b9",
+        "textMuted": "#b9b9b9",
+        "textFaint": "#565f89",
+        "borderSubtle": "rgba(218, 218, 218, 0.1)",
+        "borderNormal": "rgba(218, 218, 218, 0.22)",
+        "borderStrong": "rgba(218, 218, 218, 0.42)",
+        "focusRing": "#8a6bed",
+        "interactive": "#252631",
+        "interactiveHover": "#2f303c",
+        "interactiveActive": "#3b3c49",
+        "danger": "#f7768e",
+        "accentLift": "#a08cf2"
+      },
+      "components": {
+        "canvas": {
+          "background": "#1a1b26",
+          "backdrop": "#1a1b26",
+          "pattern": "none",
+          "gridColor": "rgba(218, 218, 218, 0.12)",
+          "gridSize": "32px",
+          "selectionStroke": "#8a6bed",
+          "selectionStrokeWidth": "1.5px"
+        },
+        "panel": {
+          "border": "#595a5f",
+          "divider": "#404149",
+          "frame": "#404149",
+          "shellBorder": "1px solid #595a5f",
+          "headerForeground": "#dadada",
+          "footerForeground": "#565f89",
+          "shadow": "none",
+          "backdropBlur": "none",
+          "contentBackground": "#1a1b26",
+          "headerStyle": "plain",
+          "density": "standard"
+        },
+        "button": {
+          "background": "rgba(218, 218, 218, 0.06)",
+          "border": "rgba(218, 218, 218, 0.2)",
+          "foreground": "#dadada",
+          "backgroundHover": "#2f303c",
+          "backgroundActive": "#3b3c49",
+          "borderActive": "#8a6bed",
+          "foregroundActive": "#dadada"
+        },
+        "control": {
+          "background": "#252631",
+          "border": "rgba(218, 218, 218, 0.25)",
+          "borderHover": "#8a6bed",
+          "emptyBackground": "rgba(218, 218, 218, 0.08)",
+          "emptyBackgroundHover": "rgba(218, 218, 218, 0.16)",
+          "rangeAccent": "#8a6bed",
+          "rangeTrack": "rgba(218, 218, 218, 0.35)",
+          "rangeThumb": "#8a6bed",
+          "rangeWell": "transparent",
+          "rangeWellBorder": "transparent",
+          "iconStrokeWidth": "1.75"
+        },
+        "input": {
+          "background": "#16161e",
+          "foreground": "#dadada"
+        },
+        "menu": {
+          "background": "#22232f",
+          "surface": "#22232f"
+        },
+        "toolbar": {
+          "background": "#1a1b26",
+          "border": "#595a5f",
+          "foreground": "#dadada",
+          "shadow": "none",
+          "backdropBlur": "none"
+        },
+        "toast": {
+          "background": "#22232f",
+          "border": "rgba(138, 107, 237, 0.5)",
+          "foreground": "#dadada"
+        },
+        "dialog": {
+          "background": "#1a1b26",
+          "border": "#595a5f",
+          "backdrop": "rgba(0, 0, 0, 0.55)",
+          "shadow": "none"
+        },
+        "editor": {
+          "background": "#1a1b26",
+          "border": "#404149",
+          "toolbarBackground": "#1a1b26"
+        },
+        "typography": {
+          "scale": "standard"
+        },
+        "spotify": {
+          "accent": "#9ece6a",
+          "panelBackground": "#1a1b26",
+          "artworkShadow": "none",
+          "artworkPlaceholder": "#2f303c",
+          "artworkPlaceholderHighlight": "#3b3c49",
+          "playlistRowBackground": "rgba(218, 218, 218, 0.06)",
+          "playlistRowBackgroundHover": "rgba(218, 218, 218, 0.12)"
+        },
+        "images": {
+          "accent": "#ff9e64",
+          "panelBackground": "#1a1b26",
+          "frameBorder": "1px solid rgba(218, 218, 218, 0.25)",
+          "frameShadow": "none",
+          "edge": "none"
+        },
+        "notes": {
+          "accent": "#7aa2f7",
+          "panelBackground": "#1a1b26",
+          "titleForeground": "#dadada",
+          "controlBackground": "#252631",
+          "controlBackgroundHover": "#2f303c"
+        }
+      }
+    }
+  }
+}

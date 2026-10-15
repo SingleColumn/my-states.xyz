@@ -105,7 +105,17 @@ function validateMode(value: unknown, path: string, supports: SupportsCssValue, 
   return problems.length === before
 }
 
-const optionalStringFields = ['author', 'description', 'derivedFrom'] as const
+/** Only http(s): the value becomes a link, so javascript: and similar must never pass. */
+export function isWebAddress(text: string): boolean {
+  try {
+    const { protocol } = new URL(text)
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const optionalStringFields = ['author', 'description', 'derivedFrom', 'inspiredBy'] as const
 const knownTopLevelKeys = new Set(['schemaVersion', 'id', 'name', 'version', 'modes', ...optionalStringFields])
 
 /**
@@ -135,6 +145,9 @@ export function validateThemeDefinition(value: unknown, supports: SupportsCssVal
     if (value[field] !== undefined && (typeof value[field] !== 'string' || (value[field] as string).length > THEME_VALUE_MAX_LENGTH)) {
       problems.push(`${field} must be a string of at most ${THEME_VALUE_MAX_LENGTH} characters`)
     }
+  }
+  if (typeof value.inspiredBy === 'string' && value.inspiredBy !== '' && !isWebAddress(value.inspiredBy)) {
+    problems.push('inspiredBy must be empty or a web address starting with http:// or https://')
   }
   for (const key of Object.keys(value)) {
     if (!knownTopLevelKeys.has(key)) problems.push(`${key} is not a supported property`)

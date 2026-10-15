@@ -51,8 +51,8 @@ describe('the version 2 database', () => {
 })
 
 describe('appearance settings', () => {
-  it('default to the built-in theme and the system mode when nothing is stored', async () => {
-    expect(await storage.getAppearanceSettings()).toEqual({ globalThemeId: 'midnight', modePreference: 'system' })
+  it('default to the built-in theme and dark mode when nothing is stored', async () => {
+    expect(await storage.getAppearanceSettings()).toEqual({ globalThemeId: 'midnight', modePreference: 'dark' })
   })
 
   it('persist the global theme and the mode preference', async () => {
@@ -67,7 +67,7 @@ describe('appearance settings', () => {
     const db = await openDB('my-states')
     await db.put('preferences', { key: 'theme-mode-preference', value: 'sepia' })
     db.close()
-    expect((await storage.getAppearanceSettings()).modePreference).toBe('system')
+    expect((await storage.getAppearanceSettings()).modePreference).toBe('dark')
   })
 })
 
