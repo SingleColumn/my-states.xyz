@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MomentOperation } from './momentOperation'
+import { BoardOperation } from './boardOperation'
 import { SaveQueue } from './saveQueue'
 
-describe('moment operation boundary', () => {
+describe('board operation boundary', () => {
   it('pauses before saving and refuses overlapping operations', async () => {
-    const operation = new MomentOperation()
+    const operation = new BoardOperation()
     const pause = vi.fn()
     operation.registerPause(pause)
     let complete!: () => void
@@ -18,7 +18,7 @@ describe('moment operation boundary', () => {
   })
 
   it.each(['switch', 'export'])('does not %s after a failed save, and allows a retry', async () => {
-    const operation = new MomentOperation()
+    const operation = new BoardOperation()
     const pause = vi.fn()
     operation.registerPause(pause)
     const queue = new SaveQueue(vi.fn())

@@ -54,7 +54,7 @@ export function createId(prefix: string) {
 /**
  * A name for a copy that is guaranteed free among `existingNames`: "X
  * (copy)", then "X (copy 2)", "X (copy 3)", and so on. Used so Duplicate
- * moment never needs to ask -- two moments with the same name in the picker
+ * board never needs to ask -- two boards with the same name in the picker
  * is confusing, and a duplicate's whole point is not to require a decision
  * before it can be made.
  */

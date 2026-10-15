@@ -57,8 +57,8 @@ test.describe('the writing tools', () => {
     await expect(style).toHaveValue('h2')
     await expect(body.locator('h2')).toHaveText('two and more')
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('* one\n\n## two and more\n')
   })
 
@@ -76,8 +76,8 @@ test.describe('the writing tools', () => {
     await bar.getByRole('button', { name: 'Underline' }).click()
     await expect(body.locator('u')).toHaveText('mark these words')
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('**<u>mark these words</u>**\n')
   })
 
@@ -94,9 +94,9 @@ test.describe('the writing tools', () => {
     // The rule goes between the lines: splitting one would leave the
     // remainder as an empty paragraph, which Markdown can only write as a
     // stray `<br />`.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('Before it\n\n***')
-    expect((await readStorage(page, moment!.id)).notes[0]?.content).not.toContain('<br />')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('Before it\n\n***')
+    expect((await readStorage(page, board!.id)).notes[0]?.content).not.toContain('<br />')
   })
 
   test('open the emoji list at the caret, and leave nothing behind on Escape', async ({ page }) => {
@@ -110,8 +110,8 @@ test.describe('the writing tools', () => {
     await expect(menu).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('Ready\n')
 
     // And chosen from, it puts the character in and takes the trigger out --
     // including the space the button had to type for the trigger to be read
@@ -121,7 +121,7 @@ test.describe('the writing tools', () => {
     await expect(menu).toBeVisible()
     await page.keyboard.type('tick')
     await menu.getByRole('option', { name: 'Done' }).click()
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready✅\n')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('Ready✅\n')
   })
 
   test('a picture can be pulled to a width, which only then costs the plain Markdown', async ({ page }) => {
@@ -135,8 +135,8 @@ test.describe('the writing tools', () => {
     await expect(picture).toHaveCount(1)
     // Left alone it is an ordinary Markdown picture: Markdown has no width,
     // so one is only written when there is a width to write.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('![dot](data:image/png')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('![dot](data:image/png')
 
     const grip = (await body.locator('.notes-image-handle').boundingBox())!
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
@@ -148,7 +148,7 @@ test.describe('the writing tools', () => {
     // size. The width is in the panel's own pixels, which the canvas scales
     // on the way to the screen, so the screen width is the smaller number.
     await expect.poll(async () => Math.round((await picture.boundingBox())!.width)).toBeGreaterThan(120)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toMatch(/<img src="data:image\/png[^"]*" alt="dot" width="\d+" \/>/)
 
     // And it comes back that size, which is the whole point of the tag.
@@ -202,11 +202,11 @@ test.describe('the writing tools', () => {
     // the next visit, so it survives a reload.
     expect(await picture.getAttribute('src')).toContain('data:image/png;base64,')
 
-    // Waited for rather than raced: the note is saved a moment after the
+    // Waited for rather than raced: the note is saved a board after the
     // edit, and a reload before that would be testing the browser's timing
     // rather than whether the picture is part of the note.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toContain('![dot](data:image/png;base64,')
     await page.reload()
     await waitForCanvas(page)

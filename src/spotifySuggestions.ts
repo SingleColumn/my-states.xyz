@@ -4,7 +4,7 @@
  *
  * The rule the panel depends on: a suggestion set is chosen once per page
  * session and then holds still. React rerenders, panel resizing, switching
- * moments and tldraw redrawing the canvas must all leave it exactly as it
+ * boards and tldraw redrawing the canvas must all leave it exactly as it
  * was — a set of cards that reshuffled itself while someone was reading it
  * would be unusable. Only a reload or the explicit Shuffle action picks a
  * new one, which is why the choice lives in this module rather than in a
@@ -121,7 +121,7 @@ function shuffle<T>(values: readonly T[], random: () => number): T[] {
 /**
  * What the previous page load in this tab showed. sessionStorage, so it is
  * per-tab and gone when the tab is: this is a nicety about repetition, not
- * state worth keeping, and it never belongs in a moment.
+ * state worth keeping, and it never belongs in a board.
  */
 export function readPreviousSuggestionIds(storage: Storage | null = sessionStorageOrNull()): string[] {
   if (!storage) return []
@@ -170,7 +170,7 @@ export function getSessionSuggestions(pool: readonly CuratedSpotifyPlaylist[] = 
 /**
  * Another valid set, without a reload. It avoids what is on screen for the
  * same reason a reload does — being handed the same six back is not a
- * shuffle — and touches nothing else: no moment, no playback, no Spotify
+ * shuffle — and touches nothing else: no board, no playback, no Spotify
  * session.
  */
 export function shuffleSessionSuggestions(pool: readonly CuratedSpotifyPlaylist[] = curatedSpotifyPlaylists): CuratedSpotifyPlaylist[] {

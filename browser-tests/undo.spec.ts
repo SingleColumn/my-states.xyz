@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   choosePanelMenuItem,
-  createMomentFromToolbar,
+  createBoardFromToolbar,
   describeCanvas,
   dragLocator,
   expectArchitectureReportPass,
@@ -13,16 +13,16 @@ import {
   panelOfType,
   selectPanel,
   shapeOf,
-  switchMoment,
+  switchBoard,
   titleOf,
   undo,
 } from './helpers'
 
 /**
- * Undo across the tldraw/moment boundary. tldraw owns the history; the app
- * owns what a panel *is* (its note, its pictures) and which moment the
+ * Undo across the tldraw/board boundary. tldraw owns the history; the app
+ * owns what a panel *is* (its note, its pictures) and which board the
  * history belongs to. Each test here checks that an undo restores a whole
- * panel, stays inside its own moment, and takes exactly the steps a person
+ * panel, stays inside its own board, and takes exactly the steps a person
  * would expect.
  */
 
@@ -73,36 +73,36 @@ test.describe('delete and undo', () => {
   })
 })
 
-test.describe('undo after switching moments', () => {
-  test('does not touch the moment just opened', async ({ page }) => {
+test.describe('undo after switching boards', () => {
+  test('does not touch the board just opened', async ({ page }) => {
     await openApp(page)
-    const first = (await describeCanvas(page)).moment?.name ?? ''
-    // Some history in the first moment, so there is something an undo could
+    const first = (await describeCanvas(page)).board?.name ?? ''
+    // Some history in the first board, so there is something an undo could
     // wrongly reach for.
     const notes = await panelOfType(page, 'notes')
     await dragLocator(page, await titleOf(page, notes.panelId), { dx: -120, dy: 60 })
     const firstLayout = (await describeCanvas(page)).panels.map(geometryOf)
 
-    await createMomentFromToolbar(page, 'Second moment')
+    await createBoardFromToolbar(page, 'Second board')
     const secondLayout = (await describeCanvas(page)).panels.map(geometryOf)
     expect(secondLayout).toHaveLength(3)
 
-    // Undo right after the switch: the new moment keeps all of its panels.
+    // Undo right after the switch: the new board keeps all of its panels.
     await page.mouse.click(720, 860)
     await undo(page)
     await undo(page)
-    expect((await describeCanvas(page)).moment?.name).toBe('Second moment')
+    expect((await describeCanvas(page)).board?.name).toBe('Second board')
     expect((await describeCanvas(page)).panels.map(geometryOf)).toEqual(secondLayout)
 
-    // And back again: the first moment is as it was left, and undoing there
+    // And back again: the first board is as it was left, and undoing there
     // cannot reach into the second.
-    await switchMoment(page, first)
+    await switchBoard(page, first)
     expect((await describeCanvas(page)).panels.map(geometryOf)).toEqual(firstLayout)
     await page.mouse.click(720, 860)
     await undo(page)
     await undo(page)
     expect((await describeCanvas(page)).panels).toHaveLength(3)
-    await switchMoment(page, 'Second moment')
+    await switchBoard(page, 'Second board')
     expect((await describeCanvas(page)).panels.map(geometryOf)).toEqual(secondLayout)
     await expectArchitectureReportPass(page)
   })

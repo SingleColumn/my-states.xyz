@@ -7,8 +7,8 @@ import { panelRegistry } from './panelRegistry'
  * The panel shape's props: its size, a stable id for the stores that hang
  * off a panel, and the panel itself: type, configuration, whether it is
  * shown and whether it is in focus view. tldraw validates every write
- * against this, persists it in the moment's document, and undoes it with
- * everything else on the canvas. The moment record carries nothing about a
+ * against this, persists it in the board's document, and undoes it with
+ * everything else on the canvas. The board record carries nothing about a
  * panel that is not here.
  *
  * This module has no React in it so the schema can be read by storage and

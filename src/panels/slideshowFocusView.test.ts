@@ -10,7 +10,7 @@ import { SlideshowPanel } from './SlideshowPanel'
 const panel = vi.hoisted(() => ({ focusView: false }))
 const slideshowRuntime = vi.hoisted(() => ({ playing: true, setIsPlaying: vi.fn() }))
 
-const image = { id: 'image_1', momentId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
+const image = { id: 'image_1', boardId: 's1', filename: 'dusk.jpg', mimeType: 'image/jpeg', name: 'dusk.jpg', size: 10, lastModified: 1, width: 1200, height: 800, url: 'blob:dusk', urlKind: 'object-url' as const }
 
 // The header's menu is closed until clicked, and a static render cannot
 // click, so the real header is rendered with its menu open.
@@ -41,7 +41,7 @@ vi.mock('../AppState', () => ({
       next: () => {},
       previous: () => {},
     },
-    moments: { activeMoment: { id: 'moment_focus' } },
+    boards: { activeBoard: { id: 'board_focus' } },
     panels: {
       get: () => ({
         id: 'panel_images',
@@ -134,7 +134,7 @@ describe('Images panel focus view', () => {
     expect(focused).not.toContain('aria-label="Next image"')
     expect(focused).not.toContain('aria-label="Stop slideshow"')
     expect(focused).not.toContain('Choose a local folder')
-    expect(focused).not.toContain('Clear images')
+    expect(focused).not.toContain('Remove local images')
     expect(focused).not.toContain('>Speed ')
     expect(focused).not.toContain('>Fade ')
     expect(focused).not.toContain('>Zoom ')
@@ -150,7 +150,7 @@ describe('Images panel focus view', () => {
     expect(full).toContain('>Zoom ')
     expect(full).toContain('card-footer')
     expect(full).toContain('>Choose a local folder<')
-    expect(full).toContain('>Clear images<')
+    expect(full).toContain('>Remove local images<')
   })
 
   it('offers the focus view toggle from the panel header, before the hide button', () => {
@@ -162,7 +162,7 @@ describe('Images panel focus view', () => {
     const markup = renderImagesPanel(false)
     expect(markup).not.toContain('slideshow-source-row')
     expect(markup).toContain('aria-label="Images panel actions"')
-    for (const label of ['Show loaded images', 'Choose a local folder', 'Choose another collection', 'Clear images']) {
+    for (const label of ['Show loaded images', 'Choose a local folder', 'Remove local images']) {
       // In the header menu means before the shared panel controls, and well
       // before the transport row down in the body.
       expect(markup).toContain(`>${label}<`)

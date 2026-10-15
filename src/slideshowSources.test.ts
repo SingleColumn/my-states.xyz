@@ -7,17 +7,17 @@ import {
   settingsForBundledCollection,
   settingsForCuratedCollection,
   settingsForClearedImages,
-  settingsForMomentAssets,
+  settingsForBoardAssets,
   statusForImageSource,
 } from './slideshowSources'
 import type { ImageItem } from './types'
 
 describe('slideshow image source transitions', () => {
   it('switches local → bundled → bundled → local while preserving playback settings', () => {
-    const local = settingsForMomentAssets({ ...defaultSlideshowSettings, intervalMs: 900, transitionMs: 1200, shuffle: true, zoom: 1.6, currentIndex: 8 }, 'Local folder')
+    const local = settingsForBoardAssets({ ...defaultSlideshowSettings, intervalMs: 900, transitionMs: 1200, shuffle: true, zoom: 1.6, currentIndex: 8 }, 'Local folder')
     const firstSample = settingsForBundledCollection(local, 'teemu-jpeg')
     const secondSample = settingsForBundledCollection({ ...firstSample, currentIndex: 4 }, 'eightbitstrana')
-    const localAgain = settingsForMomentAssets(secondSample, 'New local folder')
+    const localAgain = settingsForBoardAssets(secondSample, 'New local folder')
 
     expect(firstSample).toMatchObject({ imageSource: { type: 'bundled', collectionId: 'teemu-jpeg' }, currentIndex: 0 })
     expect(secondSample).toMatchObject({ imageSource: { type: 'bundled', collectionId: 'eightbitstrana' }, currentIndex: 0 })
@@ -48,7 +48,7 @@ describe('slideshow image source transitions', () => {
 
   it('revokes object URLs but never static sample URLs', () => {
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
-    const base = { id: 'image', momentId: null, filename: 'image.jpg', name: 'image.jpg', mimeType: 'image/jpeg', size: 0, lastModified: 0, width: null, height: null }
+    const base = { id: 'image', boardId: null, filename: 'image.jpg', name: 'image.jpg', mimeType: 'image/jpeg', size: 0, lastModified: 0, width: null, height: null }
     releaseImageItems([
       { ...base, url: 'blob:local', urlKind: 'object-url' },
       { ...base, id: 'sample', url: '/sample-images/teemu-jpeg/image.jpg', urlKind: 'static' },

@@ -26,10 +26,10 @@ test.describe('a panel at full screen', () => {
     expect(full.panelBorder).toBe('0px')
     expect(full.panelRadius).toBe('0px')
     expect([full.panelLeft, full.panelWidth, full.panelBottom]).toEqual([0, 1280, 820])
-    // And the header's title starts within a pixel of the moment's name
+    // And the header's title starts within a pixel of the board's name
     // above it, so the two bands share a left column.
     expect(full.titleLeft).not.toBeNull()
-    expect(Math.abs(full.momentNameLeft - full.titleLeft!)).toBeLessThanOrEqual(1)
+    expect(Math.abs(full.boardNameLeft - full.titleLeft!)).toBeLessThanOrEqual(1)
 
     // Restoring gives the toolbar its inset back.
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
@@ -58,7 +58,7 @@ function read(page: Page) {
     const round = (value: number) => Math.round(value) || 0
     const chrome = document.querySelector('.app-chrome')!
     const chromeBox = chrome.getBoundingClientRect()
-    const select = document.querySelector('.moment-toolbar select')!
+    const select = document.querySelector('.board-toolbar select')!
     const selectStyle = getComputedStyle(select)
     const shell = document.querySelector('.canvas-panel-shell.is-full-screen')
     const panel = shell?.getBoundingClientRect()
@@ -69,8 +69,8 @@ function read(page: Page) {
       chromeWidth: round(chromeBox.width),
       chromeBottom: round(chromeBox.bottom),
       chromeRadius: getComputedStyle(chrome).borderTopLeftRadius,
-      // Where the moment's name is laid out, not where its control begins.
-      momentNameLeft: round(select.getBoundingClientRect().x + parseFloat(selectStyle.paddingLeft) + parseFloat(selectStyle.borderLeftWidth) + selectTextInset),
+      // Where the board's name is laid out, not where its control begins.
+      boardNameLeft: round(select.getBoundingClientRect().x + parseFloat(selectStyle.paddingLeft) + parseFloat(selectStyle.borderLeftWidth) + selectTextInset),
       panelLeft: panel ? round(panel.x) : null,
       panelTop: panel ? round(panel.y) : null,
       panelWidth: panel ? round(panel.width) : null,

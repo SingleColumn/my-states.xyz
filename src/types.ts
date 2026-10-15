@@ -77,9 +77,9 @@ export interface ImageMetadata {
   height: number | null
 }
 
-export interface MomentImage extends ImageMetadata {
+export interface BoardImage extends ImageMetadata {
   id: string
-  momentId: string
+  boardId: string
   panelId?: string
   /** Shared archive assets can belong to several Images panels without storing their bytes twice. */
   panelIds?: string[]
@@ -97,7 +97,7 @@ export interface ImageAttribution {
 
 export interface ImageItem extends ImageMetadata {
   id: string
-  momentId: string | null
+  boardId: string | null
   filename: string
   mimeType: string
   url: string
@@ -108,7 +108,7 @@ export interface ImageItem extends ImageMetadata {
 
 export interface Note {
   id: string
-  momentId: string
+  boardId: string
   title: string
   /** The note as Markdown: the export, the bundle format, and the form every note has. */
   content: string
@@ -153,19 +153,19 @@ export interface CanvasCamera {
 }
 
 /**
- * A moment's canvas in the app's own terms: its panels and where they sit,
+ * A board's canvas in the app's own terms: its panels and where they sit,
  * rather than tldraw's document shape. This is the interchange format: a
- * new or imported moment is built from one (storage turns it straight into
+ * new or imported board is built from one (storage turns it straight into
  * a document, with no editor involved), and the exported archive carries
  * one too, so the file format stays in the app's own vocabulary and a
  * change to tldraw's does not become a change to the file.
  */
-export interface MomentDraft {
+export interface BoardDraft {
   panels: Panel[]
   canvas: CanvasState | null
 }
 
-export interface Moment {
+export interface Board {
   id: string
   name: string
   schemaVersion: 2
@@ -175,15 +175,15 @@ export interface Moment {
   /** tldraw's document: every panel shape with its geometry, order and configuration. */
   document: TLStoreSnapshot
   /**
-   * The theme this moment pins, by id. Absent means the moment follows the
-   * theme chosen in Settings, which is what every moment written before
+   * The theme this board pins, by id. Absent means the board follows the
+   * theme chosen in Settings, which is what every board written before
    * themes existed does. A pinned theme that is not installed is kept, not
    * cleared: the app falls back to the global theme and says so.
    */
   themeId?: string
 }
 
-export interface MomentSummary {
+export interface BoardSummary {
   id: string
   name: string
   updatedAt: number

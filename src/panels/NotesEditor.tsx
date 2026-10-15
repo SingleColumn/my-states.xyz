@@ -142,7 +142,7 @@ export const NOTE_DOCUMENT_SCHEMA_VERSION = 1
 /**
  * A stored document is preferred over the Markdown unless this local flag
  * turns it off -- a way to check what the Markdown alone gives back, since
- * that is what a moment bundle carries.
+ * that is what a board bundle carries.
  */
 function prefersMarkdown() {
   try {
@@ -289,7 +289,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
      *
      * Dispatched rather than patched in place, so the change reporter hears
      * it: the note's name and its stored document come right in the same
-     * moment the document does.
+     * board the document does.
      */
     const settleFirstLine = () => {
       const ready = editorRef.current
@@ -461,7 +461,7 @@ function floatingKeys(handlers: MutableRefObject<Set<(event: KeyboardEvent) => b
  * a quotation or an embed, so the note has somewhere to be named. Markdown
  * has no way to write an empty paragraph, and remark falls back to `<br />`
  * -- which would put a line of HTML at the top of every such note, in the
- * file an export saves, in the moment bundle and in the archive.
+ * file an export saves, in the board bundle and in the archive.
  *
  * So the document keeps the line and the Markdown does not mention it. A
  * note read back from that Markdown starts with its list again and is given

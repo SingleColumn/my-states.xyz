@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
 import { panelShapeMigrations, panelShapeProps } from './panelShapeSchema'
 import { createPanelProps, shapesForDraft } from './panelStore'
-import type { Moment, Panel } from './types'
+import type { Board, Panel } from './types'
 
 const schema = createTLSchema({ shapes: { 'music-panel': { props: panelShapeProps, migrations: panelShapeMigrations } }, bindings: {} })
 Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
 const emptyDocument = createTLStore({ schema }).getStoreSnapshot()
-const moment: Moment = { id: 'test', name: 'Test', schemaVersion: 2, createdAt: 1, updatedAt: 2, camera: { x: 0, y: 0, z: 1 }, document: emptyDocument }
+const board: Board = { id: 'test', name: 'Test', schemaVersion: 2, createdAt: 1, updatedAt: 2, camera: { x: 0, y: 0, z: 1 }, document: emptyDocument }
 
 describe('canvas restore preflight', () => {
   it('allows synchronous restore writes but reinstates the readonly input pause even on failure', () => {
@@ -31,17 +31,17 @@ describe('canvas restore preflight', () => {
       id: 'shape:notes' as TLShapeId, type: 'music-panel', parentId: page.id, index: 'a1', props: createPanelProps('notes'),
     })])
     const snapshot = store.getStoreSnapshot()
-    expect(() => prepareCanvasRestore(store, { ...moment, document: snapshot })).not.toThrow()
+    expect(() => prepareCanvasRestore(store, { ...board, document: snapshot })).not.toThrow()
     const invalid = structuredClone(snapshot)
     const shape = invalid.store['shape:notes' as TLShapeId] as unknown as { props: { panel: { config: Record<string, unknown> } } }
     shape.props.panel.config.stray = true
-    expect(() => prepareCanvasRestore(store, { ...moment, document: invalid })).toThrow(/Unexpected property/)
+    expect(() => prepareCanvasRestore(store, { ...board, document: invalid })).toThrow(/Unexpected property/)
     expect(store.getStoreSnapshot()).toEqual(snapshot)
   })
 
   it('rejects bad camera and draft geometry without touching an editor transaction', () => {
     const store = createTLStore({ schema })
-    expect(() => prepareCanvasRestore(store, { ...moment, camera: { x: 0, y: 0, z: NaN } })).toThrow()
+    expect(() => prepareCanvasRestore(store, { ...board, camera: { x: 0, y: 0, z: NaN } })).toThrow()
     const panel: Panel<'notes'> = { id: 'notes', type: 'notes', config: { activeNoteId: null }, visible: true, focusView: false }
     expect(() => shapesForDraft({
       panels: [panel], canvas: { camera: { x: 0, y: 0, z: 1 }, panels: [{ panelId: 'notes', x: NaN, y: 0, w: 400, h: 500 }] },

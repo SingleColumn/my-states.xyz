@@ -210,15 +210,15 @@ export interface AppearanceSettings {
 
 /**
  * The one answer to "which theme is on screen". Resolved in resolve.ts from
- * the open moment, the appearance settings, the library and the system
+ * the open board, the appearance settings, the library and the system
  * colour scheme; nothing else decides precedence.
  */
 export interface EffectiveTheme {
   themeId: string
   mode: ThemeModeName
-  /** Where the choice came from: the moment's own pin, the app setting, or the built-in default because neither was installed. */
-  source: 'moment' | 'global' | 'fallback'
-  /** Set when the moment pins a theme that is not installed; its id is kept, not cleared. */
+  /** Where the choice came from: the board's own pin, the app setting, or the built-in default because neither was installed. */
+  source: 'board' | 'global' | 'fallback'
+  /** Set when the board pins a theme that is not installed; its id is kept, not cleared. */
   missingThemeId?: string
   definition: ThemeDefinition
 }

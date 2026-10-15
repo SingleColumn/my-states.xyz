@@ -17,11 +17,11 @@ The editable catalogue is `src/config/video-catalog.json`. To add, remove, disab
 
 Each object must contain `id`, `provider`, `title`, `creator`, `creatorUrl`, `sourceUrl`, and `enabled`. These attribution names match the image catalogue: `creator` is the Instagram profile name, `creatorUrl` is that profile's canonical URL, and `sourceUrl` is the original post or Reel. Keep `provider` set to `instagram`. JSON does not support comments or trailing commas. The test suite rejects invalid URLs, mismatched creator/profile names, duplicate IDs, unsupported providers, and malformed checked-in entries.
 
-There is no admin interface, database, or CMS in V1. Updating the JSON file still requires rebuilding and deploying the application. New catalogue entries become available without changing saved moments because each Video panel stores only `selectedVideoId`.
+There is no admin interface, database, or CMS in V1. Updating the JSON file still requires rebuilding and deploying the application. New catalogue entries become available without changing saved boards because each Video panel stores only `selectedVideoId`.
 
 ## Persistence and unavailable entries
 
-The selected catalogue ID is stored in the Video panel's tldraw shape configuration and travels through the normal moment save, duplicate, export, and import paths. Removing or disabling a catalogue entry does not rewrite saved moments. A panel that refers to that entry shows an unavailable message and lets the person choose another enabled item.
+The selected catalogue ID is stored in the Video panel's tldraw shape configuration and travels through the normal board save, duplicate, export, and import paths. Removing or disabling a catalogue entry does not rewrite saved boards. A panel that refers to that entry shows an unavailable message and lets the person choose another enabled item.
 
 ## Instagram embedding
 

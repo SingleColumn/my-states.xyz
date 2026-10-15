@@ -3,15 +3,15 @@ import { describe, expect, it } from 'vitest'
 import {
   createDefaultPanels,
   defaultSlideshowSettings,
-  getMoment,
-  getMomentAssets,
-  importMomentContent,
+  getBoard,
+  getBoardAssets,
+  importBoardContent,
   normalizeSlideshowSettings,
 } from './storage'
 import { draftFromDocument } from './panelStore'
-import type { Moment, Panel } from './types'
+import type { Board, Panel } from './types'
 
-const slideshowOf = (moment: Moment | undefined) => moment && draftFromDocument(moment.document, moment.camera).panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
+const slideshowOf = (board: Board | undefined) => board && draftFromDocument(board.document, board.camera).panels.find((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
 
 describe('persisted slideshow image sources', () => {
   it('defaults a missing image source to none and fills other missing settings from the registry', () => {
@@ -24,9 +24,9 @@ describe('persisted slideshow image sources', () => {
     const panels = createDefaultPanels().map((panel): Panel => panel.type === 'slideshow'
       ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'teemu-jpeg', imageSource: { type: 'bundled' as const, collectionId: 'teemu-jpeg' } } }
       : panel)
-    const moment = await importMomentContent({ name: 'Bundled sample', panels, canvas: null, notes: [], assets: [] })
-    expect(slideshowOf(await getMoment(moment.id))?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'teemu-jpeg' })
-    expect(await getMomentAssets(moment.id)).toEqual([])
+    const board = await importBoardContent({ name: 'Bundled sample', panels, canvas: null, notes: [], assets: [] })
+    expect(slideshowOf(await getBoard(board.id))?.config.imageSource).toEqual({ type: 'bundled', collectionId: 'teemu-jpeg' })
+    expect(await getBoardAssets(board.id)).toEqual([])
   })
 
   it('normalizes and persists curated references without relabeling them as bundled', async () => {
@@ -36,8 +36,8 @@ describe('persisted slideshow image sources', () => {
     const panels = createDefaultPanels().map((panel): Panel => panel.type === 'slideshow'
       ? { ...panel, config: { ...defaultSlideshowSettings, folderName: 'Autumn', imageSource: { type: 'curated' as const, collectionSlug: 'rbnks-autumn' } } }
       : panel)
-    const moment = await importMomentContent({ name: 'Curated selection', panels, canvas: null, notes: [], assets: [] })
-    expect(slideshowOf(await getMoment(moment.id))?.config).toMatchObject({
+    const board = await importBoardContent({ name: 'Curated selection', panels, canvas: null, notes: [], assets: [] })
+    expect(slideshowOf(await getBoard(board.id))?.config).toMatchObject({
       folderName: 'Autumn',
       imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' },
     })

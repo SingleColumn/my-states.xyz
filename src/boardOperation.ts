@@ -1,6 +1,6 @@
-/** A moment operation holds input still from its first flush through its
+/** A board operation holds input still from its first flush through its
  * final handoff. Failures release input, but must not run the next step. */
-export class MomentOperation {
+export class BoardOperation {
   private busy = false
   private pause: ((paused: boolean) => void) | null = null
   get isBusy() { return this.busy }
@@ -12,7 +12,7 @@ export class MomentOperation {
   }
 
   async run<T>(work: () => Promise<T>): Promise<T> {
-    if (this.busy) throw new Error('Please wait for the current moment operation to finish.')
+    if (this.busy) throw new Error('Please wait for the current board operation to finish.')
     this.busy = true
     try {
       this.pause?.(true)

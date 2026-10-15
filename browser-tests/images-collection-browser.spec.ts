@@ -46,7 +46,7 @@ test.describe('Images collection browser', () => {
 
     await shape.getByRole('button', { name: 'Images panel actions' }).click()
     await expect(page.getByRole('menuitem', { name: 'Choose a local folder' })).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Choose another collection' })).toHaveCount(0)
+    await expect(page.getByRole('menuitem', { name: 'Remove local images' })).toHaveCount(0)
     await page.keyboard.press('Escape')
 
     const firstCoverName = await browser.locator('.collection-browser-cover').getAttribute('aria-label')
@@ -60,7 +60,8 @@ test.describe('Images collection browser', () => {
     const firstSource = (await panelById(page, images.panelId)).config as { imageSource: { type: string; collectionId: string } }
     expect(firstSource.imageSource.type).toBe('bundled')
 
-    await choosePanelMenuItem(shape, 'Choose another collection')
+    await choosePanelMenuItem(shape, 'Show collection grid')
+    await choosePanelMenuItem(shape, 'Show collection carousel')
     await expect(browser).toBeVisible()
     expect((await panelById(page, images.panelId)).config).toEqual(firstSource)
 

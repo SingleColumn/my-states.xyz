@@ -80,7 +80,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     const wheelScopeRef = useNativeWheelScrollScope()
     // Marked on the shell rather than read from the root, so the treatments
     // that square a full-screen panel leave the panels behind it alone --
-    // they are visible again the moment the canvas is panned.
+    // they are visible again the board the canvas is panned.
     const commands = usePanelCommands()
     if (!shape.props.visible) return null
 
@@ -142,7 +142,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
  * which panel content starves: a click or drag on interactive/text content is
  * deliberately kept from reaching tldraw at all (see
  * handlePanelPointerDownCapture and canvasEventBlockerProps in NotesPanel),
- * so tldraw's tracked pointer position goes stale the moment the cursor is
+ * so tldraw's tracked pointer position goes stale the board the cursor is
  * over that content -- exactly where a wheel-scroll fix is needed. Rather
  * than widen what reaches tldraw's pointer pipeline just to keep that
  * position fresh, this intercepts the wheel event directly.

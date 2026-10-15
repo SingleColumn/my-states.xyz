@@ -1,10 +1,10 @@
 import type { PanelLayout } from './types'
 
 /**
- * Which panel a moment was left expanded to full screen, and the size it
+ * Which panel a board was left expanded to full screen, and the size it
  * should go back to.
  *
- * The panel's geometry is in the moment's document and survives a reload on
+ * The panel's geometry is in the board's document and survives a reload on
  * its own; what does not is the knowledge that the geometry is a full-screen
  * one. Without it a reloaded panel is merely a very large card -- it keeps
  * its rounded corners and its title becomes a form field again, because
@@ -12,9 +12,9 @@ import type { PanelLayout } from './types'
  *
  * Kept here rather than in the shape's props, beside the note text size and
  * the other `mic:` preferences, because it is about this window and not
- * about the moment: it should not travel inside an exported archive, land
- * in the undo history, or follow the moment onto someone else's screen. The
- * camera is persisted with the moment and this is not, which is the one
+ * about the board: it should not travel inside an exported archive, land
+ * in the undo history, or follow the board onto someone else's screen. The
+ * camera is persisted with the board and this is not, which is the one
  * judgement in this file worth arguing with.
  */
 export interface FullScreenMemory {
@@ -23,28 +23,28 @@ export interface FullScreenMemory {
   restore: PanelLayout
 }
 
-const storageKey = (momentId: string) => `mic:full-screen:${momentId}`
+const storageKey = (boardId: string) => `mic:full-screen:${boardId}`
 
-export function rememberFullScreen(momentId: string, memory: FullScreenMemory) {
+export function rememberFullScreen(boardId: string, memory: FullScreenMemory) {
   try {
-    window.localStorage.setItem(storageKey(momentId), JSON.stringify(memory))
+    window.localStorage.setItem(storageKey(boardId), JSON.stringify(memory))
   } catch {
     // Private browsing or storage disabled: the panel is still expanded now,
     // it simply will not be after a reload.
   }
 }
 
-export function forgetFullScreen(momentId: string) {
+export function forgetFullScreen(boardId: string) {
   try {
-    window.localStorage.removeItem(storageKey(momentId))
+    window.localStorage.removeItem(storageKey(boardId))
   } catch {
     // Nothing was remembered, so nothing is left behind.
   }
 }
 
-export function readFullScreen(momentId: string): FullScreenMemory | null {
+export function readFullScreen(boardId: string): FullScreenMemory | null {
   try {
-    const raw = window.localStorage.getItem(storageKey(momentId))
+    const raw = window.localStorage.getItem(storageKey(boardId))
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<FullScreenMemory>
     const restore = parsed.restore

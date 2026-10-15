@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiMenuActionItem, TldrawUiToolbar, useCanRedo, useCanUndo } from 'tldraw'
 import { Hand, Settings } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
-import { MomentToolbar } from './MomentToolbar'
-import { MomentThemeSelect } from './MomentThemeSelect'
+import { BoardToolbar } from './BoardToolbar'
+import { BoardThemeSelect } from './BoardThemeSelect'
 import type { PanelType } from './types'
 
 export interface AppChromeRect {
@@ -111,7 +111,7 @@ export function AppChrome({
       const rect = element.getBoundingClientRect()
       const root = element.closest<HTMLElement>('.app-root')
       root?.style.setProperty('--app-chrome-height', `${rect.height}px`)
-      root?.style.setProperty('--app-moment-text-left', `${momentTextLeft(element)}px`)
+      root?.style.setProperty('--app-board-text-left', `${boardTextLeft(element)}px`)
       onMeasure({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height })
     }
     measure()
@@ -129,7 +129,7 @@ export function AppChrome({
 
   return (
     <div ref={rootRef} className="app-chrome" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-      <MomentToolbar />
+      <BoardToolbar />
 
       <section className="app-chrome-canvas" aria-label="Canvas view controls">
         <button
@@ -179,7 +179,7 @@ export function AppChrome({
         >
           <Settings size={16} aria-hidden="true" />
         </button>
-        <MomentThemeSelect />
+        <BoardThemeSelect />
         <button
           className={`app-chrome-control about-launcher${pulseAbout ? ' about-launcher-pulse' : ''}`}
           type="button"
@@ -224,7 +224,7 @@ export function AppChromeMenuPanel() {
 const SELECT_TEXT_INSET = 4
 
 /**
- * Where the open moment's name is laid out, measured from the toolbar's own
+ * Where the open board's name is laid out, measured from the toolbar's own
  * left edge.
  *
  * A panel at full screen puts its title directly beneath this, and two
@@ -236,8 +236,8 @@ const SELECT_TEXT_INSET = 4
  * from the toolbar rather than the window also makes it the same number
  * before and after the toolbar goes flush to the window edge.
  */
-function momentTextLeft(chrome: HTMLElement) {
-  const select = chrome.querySelector('.moment-toolbar select')
+function boardTextLeft(chrome: HTMLElement) {
+  const select = chrome.querySelector('.board-toolbar select')
   if (!select) return 0
   const style = getComputedStyle(select)
   const inset = select.getBoundingClientRect().x - chrome.getBoundingClientRect().x

@@ -1,9 +1,9 @@
 import type { TLShape } from 'tldraw'
-import type { Moment, Panel, PanelContent } from './types'
+import type { Board, Panel, PanelContent } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeProps, type PanelShape } from './panelShapeSchema'
 import { getPanelDefinition, isPanelType } from './panelRegistry'
-import { MOMENT_SCHEMA_VERSION } from './momentSchema'
+import { BOARD_SCHEMA_VERSION } from './boardSchema'
 
 export type ArchitectureCheckStatus = 'PASS' | 'WARNING' | 'ERROR'
 
@@ -15,7 +15,7 @@ export interface PanelArchitectureCheck {
 }
 
 export interface PanelArchitectureReport {
-  moment: {
+  board: {
     id: string
     name: string
     schemaVersion: number
@@ -33,7 +33,7 @@ export interface PanelArchitectureReport {
    */
   ownership: {
     tldraw: string[]
-    momentRecord: string[]
+    boardRecord: string[]
     ownStores: string[]
     react: string[]
   }
@@ -62,13 +62,13 @@ export interface PanelArchitectureEditor {
 }
 
 /**
- * Reads the canvas and the moment record and says whether they hold to the
+ * Reads the canvas and the board record and says whether they hold to the
  * architecture: every panel is one tldraw shape carrying its own
- * configuration, the configuration validates against the schema, the moment
+ * configuration, the configuration validates against the schema, the board
  * persists the document and nothing else about panels, and the rules the
  * registry declares (one of a singleton kind) hold.
  */
-export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchitectureEditor): PanelArchitectureReport {
+export function buildPanelArchitectureReport(board: Board, editor: PanelArchitectureEditor): PanelArchitectureReport {
   const shapes = editor.getCurrentPageShapesSorted().filter(isPanelShapeRecord)
   const checks: PanelArchitectureCheck[] = []
   const addCheck = (id: string, label: string, status: ArchitectureCheckStatus, details: string) => {
@@ -144,16 +144,16 @@ export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchit
 
   addCheck(
     'schema-version',
-    'The moment uses the current schema',
-    moment.schemaVersion === MOMENT_SCHEMA_VERSION ? 'PASS' : 'WARNING',
-    `Moment schemaVersion is ${moment.schemaVersion}`,
+    'The board uses the current schema',
+    board.schemaVersion === BOARD_SCHEMA_VERSION ? 'PASS' : 'WARNING',
+    `Board schemaVersion is ${board.schemaVersion}`,
   )
 
-  // A moment's document is never absent (see the Moment type and
+  // A board's document is never absent (see the Board type and
   // documentFromDraft in panelStore.ts), so there is no longer a
   // transitional state to check for here — only whether the canvas has
   // caught up with a debounced save, below.
-  const persistedShapeIds = new Set(Object.keys(moment.document.store).filter((id) => id.startsWith('shape:')))
+  const persistedShapeIds = new Set(Object.keys(board.document.store).filter((id) => id.startsWith('shape:')))
   const unpersisted = shapes.filter((shape) => !persistedShapeIds.has(shape.id))
   addCheck(
     'document-correlation',
@@ -165,7 +165,7 @@ export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchit
   const errors = checks.filter((check) => check.status === 'ERROR').length
   const warnings = checks.filter((check) => check.status === 'WARNING').length
   return {
-    moment: { id: moment.id, name: moment.name, schemaVersion: moment.schemaVersion },
+    board: { id: board.id, name: board.name, schemaVersion: board.schemaVersion },
     summary: {
       panelCount: panels.length,
       shapeCount: shapes.length,
@@ -180,8 +180,8 @@ export function buildPanelArchitectureReport(moment: Moment, editor: PanelArchit
         'selection and undo history',
         'pointer interaction outside a declared content region',
       ],
-      momentRecord: ['name and timestamps', 'the tldraw document snapshot', 'the camera'],
-      ownStores: ['notes (by moment)', 'image assets and folder handles (by moment and panelId)', 'Spotify tokens (browser-local, never in a moment)'],
+      boardRecord: ['name and timestamps', 'the tldraw document snapshot', 'the camera'],
+      ownStores: ['notes (by board)', 'image assets and folder handles (by board and panelId)', 'Spotify tokens (browser-local, never in a board)'],
       react: ['component-internal UI state', 'playback state and loaded images, keyed by panelId in AppState runtime maps', 'pointer interaction inside a declared content region'],
     },
     panels,

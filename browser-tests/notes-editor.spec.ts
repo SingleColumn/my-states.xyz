@@ -27,10 +27,10 @@ test.describe('Notes editor', () => {
     await expect(body.locator('p strong')).toHaveText('bold')
     await expect(body.locator('ul li')).toHaveCount(2)
 
-    // The store hears the change a moment after the last keystroke (the
-    // editor batches reports), then saves it a moment after that.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content, { message: 'the stored Markdown' })
+    // The store hears the change a board after the last keystroke (the
+    // editor batches reports), then saves it a board after that.
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content, { message: 'the stored Markdown' })
       .toBe('# A heading\n\nSome **bold** prose.\n\n* first\n* second\n')
   })
 
@@ -43,8 +43,8 @@ test.describe('Notes editor', () => {
     await page.keyboard.press('Enter')
     await page.keyboard.press('Enter')
     await page.keyboard.type('after it')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('> a quotation\n\nafter it\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('> a quotation\n\nafter it\n')
 
     await page.reload()
     await waitForCanvas(page)
@@ -68,8 +68,8 @@ test.describe('Notes editor', () => {
 
     const fresh = noteBodyOf(shape)
     await expect(fresh.locator('.is-empty')).toHaveCount(1)
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.content).sort())
       .toEqual(['', 'first note text\n'])
   })
 })
@@ -118,8 +118,8 @@ test.describe('formatting tooltip', () => {
     await expect(toolbar).toBeHidden()
     expect(await page.evaluate(() => document.activeElement?.classList.contains('ProseMirror'))).toBe(true)
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Plain words **here**\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('Plain words **here**\n')
   })
 
   test('goes away when the writing carries on, and when the pointer moves elsewhere', async ({ page }) => {
@@ -209,8 +209,8 @@ test.describe('insert menu', () => {
     await page.keyboard.type('Chapter one')
     await expect(body.locator('h2')).toHaveText('Chapter one')
     // The slash and the filter text are gone, not left in the heading.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('## Chapter one\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('## Chapter one\n')
   })
 
   test('a click inserts too, and Escape leaves the slash as typed', async ({ page }) => {
@@ -235,8 +235,8 @@ test.describe('insert menu', () => {
     await expect(menu).toBeHidden()
     await page.keyboard.type('done')
     await expect(menu).toBeHidden()
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Above\n\n***\n\nand/or /done\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('Above\n\n***\n\nand/or /done\n')
   })
 
   test('places the picture the Images panel is showing', async ({ page }) => {
@@ -268,8 +268,8 @@ test.describe('insert menu', () => {
     await expect(picture).toHaveCount(1)
     const src = await picture.getAttribute('src')
     expect(src).toMatch(/^\/|^https?:/)
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain(`](${src}`)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain(`](${src}`)
   })
 })
 
@@ -309,10 +309,10 @@ test.describe('panel embeds', () => {
     // Stored twice over: the exact document, and Markdown with the link line.
     // The drop was on the paragraph's text, so the embed sits beside it --
     // on whichever side was nearer -- never inside it.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toMatch(new RegExp(`my-states://panel/${escapeRegExp(images.panelId)}\\?image=`))
-    const stored = (await readStorage(page, moment!.id)).notes[0]!
+    const stored = (await readStorage(page, board!.id)).notes[0]!
     expect(stored.document?.schemaVersion).toBe(1)
     // The editor may keep an empty line after a trailing block, so count only the embed.
     expect(stored.document?.doc.content?.filter((block) => block.type === 'panelEmbed')).toHaveLength(1)
@@ -348,8 +348,8 @@ test.describe('panel embeds', () => {
     const resizedBox = (await embed.boundingBox())!
     expect(Math.abs((resizedBox.x + resizedBox.width / 2) - (editorBox.x + editorBox.width / 2))).toBeLessThan(2)
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toMatch(/&width=\d+/)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toMatch(/&width=\d+/)
     await page.reload()
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
@@ -392,8 +392,8 @@ test.describe('panel embeds', () => {
     // may also persist its structured representation; the reload assertion
     // below is the compatibility behavior this test is concerned with.
     await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: `Text first.\n\n[Images: whatever](my-states://panel/${images.panelId})\n\nText after.\n` })
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('my-states://panel/')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('my-states://panel/')
     await page.reload()
     await waitForCanvas(page)
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
@@ -415,14 +415,14 @@ test.describe('writing mode', () => {
     await page.keyboard.type('# A heading')
     await page.keyboard.press('Enter')
     await page.keyboard.type('A paragraph long enough to run past a comfortable reading measure on a full-screen panel, which is the whole point of the measure.')
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
     // Waited for the last word of the paragraph, not the first of the
-    // heading: the note is saved a moment after it is typed, and taking
+    // heading: the note is saved a board after it is typed, and taking
     // "before" while that was still in flight compared a half-written note
     // with a whole one.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toContain('the whole point of the measure.')
-    const before = (await readStorage(page, moment!.id)).notes[0]!.content
+    const before = (await readStorage(page, board!.id)).notes[0]!.content
 
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
     await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
@@ -446,7 +446,7 @@ test.describe('writing mode', () => {
     await shape.getByRole('button', { name: 'Writing panel actions' }).click()
     await page.getByRole('menuitem', { name: 'Restore previous panel size' }).click()
     await expect(shape.locator('.notes-editor.is-writing')).toHaveCount(0)
-    expect((await readStorage(page, moment!.id)).notes[0]?.content).toBe(before)
+    expect((await readStorage(page, board!.id)).notes[0]?.content).toBe(before)
     expect(geometryOf(await panelById(page, notes.panelId))).toEqual(geometryOf(notes))
   })
 })
@@ -487,8 +487,8 @@ test.describe('two Notes panels', () => {
     // Two editors, two documents, neither disturbed by the other.
     await expect(firstBody).toHaveText('The first note.')
     await expect(secondBody).toHaveText('The second note.')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.content).sort())
       .toEqual(['The first note.\n', 'The second note.\n'])
 
     // Each panel names the note it shows, and a reload puts them back.
@@ -508,8 +508,8 @@ test.describe('two Notes panels', () => {
     const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
     await firstBody.click()
     await page.keyboard.type('Written in the first panel.')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('first panel')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('first panel')
     const noteId = ((await panelById(page, first.panelId)).config as { activeNoteId: string }).activeNoteId
 
     // A second panel cannot be pointed at the same note: an editor takes the
@@ -530,7 +530,7 @@ test.describe('two Notes panels', () => {
     // And the first panel's note is untouched by any of it. Read from
     // storage rather than typed into again: by now the second panel sits
     // over the first, and this is about the note, not the layout.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content))
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.content))
       .toContain('Written in the first panel.\n')
   })
 
@@ -540,8 +540,8 @@ test.describe('two Notes panels', () => {
     const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
     await firstBody.click()
     await page.keyboard.type('- Buy milk')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('* Buy milk\n')
 
     await selectPanel(page, first.panelId)
     await page.keyboard.press('Control+d')
@@ -552,9 +552,9 @@ test.describe('two Notes panels', () => {
 
     // The bullet is the writing, not the name. Reading it as the name put
     // "(copy)" inside the list item and left the copy called nothing.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.content).sort())
       .toEqual(['* Buy milk\n', 'Untitled note (copy)\n\n* Buy milk\n'])
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.title).sort())
       .toEqual(['', 'Untitled note (copy)'])
   })
 
@@ -564,8 +564,8 @@ test.describe('two Notes panels', () => {
     const firstBody = noteBodyOf(await shapeOf(page, first.panelId))
     await firstBody.click()
     await page.keyboard.type('The original note.')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toContain('The original note.')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('The original note.')
 
     // Ctrl+D copies the panel, and a copied Writing panel names the note the
     // original was showing.
@@ -584,12 +584,12 @@ test.describe('two Notes panels', () => {
     // Two notes now, and the copy says in its own first line that it is one
     // -- which is where its name lives, so the name survives being typed in.
     await expect(noteBodyOf(copyShape)).toHaveText('The original note. (copy)')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.title).sort())
       .toEqual(['The original note.', 'The original note. (copy)'])
     await firstBody.click()
     await page.keyboard.press('End')
     await page.keyboard.type(' Edited after the copy.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.content).sort())
       .toEqual(['The original note. (copy)\n', 'The original note. Edited after the copy.\n'])
   })
 })
@@ -608,8 +608,8 @@ test.describe('deriving the Markdown', () => {
     await expect(shape.locator('.card-footer-meta')).toHaveText('39 characters')
 
     // The save derives the Markdown once, and what lands is the note as typed.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('One two three four five six seven eight\n')
 
     // Counted from the prose, so Markdown syntax no longer inflates it.
@@ -619,7 +619,7 @@ test.describe('deriving the Markdown', () => {
     await page.keyboard.press('Control+Home')
     await page.keyboard.type('# ')
     await expect(shape.locator('.card-footer-meta')).toHaveText('39 characters')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('# One two three four five six seven eight\n')
   })
 
@@ -635,8 +635,8 @@ test.describe('deriving the Markdown', () => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('Typed and then hidden.\n')
   })
 
@@ -670,7 +670,7 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('The old name')
@@ -681,13 +681,13 @@ test.describe('the first line names the note', () => {
     })
 
     await expect(body).toHaveText('The new nameThe new body.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0])
       .toMatchObject({ title: 'The new name', content: 'The new name\n\nThe new body.\n' })
 
     await body.locator('p').last().click()
     await page.keyboard.press('End')
     await page.keyboard.type(' Still current.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('The new name\n\nThe new body. Still current.\n')
   })
 
@@ -696,7 +696,7 @@ test.describe('the first line names the note', () => {
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
     const body = noteBodyOf(shape)
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await dispatch(page, {
       kind: 'note.setContent',
@@ -707,7 +707,7 @@ test.describe('the first line names the note', () => {
     await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'A safe name' })
 
     await expect(body.locator('img:not(.ProseMirror-separator)')).toHaveCount(1)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('A safe name\n\n![A photograph](https://example.com/photo.png)\n\nThe body.\n')
   })
 
@@ -715,11 +715,11 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: '2 * 3' })
     await expect(body.locator('p').first()).toHaveText('2 * 3')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0])
       .toMatchObject({ title: '2 * 3', content: '2 \\* 3\n' })
   })
 
@@ -728,7 +728,7 @@ test.describe('the first line names the note', () => {
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
     const body = noteBodyOf(shape)
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     // No field to name it in: there is one writing surface and the name is
     // the first thing written on it.
@@ -736,19 +736,19 @@ test.describe('the first line names the note', () => {
 
     await body.click()
     await page.keyboard.type('A title')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('A title')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('A title')
 
     // A second line is the note, not its name.
     await page.keyboard.press('Enter')
     await page.keyboard.type('The body of it.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0])
       .toMatchObject({ title: 'A title', content: 'A title\n\nThe body of it.\n' })
 
     // Rewriting the first line renames the note, with nothing else to do.
     await body.locator('p').first().click()
     await page.keyboard.press('End')
     await page.keyboard.type(', renamed')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('A title, renamed')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('A title, renamed')
   })
 
   test('the first line is drawn as a name, so the writer can see it is one', async ({ page }) => {
@@ -779,7 +779,7 @@ test.describe('the first line names the note', () => {
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
     const body = noteBodyOf(shape)
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('- Buy milk')
@@ -790,33 +790,33 @@ test.describe('the first line names the note', () => {
     await expect(body.locator('ul li')).toHaveCount(1)
     await expect(body.locator('ul li')).toHaveText('Buy milk')
     expect(await body.evaluate((el) => [...el.children].map((child) => child.tagName))).toEqual(['P', 'UL'])
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('')
 
     // The empty line is the document's business and nothing the Markdown
     // needs to carry: Markdown cannot write an empty paragraph, and the
     // `<br />` remark reaches for instead would be a line of HTML at the top
     // of the exported file.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('* Buy milk\n')
 
     // And the line above is a real one: the note is named by typing in it.
     await body.locator('p').first().click()
     await page.keyboard.type('The shopping')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('The shopping')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('The shopping')
   })
 
   test('a name written in bold is not given a second title when the note is reopened', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('**Notes** from the harbour')
     await expect(body.locator('strong')).toHaveText('Notes')
     // The name is the line as it reads, so the Markdown that carries the
     // bold is not part of it.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Notes from the harbour')
-    const written = (await readStorage(page, moment!.id)).notes[0]!.content
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('Notes from the harbour')
+    const written = (await readStorage(page, board!.id)).notes[0]!.content
 
     await page.reload()
     await waitForCanvas(page)
@@ -826,7 +826,7 @@ test.describe('the first line names the note', () => {
     // one from the Markdown source -- so a note whose first line carried any
     // formatting never matched its own name and had a second title written
     // in above it, by nothing more than being looked at.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe(written)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe(written)
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect(again.locator('h1')).toHaveCount(0)
     await expect(again.locator('p')).toHaveCount(1)
@@ -836,13 +836,13 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('- Buy milk')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('* Buy milk\n')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('* Buy milk\n')
 
-    // Read back from the Markdown alone, which is what a moment bundle
+    // Read back from the Markdown alone, which is what a board bundle
     // carries and what the record says: the empty naming line is the
     // document's business and is not written to it.
     await page.addInitScript(() => window.localStorage.setItem('mic:notes-load-from-markdown', 'true'))
@@ -862,11 +862,11 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('犬')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('犬')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('犬')
 
     // A note named the old way: a title of its own that its writing does not
     // say. Comparing names by their ascii letters alone left both sides of
@@ -894,18 +894,18 @@ test.describe('the first line names the note', () => {
     // The old name is kept, written in where a name now lives.
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect(again.locator('h1')).toHaveText('猫')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('猫')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('猫')
   })
 
   test('legacy names that differ only by punctuation are not treated as equal', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('# C# Guide')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('# C# Guide\n')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('# C# Guide\n')
     await page.evaluate(async () => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const open = indexedDB.open('my-states')
@@ -931,7 +931,7 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
     await body.click()
     await page.keyboard.type('The first note')
     const firstId = (await describeCanvas(page)).panels.find((panel) => panel.panelId === notes.panelId)!.note!.id
@@ -943,7 +943,7 @@ test.describe('the first line names the note', () => {
     await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'The queued name' })
 
     await expect(noteBodyOf(await shapeOf(page, notes.panelId)).locator('p').first()).toHaveText('The queued name')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title))
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.title))
       .toContain('The queued name')
   })
 
@@ -951,14 +951,14 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('A paragraph')
     await page.keyboard.press('Control+Home')
     await page.keyboard.press('Enter')
 
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('<br />\n\nA paragraph\n')
   })
 
@@ -979,11 +979,11 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('Shopping list')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Shopping list\n')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('Shopping list\n')
 
     // A note from when every unnamed note wore "Untitled note".
     await page.evaluate(async () => {
@@ -1009,7 +1009,7 @@ test.describe('the first line names the note', () => {
     // saying it: an already-nameable first line causes no edit, so a stale
     // name left here would have stood in the picker and in the name an
     // export saves under until some unrelated keystroke replaced it.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Shopping list')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('Shopping list')
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect(again.locator('h1')).toHaveCount(0)
     await expect(again.locator('p')).toHaveText('Shopping list')
@@ -1031,24 +1031,24 @@ test.describe('the first line names the note', () => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const shape = await shapeOf(page, notes.panelId)
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await noteBodyOf(shape).click()
     await page.keyboard.type('# Written as a heading')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Written as a heading')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('Written as a heading')
   })
 
   test('the note.setTitle command renames by rewriting the first line', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('First name')
     await page.keyboard.press('Enter')
     await page.keyboard.type('The body of it.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('First name')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('First name')
 
     await dispatch(page, { kind: 'note.setTitle', panelId: notes.panelId, title: 'Second name' })
 
@@ -1061,26 +1061,26 @@ test.describe('the first line names the note', () => {
     await body.locator('p').last().click()
     await page.keyboard.press('End')
     await page.keyboard.type(' And more.')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0])
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0])
       .toMatchObject({ title: 'Second name', content: 'Second name\n\nThe body of it. And more.\n' })
   })
 
-  test('a rename dispatched the moment the panel changes note lands on the right one', async ({ page }) => {
+  test('a rename dispatched the board the panel changes note lands on the right one', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const { moment } = await describeCanvas(page)
+    const { board } = await describeCanvas(page)
 
     await body.click()
     await page.keyboard.type('The first note')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('The first note\n')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('The first note\n')
 
     const firstId = (await describeCanvas(page)).panels.find((panel) => panel.panelId === notes.panelId)!.note!.id
 
     await dispatch(page, { kind: 'note.create', panelId: notes.panelId })
     await noteBodyOf(await shapeOf(page, notes.panelId)).click()
     await page.keyboard.type('The second note')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.length).toBe(2)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.length).toBe(2)
 
     // Back to back, the way a script would. The panel is pointed at the
     // first note and renamed in the same breath, while the editor standing
@@ -1091,7 +1091,7 @@ test.describe('the first line names the note', () => {
     // The rename reaches the note it named, and no other note is touched by
     // it: renaming through whichever editor happened to be standing there
     // would have written this name into the note being left.
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort())
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.title).sort())
       .toEqual(['Renamed by a script', 'The second note'])
     await expect(noteBodyOf(await shapeOf(page, notes.panelId)).locator('p').first()).toHaveText('Renamed by a script')
   })
@@ -1107,8 +1107,8 @@ test.describe('the first line names the note', () => {
 
     await noteBodyOf(shape).click()
     await page.keyboard.type('Written large')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.title).toBe('Written large')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.title).toBe('Written large')
   })
 })
 
@@ -1205,8 +1205,8 @@ test.describe('links and text size', () => {
 
     const link = body.locator('a')
     await expect(link).toHaveAttribute('href', 'https://example.com')
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('[Visit the](https://example.com) site now\n')
 
     // A held modifier says so before it acts, and opens on either of the two
@@ -1285,8 +1285,8 @@ test.describe('the link editor', () => {
     await page.keyboard.press('Enter')
     await expect(link).toHaveAttribute('href', 'https://new.example')
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('[a link](https://new.example)\n')
 
     // Removing goes back to plain words, not an empty bracket.
@@ -1296,7 +1296,7 @@ test.describe('the link editor', () => {
     await page.getByRole('button', { name: 'Remove link' }).click()
     await expect(body.locator('a')).toHaveCount(0)
     await expect(body.locator('p')).toHaveText('a link')
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('a link\n')
   })
 
@@ -1323,8 +1323,8 @@ test.describe('the link editor', () => {
     await expect(popover).toBeHidden()
     await expect(body.locator('a')).toHaveCount(0)
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('select this phrase please\n')
   })
 
@@ -1356,8 +1356,8 @@ test.describe('underline', () => {
 
     // Markdown has no underline, so the note carries the one thing it does
     // allow for what it lacks.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('A firm <u>word</u>\n')
 
     // And the tags come back as the mark, not as four literal characters.
@@ -1417,8 +1417,8 @@ test.describe('what a line is', () => {
     // And the way back, which the editor had no route to before.
     await bar.getByRole('button', { name: 'Text' }).click()
     await expect(body.locator('h2')).toHaveCount(0)
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('A line of writing\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('A line of writing\n')
   })
 
   test('the insert menu offers the way back too', async ({ page }) => {
@@ -1436,8 +1436,8 @@ test.describe('what a line is', () => {
     const menu = page.getByRole('listbox', { name: 'Insert' })
     await menu.getByRole('option', { name: 'Text', exact: true }).click()
     await expect(body.locator('h2')).toHaveCount(0)
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('A subheading\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('A subheading\n')
   })
 })
 
@@ -1462,8 +1462,8 @@ test.describe('highlight', () => {
     // Written as the convention every reader of it knows, not as a tag: a
     // note that uses a highlight is still Markdown rather than Markdown
     // with HTML in it.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('Mark ==these words== as typed\n\n==And a second line==\n')
 
     // And read back as the mark, not as four equals signs in the prose.
@@ -1505,8 +1505,8 @@ test.describe('highlight', () => {
     await page.keyboard.type('a == b and c == d')
     await expect(body.locator('mark')).toHaveCount(0)
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('a == b and c == d\n')
   })
 
@@ -1546,8 +1546,8 @@ test.describe('emoji', () => {
     await page.keyboard.press('Enter')
     await expect(menu).toBeHidden()
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('Ready ✅\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('Ready ✅\n')
   })
 
   test('the insert menu opens the whole list for anyone who has not met the colon', async ({ page }) => {
@@ -1565,8 +1565,8 @@ test.describe('emoji', () => {
     expect(await menu.getByRole('option').count()).toBeGreaterThan(50)
     await menu.getByRole('option', { name: 'Warning' }).click()
 
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content).toBe('⚠️\n')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('⚠️\n')
   })
 })
 
@@ -1590,13 +1590,13 @@ test.describe('opening a markdown file', () => {
     // Named by the heading the file opens with, not by the file's own name:
     // the first line names the note, and the file brought one with it.
     await expect.poll(async () => {
-      const { moment } = await describeCanvas(page)
-      return (await readStorage(page, moment!.id)).notes.map((note) => note.title).sort()
+      const { board } = await describeCanvas(page)
+      return (await readStorage(page, board!.id)).notes.map((note) => note.title).sort()
     }).toEqual(['A heading from the file', 'Already written here'])
 
     // The note that was open is still there, with its own words.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes.map((note) => note.content).sort())
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes.map((note) => note.content).sort())
       .toEqual(['# A heading from the file\n\nWith **prose** under it.\n', 'Already written here\n'])
   })
 })
@@ -1616,11 +1616,11 @@ test.describe('a note from before the structured document existed', () => {
     await body.click()
     await page.keyboard.type('placeholder')
 
-    // The app saves a moment after the edit. Rewriting the stored record
+    // The app saves a board after the edit. Rewriting the stored record
     // before that lands would just have the app's own save overwrite it, so
     // this waits for the placeholder to be the settled content first.
-    const { moment } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, moment!.id)).notes[0]?.content)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
       .toBe('placeholder\n')
 
     // Rewritten from outside the app's own code, the way an old record

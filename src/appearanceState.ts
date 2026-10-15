@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Moment } from './types'
+import type { Board } from './types'
 import {
   deleteStoredTheme,
   getAppearanceSettings,
@@ -17,7 +17,7 @@ import { parseThemeFile, validateThemeDefinition, type SupportsCssValue } from '
 
 /**
  * Appearance: the theme library, the app-level settings, and the one
- * resolved theme on screen. Everything the Settings dialog, the moment
+ * resolved theme on screen. Everything the Settings dialog, the board
  * toolbar and the canvas need to agree on comes from here, and the theme is
  * applied to the page from here, so no component decides precedence for
  * itself.
@@ -57,7 +57,7 @@ function useSystemPrefersDark(enabled: boolean) {
   return prefersDark
 }
 
-export function useAppearanceState(activeMoment: Moment | null): AppearanceState {
+export function useAppearanceState(activeBoard: Board | null): AppearanceState {
   const [stored, setStored] = useState<StoredTheme[]>([])
   const [settings, setSettings] = useState<AppearanceSettings>({ globalThemeId: DEFAULT_THEME_ID, modePreference: 'system' })
   const [isReady, setIsReady] = useState(false)
@@ -75,7 +75,7 @@ export function useAppearanceState(activeMoment: Moment | null): AppearanceState
       setSettings(loaded)
       setIsReady(true)
     }).catch(() => {
-      // Storage failed to open; the moments layer reports that. The built-in
+      // Storage failed to open; the boards layer reports that. The built-in
       // default is applied regardless, so the page is never unstyled.
       if (!cancelled) setIsReady(true)
     })
@@ -86,12 +86,12 @@ export function useAppearanceState(activeMoment: Moment | null): AppearanceState
   const themes = useMemo(() => [...library.values()].map(toThemeEntry), [library])
 
   const effective = useMemo(() => resolveEffectiveTheme({
-    momentThemeId: activeMoment?.themeId,
+    boardThemeId: activeBoard?.themeId,
     appearance: settings,
     systemPrefersDark,
     themes: library,
     defaultThemeId: DEFAULT_THEME_ID,
-  }), [activeMoment?.themeId, settings, systemPrefersDark, library])
+  }), [activeBoard?.themeId, settings, systemPrefersDark, library])
 
   useEffect(() => { applyTheme(effective) }, [effective])
 

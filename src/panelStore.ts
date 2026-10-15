@@ -1,5 +1,5 @@
 import { T, createShapeId, createTLStore, getIndices, type Editor, type TLPage, type TLShape, type TLShapePartial, type TLStoreSnapshot } from 'tldraw'
-import type { CanvasCamera, MomentDraft, Panel, PanelConfigs, PanelLayout, PanelType } from './types'
+import type { CanvasCamera, BoardDraft, Panel, PanelConfigs, PanelLayout, PanelType } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { documentSchema, panelShapeProps, type PanelShape, type PanelShapeProps } from './panelShapeSchema'
 import { getPanelDefinition } from './panelRegistry'
@@ -210,9 +210,9 @@ export function createPanelShape<Type extends PanelType>(
  * too (locked, so the canvas leaves them alone); a panel with no saved
  * layout takes its type's default place.
  */
-export function shapesForDraft(draft: MomentDraft): TLShapePartial<PanelShape>[] {
+export function shapesForDraft(draft: BoardDraft): TLShapePartial<PanelShape>[] {
   const ids = new Set(draft.panels.map((panel) => panel.id))
-  if (ids.size !== draft.panels.length || ids.has('')) throw new Error('This moment contains missing or duplicate panel identities. Its original data has been kept.')
+  if (ids.size !== draft.panels.length || ids.has('')) throw new Error('This board contains missing or duplicate panel identities. Its original data has been kept.')
   const layouts = new Map((draft.canvas?.panels ?? []).map((layout) => [layout.panelId, layout]))
   // A panel with no saved layout goes after every panel that has one.
   const orderOf = (panel: Panel) => layouts.get(panel.id)?.order ?? Number.MAX_SAFE_INTEGER
@@ -230,7 +230,7 @@ export function shapesForDraft(draft: MomentDraft): TLShapePartial<PanelShape>[]
       isLocked: !visible,
       props: {
         w: layout?.w ?? definition.defaultLayout.w,
-        // No saved layout means a brand-new moment, where some panels start short.
+        // No saved layout means a brand-new board, where some panels start short.
         h: layout?.h ?? definition.startingHeight ?? definition.defaultLayout.h,
         panelId: panel.id,
         panel: { type: panel.type, config: panel.config } as PanelShapeProps['panel'],
@@ -250,13 +250,13 @@ export function shapesForDraft(draft: MomentDraft): TLShapePartial<PanelShape>[]
 
 /**
  * A draft's shapes as a real tldraw document, built with no editor at all:
- * storage calls this so a moment has its document from creation, rather
+ * storage calls this so a board has its document from creation, rather
  * than waiting for the canvas to build one on first open. Uses only
  * documented store primitives (`RecordType.create`, `getIndices`), not the
  * editor's own internal bootstrap, since nothing here is ever shown on
  * screen directly.
  */
-export function documentFromDraft(draft: MomentDraft): TLStoreSnapshot {
+export function documentFromDraft(draft: BoardDraft): TLStoreSnapshot {
   const store = createTLStore({ schema: documentSchema })
   const page = documentSchema.types.page.create({ name: '', index: 'a1' as TLPage['index'] })
   const shapes = shapesForDraft(draft)
@@ -272,7 +272,7 @@ export function documentFromDraft(draft: MomentDraft): TLStoreSnapshot {
  * A document as a draft, for the archive format and for anything that wants
  * panels without an editor. Order is stacking order.
  */
-export function draftFromDocument(document: TLStoreSnapshot, camera: CanvasCamera | null): MomentDraft {
+export function draftFromDocument(document: TLStoreSnapshot, camera: CanvasCamera | null): BoardDraft {
   const shapes = Object.values(document.store)
     .filter((record): record is PanelShape => record.typeName === 'shape' && (record as TLShape).type === PANEL_SHAPE_TYPE)
     .sort((left, right) => (left.index < right.index ? -1 : left.index > right.index ? 1 : 0))

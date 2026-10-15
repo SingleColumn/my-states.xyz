@@ -22,13 +22,13 @@ import { buildPanelArchitectureReport, type PanelArchitectureReport } from './pa
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
 import { AppSettings } from './AppSettings'
-import type { Moment, PanelLayout, PanelType } from './types'
+import type { Board, PanelLayout, PanelType } from './types'
 
 const shapeUtils = [PanelShapeUtil]
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
-// Storage builds a moment's document with no editor at all (documentSchema
+// Storage builds a board's document with no editor at all (documentSchema
 // in panelShapeSchema.ts), on the verified premise that it is exactly the
 // schema this mounted editor derives from PanelShapeUtil's own statics. If
 // a future change to tldraw's defaults or to PanelShapeUtil ever makes that
@@ -51,7 +51,7 @@ export default function App() {
 function AppContent() {
   const posthog = usePostHog()
   const appState = useAppState()
-  const { spotify, moments, panels, appearance } = appState
+  const { spotify, boards, panels, appearance } = appState
   const [callbackStatus, setCallbackStatus] = useState<string | null>(null)
   const callbackHandledRef = useRef(false)
   const [isPanMode, setIsPanMode] = useState(false)
@@ -72,9 +72,9 @@ function AppContent() {
   const appRootRef = useRef<HTMLElement | null>(null)
   const chromeRectRef = useRef<AppChromeRect | null>(null)
   const restoringCanvasRef = useRef(false)
-  const canvasMomentIdRef = useRef<string | null>(null)
+  const canvasBoardIdRef = useRef<string | null>(null)
   const persistCanvasRef = useRef<ReturnType<typeof debounce> | null>(null)
-  const momentsRef = useRef(moments)
+  const boardsRef = useRef(boards)
   const panelsRef = useRef(panels)
   const appStateRef = useRef(appState)
   const appearanceRef = useRef(appearance)
@@ -82,11 +82,11 @@ function AppContent() {
   const preFocusPanelGeometryRef = useRef(new Map<string, PanelLayout>())
 
   useEffect(() => {
-    momentsRef.current = moments
+    boardsRef.current = boards
     panelsRef.current = panels
     appStateRef.current = appState
     appearanceRef.current = appearance
-  }, [appState, appearance, moments, panels])
+  }, [appState, appearance, boards, panels])
 
   // tldraw's light/dark switch lives in its user preferences, not the DOM,
   // so the theme's mode is pushed to it here whenever the theme changes;
@@ -95,14 +95,14 @@ function AppContent() {
     editorRef.current?.user.updateUserPreferences({ colorScheme: appearance.effective.mode })
   }, [appearance.effective.mode, isCanvasReady])
 
-  // A moment can pin a theme that is not installed here (it was deleted, or
-  // the moment came from another browser). The id is kept and the global
-  // theme is shown; say so once per moment.
+  // A board can pin a theme that is not installed here (it was deleted, or
+  // the board came from another browser). The id is kept and the global
+  // theme is shown; say so once per board.
   useEffect(() => {
     const missing = appearance.effective.missingThemeId
     if (!missing) return
-    setCallbackStatus(`This moment was saved with the theme "${missing}", which is not installed. Your current theme is being used instead.`)
-  }, [moments.activeMoment?.id, appearance.effective.missingThemeId])
+    setCallbackStatus(`This board was saved with the theme "${missing}", which is not installed. Your current theme is being used instead.`)
+  }, [boards.activeBoard?.id, appearance.effective.missingThemeId])
 
   useEffect(() => {
     if (window.location.pathname !== '/callback' || callbackHandledRef.current) return
@@ -144,59 +144,59 @@ function AppContent() {
   }, [posthog, spotify])
 
   /**
-   * Puts a moment on the canvas. Every moment has its document from
+   * Puts a board on the canvas. Every board has its document from
    * creation (storage builds it directly; see `documentFromDraft` in
    * panelStore.ts), so this only ever loads it, ids and all.
    *
    * Loading is not something the user did on the canvas, so none of it goes
    * into the undo history, and whatever history there was is cleared: it
-   * could only refer to shapes of another moment.
+   * could only refer to shapes of another board.
    */
-  const restoreCanvas = useCallback((editor: Editor, moment: Moment) => {
-    if (canvasMomentIdRef.current === moment.id) return
+  const restoreCanvas = useCallback((editor: Editor, board: Board) => {
+    if (canvasBoardIdRef.current === board.id) return
     // Preflight in a detached store before the editor transaction. On
     // failure the old canvas and stored source remain intact.
     try {
-      prepareCanvasRestore(editor.store, moment)
+      prepareCanvasRestore(editor.store, board)
     } catch (error) {
-      setCallbackStatus(error instanceof Error ? error.message : 'Could not open this moment. Its original data has been kept.')
+      setCallbackStatus(error instanceof Error ? error.message : 'Could not open this board. Its original data has been kept.')
       return
     }
     restoringCanvasRef.current = true
     try {
       withRestoreWriteAccess(editor, () => editor.run(() => {
-        loadSnapshot(editor.store, moment.document)
+        loadSnapshot(editor.store, board.document)
         editor.selectNone()
         setSelectedPanelId(null)
-        if (moment.camera) editor.setCamera(moment.camera)
+        if (board.camera) editor.setCamera(board.camera)
         else fitBoundsInUsableViewport(editor, getPanelBounds(editor), null)
       }, { history: 'ignore', ignoreShapeLock: true }))
       editor.clearHistory()
-      canvasMomentIdRef.current = moment.id
+      canvasBoardIdRef.current = board.id
     } finally {
       restoringCanvasRef.current = false
     }
     previousPanelGeometryRef.current.clear()
     preFocusPanelGeometryRef.current.clear()
-    // A moment left with a panel expanded opens with it expanded. The
+    // A board left with a panel expanded opens with it expanded. The
     // geometry came back with the document; what did not is that the
     // geometry is a full-screen one, and every part of the treatment -- the
     // flush toolbar, the squared corners, the note's title as a line of
     // writing rather than a form field -- follows from the app knowing it.
     // The panel is then laid out again for this window, which may not be
     // the size of the one it was expanded in.
-    const remembered = readFullScreen(moment.id)
+    const remembered = readFullScreen(board.id)
     if (remembered && getPanelShape(editor, remembered.panelId)) {
       previousPanelGeometryRef.current.set(remembered.panelId, remembered.restore)
       setFullScreenPanelId(remembered.panelId)
     } else {
-      if (remembered) forgetFullScreen(moment.id)
+      if (remembered) forgetFullScreen(board.id)
       setFullScreenPanelId(null)
     }
     // Through the ref, not the value: the panels state is rebuilt whenever a
     // shape changes, and a restore changes every shape. Depending on it here
     // would make the restore re-run itself.
-    panelsRef.current.markRestored(moment.id)
+    panelsRef.current.markRestored(board.id)
   }, [])
 
   const handleMount = useCallback((editor: Editor) => {
@@ -209,15 +209,15 @@ function AppContent() {
     // to choose and is kept in step by the effect below; it is set here too
     // so the first frame is right.
     editor.user.updateUserPreferences({ locale: 'en', colorScheme: appearanceRef.current.effective.mode })
-    if (moments.activeMoment) restoreCanvas(editor, moments.activeMoment)
+    if (boards.activeBoard) restoreCanvas(editor, boards.activeBoard)
 
     // Whatever changes on the canvas, by the user's hand or the app's, the
-    // document snapshot is what the moment keeps. Loads are the one exception
+    // document snapshot is what the board keeps. Loads are the one exception
     // and are fenced off by the ref.
     const saveNow = () => {
-      const momentId = canvasMomentIdRef.current
-      if (restoringCanvasRef.current || !momentId) return
-      momentsRef.current.updateDocument(momentId, getSnapshot(editor.store).document, editor.getCamera())
+      const boardId = canvasBoardIdRef.current
+      if (restoringCanvasRef.current || !boardId) return
+      boardsRef.current.updateDocument(boardId, getSnapshot(editor.store).document, editor.getCamera())
     }
     const persist = debounce(saveNow, 300)
     persistCanvasRef.current = persist
@@ -226,20 +226,20 @@ function AppContent() {
     // tab has no frames, so a change made just before the tab was hidden may
     // not have reached the listener below at all. The same is true when the
     // tab goes hidden or is closed, so both save directly too.
-    const unregisterCanvasFlush = moments.registerCanvasFlush(() => {
+    const unregisterCanvasFlush = boards.registerCanvasFlush(() => {
       persist.cancel()
       saveNow()
     })
-    const unregisterCanvasPause = moments.registerCanvasPause((paused) => {
+    const unregisterCanvasPause = boards.registerCanvasPause((paused) => {
       editor.updateInstanceState({ isReadonly: paused })
       if (appRootRef.current) appRootRef.current.inert = paused
     })
-    const unregisterCanvasRestore = moments.registerCanvasRestore((moment) => {
-      prepareCanvasRestore(editor.store, moment)
-      return () => restoreCanvas(editor, moment)
+    const unregisterCanvasRestore = boards.registerCanvasRestore((board) => {
+      prepareCanvasRestore(editor.store, board)
+      return () => restoreCanvas(editor, board)
     })
     const blockInputWhileSaving = (event: Event) => {
-      if (!momentsRef.current.isOperationPending()) return
+      if (!boardsRef.current.isOperationPending()) return
       event.preventDefault()
       event.stopImmediatePropagation()
     }
@@ -249,7 +249,7 @@ function AppContent() {
     const saveWhenLeaving = () => {
       // pagehide is unconditional; visibilityState need not be hidden yet.
       // This flush includes notes and immediately captures the canvas.
-      void momentsRef.current.flush().catch(() => {})
+      void boardsRef.current.flush().catch(() => {})
     }
     const saveWhenHidden = () => { if (document.visibilityState === 'hidden') saveWhenLeaving() }
     document.addEventListener('visibilitychange', saveWhenHidden)
@@ -324,13 +324,13 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown)
       delete window.myStates
       editorRef.current = null
-      canvasMomentIdRef.current = null
+      canvasBoardIdRef.current = null
       panelsRef.current.attachEditor(null)
       panelsRef.current.markRestored(null)
       setIsCanvasReady(false)
       setSelectedPanelId(null)
     }
-  }, [restoreCanvas, moments.activeMoment?.id, moments.registerCanvasFlush])
+  }, [restoreCanvas, boards.activeBoard?.id, boards.registerCanvasFlush])
 
   const hidePanel = useCallback((panelId: string) => {
     const editor = editorRef.current
@@ -365,7 +365,7 @@ function AppContent() {
       // The toolbar goes flush to the top of the window as the panel
       // expands, so where it is about to be -- the top of the viewport plus
       // its height -- is what the page has to clear, not where it was
-      // measured a moment ago with its inset still on.
+      // measured a board ago with its inset still on.
       chrome ? viewport.y + chrome.height : undefined,
       (point) => editor.screenToPage(point),
     )
@@ -393,20 +393,20 @@ function AppContent() {
     })
   }, [fullScreenBoundsFor])
 
-  // What this window remembers about the moment, kept in step with the one
+  // What this window remembers about the board, kept in step with the one
   // piece of state that says whether a panel is expanded. Written here
   // rather than at each of the several places that leave full screen --
   // restoring the size, entering focus view, resetting one panel, resetting
   // the layout -- so none of them can forget to.
   useEffect(() => {
-    const momentId = canvasMomentIdRef.current
-    if (!momentId) return
+    const boardId = canvasBoardIdRef.current
+    if (!boardId) return
     if (!fullScreenPanelId) {
-      forgetFullScreen(momentId)
+      forgetFullScreen(boardId)
       return
     }
     const restore = previousPanelGeometryRef.current.get(fullScreenPanelId)
-    if (restore) rememberFullScreen(momentId, { panelId: fullScreenPanelId, restore })
+    if (restore) rememberFullScreen(boardId, { panelId: fullScreenPanelId, restore })
   }, [fullScreenPanelId])
 
   // The toolbar changes shape as a panel expands, and it is measured after
@@ -589,18 +589,18 @@ function AppContent() {
     setChromeBottom((current) => Math.abs(current - rect.bottom) < 0.5 ? current : rect.bottom)
   }, [])
 
-  // The report reads the moment as last written, not the one in React state,
+  // The report reads the board as last written, not the one in React state,
   // because the document is kept out of state.
   const openArchitectureReport = useCallback(() => {
     const editor = editorRef.current
-    const moment = moments.getActiveMomentRecord()
-    if (!editor || !moment) return
-    setArchitectureReport(buildPanelArchitectureReport(moment, editor))
-  }, [moments])
+    const board = boards.getActiveBoardRecord()
+    if (!editor || !board) return
+    setArchitectureReport(buildPanelArchitectureReport(board, editor))
+  }, [boards])
 
-  const latestMoment = moments.getActiveMomentRecord()
-  const displayedArchitectureReport = architectureReport && latestMoment && editorRef.current
-    ? buildPanelArchitectureReport(latestMoment, editorRef.current)
+  const latestBoard = boards.getActiveBoardRecord()
+  const displayedArchitectureReport = architectureReport && latestBoard && editorRef.current
+    ? buildPanelArchitectureReport(latestBoard, editorRef.current)
     : architectureReport
 
   const openHelpAbout = useCallback(() => {
@@ -620,8 +620,8 @@ function AppContent() {
   const closeSettings = useCallback(() => setIsSettingsOpen(false), [])
 
   useEffect(() => {
-    if (editorRef.current && moments.activeMoment) restoreCanvas(editorRef.current, moments.activeMoment)
-  }, [restoreCanvas, moments.activeMoment?.id])
+    if (editorRef.current && boards.activeBoard) restoreCanvas(editorRef.current, boards.activeBoard)
+  }, [restoreCanvas, boards.activeBoard?.id])
 
   // tldraw remounts components.MenuPanel whenever its reference changes, which would wipe
   // AppChrome's internal state (e.g. the About-button pulse) on almost every interaction.
@@ -646,7 +646,7 @@ function AppContent() {
     onMeasure: handleChromeMeasure,
   }
 
-  // One moment is one page, so tldraw's "Move to page" has nowhere to move a
+  // One board is one page, so tldraw's "Move to page" has nowhere to move a
   // panel to. Declaring the limit hides that submenu instead of leaving a
   // dead end in the menu.
   const editorOptions = useMemo(() => ({ maxPages: 1 }), [])
@@ -657,7 +657,7 @@ function AppContent() {
     // arm the draw tool, 'e' the eraser, 'r' a rectangle, and so on, with no
     // menu entry pointing at any of it. Every one of those tools produces a
     // native tldraw shape, and this app's canvas is architected to hold only
-    // panels -- panelArchitectureReport.ts and momentArchive.ts's export both
+    // panels -- panelArchitectureReport.ts and boardArchive.ts's export both
     // only look at panel shapes, so a shape created this way is invisible to
     // them and just accumulates in the document forever. Keeping only
     // 'select' and 'hand' (the one other tool this app drives itself, via
@@ -715,8 +715,8 @@ function AppContent() {
     [],
   )
 
-  if (!moments.isReady || !moments.activeMoment) {
-    return <main className="app-root app-loading" role="status">{moments.error ?? 'Loading moments...'}</main>
+  if (!boards.isReady || !boards.activeBoard) {
+    return <main className="app-root app-loading" role="status">{boards.error ?? 'Loading boards...'}</main>
   }
 
   return (
@@ -741,7 +741,7 @@ function AppContent() {
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
       <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />
-      {moments.error ? <div className="callback-toast" role="alert">{moments.error} <button type="button" onClick={() => { void moments.flush().catch(() => {}) }}>Retry save</button></div> : null}
+      {boards.error ? <div className="callback-toast" role="alert">{boards.error} <button type="button" onClick={() => { void boards.flush().catch(() => {}) }}>Retry save</button></div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>
   )

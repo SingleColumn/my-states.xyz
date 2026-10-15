@@ -20,7 +20,7 @@
   --font-weight-display: 680;
   --font-weight-emphasis: 650;
   --tracking-label: 0.04em;
-  --size-moment-error-max-width: 260px;
+  --size-board-error-max-width: 260px;
   --size-tldraw-icon: 16px;
   --space-control-padding-x: 12px;
   --space-app-chrome-compact-gap: 10px;
@@ -78,7 +78,7 @@
   --size-image-handle-target: 18px;
   --size-image-handle-grip: 34px;
   --size-image-handle-grip-width: 6px;
-  --size-moment-menu-min-width: 190px;
+  --size-board-menu-min-width: 190px;
   --size-canvas-menu-min-width: 220px;
   --space-card-eyebrow-bottom: 4px;
   --space-card-footer-padding-y: 12px;
@@ -106,7 +106,7 @@
   --font-size-panel-body: var(--type-md);
   --font-size-panel-label: var(--type-sm);
   --font-size-app-badge-title: 14px;
-  /* Follows the ladder so the toolbar (the moment picker, panel-view menu,
+  /* Follows the ladder so the toolbar (the board picker, panel-view menu,
      etc.) grows under a spacious scale instead of staying fixed while panel
      content moves around it -- but never below its original 12px, so a
      compact scale (chosen for panel density) does not also shrink the
@@ -250,7 +250,7 @@
   --canvas-pattern-dots: radial-gradient(circle, var(--color-canvas-grid) 1.5px, transparent 2.5px);
   --size-top-toolbar-height: 54px;
   --size-top-toolbar-control: 36px;
-  --size-moment-selector-width: 260px;
+  --size-board-selector-width: 260px;
   --size-tldraw-control-button: var(--size-top-toolbar-control);
   --size-tldraw-page-selector-width: 112px;
   --z-app-badge: 5;

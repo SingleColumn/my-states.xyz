@@ -75,7 +75,7 @@ button {
 
 .app-chrome {
   display: grid;
-  grid-template-areas: "moments canvas spacer tldraw";
+  grid-template-areas: "boards canvas spacer tldraw";
   grid-template-columns: auto auto minmax(8px, 1fr) auto;
   align-items: center;
   column-gap: var(--space-app-chrome-group-gap);
@@ -96,9 +96,9 @@ button {
   pointer-events: auto;
 }
 
-.moment-toolbar {
+.board-toolbar {
   position: relative;
-  grid-area: moments;
+  grid-area: boards;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -106,27 +106,27 @@ button {
   min-width: 0;
 }
 
-.moment-toolbar select {
-  width: min(var(--size-moment-selector-width), 22vw);
+.board-toolbar select {
+  width: min(var(--size-board-selector-width), 22vw);
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
   padding: 0 var(--space-detail-3);
 }
 
-.moment-toolbar .card-icon-button {
+.board-toolbar .card-icon-button {
   width: var(--size-top-toolbar-control);
   height: var(--size-top-toolbar-control);
   min-width: var(--size-top-toolbar-control);
 }
 
-.moment-action-transfer,
-.moment-action-delete {
+.board-action-transfer,
+.board-action-delete {
   position: relative;
   margin-left: 6px;
 }
 
-.moment-action-transfer::before,
-.moment-action-delete::before {
+.board-action-transfer::before,
+.board-action-delete::before {
   position: absolute;
   top: var(--space-divider-inset);
   bottom: var(--space-divider-inset);
@@ -136,23 +136,23 @@ button {
   content: "";
 }
 
-.moment-action-delete:hover:not(:disabled),
-.moment-actions-menu .is-destructive:hover:not(:disabled) {
+.board-action-delete:hover:not(:disabled),
+.board-actions-menu .is-destructive:hover:not(:disabled) {
   color: var(--color-danger);
 }
 
-.moment-toolbar .moment-actions-menu-trigger {
+.board-toolbar .board-actions-menu-trigger {
   display: none;
 }
 
-.moment-actions-menu {
+.board-actions-menu {
   position: absolute;
   top: calc(100% + var(--space-popover-offset));
   right: 0;
   z-index: 30;
   display: grid;
   width: max-content;
-  min-width: var(--size-moment-menu-min-width);
+  min-width: var(--size-board-menu-min-width);
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
@@ -161,7 +161,7 @@ button {
   backdrop-filter: var(--blur-app-badge);
 }
 
-.moment-actions-menu button {
+.board-actions-menu button {
   display: flex;
   align-items: center;
   gap: var(--space-menu-item-gap);
@@ -174,21 +174,21 @@ button {
   text-align: left;
 }
 
-.moment-actions-menu button:hover:not(:disabled) {
+.board-actions-menu button:hover:not(:disabled) {
   background: var(--card-button-bg-hover);
 }
 
-.moment-actions-menu button:disabled {
+.board-actions-menu button:disabled {
   cursor: not-allowed;
   opacity: var(--opacity-disabled);
 }
 
-.moment-toolbar-error {
+.board-toolbar-error {
   position: absolute;
   top: calc(100% + var(--space-detail-2));
   left: 50%;
   transform: translateX(-50%);
-  max-width: var(--size-moment-error-max-width);
+  max-width: var(--size-board-error-max-width);
   padding: var(--space-menu-padding) var(--space-menu-item-padding-x);
   border-radius: var(--button-radius);
   background: var(--background-toast);
@@ -544,7 +544,7 @@ button {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.panel-slideshow-surface.is-collection-browser /* Pills drawn over a picture sit on the picture, not on the theme's surface,
+/* Pills drawn over a picture sit on the picture, not on the theme's surface,
    so they keep one dark scrim with light text in every theme and mode. */
 :root {
   --image-overlay-bg: rgba(14, 14, 18, 0.78);
@@ -552,7 +552,7 @@ button {
   --image-overlay-text-muted: rgba(245, 243, 238, 0.72);
 }
 
-.slideshow-stage {
+.panel-slideshow-surface.is-collection-browser .slideshow-stage {
   align-self: stretch;
   justify-self: stretch;
   width: calc(100% - (var(--image-panel-stage-inset-x) * 2));
@@ -729,7 +729,7 @@ button {
 
 /* The panel menu: one ... button at the right of the header and, below it, a
    single column of every action the panel offers, anchored to the header's
-   right edge. It shares its look with the moment and canvas-view menus so
+   right edge. It shares its look with the board and canvas-view menus so
    the three read as one kind of thing. The menu is a static flex item so it
    sits with the header's buttons; the list is absolute and anchored to the
    header's right padding, exactly where the pickers open. */
@@ -1471,7 +1471,7 @@ input[type="range"]:focus-visible {
 
 /*
  * Suggestions — what an empty panel offers instead of an empty list. They
- * occupy the room the results would, and give it straight back the moment
+ * occupy the room the results would, and give it straight back the board
  * there is a search to answer, so the two never compete for the same space.
  *
  * Deliberately outside the whole-row measurement the results list uses: this
@@ -2936,7 +2936,7 @@ input[type="range"]:focus-visible {
 /* The line under an empty state's heading: why there is nothing here, when
    that is not obvious from the heading alone. */
 .notes-empty-hint {
-  max-width: var(--size-moment-error-max-width);
+  max-width: var(--size-board-error-max-width);
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--type-sm);
@@ -3166,7 +3166,7 @@ input[type="range"]:focus-visible {
      list is shorter than this and so is unaffected. */
   max-height: var(--size-insert-menu-max-height);
   overflow-y: auto;
-  min-width: var(--size-moment-menu-min-width);
+  min-width: var(--size-board-menu-min-width);
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
@@ -3270,7 +3270,7 @@ input[type="range"]:focus-visible {
 .notes-writing-toolbar {
   display: flex;
   /* One row, always. Wrapping put three of the tools on a second line
-     inside the frame the moment the content came within a few pixels of
+     inside the frame the board the content came within a few pixels of
      the column, which reads as a mistake rather than as a layout. When
      there is genuinely not enough room the style menu gives up width
      instead -- it has a min-width of nothing for exactly that. */
@@ -3526,10 +3526,10 @@ input[type="range"]:focus-visible {
 
 /* Two bands of text stacked on each other have to share a left column, or
    the seam between them reads as careless. The panel's title is moved to
-   where the moment's name is laid out -- measured, because that column is
+   where the board's name is laid out -- measured, because that column is
    the toolbar's inset plus the dropdown's own border and padding plus what
    the browser adds inside it, and the first three are the theme's to
-   choose. AppChrome measures it; see --app-moment-text-left there.
+   choose. AppChrome measures it; see --app-board-text-left there.
 
    Multiplied by --tl-scale because the two are not in the same units. The
    toolbar is drawn at screen size, while a panel is drawn inside tldraw's
@@ -3539,7 +3539,7 @@ input[type="range"]:focus-visible {
    same column before a theme touches it, for the frame before the toolbar
    has been measured. */
 .canvas-panel-shell.is-full-screen .card-header {
-  padding-left: calc(var(--app-moment-text-left, 25px) * var(--tl-scale));
+  padding-left: calc(var(--app-board-text-left, 25px) * var(--tl-scale));
 }
 
 @container panel-shell (max-width: 520px) {
@@ -3632,7 +3632,7 @@ input[type="range"]:focus-visible {
     padding-inline: 12px;
   }
 
-  .moment-toolbar select {
+  .board-toolbar select {
     width: clamp(180px, 20vw, 220px);
   }
 
@@ -3651,16 +3651,16 @@ input[type="range"]:focus-visible {
 }
 
 @media (max-width: 1199px) {
-  .moment-action-secondary,
-  .moment-theme-control {
+  .board-action-secondary,
+  .board-theme-control {
     display: none !important;
   }
 
-  .moment-toolbar .moment-actions-menu-trigger {
+  .board-toolbar .board-actions-menu-trigger {
     display: inline-flex;
   }
 
-  .moment-toolbar select {
+  .board-toolbar select {
     width: clamp(160px, 22vw, 200px);
   }
 
@@ -3684,7 +3684,7 @@ input[type="range"]:focus-visible {
     min-width: 96px;
   }
 
-  .moment-toolbar-error {
+  .board-toolbar-error {
     max-width: calc(100vw - 32px);
   }
 }
@@ -3692,14 +3692,14 @@ input[type="range"]:focus-visible {
 @media (max-width: 799px) {
   .app-chrome {
     grid-template-areas:
-      "moments moments moments"
+      "boards boards boards"
       "canvas spacer tldraw";
     grid-template-columns: auto minmax(8px, 1fr) auto;
     row-gap: var(--space-top-toolbar-gap);
     column-gap: var(--space-app-chrome-compact-gap);
   }
 
-  .moment-toolbar {
+  .board-toolbar {
     justify-content: flex-end;
   }
 
@@ -3708,7 +3708,7 @@ input[type="range"]:focus-visible {
     border-left: 0;
   }
 
-  .moment-toolbar select {
+  .board-toolbar select {
     width: clamp(130px, 30vw, 190px);
   }
 }
@@ -3716,13 +3716,13 @@ input[type="range"]:focus-visible {
 @media (max-width: 520px) {
   .app-chrome {
     grid-template-areas:
-      "moments moments"
+      "boards boards"
       "canvas spacer"
       "tldraw tldraw";
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .moment-toolbar select {
+  .board-toolbar select {
     width: clamp(105px, 28vw, 145px);
   }
 
@@ -3734,7 +3734,7 @@ input[type="range"]:focus-visible {
 }
 
 @media (max-width: 380px) {
-  .moment-toolbar select {
+  .board-toolbar select {
     width: 100px;
   }
 }
@@ -4058,34 +4058,34 @@ input[type="range"]:focus-visible {
   .app-settings-theme-meta { grid-column: 1 / -1; }
 }
 
-/* The moment's theme choice: a select beside the Settings button at full
-   width, a group of radio items in the moment … menu when the chrome is
+/* The board's theme choice: a select beside the Settings button at full
+   width, a group of radio items in the board … menu when the chrome is
    compact. */
-.moment-theme-control {
+.board-theme-control {
   position: relative;
   display: inline-flex;
 }
 
-.app-chrome-tldraw .moment-theme-select {
+.app-chrome-tldraw .board-theme-select {
   width: clamp(130px, 12vw, 180px);
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
   padding: 0 var(--space-detail-3);
 }
 
-.moment-theme-control .moment-toolbar-error {
+.board-theme-control .board-toolbar-error {
   left: auto;
   right: 0;
   transform: none;
 }
 
-.moment-theme-menu-spacer { display: inline-block; width: 16px; }
+.board-theme-menu-spacer { display: inline-block; width: 16px; }
 
-.moment-actions-menu button[role="menuitemradio"][aria-checked="true"] {
+.board-actions-menu button[role="menuitemradio"][aria-checked="true"] {
   color: var(--color-text);
 }
 
-.moment-toolbar-notice { color: var(--color-text-muted); }
+.board-toolbar-notice { color: var(--color-text-muted); }
 
 .settings-launcher {
   width: var(--size-top-toolbar-control);

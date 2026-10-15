@@ -6,7 +6,7 @@ import type { PanelType } from '../src/types'
  * Shared vocabulary for the browser suite.
  *
  * The assertion oracle is `window.myStates.describe()` (src/canvasApi.ts):
- * a plain snapshot of the open moment straight from tldraw's store, which
+ * a plain snapshot of the open board straight from tldraw's store, which
  * is far more reliable than reading panel state back out of rendered DOM.
  * `dispatch()` is used only to *set up* a scenario (fill a note with enough
  * text to scroll, say) -- never in place of the pointer or keyboard
@@ -16,7 +16,7 @@ import type { PanelType } from '../src/types'
 export type { CanvasCommand, CanvasDescription, PanelDescription }
 
 /**
- * Loads the app in a fresh profile and waits for the first moment's panels.
+ * Loads the app in a fresh profile and waits for the first board's panels.
  * On a themed project (playwright.config.ts) the project's theme is then
  * selected as the global theme, so every test that follows runs under it.
  */
@@ -224,8 +224,8 @@ export async function loadSampleImages(page: Page, panelId: string) {
     .toMatch(/^(bundled|curated)$/)
 }
 
-/** What the app's own IndexedDB holds for a moment, read with no help from the page's code. */
-export async function readStorage(page: Page, momentId: string) {
+/** What the app's own IndexedDB holds for a board, read with no help from the page's code. */
+export async function readStorage(page: Page, boardId: string) {
   return page.evaluate(async (id) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('my-states')
@@ -238,30 +238,30 @@ export async function readStorage(page: Page, momentId: string) {
       request.onerror = () => reject(request.error)
     })
     interface StoredShape { typeName: string; index: string; x: number; y: number; props: { panelId: string; w: number; h: number; visible: boolean; focusView: boolean; panel: { config: unknown } } }
-    const moment = await read<{ document: { store: Record<string, StoredShape> } } | undefined>('moments', (store) => store.get(id))
-    const notes = await read<Array<{ momentId: string; title: string; content: string; document?: { schemaVersion: number; doc: { content?: Array<{ type: string }> } } }>>('notes', (store) => store.getAll())
+    const board = await read<{ document: { store: Record<string, StoredShape> } } | undefined>('boards', (store) => store.get(id))
+    const notes = await read<Array<{ boardId: string; title: string; content: string; document?: { schemaVersion: number; doc: { content?: Array<{ type: string }> } } }>>('notes', (store) => store.getAll())
     db.close()
-    const shapes = moment ? Object.values(moment.document.store).filter((record) => record.typeName === 'shape') : []
+    const shapes = board ? Object.values(board.document.store).filter((record) => record.typeName === 'shape') : []
     shapes.sort((left, right) => (left.index < right.index ? -1 : left.index > right.index ? 1 : 0))
     return {
-      found: !!moment,
+      found: !!board,
       panels: shapes.map((shape, order) => ({ panelId: shape.props.panelId, x: shape.x, y: shape.y, w: shape.props.w, h: shape.props.h, visible: shape.props.visible, focusView: shape.props.focusView, order, config: shape.props.panel.config })),
-      notes: notes.filter((note) => note.momentId === id).map((note) => ({ title: note.title, content: note.content, document: note.document ?? null })),
+      notes: notes.filter((note) => note.boardId === id).map((note) => ({ title: note.title, content: note.content, document: note.document ?? null })),
     }
-  }, momentId)
+  }, boardId)
 }
 
 /**
  * Waits until the stored document matches the canvas. Canvas saves are
  * debounced (300ms), and a flush started by `pagehide` does not survive the
  * unload that follows it, so a test that reloads right after an edit must
- * first let the save land -- as a person pausing for a moment would.
+ * first let the save land -- as a person pausing for a board would.
  */
 export async function expectCanvasSaved(page: Page) {
   const canvas = await describeCanvas(page)
-  if (!canvas.moment) throw new Error('No moment is open')
+  if (!canvas.board) throw new Error('No board is open')
   const expected = canvas.panels.map(({ panelId, x, y, w, h, visible, focusView, order, config }) => ({ panelId, x, y, w, h, visible, focusView, order, config }))
-  await expect.poll(async () => (await readStorage(page, canvas.moment!.id)).panels, { message: 'the stored document matches the canvas' }).toEqual(expected)
+  await expect.poll(async () => (await readStorage(page, canvas.board!.id)).panels, { message: 'the stored document matches the canvas' }).toEqual(expected)
 }
 
 /** The panel report lives under Settings > Developer; opening it closes Settings. */
@@ -300,25 +300,25 @@ export async function addPanelFromToolbar(page: Page, type: PanelType): Promise<
   return added
 }
 
-/** The moment picker in the toolbar. */
-export function momentPicker(page: Page) {
-  return page.getByRole('combobox', { name: 'Open moment' })
+/** The board picker in the toolbar. */
+export function boardPicker(page: Page) {
+  return page.getByRole('combobox', { name: 'Open board' })
 }
 
-export async function momentPickerNames(page: Page): Promise<string[]> {
-  return momentPicker(page).locator('option').allTextContents()
+export async function boardPickerNames(page: Page): Promise<string[]> {
+  return boardPicker(page).locator('option').allTextContents()
 }
 
-/** Creates a moment through the "New moment" button and its name prompt, then waits for it to open. */
-export async function createMomentFromToolbar(page: Page, name: string) {
+/** Creates a board through the "New board" button and its name prompt, then waits for it to open. */
+export async function createBoardFromToolbar(page: Page, name: string) {
   page.once('dialog', (dialog) => void dialog.accept(name))
-  await page.getByRole('button', { name: 'New moment' }).click()
-  await expect.poll(async () => (await describeCanvas(page)).moment?.name).toBe(name)
+  await page.getByRole('button', { name: 'New board' }).click()
+  await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe(name)
   await waitForCanvas(page)
 }
 
-export async function switchMoment(page: Page, name: string) {
-  await momentPicker(page).selectOption({ label: name })
-  await expect.poll(async () => (await describeCanvas(page)).moment?.name).toBe(name)
+export async function switchBoard(page: Page, name: string) {
+  await boardPicker(page).selectOption({ label: name })
+  await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe(name)
   await waitForCanvas(page)
 }

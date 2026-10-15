@@ -193,7 +193,7 @@ export function NotesImageView() {
    *
    * On the click and not the press: the editor sets its own selection from
    * the pointer as the press completes, so a selection made before that is
-   * thrown away a moment later.
+   * thrown away a board later.
    */
   function select() {
     const at = getPos()

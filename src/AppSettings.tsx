@@ -22,7 +22,7 @@ const modeLabels: Array<{ value: ThemeModePreference; label: string; hint: strin
 ]
 
 /**
- * Settings: Appearance (the theme every moment follows unless it pins its
+ * Settings: Appearance (the theme every board follows unless it pins its
  * own, the light/dark preference, and the theme library) and, in
  * development builds, Developer (the panel architecture report). The dialog
  * is built the same way as Help & About (backdrop, Escape, focus returned
@@ -30,7 +30,7 @@ const modeLabels: Array<{ value: ThemeModePreference; label: string; hint: strin
  * seen while it is made.
  */
 export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectureReport }: AppSettingsProps) {
-  const { appearance, moments } = useAppState()
+  const { appearance, boards } = useAppState()
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const wasOpenRef = useRef(false)
@@ -87,8 +87,8 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
   }
 
   function deleteTheme(themeId: string, name: string) {
-    const users = moments.moments.filter((moment) => moment.themeId === themeId).length
-    const usage = users ? ` ${users === 1 ? 'One moment uses' : `${users} moments use`} this theme and will fall back to the theme chosen here.` : ''
+    const users = boards.boards.filter((board) => board.themeId === themeId).length
+    const usage = users ? ` ${users === 1 ? 'One board uses' : `${users} boards use`} this theme and will fall back to the theme chosen here.` : ''
     if (!window.confirm(`Delete the theme "${name}"?${usage}`)) return
     void run(async () => {
       await appearance.deleteTheme(themeId)
@@ -98,7 +98,7 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
 
   const { settings, effective, themes } = appearance
   const activeTheme = themes.find((theme) => theme.id === settings.globalThemeId)
-  const momentOverrides = effective.source === 'moment'
+  const boardOverrides = effective.source === 'board'
 
   return (
     <div className="help-about-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
@@ -124,7 +124,7 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
                 <h3 id="app-settings-developer">Developer</h3>
                 <div className="app-settings-field">
                   <h4>Panel report</h4>
-                  <p className="app-settings-hint">Checks the open moment's panels against their stored shapes: one shape per panel, no orphaned references, the current schema version. Available in development builds.</p>
+                  <p className="app-settings-hint">Checks the open board's panels against their stored shapes: one shape per panel, no orphaned references, the current schema version. Available in development builds.</p>
                   <div className="app-settings-actions">
                     <button type="button" className="app-chrome-control" onClick={() => { onClose(); onOpenArchitectureReport() }}>
                       Open panel report
@@ -150,9 +150,9 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
                   ))}
                 </select>
                 <p className="app-settings-hint">
-                  {momentOverrides
-                    ? <>The open moment uses its own theme, <strong>{effective.definition.name}</strong>. Changing the theme here affects moments that follow the global theme; the open moment keeps its own until it is set back to Global in the moment toolbar.</>
-                    : <>Every moment follows this theme unless it chooses its own in the moment toolbar. The open moment is showing <strong>{effective.definition.name}</strong>{effective.source === 'fallback' ? ' because the chosen theme is not installed' : ''}.</>}
+                  {boardOverrides
+                    ? <>The open board uses its own theme, <strong>{effective.definition.name}</strong>. Changing the theme here affects boards that follow the global theme; the open board keeps its own until it is set back to Global in the board toolbar.</>
+                    : <>Every board follows this theme unless it chooses its own in the board toolbar. The open board is showing <strong>{effective.definition.name}</strong>{effective.source === 'fallback' ? ' because the chosen theme is not installed' : ''}.</>}
                 </p>
               </div>
 

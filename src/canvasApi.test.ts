@@ -31,7 +31,7 @@ function editorWith(...shapes: TLShape[]): Editor {
 function fakeState(overrides: Partial<{ deleteNote: ReturnType<typeof vi.fn>; isOperationPending: boolean }> = {}) {
   const deleteNote = overrides.deleteNote ?? vi.fn().mockResolvedValue(undefined)
   const state = {
-    moments: { isOperationPending: () => overrides.isOperationPending ?? false },
+    boards: { isOperationPending: () => overrides.isOperationPending ?? false },
     notes: { deleteNote },
   } as unknown as AppStateValue
   return { state, deleteNote }
@@ -58,13 +58,13 @@ describe('canvasApi note.delete', () => {
     expect(deleteNote).not.toHaveBeenCalled()
   })
 
-  it('rejects while a moment operation is pending, without calling deleteNote', async () => {
+  it('rejects while a board operation is pending, without calling deleteNote', async () => {
     const shape = makeShape('notes', 'panel-notes')
     const { state, deleteNote } = fakeState({ isOperationPending: true })
     const api = createCanvasApi(editorWith(shape), () => state)
 
     await expect(api.dispatch({ kind: 'note.delete', panelId: 'panel-notes', noteId: 'note-1' })).rejects.toThrow(
-      'Please wait for the current moment operation to finish.',
+      'Please wait for the current board operation to finish.',
     )
     expect(deleteNote).not.toHaveBeenCalled()
   })

@@ -383,7 +383,7 @@ export function insertDivider(ctx: Ctx) {
  *
  * The alternative was an object URL, which is what the Images panel hands
  * out, and which dies with the page -- a note would show a broken picture
- * the moment it was reopened. A data URL is the note: it survives a reload,
+ * the board it was reopened. A data URL is the note: it survives a reload,
  * an export and a move to another machine, and it is ordinary Markdown that
  * any reader understands. What it costs is size, roughly a third more than
  * the file itself, stored as text in the note. Hence the limit, which is

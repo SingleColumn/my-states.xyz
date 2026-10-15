@@ -21,15 +21,15 @@ describe('debounce', () => {
 
 describe('nextDuplicateName', () => {
   it('proposes "(copy)" when that name is free', () => {
-    expect(nextDuplicateName('Kitty moment', ['Kitty moment'])).toBe('Kitty moment (copy)')
+    expect(nextDuplicateName('Kitty board', ['Kitty board'])).toBe('Kitty board (copy)')
   })
 
   it('counts up past every taken "(copy N)" until one is free', () => {
-    expect(nextDuplicateName('Kitty moment', ['Kitty moment', 'Kitty moment (copy)'])).toBe('Kitty moment (copy 2)')
-    expect(nextDuplicateName('Kitty moment', ['Kitty moment', 'Kitty moment (copy)', 'Kitty moment (copy 2)'])).toBe('Kitty moment (copy 3)')
+    expect(nextDuplicateName('Kitty board', ['Kitty board', 'Kitty board (copy)'])).toBe('Kitty board (copy 2)')
+    expect(nextDuplicateName('Kitty board', ['Kitty board', 'Kitty board (copy)', 'Kitty board (copy 2)'])).toBe('Kitty board (copy 3)')
   })
 
   it('does not require the source name itself to be present', () => {
-    expect(nextDuplicateName('Untitled moment', [])).toBe('Untitled moment (copy)')
+    expect(nextDuplicateName('Untitled board', [])).toBe('Untitled board (copy)')
   })
 })

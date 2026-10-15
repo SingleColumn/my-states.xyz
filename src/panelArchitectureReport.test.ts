@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TLShape, TLStoreSnapshot } from 'tldraw'
 import { buildPanelArchitectureReport } from './panelArchitectureReport'
 import { createPanelProps } from './panelStore'
-import type { Moment, PanelType } from './types'
+import type { Board, PanelType } from './types'
 
 function makeShape(type: PanelType, panelId: string, id = `shape:${panelId}`, overrides: Partial<{ x: number; index: string; isLocked: boolean; visible: boolean; config: unknown }> = {}): TLShape {
   const props = createPanelProps(type, panelId)
@@ -26,14 +26,14 @@ function makeShape(type: PanelType, panelId: string, id = `shape:${panelId}`, ov
   } as unknown as TLShape
 }
 
-function makeMoment(shapes: TLShape[], overrides: Partial<Moment> = {}): Moment {
+function makeBoard(shapes: TLShape[], overrides: Partial<Board> = {}): Board {
   const document: TLStoreSnapshot = {
     store: Object.fromEntries(shapes.map((shape) => [shape.id, shape])) as TLStoreSnapshot['store'],
     schema: { schemaVersion: 2, sequences: {} },
   }
   return {
-    id: 'moment-1',
-    name: 'Test moment',
+    id: 'board-1',
+    name: 'Test board',
     schemaVersion: 2,
     createdAt: 1,
     updatedAt: 1,
@@ -52,7 +52,7 @@ const check = (report: ReturnType<typeof buildPanelArchitectureReport>, id: stri
 describe('panel architecture report', () => {
   it('reports a healthy single-panel state', () => {
     const shape = makeShape('notes', 'panel-notes')
-    const report = buildPanelArchitectureReport(makeMoment([shape]), editorWith(shape))
+    const report = buildPanelArchitectureReport(makeBoard([shape]), editorWith(shape))
 
     expect(report.summary.status).toBe('PASS')
     expect(report.summary.errors).toBe(0)
@@ -61,12 +61,12 @@ describe('panel architecture report', () => {
 
   it('reports every panel kind and describes ownership as the system has it', () => {
     const shapes = [makeShape('spotify', 'p1', 'shape:1', { index: 'a1' }), makeShape('slideshow', 'p2', 'shape:2', { index: 'a2' }), makeShape('notes', 'p3', 'shape:3', { index: 'a3' }), makeShape('video', 'p4', 'shape:4', { index: 'a4' })]
-    const report = buildPanelArchitectureReport(makeMoment(shapes), editorWith(...shapes))
+    const report = buildPanelArchitectureReport(makeBoard(shapes), editorWith(...shapes))
 
     expect(report.summary.status).toBe('PASS')
     expect(report.ownership.tldraw.join(' ')).toContain('configuration')
     expect(report.ownership.tldraw.join(' ')).toContain('outside a declared content region')
-    expect(report.ownership.momentRecord).toContain('the tldraw document snapshot')
+    expect(report.ownership.boardRecord).toContain('the tldraw document snapshot')
     expect(report.ownership.react).toContain('component-internal UI state')
   })
 
@@ -74,7 +74,7 @@ describe('panel architecture report', () => {
     const shape = makeShape('slideshow', 'panel-images', 'shape:images', {
       config: { folderName: 'Autumn', imageSource: { type: 'curated', collectionSlug: 'rbnks-autumn' }, currentIndex: 0, intervalMs: 5000, transitionMs: 500, shuffle: false, zoom: 1 },
     })
-    const report = buildPanelArchitectureReport(makeMoment([shape]), editorWith(shape))
+    const report = buildPanelArchitectureReport(makeBoard([shape]), editorWith(shape))
     expect(report.summary.status).toBe('PASS')
     expect(report.panels[0].contentReferences).toEqual({ curatedCollectionSlug: 'rbnks-autumn' })
   })
@@ -82,7 +82,7 @@ describe('panel architecture report', () => {
   it('reports two shapes sharing a panelId', () => {
     const one = makeShape('slideshow', 'panel-a', 'shape:one')
     const two = makeShape('slideshow', 'panel-a', 'shape:two')
-    const report = buildPanelArchitectureReport(makeMoment([one, two]), editorWith(one, two))
+    const report = buildPanelArchitectureReport(makeBoard([one, two]), editorWith(one, two))
 
     expect(check(report, 'stable-panel-ids')).toBe('ERROR')
     expect(report.summary.status).toBe('ERROR')
@@ -90,7 +90,7 @@ describe('panel architecture report', () => {
 
   it('reports a configuration the schema rejects', () => {
     const shape = makeShape('slideshow', 'panel-a', 'shape:a', { config: { folderName: null, imageSource: { type: 'folder' }, currentIndex: 1.5, intervalMs: 5000, transitionMs: 0, shuffle: false, zoom: 1 } })
-    const report = buildPanelArchitectureReport(makeMoment([shape]), editorWith(shape))
+    const report = buildPanelArchitectureReport(makeBoard([shape]), editorWith(shape))
 
     expect(check(report, 'config-validates')).toBe('ERROR')
   })
@@ -98,7 +98,7 @@ describe('panel architecture report', () => {
   it('reports a second copy of a singleton kind', () => {
     const one = makeShape('spotify', 'panel-a', 'shape:one')
     const two = makeShape('spotify', 'panel-b', 'shape:two')
-    const report = buildPanelArchitectureReport(makeMoment([one, two]), editorWith(one, two))
+    const report = buildPanelArchitectureReport(makeBoard([one, two]), editorWith(one, two))
 
     expect(check(report, 'singletons')).toBe('ERROR')
   })
@@ -106,14 +106,14 @@ describe('panel architecture report', () => {
   it('reports a hidden panel that the canvas could still act on', () => {
     const hidden = makeShape('notes', 'panel-a', 'shape:a', { visible: false, isLocked: false })
     const locked = makeShape('notes', 'panel-b', 'shape:b', { visible: false, isLocked: true })
-    expect(check(buildPanelArchitectureReport(makeMoment([hidden]), editorWith(hidden)), 'hidden-panels-locked')).toBe('ERROR')
-    expect(check(buildPanelArchitectureReport(makeMoment([locked]), editorWith(locked)), 'hidden-panels-locked')).toBe('PASS')
+    expect(check(buildPanelArchitectureReport(makeBoard([hidden]), editorWith(hidden)), 'hidden-panels-locked')).toBe('ERROR')
+    expect(check(buildPanelArchitectureReport(makeBoard([locked]), editorWith(locked)), 'hidden-panels-locked')).toBe('PASS')
   })
 
   it('reports a shape the document has not caught up with as a warning, not a violation', () => {
     const saved = makeShape('notes', 'panel-a', 'shape:a')
     const fresh = makeShape('notes', 'panel-b', 'shape:b')
-    const report = buildPanelArchitectureReport(makeMoment([saved]), editorWith(saved, fresh))
+    const report = buildPanelArchitectureReport(makeBoard([saved]), editorWith(saved, fresh))
 
     expect(check(report, 'document-correlation')).toBe('WARNING')
     expect(report.summary.status).toBe('WARNING')

@@ -7,8 +7,8 @@ The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other 
 ## What it does
 
 - Pan and zoom an infinite canvas; drag and resize the three built-in panels.
-- Create named moments; each retains its own canvas camera, panel layout, images, notes, slideshow settings, and Spotify playlist reference.
-- Import and export complete portable moments as `.moment.zip` files. Exports include the moment's image bytes and Markdown notes, but never Spotify credentials.
+- Create named boards; each retains its own canvas camera, panel layout, images, notes, slideshow settings, and Spotify playlist reference.
+- Import and export complete portable boards as `.board.zip` files. Exports include the board's image bytes and Markdown notes, but never Spotify credentials.
 - Search Spotify playlists and songs, and browse a rotating set of curated suggestions, without connecting a Spotify account.
 - Connect Spotify with OAuth PKCE when you want playback, and control it in the panel.
 - Load a playlist from a Spotify playlist URL or URI.
@@ -74,7 +74,7 @@ The app talks to Spotify in two separate ways, and keeps them apart on purpose.
 
 **Application-level, for the public catalog.** The endpoints in `api/spotify/` use Spotify's Client Credentials flow with `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to search playlists and songs and to read the curated suggestions' details. This authenticates the application, not the visitor, so it reaches public catalog data only and no Spotify login screen appears. The browser can ask these endpoints two questions -- a search, and the details of a list of playlist ids -- and nothing else: it cannot name a Spotify URL or path, and the application's token is never sent to it.
 
-**User-level, for playback.** Connecting Spotify uses the browser-side Authorization Code + PKCE flow, exactly as before, and the resulting token stays in `localStorage`, separate from moments. Playback, the Web Playback SDK, and anything else tied to a Spotify account use that token and only that token. Browsing the catalog can never start playback, and application credentials are never used for anything belonging to a visitor.
+**User-level, for playback.** Connecting Spotify uses the browser-side Authorization Code + PKCE flow, exactly as before, and the resulting token stays in `localStorage`, separate from boards. Playback, the Web Playback SDK, and anything else tied to a Spotify account use that token and only that token. Browsing the catalog can never start playback, and application credentials are never used for anything belonging to a visitor.
 
 ## Curated playlist suggestions
 
@@ -142,7 +142,7 @@ does not collide with `npm run dev`. Every test opens a fresh browser
 profile, drives the app with real pointer and keyboard input, and reads the
 result back through `window.myStates.describe()` and the in-app Panel
 report. It covers the frame/content pointer boundary of a panel, undo across
-deletes, duplicates, focus view and moment switches, and the moment
+deletes, duplicates, focus view and board switches, and the board
 lifecycle (reload, export/import, the save flush the page runs when it is
 hidden or left -- with a synthetic event, not a real unload -- and refusing
 commands mid-switch). The one-off setup is downloading the
@@ -197,12 +197,12 @@ Use [VERCEL_DEPLOYMENT_CHECKLIST.md](VERCEL_DEPLOYMENT_CHECKLIST.md) for the com
 
 ## Using the workspace
 
-On first launch, the app creates a moment with its three panels. Use the moment controls at the top of the canvas to open, create, rename, import, export, or permanently delete a moment.
+On first launch, the app creates a board with its three panels. Use the board controls at the top of the canvas to open, create, rename, import, export, or permanently delete a board.
 
 | Panel | How to use it |
 | --- | --- |
 | Music | Search Spotify, or pick one of the suggested playlists, straight away -- no Spotify account is needed to look. Connect Spotify to play what you have chosen, or to paste a Spotify playlist URL/URI. Playback requires Spotify Premium. |
-| Images | Browse and select a live curated collection when configured (otherwise a bundled sample), or choose a local folder from the panel menu. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active moment. |
+| Images | Browse and select a live curated collection when configured (otherwise a bundled sample), or choose a local folder from the panel menu. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active board. |
 | Markdown Text Editor | Create a document, give it a name, and write with the toolbar. Notes autosave; use the download button to export the active note as `.md`. |
 
 Drag a panel by its frame and use its resize handles to change its size. Use the usual canvas gestures to pan and zoom. Canvas interactions are isolated from each panel's internal controls.
@@ -227,11 +227,11 @@ Open the Images panel and choose the collection to verify it. The generator incl
 
 For a responsive app, prefer WebP or AVIF where appropriate, avoid unnecessarily large source files, keep enough resolution for enlarged panels, and keep the total bundled sample size reasonable. No external image service is used.
 
-## Portable moments
+## Portable boards
 
-Export downloads a complete `.moment.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. Curated selections are copied into the archive with their attribution and restore as local session images, so the archive does not depend on the live feed remaining unchanged. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Spotify login tokens, playback device data, current-track data, search results, and the session's suggestions are not included.
+Export downloads a complete `.board.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. Curated selections are copied into the archive with their attribution and restore as local session images, so the archive does not depend on the live feed remaining unchanged. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Spotify login tokens, playback device data, current-track data, search results, and the session's suggestions are not included.
 
-Version 1 supports up to 200 images, 25 MB per image, and 250 MB of image data in a moment. Import validates the archive structure and rejects unsupported or oversized content. Before a moment is switched, created, deleted, imported, or exported, pending note and canvas saves are flushed so the archive and stored moment include the most recent changes.
+Version 1 supports up to 200 images, 25 MB per image, and 250 MB of image data in a board. Import validates the archive structure and rejects unsupported or oversized content. Before a board is switched, created, deleted, imported, or exported, pending note and canvas saves are flushed so the archive and stored board include the most recent changes.
 
 Archives are written in format version 3, which can associate one embedded curated image with several Images panels without storing its bytes repeatedly. Format version 2 remains importable. A file exported by the earlier format version 1 is refused with a message that says so: on 2026-09-13 the app started over with a new browser database and a new file format, and neither carries earlier saved work forward. From version 2 on, an exported file is meant to stay openable by later versions of the app.
 
@@ -239,14 +239,14 @@ Archives are written in format version 3, which can associate one embedded curat
 
 All workspace data stays in the browser:
 
-- IndexedDB holds moments, their canvas/layout and slideshow state, Markdown notes, embedded image blobs and metadata, and—where the browser permits it—a selected folder handle for convenience.
-- `localStorage` holds Spotify authentication data only; the active moment is a preference inside IndexedDB.
-- `sessionStorage` holds two throwaway notes, per browser tab: which suggestions the previous page load showed, so the next one can differ, and what someone was about to play when they left to connect Spotify. Neither holds a token, and neither reaches a moment.
-- Images are read locally when selected and copied into the active moment; they are not uploaded by this app.
+- IndexedDB holds boards, their canvas/layout and slideshow state, Markdown notes, embedded image blobs and metadata, and—where the browser permits it—a selected folder handle for convenience.
+- `localStorage` holds Spotify authentication data only; the active board is a preference inside IndexedDB.
+- `sessionStorage` holds two throwaway notes, per browser tab: which suggestions the previous page load showed, so the next one can differ, and what someone was about to play when they left to connect Spotify. Neither holds a token, and neither reaches a board.
+- Images are read locally when selected and copied into the active board; they are not uploaded by this app.
 
-The File System Access API allows Chromium browsers to remember a selected folder, but the browser may ask you to grant permission again after a restart. If direct folder selection is not supported, the Images panel falls back to directory file selection; this fallback does not retain an access handle. A selected folder is a convenience only: exported moments use their embedded image copies.
+The File System Access API allows Chromium browsers to remember a selected folder, but the browser may ask you to grant permission again after a restart. If direct folder selection is not supported, the Images panel falls back to directory file selection; this fallback does not retain an access handle. A selected folder is a convenience only: exported boards use their embedded image copies.
 
-Clearing this site's browser data removes the stored moments, notes, images, settings, and Spotify session. Use moment export or the note download button for backups.
+Clearing this site's browser data removes the stored boards, notes, images, settings, and Spotify session. Use board export or the note download button for backups.
 
 ## Limitations
 
