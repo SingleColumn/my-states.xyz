@@ -244,6 +244,9 @@ function readManifest(value: unknown, entry: CuratedIndexEntry, baseUrl: string)
     id: entry.slug,
     title: entry.title,
     coverUrl: items[0]?.thumbUrl ?? null,
+    // The grid draws covers far larger than the stored thumbnail, so it uses the
+    // full picture; the carousel keeps the thumbnail to stay light as it rotates.
+    gridCoverUrl: items[0]?.fileUrl ?? null,
     creators: [...new Set(items.map((item) => item.attribution.creator))],
     imageCount: entry.count,
     version: entry.version,

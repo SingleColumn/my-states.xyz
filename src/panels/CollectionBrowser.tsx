@@ -105,6 +105,24 @@ export function CollectionBrowser({
     (gridPage + 1) * collectionsPerGridPage,
   )
 
+  // Warm the browser cache with the covers on the other grid pages so paging
+  // shows finished pictures instead of waiting on full-size downloads. Pages
+  // nearest the current one go first.
+  useEffect(() => {
+    if (viewMode !== 'grid') return
+    const urls = collections
+      .map((collection, index) => ({ url: collection.gridCoverUrl ?? collection.coverUrl, distance: Math.abs(Math.floor(index / collectionsPerGridPage) - gridPage) }))
+      .filter((cover) => cover.url && cover.distance > 0)
+      .sort((a, b) => a.distance - b.distance)
+    const preloaders = urls.map((cover) => {
+      const image = new Image()
+      image.decoding = 'async'
+      image.src = cover.url as string
+      return image
+    })
+    return () => { preloaders.forEach((image) => { image.src = '' }) }
+  }, [collections, gridPage, viewMode])
+
   useEffect(() => {
     setGridPage((page) => Math.min(page, gridPageCount - 1))
   }, [gridPageCount])
@@ -209,8 +227,8 @@ export function CollectionBrowser({
                   onClick={() => onSelectCollection(collection.id)}
                 >
                   <span className="collection-grid-thumbnail" aria-hidden="true">
-                    {collection.coverUrl
-                      ? <img src={collection.coverUrl} alt="" loading="lazy" decoding="async" draggable={false} />
+                    {(collection.gridCoverUrl ?? collection.coverUrl)
+                      ? <FadeInImage src={collection.gridCoverUrl ?? collection.coverUrl} />
                       : <Images className="collection-browser-cover-fallback" aria-hidden="true" />}
                   </span>
                   <span className="collection-grid-title">{collection.title}</span>
@@ -309,6 +327,27 @@ export function CollectionBrowser({
       <p className="collection-browser-heading">Choose an image collection</p>
       <div className="collection-browser-stage">{content}</div>
     </section>
+  )
+}
+
+/**
+ * Fades in once decoded so the sharp picture dissolves over the preview behind
+ * it instead of popping in. The ref check covers images already in the cache,
+ * whose load event can fire before React attaches the handler.
+ */
+function FadeInImage({ src }: { src: string }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <img
+      ref={(img) => { if (img?.complete && img.naturalWidth > 0) setLoaded(true) }}
+      className={`fade-in-image${loaded ? ' is-loaded' : ''}`}
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      onLoad={() => setLoaded(true)}
+    />
   )
 }
 

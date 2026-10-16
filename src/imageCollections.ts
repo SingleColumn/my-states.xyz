@@ -11,6 +11,8 @@ export interface CollectionSummary {
   id: string
   title: string
   coverUrl: string | null
+  /** A larger cover for the grid, where cards are drawn big. Falls back to coverUrl. */
+  gridCoverUrl?: string | null
   creators: string[]
   imageCount?: number
 }

@@ -85,6 +85,7 @@ describe('curated image collections', () => {
       id: 'autumn',
       title: 'Autumn',
       coverUrl: `${base}/thumbs/ab/image-0.webp`,
+      gridCoverUrl: `${base}/images/ab/image-0.jpg`,
       creators: ['rbnks', 'other.creator'],
       imageCount: 2,
     })])
