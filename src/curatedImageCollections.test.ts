@@ -84,7 +84,7 @@ describe('curated image collections', () => {
     expect(catalog.collections).toEqual([expect.objectContaining({
       id: 'autumn',
       title: 'Autumn',
-      coverUrl: `${base}/thumbs/ab/image-0.webp`,
+      coverUrl: `${base}/images/ab/image-0.jpg`,
       creators: ['rbnks', 'other.creator'],
       imageCount: 2,
     })])
