@@ -2758,12 +2758,12 @@ input[type="range"]:focus-visible {
 }
 
 /* Headings are a fixed multiple of the paragraph, so the proportions hold
-   at every text size: title 1.9x, h1 1.6x, h2 1.35x, h3 1.15x. A gentle
+   at every text size: title 1.6x, h1 1.45x, h2 1.25x, h3 1.1x. A gentle
    ratio suits long-form reading; weight and spacing carry the rest of the
    hierarchy. */
 .notes-editor-content {
   --note-text-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
-  --note-title-size: calc(var(--note-text-size) * 1.9);
+  --note-title-size: calc(var(--note-text-size) * 1.6);
 }
 
 .notes-editor-content h1,
@@ -2776,15 +2776,15 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor-content h1 {
-  font-size: calc(var(--note-text-size) * 1.6);
+  font-size: calc(var(--note-text-size) * 1.45);
 }
 
 .notes-editor-content h2 {
-  font-size: calc(var(--note-text-size) * 1.35);
+  font-size: calc(var(--note-text-size) * 1.25);
 }
 
 .notes-editor-content h3 {
-  font-size: calc(var(--note-text-size) * 1.15);
+  font-size: calc(var(--note-text-size) * 1.1);
 }
 
 /* The first line is the note's name, so it is drawn as one -- whatever it is
