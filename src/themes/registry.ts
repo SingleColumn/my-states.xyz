@@ -25,10 +25,10 @@ import brutalism from './builtin/brutalism.theme.json'
  * the browser-only CSS value check): a built-in that would fail import is a
  * bug worth failing loudly on at startup.
  */
-export const builtInThemes: readonly ThemeDefinition[] = [midnight, paper, terminal, kittyBow, scrapbook, minimal, blueBeachhouse, ukiyo, everforest, gruvbox, wasp, shimmeringFocus, ebullientworks, brutalism].map((definition) => validateThemeDefinition(definition, acceptEveryValue))
+export const builtInThemes: readonly ThemeDefinition[] = [minimal, midnight, terminal, scrapbook, blueBeachhouse, ukiyo, everforest, gruvbox, wasp, shimmeringFocus, ebullientworks, brutalism, kittyBow, paper].map((definition) => validateThemeDefinition(definition, acceptEveryValue))
 
 /** What a fresh profile shows, and what everything falls back to. Pinned by name, not by position in the list. */
-export const DEFAULT_THEME_ID = 'midnight'
+export const DEFAULT_THEME_ID = 'minimal'
 /** Dark unless the person chooses otherwise; a theme with no dark mode still falls back to the mode it has. */
 export const DEFAULT_MODE_PREFERENCE = 'dark' as const
 if (!builtInThemes.some((theme) => theme.id === DEFAULT_THEME_ID)) throw new Error(`The default theme "${DEFAULT_THEME_ID}" is not among the built-in themes.`)

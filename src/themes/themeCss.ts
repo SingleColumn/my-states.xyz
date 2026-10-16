@@ -2,7 +2,7 @@ import { compileThemeMode } from './compile'
 import { getBuiltInTheme, DEFAULT_THEME_ID } from './registry'
 import { THEME_TOKEN_NAMES } from './tokens'
 
-export const THEME_CSS_GENERATED_START = '  /* @generated from builtin/midnight.theme.json -- do not edit; see themeCss.test.ts */'
+export const THEME_CSS_GENERATED_START = '  /* @generated from builtin/minimal.theme.json -- do not edit; see themeCss.test.ts */'
 export const THEME_CSS_GENERATED_END = '  /* @generated end */'
 
 /**

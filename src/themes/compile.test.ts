@@ -20,15 +20,15 @@ function readThemeCssRoot(): Map<string, string> {
   return tokens
 }
 
-describe('the built-in Midnight theme and theme.css', () => {
+describe('the built-in Minimal theme and theme.css', () => {
   const css = readThemeCssRoot()
-  const compiled = compileThemeMode(getBuiltInTheme('midnight')!.modes.dark!)
+  const compiled = compileThemeMode(getBuiltInTheme('minimal')!.modes.dark!)
 
   it('compile to the same values, token for token', () => {
     const differences: string[] = []
     for (const [name, value] of css) {
       if (value.includes('var(') || value === 'initial') continue // an alias of another token, or a deliberate fallthrough, not a theme value
-      if (compiled[name] !== value) differences.push(`${name}: css=${JSON.stringify(value)} midnight=${JSON.stringify(compiled[name])}`)
+      if (compiled[name] !== value) differences.push(`${name}: css=${JSON.stringify(value)} minimal=${JSON.stringify(compiled[name])}`)
     }
     expect(differences).toEqual([])
   })
