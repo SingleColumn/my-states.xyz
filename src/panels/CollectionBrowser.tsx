@@ -218,6 +218,7 @@ export function CollectionBrowser({
             const creatorLabel = collection.creators.length === 1
               ? collection.creators[0]
               : collection.creators.length > 1 ? 'Various creators' : 'Creator not listed'
+            const coverUrl = collection.gridCoverUrl ?? collection.coverUrl
             return (
               <div className="collection-grid-item" role="listitem" key={collection.id}>
                 <button
@@ -227,8 +228,8 @@ export function CollectionBrowser({
                   onClick={() => onSelectCollection(collection.id)}
                 >
                   <span className="collection-grid-thumbnail" aria-hidden="true">
-                    {(collection.gridCoverUrl ?? collection.coverUrl)
-                      ? <FadeInImage src={collection.gridCoverUrl ?? collection.coverUrl} />
+                    {coverUrl
+                      ? <FadeInImage src={coverUrl} />
                       : <Images className="collection-browser-cover-fallback" aria-hidden="true" />}
                   </span>
                   <span className="collection-grid-title">{collection.title}</span>
