@@ -8,7 +8,7 @@ const themeCssPath = resolve(__dirname, '..', 'theme.css')
 
 /**
  * theme.css's statement of the default theme is generated from
- * builtin/midnight.theme.json and committed, so the page has a complete
+ * builtin/minimal.theme.json and committed, so the page has a complete
  * appearance before any JSON has been read and the two can never disagree.
  * When the default theme or the token spec changes, regenerate with:
  *

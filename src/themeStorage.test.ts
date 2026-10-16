@@ -52,7 +52,7 @@ describe('the version 2 database', () => {
 
 describe('appearance settings', () => {
   it('default to the built-in theme and dark mode when nothing is stored', async () => {
-    expect(await storage.getAppearanceSettings()).toEqual({ globalThemeId: 'midnight', modePreference: 'dark' })
+    expect(await storage.getAppearanceSettings()).toEqual({ globalThemeId: 'minimal', modePreference: 'dark' })
   })
 
   it('persist the global theme and the mode preference', async () => {
@@ -112,7 +112,7 @@ describe('the theme library', () => {
     await storage.setGlobalThemeId('mine-2')
     await storage.deleteStoredTheme('mine-2')
     expect(await storage.getStoredTheme('mine-2')).toBeUndefined()
-    expect((await storage.getAppearanceSettings()).globalThemeId).toBe('midnight')
+    expect((await storage.getAppearanceSettings()).globalThemeId).toBe('minimal')
     // Deleting a theme that is not the global choice leaves the choice alone.
     await storage.setGlobalThemeId('mine')
     await storage.deleteStoredTheme('mine-3')

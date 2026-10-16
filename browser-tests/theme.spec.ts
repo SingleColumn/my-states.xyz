@@ -62,11 +62,13 @@ const globalThemeOption = (page: Page, text: string) => globalThemePicker(page).
 test('a fresh profile shows the built-in default, from Settings, in dark mode', async ({ page }) => {
   const { pageErrors } = await openApp(page)
   await expect.poll(() => themeOnScreen(page)).toMatchObject({
-    id: 'midnight', name: 'Midnight', source: 'global', globalThemeId: 'midnight', mode: 'dark',
-    rootTheme: 'midnight', rootMode: 'dark', canvas: '#101114', tldrawBackground: '#101114', tldrawScheme: 'dark', headerStyle: 'plain',
+    id: 'minimal', name: 'Minimal', source: 'global', globalThemeId: 'minimal', mode: 'dark',
+    rootTheme: 'minimal', rootMode: 'dark', canvas: '#121213', tldrawBackground: '#121213', tldrawScheme: 'dark', headerStyle: 'underline',
   })
+  await expect(boardThemePicker(page).locator('option').nth(1)).toHaveText('Minimal')
+  await expect(boardThemePicker(page).locator('option').last()).toHaveText('Brown paper')
   await expect(boardThemePicker(page)).toHaveValue('')
-  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Midnight)')
+  await expect(boardThemePicker(page).locator('option').first()).toHaveText('Global (Minimal)')
   expect(pageErrors).toEqual([])
 })
 
@@ -88,7 +90,7 @@ test('a board follows Global until it pins a theme, and the pin survives a canva
   await openApp(page)
   const picker = boardThemePicker(page)
   await picker.selectOption('paper')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'board', mode: 'light', canvas: '#f3eee4', tldrawScheme: 'light', colorScheme: 'light', headerStyle: 'underline' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'paper', source: 'board', mode: 'light', canvas: '#d5c7aa', tldrawScheme: 'light', colorScheme: 'light', headerStyle: 'plain' })
   await expect.poll(async () => (await describeCanvas(page)).board?.themeId).toBe('paper')
 
   // A canvas write triggers the debounced document save, which rebuilds the
@@ -102,7 +104,7 @@ test('a board follows Global until it pins a theme, and the pin survives a canva
   await expect(picker).toHaveValue('paper')
 
   await picker.selectOption('')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', mode: 'dark', tldrawScheme: 'dark', headerStyle: 'plain' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'minimal', source: 'global', mode: 'dark', tldrawScheme: 'dark', headerStyle: 'underline' })
   await expect.poll(async () => (await describeCanvas(page)).board?.themeId).toBeNull()
   await expectArchitectureReportPass(page)
 })
@@ -153,8 +155,8 @@ test('a theme file is imported, listed, selectable, and deleted with a fallback'
   await expect(globalThemeOption(page, 'Ember (imported)')).toHaveCount(0)
   // The global choice fell back to the default; the board keeps its pinned
   // id and shows the global theme in the meantime.
-  await expect(globalThemePicker(page)).toHaveValue('midnight')
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', canvas: '#101114' })
+  await expect(globalThemePicker(page)).toHaveValue('minimal')
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'minimal', source: 'global', canvas: '#121213' })
   await expect.poll(async () => (await describeCanvas(page)).board?.themeId).toBe('ember')
   await closeSettings(page)
   await expect(boardThemePicker(page).locator('option', { hasText: 'ember (not installed)' })).toBeAttached()
@@ -178,7 +180,7 @@ test('built-in themes cannot be deleted and an invalid file is refused with its 
   await expect(status).toContainText('was imported under the id "midnight-2"')
   await expect(globalThemeOption(page, 'Midnight')).toHaveCount(1)
   await expect(globalThemeOption(page, 'Impostor (imported)')).toHaveCount(1)
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', canvas: '#101114' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'minimal', canvas: '#121213' })
 })
 
 test('a theme is imported and deleted through the command surface, with the same validation as the file path', async ({ page }) => {
@@ -194,5 +196,5 @@ test('a theme is imported and deleted through the command surface, with the same
   await expect(dispatch({ kind: 'appearance.deleteTheme', themeId: 'midnight' })).rejects.toThrow(/Built-in themes cannot be deleted/)
 
   await dispatch({ kind: 'appearance.deleteTheme', themeId: 'ember' })
-  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'midnight', source: 'global', globalThemeId: 'midnight' })
+  await expect.poll(() => themeOnScreen(page)).toMatchObject({ id: 'minimal', source: 'global', globalThemeId: 'minimal' })
 })
