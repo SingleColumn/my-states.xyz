@@ -252,7 +252,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         style={{
           '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
           '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
-          '--notes-title-ratio': editorFontSizes[fontSize].titleRatio,
           '--notes-paper-width': paperWidths[paperWidth].width,
           '--notes-zoom': zoom / 100,
         } as CSSProperties}
@@ -424,10 +423,10 @@ function readPaperWidth(): PaperWidth {
 // Four steps for reading at, each with the leading that suits it: tighter
 // where the line is short, looser where it is long. Medium is the default.
 const editorFontSizes = {
-  small: { label: 'Small', fontSize: '17px', lineHeight: '25px', titleRatio: 0.85 },
-  medium: { label: 'Medium', fontSize: '19px', lineHeight: '30px', titleRatio: 1 },
-  large: { label: 'Large', fontSize: '21px', lineHeight: '34px', titleRatio: 1.15 },
-  xlarge: { label: 'Extra large', fontSize: '24px', lineHeight: '40px', titleRatio: 1.3 },
+  small: { label: 'Small', fontSize: '17px', lineHeight: '25px' },
+  medium: { label: 'Medium', fontSize: '19px', lineHeight: '30px' },
+  large: { label: 'Large', fontSize: '21px', lineHeight: '34px' },
+  xlarge: { label: 'Extra large', fontSize: '24px', lineHeight: '40px' },
 } as const
 type EditorFontSize = keyof typeof editorFontSizes
 const defaultEditorFontSize: EditorFontSize = 'medium'
