@@ -1742,7 +1742,9 @@ input[type="range"]:focus-visible {
    out on the background instead of reading as part of the image. */
 .image-attribution {
   position: absolute;
-  bottom: 10px;
+  /* Hugs the bottom of the stage so that, when the picture is letterboxed, the
+     pill lands in the empty band below it instead of straddling the image edge. */
+  bottom: 4px;
   left: 50%;
   z-index: 2;
   display: flex;
@@ -2447,6 +2449,15 @@ input[type="range"]:focus-visible {
   transition: transform var(--transition-fast);
 }
 
+.collection-grid-thumbnail img.fade-in-image {
+  opacity: 0;
+  transition: opacity 300ms ease, transform var(--transition-fast);
+}
+
+.collection-grid-thumbnail img.fade-in-image.is-loaded {
+  opacity: 1;
+}
+
 .collection-grid-card:hover .collection-grid-thumbnail img {
   transform: scale(1.025);
 }
@@ -2495,11 +2506,21 @@ input[type="range"]:focus-visible {
 }
 
 .slideshow-controls {
+  /* A compact set of local sizes: the picture is what people came to see, so
+     the controls give back height to it. Set here rather than on the shared
+     tokens so other panels keep their proportions. */
+  --card-header-button-size: 28px;
+  --size-play-button: 38px;
+  --size-control-icon: 16px;
+  --size-primary-icon: 18px;
+  --space-row-bottom: 8px;
+  --space-range-label-gap: 6px;
+  --space-range-bottom: 8px;
+  --space-zoom-bottom: 0px;
   min-height: 0;
   max-height: min(42cqb, var(--size-slideshow-controls-max-height));
   overflow: auto;
-  padding: var(--space-slideshow-controls-top) var(--image-panel-control-x)
-    var(--image-panel-control-bottom);
+  padding: 8px var(--image-panel-control-x) 8px;
 }
 
 /* Scoped to the slideshow: the Spotify transport row ends in a flexible volume

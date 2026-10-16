@@ -243,8 +243,9 @@ function readManifest(value: unknown, entry: CuratedIndexEntry, baseUrl: string)
   return {
     id: entry.slug,
     title: entry.title,
-    coverUrl: items[0]?.thumbUrl ?? null,
-    creators: [...new Set(items.map((item) => item.attribution.creator))],
+    // The grid draws covers far larger than the stored thumbnail, so the full
+    // picture is used; only six covers load per page, which keeps this cheap.
+    coverUrl: items[0]?.fileUrl ?? null,    creators: [...new Set(items.map((item) => item.attribution.creator))],
     imageCount: entry.count,
     version: entry.version,
     items,
