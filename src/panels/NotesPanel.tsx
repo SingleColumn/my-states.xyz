@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
-import { CopyPlus, Download, FilePlus2, FileUp, Ruler, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Minus, Plus, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { markdownNamedAsCopy } from '../noteTitle'
@@ -19,6 +19,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
   const [paperWidth, setPaperWidth] = useState(() => readPaperWidth())
   const [showTools, setShowTools] = useState(() => readShowTools())
+  const [zoom, setZoomState] = useState(() => readZoom())
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
@@ -36,6 +37,16 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     }
     wasInWritingModeRef.current = isWritingMode
   }, [isWritingMode, posthog])
+
+  function setZoom(next: number) {
+    const clamped = Math.min(maxZoom, Math.max(minZoom, next))
+    setZoomState(clamped)
+    try {
+      window.localStorage.setItem(zoomStorageKey, String(clamped))
+    } catch {
+      // The zoom still holds for this session.
+    }
+  }
 
   async function openMarkdownFile(file: File) {
     // Every Markdown this app writes uses \n alone -- every toMarkdown
@@ -212,6 +223,19 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           })),
         ]}
       >
+        {isWritingMode ? (
+          <div className="notes-zoom-control" role="group" aria-label="Zoom">
+            <button className="card-icon-button" type="button" title="Zoom out" aria-label="Zoom out" disabled={zoom <= minZoom} onClick={() => setZoom(zoom - zoomStep)}>
+              <Minus size={16} aria-hidden="true" />
+            </button>
+            <button className="card-icon-button notes-zoom-value" type="button" title="Reset zoom to 100%" aria-label={`Zoom ${zoom}%, reset to 100%`} onClick={() => setZoom(100)}>
+              {zoom}%
+            </button>
+            <button className="card-icon-button" type="button" title="Zoom in" aria-label="Zoom in" disabled={zoom >= maxZoom} onClick={() => setZoom(zoom + zoomStep)}>
+              <Plus size={16} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         {isWritingMode && hasNotes ? (
           <label className="writing-note-picker">
             <span className="sr-only">Choose a note</span>
@@ -230,6 +254,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
           '--notes-title-ratio': editorFontSizes[fontSize].titleRatio,
           '--notes-paper-width': paperWidths[paperWidth].width,
+          '--notes-zoom': zoom / 100,
         } as CSSProperties}
       >
         {/* No title field in either treatment: the note is named by its
@@ -351,6 +376,19 @@ const newDocumentSelectValue = '__new_document__'
 const editorFontSizeStorageKey = 'mic:notes-editor-font-size'
 const paperWidthStorageKey = 'mic:notes-paper-width'
 const showToolsStorageKey = 'mic:notes-formatting-tools'
+const zoomStorageKey = 'mic:notes-zoom'
+const minZoom = 50
+const maxZoom = 200
+const zoomStep = 10
+
+function readZoom() {
+  try {
+    const stored = Number(window.localStorage.getItem(zoomStorageKey))
+    return Number.isFinite(stored) && stored >= minZoom && stored <= maxZoom ? Math.round(stored) : 100
+  } catch {
+    return 100
+  }
+}
 
 /**
  * Whether the writing tools are on show. Off until asked for: the tools are

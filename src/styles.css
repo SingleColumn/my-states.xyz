@@ -3023,7 +3023,12 @@ input[type="range"]:focus-visible {
   /* Keep the first-line title from touching the editor's top edge after the
      writing surface sheds its normal card padding. */
   box-sizing: border-box;
-  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  /* The view's zoom scales the sheet as a whole -- text, margins, images --
+     which is not the same as the text size, a choice made against the sheet.
+     Percentages inside a zoomed box are scaled with it, so the available
+     width is divided by the zoom to land on the window's edge. */
+  zoom: var(--notes-zoom, 1);
+  width: min(var(--notes-paper-width, 794px), calc((100% - (var(--card-padding) * 2)) / var(--notes-zoom, 1)));
   min-height: var(--writing-paper-height);
   margin-inline: auto;
   padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom);
@@ -4121,4 +4126,17 @@ input[type="range"]:focus-visible {
 .theme-credit:focus-visible {
   opacity: 1;
   text-decoration: underline;
+}
+
+/* Zoom stepper beside the panel menu, full screen only. */
+.notes-zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.notes-zoom-value {
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
