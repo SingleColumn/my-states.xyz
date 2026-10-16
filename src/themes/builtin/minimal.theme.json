@@ -142,7 +142,8 @@
         "typography": {
           "uiFont": "\"Helvetica Neue\", Helvetica, \"Segoe UI\", Arial, sans-serif",
           "headingFont": "\"Helvetica Neue\", Helvetica, \"Segoe UI\", Arial, sans-serif",
-          "headingWeight": "500"
+          "headingWeight": "500",
+          "monoFont": "\"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace"
         },
         "shape": {
           "radiusLarge": "10px",
@@ -173,7 +174,8 @@
         "canvas": {
           "backdrop": "#121213",
           "pattern": "none",
-          "selectionStrokeWidth": "1px"
+          "selectionStrokeWidth": "1px",
+          "gridSize": "48px"
         },
         "toolbar": {
           "background": "#1a1a1b",
@@ -238,7 +240,10 @@
           "accent": "#d8d8d4",
           "panelBackground": "#1a1a1b",
           "frameBorder": "1px solid rgba(236, 236, 234, 0.16)",
-          "edge": "none"
+          "edge": "none",
+          "frameShadow": "none",
+          "tilt": "0deg",
+          "inset": "0px"
         },
         "notes": {
           "accent": "#d8d8d4",

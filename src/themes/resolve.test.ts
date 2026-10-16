@@ -20,7 +20,7 @@ function resolveWith(overrides: Partial<ResolveThemeInput>) {
 
 describe('resolveEffectiveTheme', () => {
   it('shows the built-in default when nothing has been chosen', () => {
-    expect(resolveWith({})).toMatchObject({ themeId: 'midnight', source: 'global', mode: 'dark' })
+    expect(resolveWith({})).toMatchObject({ themeId: 'minimal', source: 'global', mode: 'dark' })
   })
 
   it('shows the global choice for a board that follows Global', () => {
