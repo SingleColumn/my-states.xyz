@@ -111,7 +111,7 @@ export function CollectionBrowser({
   useEffect(() => {
     if (viewMode !== 'grid') return
     const urls = collections
-      .map((collection, index) => ({ url: collection.coverUrl, distance: Math.abs(Math.floor(index / collectionsPerGridPage) - gridPage) }))
+      .map((collection, index) => ({ url: collection.gridCoverUrl ?? collection.coverUrl, distance: Math.abs(Math.floor(index / collectionsPerGridPage) - gridPage) }))
       .filter((cover) => cover.url && cover.distance > 0)
       .sort((a, b) => a.distance - b.distance)
     const preloaders = urls.map((cover) => {
@@ -227,8 +227,8 @@ export function CollectionBrowser({
                   onClick={() => onSelectCollection(collection.id)}
                 >
                   <span className="collection-grid-thumbnail" aria-hidden="true">
-                    {collection.coverUrl
-                      ? <FadeInImage src={collection.coverUrl} />
+                    {(collection.gridCoverUrl ?? collection.coverUrl)
+                      ? <FadeInImage src={collection.gridCoverUrl ?? collection.coverUrl} />
                       : <Images className="collection-browser-cover-fallback" aria-hidden="true" />}
                   </span>
                   <span className="collection-grid-title">{collection.title}</span>
