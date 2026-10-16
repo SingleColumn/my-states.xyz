@@ -2758,12 +2758,12 @@ input[type="range"]:focus-visible {
 }
 
 /* Headings are a fixed multiple of the paragraph, so the proportions hold
-   at every text size: title 1.6x, h1 1.45x, h2 1.25x, h3 1.1x. A gentle
+   at every text size: title 1.5x, h1 1.4x, h2 1.25x, h3 1.1x. A gentle
    ratio suits long-form reading; weight and spacing carry the rest of the
    hierarchy. */
 .notes-editor-content {
   --note-text-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
-  --note-title-size: calc(var(--note-text-size) * 1.6);
+  --note-title-size: calc(var(--note-text-size) * 1.5);
 }
 
 .notes-editor-content h1,
@@ -2776,7 +2776,7 @@ input[type="range"]:focus-visible {
 }
 
 .notes-editor-content h1 {
-  font-size: calc(var(--note-text-size) * 1.45);
+  font-size: calc(var(--note-text-size) * 1.4);
 }
 
 .notes-editor-content h2 {
