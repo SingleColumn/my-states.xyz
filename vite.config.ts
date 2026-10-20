@@ -2,6 +2,34 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { notGetResult } from './api/_lib/httpAdapter'
 import { handleCatalogSearch, handleCuratedPlaylists, type CatalogDeps } from './api/_lib/spotifyCatalog'
+import aiApi from './api/ai'
+
+async function requestBody(request: import('http').IncomingMessage) {
+  const chunks: Buffer[] = []
+  for await (const chunk of request) chunks.push(Buffer.from(chunk))
+  return Buffer.concat(chunks)
+}
+
+function aiDevApi(): Plugin {
+  return {
+    name: 'my-states:ai-dev-api',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(async (request, response, next) => {
+        const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+        if (url.pathname !== '/api/ai') { next(); return }
+        const body = request.method === 'POST' ? await requestBody(request) : undefined
+        const headers = new Headers()
+        for (const [name, value] of Object.entries(request.headers)) if (typeof value === 'string') headers.set(name, value)
+        const upstreamRequest = new Request(url, { method: request.method, headers, body: body && body.length ? body : undefined, duplex: 'half' } as RequestInit & { duplex: 'half' })
+        const upstreamResponse = await aiApi.fetch(upstreamRequest)
+        response.statusCode = upstreamResponse.status
+        upstreamResponse.headers.forEach((value, name) => response.setHeader(name, value))
+        response.end(Buffer.from(await upstreamResponse.arrayBuffer()))
+      })
+    },
+  }
+}
 
 /**
  * `/api/spotify/*` during `npm run dev`.
@@ -64,7 +92,7 @@ function spotifyCatalogDevApi(env: Record<string, string | undefined>): Plugin {
 export default defineConfig(({ mode }) => ({
   // Every variable, not just the VITE_ ones: the dev API above needs the two
   // server-only Spotify credentials, and they are deliberately not prefixed.
-  plugins: [react(), spotifyCatalogDevApi(loadEnv(mode, process.cwd(), ''))],
+  plugins: [react(), spotifyCatalogDevApi(loadEnv(mode, process.cwd(), '')), aiDevApi()],
   server: {
     host: '127.0.0.1',
     // Honour an assigned PORT so more than one dev server can run side by side;

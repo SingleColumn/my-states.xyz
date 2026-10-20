@@ -1,3 +1,5 @@
+import { useOpenWordGraph } from '../wordGraph/WordGraphController'
+import { captureWordSelection } from '../wordGraph/wordGraphSelection'
 import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { Bold, Code, Heading1, Heading2, Heading3, Highlighter, Italic, Link as LinkIcon, Pilcrow, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
@@ -47,6 +49,7 @@ export function NotesFormattingTooltip() {
   const { view, prevState } = usePluginViewContext()
   const viewRef = useRef(view)
   viewRef.current = view
+  const openWordGraph = useOpenWordGraph()
   const { run, openLinkEditor } = useNotesEditorActions()
   // Where the writer asked for the bar, and whether they have asked at all.
   // A ref rather than state: the provider's shouldShow, made once, reads it.
@@ -127,6 +130,7 @@ export function NotesFormattingTooltip() {
   })
 
   const { state } = view
+  const wordSelection = captureWordSelection(state)
   const marks = state.schema.marks
   const block = blockOf(state)
 
@@ -151,6 +155,16 @@ export function NotesFormattingTooltip() {
 
   return (
     <div ref={ref} className="notes-formatting-tooltip" role="toolbar" aria-label="Formatting" data-show="false" onKeyDown={handleKeyDown} onPointerDown={markPointerEventHandled}>
+      <button type="button" className="notes-formatting-button word-graph-invoke" disabled={!wordSelection}
+        onMouseDown={event => event.preventDefault()}
+        onClick={() => {
+          const captured = captureWordSelection(viewRef.current.state)
+          if (!captured) return
+          const anchor = viewRef.current.coordsAtPos(viewRef.current.state.selection.from)
+          openAt.current = null
+          provider.current?.hide()
+          openWordGraph({ ...captured, anchor: { x: anchor.left + 24, y: anchor.bottom + 12 }, returnFocus: viewRef.current.dom })
+        }}>Explore associations</button>
       {blockChoices.map(({ level, label, icon }) => (
         <FormatButton key={level} label={label} active={block === level} onActivate={() => setBlock(level)}>
           {icon}

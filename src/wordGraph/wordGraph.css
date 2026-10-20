@@ -1,0 +1,56 @@
+.word-graph-window {
+  position: fixed; z-index: 7; display: flex; flex-direction: column; box-sizing: border-box;
+  background: var(--panel-content-background); color: var(--text-primary);
+  border: var(--card-border); border-radius: var(--radius-large); box-shadow: var(--shadow-panel);
+  font-family: var(--font-family-ui); font-size: var(--type-sm); overflow: hidden;
+  --accent: var(--accent-notes); --bg: var(--bg-notes);
+  /* Keep relationship colors distinct from the panel accent so the graph can
+     be read at a glance, even when several edge styles are visible together. */
+  --relationship-semantic: #5db7ff;
+  --relationship-conceptual: #b78cff;
+  --relationship-emotional: #ff78ae;
+  --relationship-symbolic: #f4bd55;
+  --relationship-sensory: #53d6c0;
+  --relationship-opposite: #ff7c6e;
+}
+.word-graph-window:focus { outline: none; }
+.word-graph-header { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--color-panel-divider); padding: 8px 12px; }
+.word-graph-drag { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 16px; cursor: move; touch-action: none; user-select: none; }
+.word-graph-drag strong { font-weight: var(--card-title-weight); white-space: nowrap; }
+.word-graph-drag span { color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.word-graph-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.word-graph-status { margin: auto; padding: 24px; max-width: 320px; color: var(--color-text-muted); text-align: center; line-height: 1.5; }
+.word-graph-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; }
+.word-graph-resize::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 9px; height: 9px; border-right: 2px solid var(--color-text-muted); border-bottom: 2px solid var(--color-text-muted); }
+
+.word-graph-invoke { width: auto; padding: 0 10px; white-space: nowrap; font: inherit; }
+
+.word-graph-hint { margin: 12px 16px 0; color: var(--color-text-muted); font-size: var(--type-xs); line-height: 1.5; }
+.word-graph-svg { flex: 1; min-height: 0; width: 100%; cursor: grab; touch-action: none; user-select: none; }
+.word-graph-svg:active { cursor: grabbing; }
+.word-graph-svg line { stroke: var(--color-text-muted); stroke-width: 1.5; opacity: .72; pointer-events: none; }
+.word-graph-svg line[data-relationship="semantic"] { stroke: var(--relationship-semantic); }
+.word-graph-svg line[data-relationship="conceptual"] { stroke: var(--relationship-conceptual); }
+.word-graph-svg line[data-relationship="emotional"] { stroke: var(--relationship-emotional); }
+.word-graph-svg line[data-relationship="symbolic"] { stroke: var(--relationship-symbolic); }
+.word-graph-svg line[data-relationship="sensory"] { stroke: var(--relationship-sensory); }
+.word-graph-svg line[data-relationship="opposite"] { stroke: var(--relationship-opposite); }
+.word-graph-svg [data-node-id] { cursor: pointer; outline: none; }
+.word-graph-svg [data-node-id] rect { fill: var(--panel-content-background); stroke: transparent; }
+.word-graph-svg [data-node-id]:focus-visible rect, .word-graph-svg [data-node-id]:hover rect { stroke: var(--color-focus-ring); }
+.word-graph-svg text { fill: var(--text-primary); font: 17px var(--font-family-ui); }
+.word-graph-svg circle { fill: var(--color-text-muted); }
+.word-graph-svg [data-root="true"] text { font-weight: 650; fill: var(--accent-notes); }
+.word-graph-svg [data-root="true"] circle { fill: var(--accent-notes); }
+.word-graph-svg .word-graph-expander { fill: var(--color-text-muted); font-size: 13px; }
+.word-graph-filters { margin: 0; border: 0; border-top: 1px solid var(--color-panel-divider); padding: 8px 26px 12px 16px; display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.word-graph-filters legend { color: var(--color-text-muted); font-size: var(--type-xs); padding: 0 4px; }
+.word-graph-filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: var(--type-xs); }
+.word-graph-filters label svg line { stroke-width: 2; }
+.word-graph-filters .word-graph-relationship-semantic { color: var(--relationship-semantic); }
+.word-graph-filters .word-graph-relationship-conceptual { color: var(--relationship-conceptual); }
+.word-graph-filters .word-graph-relationship-emotional { color: var(--relationship-emotional); }
+.word-graph-filters .word-graph-relationship-symbolic { color: var(--relationship-symbolic); }
+.word-graph-filters .word-graph-relationship-sensory { color: var(--relationship-sensory); }
+.word-graph-filters .word-graph-relationship-opposite { color: var(--relationship-opposite); }
+.word-graph-filters input { margin: 0; accent-color: var(--accent-notes); }

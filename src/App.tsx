@@ -22,6 +22,7 @@ import { buildPanelArchitectureReport, type PanelArchitectureReport } from './pa
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
 import { AppSettings } from './AppSettings'
+import { WordGraphProvider } from './wordGraph/WordGraphController'
 import { ThemeCredit } from './ThemeCredit'
 import type { Board, PanelLayout, PanelType } from './types'
 
@@ -729,14 +730,16 @@ function AppContent() {
     >
       <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId }}>
         <AppChromePropsProvider value={appChromeProps}>
-          <Tldraw
-            shapeUtils={shapeUtils}
-            components={components}
-            overrides={uiOverrides}
-            options={editorOptions}
-            onMount={handleMount}
-            licenseKey={TLDRAW_LICENSE_KEY}
-          />
+          <WordGraphProvider boardId={boards.activeBoard.id}>
+            <Tldraw
+              shapeUtils={shapeUtils}
+              components={components}
+              overrides={uiOverrides}
+              options={editorOptions}
+              onMount={handleMount}
+              licenseKey={TLDRAW_LICENSE_KEY}
+            />
+          </WordGraphProvider>
         </AppChromePropsProvider>
       </PanelCommandsProvider>
       <ThemeCredit url={appearance.effective.definition.inspiredBy} />

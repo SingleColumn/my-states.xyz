@@ -4,6 +4,9 @@ import { useAppState } from './AppState'
 import { isPanelReportEnabled } from './panelReportFeature'
 import type { ThemeModePreference } from './themes/types'
 import { modesOf } from './themes/validate'
+import { openAiCredentialMode, removeOpenAiCredential, saveOpenAiCredential, hasOpenAiCredential, type CredentialStorageMode } from './ai/credentials'
+import { testOpenAiCredential } from './ai/service'
+import { clearAiAuditReport, isAiAuditEnabled, readAiAuditReport, setAiAuditEnabled, type AiAuditReport } from './ai/audit'
 
 interface AppSettingsProps {
   isOpen: boolean
@@ -13,7 +16,7 @@ interface AppSettingsProps {
   onOpenArchitectureReport(): void
 }
 
-type SettingsSection = 'appearance' | 'developer'
+type SettingsSection = 'appearance' | 'ai' | 'developer'
 const panelReportEnabled = isPanelReportEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_PANEL_REPORT)
 
 const modeLabels: Array<{ value: ThemeModePreference; label: string; hint: string }> = [
@@ -38,6 +41,22 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [section, setSection] = useState<SettingsSection>('appearance')
+  const [aiKey, setAiKey] = useState('')
+  const [aiMode, setAiMode] = useState<CredentialStorageMode>(openAiCredentialMode() ?? 'session')
+  const [auditEnabled, setAuditEnabled] = useState(isAiAuditEnabled())
+  const [auditReport, setAuditReport] = useState<AiAuditReport | null>(readAiAuditReport())
+  useEffect(() => {
+    function copyAudit(event: ClipboardEvent) {
+      const selection = window.getSelection()
+      const anchor = selection?.anchorNode instanceof Element ? selection.anchorNode : selection?.anchorNode?.parentElement
+      if (!anchor?.closest('.app-settings-audit-report') || !auditReport) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      event.clipboardData?.setData('text/plain', JSON.stringify(auditReport, null, 2))
+    }
+    document.addEventListener('copy', copyAudit, true)
+    return () => document.removeEventListener('copy', copyAudit, true)
+  }, [auditReport])
 
   useEffect(() => {
     if (!isOpen) return
@@ -115,15 +134,19 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
         <div className="app-settings-body">
           <nav className="app-settings-nav" aria-label="Settings sections">
             <button type="button" className="app-settings-nav-item" aria-current={section === 'appearance' ? 'page' : undefined} onClick={() => setSection('appearance')}>Appearance</button>
+            <button type="button" className="app-settings-nav-item" aria-current={section === 'ai' ? 'page' : undefined} onClick={() => setSection('ai')}>AI Providers</button>
             {panelReportEnabled ? (
               <button type="button" className="app-settings-nav-item" aria-current={section === 'developer' ? 'page' : undefined} onClick={() => setSection('developer')}>Developer</button>
             ) : null}
           </nav>
 
           <div className="help-about-content app-settings-content">
-            {section === 'developer' ? (
+            {section === 'ai' ? (
+              <section aria-labelledby="app-settings-ai"><h3 id="app-settings-ai">AI Providers</h3><div className="app-settings-field"><h4>OpenAI</h4><p className="app-settings-hint">Your selected word and a short excerpt are sent to OpenAI to generate the graph. Usage is billed to your OpenAI account; a ChatGPT subscription does not include API credits.</p><label htmlFor="openai-key">API key</label><input id="openai-key" type="password" autoComplete="off" value={aiKey} placeholder={hasOpenAiCredential() ? 'Key configured' : 'Paste your OpenAI API key'} onChange={event => setAiKey(event.target.value)} /><label><input type="radio" checked={aiMode === 'session'} onChange={() => setAiMode('session')} /> Use for this browser session only</label><label><input type="radio" checked={aiMode === 'persistent'} onChange={() => setAiMode('persistent')} /> Keep across browser sessions</label><p className="app-settings-hint">Browser storage is not a secure secrets vault. The key is not placed in boards, exports, analytics, or the application backend.</p><div className="app-settings-actions"><button type="button" className="app-chrome-control" disabled={!aiKey.trim() || busy} onClick={() => void run(async () => { await testOpenAiCredential(aiKey); return 'OpenAI connection succeeded.' })}>Test connection</button><button type="button" className="app-chrome-control" disabled={!aiKey.trim() || busy} onClick={() => void run(async () => { saveOpenAiCredential(aiKey, aiMode); setAiKey(''); return 'OpenAI key saved.' })}>Save key</button><button type="button" className="app-chrome-control" disabled={!hasOpenAiCredential() || busy} onClick={() => void run(async () => { removeOpenAiCredential(); return 'OpenAI key removed.' })}>Remove key</button></div></div>{notice ? <p className="app-settings-notice" role="status">{notice}</p> : null}</section>
+            ) : section === 'developer' ? (
               <section aria-labelledby="app-settings-developer">
                 <h3 id="app-settings-developer">Developer</h3>
+                {auditReport ? <div className="app-settings-actions"><button type="button" className="app-chrome-control" onClick={() => void navigator.clipboard?.writeText(JSON.stringify(auditReport, null, 2))}>Copy report</button></div> : null}
                 <div className="app-settings-field">
                   <h4>Panel report</h4>
                   <p className="app-settings-hint">Checks the open board's panels against their stored shapes: one shape per panel, no orphaned references, the current schema version. Available in development builds.</p>
@@ -133,6 +156,7 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
                     </button>
                   </div>
                 </div>
+                <div className="app-settings-field"><h4>Word Graph generation audit</h4><label><input type="checkbox" checked={auditEnabled} onChange={event => { setAuditEnabled(event.target.checked); setAiAuditEnabled(event.target.checked); setAuditReport(readAiAuditReport()) }} /> Record the last generation report</label><p className="app-settings-hint">Stores the selected word, AI operations, sanitized parameters, responses, errors, and timings in this browser session. API keys are never recorded.</p><div className="app-settings-actions"><button type="button" className="app-chrome-control" onClick={() => setAuditReport(readAiAuditReport())}>Refresh report</button><button type="button" className="app-chrome-control" disabled={!auditReport} onClick={() => { clearAiAuditReport(); setAuditReport(null) }}>Clear report</button></div>{auditReport ? <pre className="app-settings-audit-report" aria-label="Word Graph audit report">{JSON.stringify(auditReport, null, 2)}</pre> : <p className="app-settings-hint">No generation report is available.</p>}</div>
               </section>
             ) : (
             <section aria-labelledby="app-settings-appearance">
