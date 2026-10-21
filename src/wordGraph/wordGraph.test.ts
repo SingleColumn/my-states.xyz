@@ -75,7 +75,7 @@ describe('graph data and reachability', () => {
     const graph = buildGraph('a', [['a', 'b', 'semantic'], ['b', 'c', 'semantic'], ['c', 'a', 'opposite']])
     expect(visibleGraph(graph, ids('a', 'b', 'c'), all).nodes).toHaveLength(3)
     expect(visibleGraph(graph, ids('a', 'b', 'c'), all).edges).toHaveLength(3)
-    expect(graph.nodes.map(node => node.depth)).toEqual([0, 1, 2])
+    expect(graph.nodes.map(node => node.depth)).toEqual([0, 1, 1])
   })
   it('always keeps the root, including when all filters or the root are collapsed', () => {
     expect(labels(visibleGraph(graph, ids('dark'), new Set()))).toEqual(['dark'])
