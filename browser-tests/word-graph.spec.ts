@@ -70,6 +70,39 @@ async function selectAndOpen(page: Page, word = 'dark') {
 }
 const node = (page: Page, word: string) => page.locator(`.word-graph-svg [data-node-id="word:${word}"]`)
 
+test('audit recording follows Settings while graph recovery remains available', async ({ page }) => {
+  await openApp(page)
+  const boardId = (await describeCanvas(page)).board!.id
+  const first = await selectAndOpen(page)
+  await expect(node(page, 'dark')).toBeVisible()
+  await expect.poll(async () => (await readStoredWordGraph(page, boardId))?.graph?.nodes?.length).toBeGreaterThan(1)
+  expect(await page.evaluate(() => sessionStorage.getItem('my-states:ai-audit-last'))).toBeNull()
+  await first.dialog.getByRole('button', { name: 'Close Word Graph' }).click()
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+  await settings.getByRole('button', { name: 'Developer' }).click()
+  await settings.getByRole('checkbox', { name: 'Record the last generation report' }).check()
+  await page.keyboard.press('Escape')
+  const second = await selectAndOpen(page)
+  await expect(node(page, 'dark')).toBeVisible()
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem('my-states:ai-audit-last'))).not.toBeNull()
+  const reportBefore = await page.evaluate(() => sessionStorage.getItem('my-states:ai-audit-last'))
+  const parsed = JSON.parse(reportBefore!)
+  expect(parsed.run.status).toBe('completed')
+  expect(parsed.candidate_decisions.length).toBeGreaterThan(0)
+  await second.dialog.getByRole('button', { name: 'Close Word Graph' }).click()
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await settings.getByRole('button', { name: 'Developer' }).click()
+  await settings.getByRole('checkbox', { name: 'Record the last generation report' }).uncheck()
+  await page.keyboard.press('Escape')
+  const third = await selectAndOpen(page)
+  await expect(node(page, 'dark')).toBeVisible()
+  expect(await page.evaluate(() => sessionStorage.getItem('my-states:ai-audit-last'))).toBe(reportBefore)
+  await third.dialog.getByRole('button', { name: 'Close Word Graph' }).click()
+})
+
 test('selected Unicode word opens outside the canvas without altering notes or shapes; a new request replaces it', async ({ page }) => {
   await openApp(page)
   const before = await describeCanvas(page)
