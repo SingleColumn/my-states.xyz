@@ -8,7 +8,7 @@ export interface SavedWordGraph {
   createdAt: string
   updatedAt: string
   graph: { rootId: string; rootWord: string; nodes: WordGraphNode[]; edges: WordGraphEdge[]; generation?: WordGraph['generation'] }
-  presentation: { expandedNodeIds: string[]; enabledRelationshipTypes: RelationshipType[]; nodePositions?: Record<string, { x: number; y: number }>; viewport?: { x: number; y: number; zoom: number }; window?: { x: number; y: number; width: number; height: number; maximized: boolean }; isOpen: boolean }
+  presentation: { expandedNodeIds: string[]; enabledRelationshipTypes: RelationshipType[]; nodePositions?: Record<string, { x: number; y: number }>; layout?: 'rings' | 'grid'; viewport?: { x: number; y: number; zoom: number }; window?: { x: number; y: number; width: number; height: number; maximized: boolean }; isOpen: boolean }
 }
 interface GraphDb { graphs: { key: string; value: SavedWordGraph } }
 const db = openDB<GraphDb>('my-states-word-graphs', 1, { upgrade(database) { database.createObjectStore('graphs') } })

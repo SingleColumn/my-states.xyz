@@ -3,14 +3,13 @@ import type { WordGraph } from './wordGraphTypes'
 import { relationshipTypes, type RelationshipType } from './wordGraphTypes'
 import { visibleGraph } from './wordGraphVisibility'
 import { BADGE_RADIUS, fitCamera, graphGeometry, isOutOfView, layoutGraph, nodeWidth, NODE_HEIGHT, setTextMeasurer, shownLabel, type Camera, type Point, type Region } from './wordGraphLayout'
-import { gridLayout } from './wordGraphGrid'
+import { gridLayout, layoutToRestore, type LayoutMode } from './wordGraphGrid'
 import { arcAround, branchingEdgeIds } from './wordGraphLinks'
 
-export interface WordGraphPresentation { expandedNodeIds?: string[]; enabledRelationshipTypes?: RelationshipType[]; nodePositions?: Record<string, Point>; viewport?: Camera }
+export interface WordGraphPresentation { expandedNodeIds?: string[]; enabledRelationshipTypes?: RelationshipType[]; nodePositions?: Record<string, Point>; layout?: LayoutMode; viewport?: Camera }
 const dashes = ['', '5 3', '2 3', '8 3 2 3']
 
 // Prototype: 'grid' snaps words to shared rows and columns and draws links between non-branching words as faint arcs.
-type LayoutMode = 'rings' | 'grid'
 const layoutKey = 'my-states:word-graph-layout'
 function storedLayout(): LayoutMode {
   try { return localStorage.getItem(layoutKey) === 'grid' ? 'grid' : 'rings' } catch { return 'rings' }
@@ -33,7 +32,7 @@ function installTextMeasurer() {
 
 export function WordGraphView({ graph, presentation, onPresentationChange }: { graph: WordGraph; presentation?: WordGraphPresentation; onPresentationChange?(presentation: Partial<WordGraphPresentation>): void }) {
   installTextMeasurer()
-  const [mode, setMode] = useState<LayoutMode>(storedLayout)
+  const [mode, setMode] = useState<LayoutMode>(() => layoutToRestore(presentation, storedLayout()))
   const geometry = useMemo(() => graphGeometry(graph, { rule: mode === 'grid' ? 'angle' : 'pill' }), [graph, mode])
   const branching = useMemo(() => branchingEdgeIds(graph), [graph])
   const svg = useRef<SVGSVGElement>(null)
@@ -119,7 +118,7 @@ export function WordGraphView({ graph, presentation, onPresentationChange }: { g
     const fresh = layoutFor(graph, next)
     setMode(next)
     setPositions(fresh)
-    notify({ nodePositions: fresh })
+    notify({ nodePositions: fresh, layout: next })
     const { expanded: open, enabled: shown } = latest.current
     const nodes = visibleGraph(graph, open, shown).nodes.map(node => ({ ...fresh[node.id], width: nodeWidth(node.label) }))
     moveCamera(fitCamera(nodes, visibleRegion()), true)
@@ -156,7 +155,7 @@ export function WordGraphView({ graph, presentation, onPresentationChange }: { g
     const dx = p.x - active.start.x, dy = p.y - active.start.y
     if (active.nodeId && active.position) {
       const id = active.nodeId, position = active.position
-      setPositions(current => { const next = { ...current, [id]: { x: position.x + dx / active.camera.zoom, y: position.y + dy / active.camera.zoom } }; notify({ nodePositions: next }); return next })
+      setPositions(current => { const next = { ...current, [id]: { x: position.x + dx / active.camera.zoom, y: position.y + dy / active.camera.zoom } }; notify({ nodePositions: next, layout: mode }); return next })
     } else { const next = { ...active.camera, x: active.camera.x + dx, y: active.camera.y + dy }; setCamera(next); notify({ viewport: next }) }
   }
   function end(event: PointerEvent, cancelled = false) {

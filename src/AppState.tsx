@@ -44,6 +44,7 @@ import { downloadBoardArchive, duplicateBoard as duplicateStoredBoard, exportBoa
 import { useAppearanceState, type AppearanceState } from './appearanceState'
 import { createId, nextDuplicateName } from './utils'
 import { SaveQueue } from './saveQueue'
+import { deleteSavedWordGraph } from './wordGraph/wordGraphStorage'
 import { persistNoteSnapshot } from './notePersistence'
 import { BoardOperation } from './boardOperation'
 import { withRestoreWriteAccess } from './canvasRestore'
@@ -568,6 +569,9 @@ function useBoardState() {
   const remove = useCallback(async (boardId: string) => {
     const removingActive = activeBoardRef.current?.id === boardId
     await deleteStoredBoard(boardId)
+    // A board's Word Graph is kept in its own database, so it is not removed with the board unless asked.
+    // Failing to remove it must not leave the board half-deleted.
+    await deleteSavedWordGraph(boardId).catch(() => undefined)
     if (removingActive) activeBoardRef.current = null
     const remaining = await getBoardSummaries()
     setBoards(remaining)

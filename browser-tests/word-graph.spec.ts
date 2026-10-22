@@ -349,6 +349,18 @@ test('recovery stays outside board archives and remains scoped while switching b
   await expect(page.locator('.word-graph-window')).toHaveCount(0)
 })
 
+test('deleting a board also removes the Word Graph kept for recovery', async ({ page }) => {
+  await openApp(page)
+  await selectAndOpen(page)
+  await expectCanvasSaved(page)
+  const boardId = (await describeCanvas(page)).board!.id
+  await expect.poll(() => readStoredWordGraph(page, boardId)).toBeTruthy()
+  page.once('dialog', dialog => void dialog.accept())
+  await page.getByRole('button', { name: 'Delete board' }).click()
+  await expect.poll(async () => (await describeCanvas(page)).board?.id).not.toBe(boardId)
+  await expect.poll(() => readStoredWordGraph(page, boardId)).toBeUndefined()
+})
+
 test('graph exploration and floating-window state survive reload without another OpenAI request', async ({ page }) => {
   await openApp(page)
   const boardId = (await describeCanvas(page)).board!.id

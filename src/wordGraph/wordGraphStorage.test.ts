@@ -35,6 +35,15 @@ describe('Word Graph recovery storage', () => {
     expect(restored?.presentation.enabledRelationshipTypes).toEqual(['related', 'feeling', 'opposite'])
   })
 
+  it('keeps the layout a graph was arranged in together with its positions', async () => {
+    const id = boardId('layout')
+    await saveCompletedWordGraph(id, createWordGraphFixture('dark'))
+    await updateSavedWordGraphPresentation(id, { nodePositions: { 'word:dark': { x: 0, y: 0 } }, layout: 'grid' })
+    const restored = await loadSavedWordGraph(id)
+    expect(restored?.presentation.layout).toBe('grid')
+    expect(restored?.presentation.nodePositions).toEqual({ 'word:dark': { x: 0, y: 0 } })
+  })
+
   it('restores the incomplete warning marker with a partial graph', async () => {
     const id = boardId('partial')
     const graph = { ...createWordGraphFixture('dark'), generation: { status: 'partial' as const, failedRequests: 1 } }

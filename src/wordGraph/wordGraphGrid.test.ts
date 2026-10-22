@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildGraph } from './wordGraphFixture'
 import { crowdedConnectors, graphGeometry, MIN_LINE_LENGTH, nodeWidth, NODE_HEIGHT } from './wordGraphLayout'
-import { gridCells, gridLayout } from './wordGraphGrid'
+import { gridCells, gridLayout, layoutToRestore } from './wordGraphGrid'
 import { ARC_CLEARANCE, arcAround, branchingEdgeIds } from './wordGraphLinks'
 import type { RelationshipType } from './wordGraphTypes'
 
@@ -121,5 +121,21 @@ describe('links between words that are not branching from one another', () => {
     expect(arcAround(chord, [{ x: 150, y: 0, width: 80 }]).bow).toBeGreaterThan(0)
     const blocked = arcAround(chord, [{ x: 150, y: 0, width: 80 }, { x: 150, y: 45, width: 80 }, { x: 150, y: 90, width: 80 }])
     expect(blocked.bow).toBeLessThan(0)
+  })
+})
+
+describe('which layout a restored graph opens in', () => {
+  const positions = { 'word:a': { x: 0, y: 0 } }
+  it('uses the layout the saved positions were made in, whatever the person last chose elsewhere', () => {
+    // Board A was left in Rings; board B later picked Grid, which is now the stored preference.
+    expect(layoutToRestore({ layout: 'rings', nodePositions: positions }, 'grid')).toBe('rings')
+    expect(layoutToRestore({ layout: 'grid', nodePositions: positions }, 'rings')).toBe('grid')
+  })
+  it('treats positions saved before the layout was recorded as Rings positions', () => {
+    expect(layoutToRestore({ nodePositions: positions }, 'grid')).toBe('rings')
+  })
+  it('follows the stored preference when nothing was saved to match', () => {
+    expect(layoutToRestore(undefined, 'grid')).toBe('grid')
+    expect(layoutToRestore({}, 'rings')).toBe('rings')
   })
 })

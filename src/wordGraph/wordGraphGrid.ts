@@ -15,6 +15,16 @@ const SPILL_RINGS = 3
 
 export type Cell = { column: number; row: number }
 
+export type LayoutMode = 'rings' | 'grid'
+
+/** Which layout a restored graph should open in. Saved positions belong to the layout they were made in, so
+ * that layout wins over the person's current preference; positions saved before the layout was recorded
+ * were made in Rings. With no saved positions there is nothing to match, so the preference decides. */
+export function layoutToRestore(saved: { layout?: LayoutMode; nodePositions?: unknown } | undefined, preferred: LayoutMode): LayoutMode {
+  if (saved?.layout) return saved.layout
+  return saved?.nodePositions ? 'rings' : preferred
+}
+
 /** Lays the words out on a grid, so that words in the same row or column line up exactly.
  *
  * The origin sits in the middle cell. Its words take the eight cells around it, their words take the
