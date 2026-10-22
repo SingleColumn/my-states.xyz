@@ -4040,10 +4040,12 @@ input[type="range"]:focus-visible {
 .app-settings-content { min-width: 0; }
 
 .app-settings-field { display: grid; gap: 8px; margin: 0 0 20px; }
+.app-settings-audit-report { max-height: 320px; overflow: auto; padding: 12px; white-space: pre-wrap; font: 12px/1.45 var(--font-family-mono, monospace); color: var(--color-text-soft); background: color-mix(in srgb, var(--color-text) 6%, transparent); border: 1px solid var(--color-panel-divider); border-radius: var(--radius-small); }
 .app-settings-field > label,
 .app-settings-field > legend,
 .app-settings-field > h4 { margin: 0; color: var(--color-text); font-size: 16px; font-weight: var(--font-weight-semibold); }
 .app-settings-field .app-dropdown { width: min(320px, 100%); height: var(--size-input-height); }
+.app-settings-field > input[type="number"] { width: min(160px, 100%); height: var(--size-input-height); padding: 0 10px; }
 
 .app-settings-modes { padding: 0; border: 0; }
 .app-settings-mode { display: flex; align-items: center; gap: 8px; }

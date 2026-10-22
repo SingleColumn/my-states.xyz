@@ -48,7 +48,7 @@ const deployed = Object.entries(sources)
   .filter(([key]) => !key.endsWith('.test.ts') && !key.endsWith('.d.ts'))
   .map(([key, source]) => ({ location: new URL(key, thisFile).pathname, source }))
 
-describe('The files that are deployed as the Spotify functions', () => {
+describe('The files that are deployed as server functions', () => {
   // Without this, a glob that quietly matched nothing would pass every check below.
   it('are the ones this test thinks it is checking', () => {
     const names = deployed.map((file) => file.location).sort()
@@ -57,6 +57,7 @@ describe('The files that are deployed as the Spotify functions', () => {
       '/api/_lib/spotifyAppToken.ts',
       '/api/_lib/spotifyCatalog.ts',
       '/api/_lib/spotifyCatalogTypes.ts',
+      '/api/ai.ts',
       '/api/spotify/playlists.ts',
       '/api/spotify/search.ts',
     ])

@@ -4,6 +4,10 @@ import { useAppState } from './AppState'
 import { isPanelReportEnabled } from './panelReportFeature'
 import type { ThemeModePreference } from './themes/types'
 import { modesOf } from './themes/validate'
+import { openAiCredentialMode, removeOpenAiCredential, saveOpenAiCredential, hasOpenAiCredential, type CredentialStorageMode } from './ai/credentials'
+import { testOpenAiCredential } from './ai/service'
+import { clearAiAuditReport, isAiAuditEnabled, readAiAuditReport, setAiAuditEnabled, type AiAuditReport } from './ai/audit'
+import { defaultWordGraphSettings, readWordGraphSettings, saveWordGraphSettings, wordGraphSettingsError, type WordGraphSettings } from './wordGraph/wordGraphSettings'
 
 interface AppSettingsProps {
   isOpen: boolean
@@ -13,7 +17,7 @@ interface AppSettingsProps {
   onOpenArchitectureReport(): void
 }
 
-type SettingsSection = 'appearance' | 'developer'
+type SettingsSection = 'appearance' | 'ai' | 'graph' | 'developer'
 const panelReportEnabled = isPanelReportEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_PANEL_REPORT)
 
 const modeLabels: Array<{ value: ThemeModePreference; label: string; hint: string }> = [
@@ -38,6 +42,23 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [section, setSection] = useState<SettingsSection>('appearance')
+  const [aiKey, setAiKey] = useState('')
+  const [aiMode, setAiMode] = useState<CredentialStorageMode>(openAiCredentialMode() ?? 'session')
+  const [auditEnabled, setAuditEnabled] = useState(isAiAuditEnabled())
+  const [auditReport, setAuditReport] = useState<AiAuditReport | null>(readAiAuditReport())
+  const [graphSettings, setGraphSettings] = useState<WordGraphSettings>(readWordGraphSettings)
+  useEffect(() => {
+    function copyAudit(event: ClipboardEvent) {
+      const selection = window.getSelection()
+      const anchor = selection?.anchorNode instanceof Element ? selection.anchorNode : selection?.anchorNode?.parentElement
+      if (!anchor?.closest('.app-settings-audit-report') || !auditReport) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      event.clipboardData?.setData('text/plain', JSON.stringify(auditReport, null, 2))
+    }
+    document.addEventListener('copy', copyAudit, true)
+    return () => document.removeEventListener('copy', copyAudit, true)
+  }, [auditReport])
 
   useEffect(() => {
     if (!isOpen) return
@@ -97,10 +118,22 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
     })
   }
 
+  function updateGraphSetting(key: keyof WordGraphSettings, value: string) {
+    setGraphSettings(current => ({ ...current, [key]: value === '' ? Number.NaN : Number(value) }))
+  }
+
+  function saveGraphSettings() {
+    void run(async () => {
+      saveWordGraphSettings(graphSettings)
+      return 'Graph settings saved. They will apply to the next graph you generate.'
+    })
+  }
+
   const { settings, effective, themes } = appearance
   // The theme actually on screen (a board may pin its own), not just the global choice
   const shownModes = modesOf(effective.definition)
   const boardOverrides = effective.source === 'board'
+  const graphSettingsError = wordGraphSettingsError(graphSettings)
 
   return (
     <div className="help-about-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
@@ -115,13 +148,49 @@ export function AppSettings({ isOpen, onClose, returnFocusRef, onOpenArchitectur
         <div className="app-settings-body">
           <nav className="app-settings-nav" aria-label="Settings sections">
             <button type="button" className="app-settings-nav-item" aria-current={section === 'appearance' ? 'page' : undefined} onClick={() => setSection('appearance')}>Appearance</button>
+            <button type="button" className="app-settings-nav-item" aria-current={section === 'ai' ? 'page' : undefined} onClick={() => setSection('ai')}>API keys</button>
+            <button type="button" className="app-settings-nav-item" aria-current={section === 'graph' ? 'page' : undefined} onClick={() => setSection('graph')}>Graph</button>
             {panelReportEnabled ? (
               <button type="button" className="app-settings-nav-item" aria-current={section === 'developer' ? 'page' : undefined} onClick={() => setSection('developer')}>Developer</button>
             ) : null}
           </nav>
 
           <div className="help-about-content app-settings-content">
-            {section === 'developer' ? (
+            {section === 'ai' ? (
+              <section aria-labelledby="app-settings-ai"><h3 id="app-settings-ai">API keys</h3><div className="app-settings-field"><h4>OpenAI</h4><label htmlFor="openai-key">API key</label><input id="openai-key" type="password" autoComplete="off" value={aiKey} placeholder={hasOpenAiCredential() ? 'Key configured' : 'Paste your OpenAI API key'} onChange={event => setAiKey(event.target.value)} /><label><input type="radio" checked={aiMode === 'session'} onChange={() => setAiMode('session')} /> Use for this browser session only</label><label><input type="radio" checked={aiMode === 'persistent'} onChange={() => setAiMode('persistent')} /> Keep across browser sessions</label><p className="app-settings-hint">Browser storage is not a secure secrets vault. The key is not placed in boards, exports, analytics, or the application backend.</p><div className="app-settings-actions"><button type="button" className="app-chrome-control" disabled={!aiKey.trim() || busy} onClick={() => void run(async () => { await testOpenAiCredential(aiKey); return 'OpenAI connection succeeded.' })}>Test connection</button><button type="button" className="app-chrome-control" disabled={!aiKey.trim() || busy} onClick={() => void run(async () => { saveOpenAiCredential(aiKey, aiMode); setAiKey(''); return 'OpenAI key saved.' })}>Save key</button><button type="button" className="app-chrome-control" disabled={!hasOpenAiCredential() || busy} onClick={() => void run(async () => { removeOpenAiCredential(); return 'OpenAI key removed.' })}>Remove key</button></div></div>{notice ? <p className="app-settings-notice" role="status">{notice}</p> : null}</section>
+            ) : section === 'graph' ? (
+              <section aria-labelledby="app-settings-graph">
+                <h3 id="app-settings-graph">Graph</h3>
+                <p className="app-settings-hint">Choose how large and detailed new Word Graphs can be. Larger graphs may take longer and use more API credits. Saved graphs keep their existing shape.</p>
+                <div className="app-settings-field">
+                  <label htmlFor="graph-max-nodes">Maximum words (including the starting word)</label>
+                  <input id="graph-max-nodes" type="number" min="1" max="200" step="1" value={Number.isNaN(graphSettings.maxTotalNodes) ? '' : graphSettings.maxTotalNodes} onChange={event => updateGraphSetting('maxTotalNodes', event.target.value)} />
+                  <p className="app-settings-hint">From 1 to 200. The default is 30.</p>
+                </div>
+                <div className="app-settings-field">
+                  <label htmlFor="graph-depth">Maximum steps from the starting word</label>
+                  <input id="graph-depth" type="number" min="0" max="5" step="1" value={Number.isNaN(graphSettings.depth) ? '' : graphSettings.depth} onChange={event => updateGraphSetting('depth', event.target.value)} />
+                  <p className="app-settings-hint">From 0 to 5. A setting of 0 shows only the starting word. The default is 2.</p>
+                </div>
+                <div className="app-settings-field">
+                  <label htmlFor="graph-connections">Maximum connections from each word</label>
+                  <input id="graph-connections" type="number" min="0" max="15" step="1" value={Number.isNaN(graphSettings.maxConnectionsPerNode) ? '' : graphSettings.maxConnectionsPerNode} onChange={event => updateGraphSetting('maxConnectionsPerNode', event.target.value)} />
+                  <p className="app-settings-hint">From 0 to 15 outgoing connections. The default is 4.</p>
+                </div>
+                <div className="app-settings-field">
+                  <label htmlFor="graph-remoteness">Maximum remoteness</label>
+                  <input id="graph-remoteness" type="number" min="0" max="2" step="0.01" value={Number.isNaN(graphSettings.maxRemoteness) ? '' : graphSettings.maxRemoteness} onChange={event => updateGraphSetting('maxRemoteness', event.target.value)} />
+                  <p className="app-settings-hint">From 0 to 2. Smaller values keep words more closely related. The default is 0.65.</p>
+                </div>
+                {graphSettingsError ? <p className="app-settings-hint" role="alert">{graphSettingsError}</p> : null}
+                <div className="app-settings-actions">
+                  <button type="button" className="app-chrome-control" disabled={Boolean(graphSettingsError) || busy} onClick={saveGraphSettings}>Save graph settings</button>
+                  <button type="button" className="app-chrome-control" disabled={busy} onClick={() => void run(async () => { saveWordGraphSettings(defaultWordGraphSettings); setGraphSettings({ ...defaultWordGraphSettings }); return 'Graph settings reset to their defaults.' })}>Reset to defaults</button>
+                </div>
+                {notice ? <p className="app-settings-notice" role="status">{notice}</p> : null}
+                <div className="app-settings-field"><h4>Word Graph generation audit</h4><label><input type="checkbox" checked={auditEnabled} onChange={event => { setAuditEnabled(event.target.checked); setAiAuditEnabled(event.target.checked); setAuditReport(readAiAuditReport()) }} /> Record the last generation report</label><p className="app-settings-hint">When enabled, stores the selected word, request summaries, candidate decisions, available token usage, estimated cost, errors, and timings in this browser session. The choice is set when each generation starts. Turning it off leaves an earlier report available until you clear it. API keys are never recorded.</p><div className="app-settings-actions"><button type="button" className="app-chrome-control" onClick={() => setAuditReport(readAiAuditReport())}>Refresh report</button><button type="button" className="app-chrome-control" disabled={!auditReport} onClick={() => { clearAiAuditReport(); setAuditReport(null) }}>Clear report</button>{auditReport ? <button type="button" className="app-chrome-control" onClick={() => void navigator.clipboard?.writeText(JSON.stringify(auditReport, null, 2))}>Copy report</button> : null}</div>{auditReport ? <pre className="app-settings-audit-report" aria-label="Word Graph audit report">{JSON.stringify(auditReport, null, 2)}</pre> : <p className="app-settings-hint">No generation report is available.</p>}</div>
+              </section>
+            ) : section === 'developer' ? (
               <section aria-labelledby="app-settings-developer">
                 <h3 id="app-settings-developer">Developer</h3>
                 <div className="app-settings-field">
