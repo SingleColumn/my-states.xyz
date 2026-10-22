@@ -28,7 +28,7 @@ export interface WordGraphCandidateDecision {
   introducedNewEdge: boolean
   edgeId?: string
 }
-export interface WordGraphExpansionDecision { sourceWord: string; sourceDepth: number; reason: 'max_depth' | 'max_total_nodes' | 'max_outgoing_connections' }
+export interface WordGraphExpansionDecision { sourceWord: string; sourceDepth: number; reason: 'max_depth' | 'max_total_nodes' | 'max_outgoing_connections' | 'request_failed'; requestId?: string }
 export interface WordGraphGenerationObserver {
   onCandidateProposed?(decision: WordGraphCandidateDecision): void
   onExpansionSkipped?(decision: WordGraphExpansionDecision): void
@@ -63,6 +63,8 @@ export async function generateWordGraph(request: WordGraphGenerationRequest, ass
   const outgoingCounts = new Map<string, number>()
   const vectors = new Map<string, number[]>()
   let associationRequestIndex = 0
+  let failedRequests = 0
+  let firstFailure: unknown
 
   while (frontier.length && frontier[0].depth < request.depth && nodes.size < request.maxTotalNodes && request.maxConnectionsPerNode > 0) {
     throwIfAborted(signal)
@@ -74,12 +76,11 @@ export async function generateWordGraph(request: WordGraphGenerationRequest, ass
       context: current.depth ? `${request.context} Association path: ${current.path.join(' → ')}` : request.context,
       path: current.path,
       relationshipTypes: request.relationshipTypes,
-      limit: Math.min(15, request.maxConnectionsPerNode * 3),
+      // A modest surplus leaves room for filtering without spending time scoring
+      // three candidates for every edge the graph can actually admit.
+      limit: Math.min(10, request.maxConnectionsPerNode * 2),
     }, requestIds[index])))
-    const failed = settled.find(result => result.status === 'rejected')
-    if (observer && (signal?.aborted || failed)) {
-      // Other requests in this level may have succeeded. Their proposals were
-      // received but never entered candidate filtering after the level failed.
+    if (observer && signal?.aborted) {
       settled.forEach((result, index) => {
         if (result.status !== 'fulfilled') return
         const current = frontier[index]
@@ -89,24 +90,29 @@ export async function generateWordGraph(request: WordGraphGenerationRequest, ass
             requestId: requestIds[index], candidateIndex, sourceWord: current.word, sourceNodeId: `word:${current.word}`,
             sourceDepth: current.depth, proposedTarget, targetWord: proposedTarget ? normalizeWord(proposedTarget) || null : null,
             proposedRelationship: candidate.relationship ?? candidate.type ?? null, status: 'unresolved',
-            reason: signal?.aborted ? 'cancelled' : 'generation_failed', cosineSimilarity: null, cosineDistance: null,
+            reason: 'cancelled', cosineSimilarity: null, cosineDistance: null,
             maxRemoteness: request.maxRemoteness, passedRemoteness: null, introducedNewNode: false, introducedNewEdge: false,
           })
         })
       })
     }
     throwIfAborted(signal)
-    if (failed?.status === 'rejected') throw failed.reason
-    const results = settled.map(result => (result as PromiseFulfilledResult<{ candidates: Candidate[] }>).value)
+    settled.forEach((result, index) => {
+      if (result.status !== 'rejected') return
+      firstFailure ??= result.reason
+      failedRequests++
+      observer?.onExpansionSkipped?.({ sourceWord: frontier[index].word, sourceDepth: frontier[index].depth, reason: 'request_failed', requestId: requestIds[index] })
+    })
+    const available = settled.flatMap((result, index) => result.status === 'fulfilled'
+      ? [{ current: frontier[index], requestId: requestIds[index], result: result.value }] : [])
 
-    const candidateGroups = results.map((result, index) => {
-      const current = frontier[index]
+    const candidateGroups = available.map(({ current, requestId, result }) => {
       const responseEdgeIds = new Set<string>()
       return result.candidates.flatMap((candidate, candidateIndex) => {
         const target = normalizeWord(candidate.target ?? candidate.word ?? candidate.term ?? candidate.association ?? '')
         const relationship = candidate.relationship ?? candidate.type
         const audit: WordGraphCandidateDecision | undefined = observer ? {
-          requestId: requestIds[index], candidateIndex, sourceWord: current.word, sourceNodeId: `word:${current.word}`,
+          requestId, candidateIndex, sourceWord: current.word, sourceNodeId: `word:${current.word}`,
           sourceDepth: current.depth, proposedTarget: candidate.target ?? candidate.word ?? candidate.term ?? candidate.association ?? null,
           targetWord: target || null, proposedRelationship: relationship ?? null, status: 'unresolved',
           cosineSimilarity: null, cosineDistance: null, maxRemoteness: request.maxRemoteness,
@@ -129,17 +135,30 @@ export async function generateWordGraph(request: WordGraphGenerationRequest, ass
 
     const missingTerms = [...new Set(candidateGroups.flatMap(candidates => candidates.flatMap(candidate => [candidate.source, candidate.target])))]
       .filter(term => !vectors.has(term))
+    let embeddingFailed = false
     for (let offset = 0; offset < missingTerms.length; offset += 100) {
       const terms = missingTerms.slice(offset, offset + 100)
-      const response = await embeddings({ input: terms })
+      let response: { embeddings: number[][] }
+      try { response = await embeddings({ input: terms }) }
+      catch (error) {
+        throwIfAborted(signal)
+        firstFailure ??= error
+        failedRequests++
+        for (const group of candidateGroups) for (const candidate of group) {
+          if (candidate.audit) candidate.audit.reason = 'generation_failed'
+        }
+        embeddingFailed = true
+        break
+      }
       throwIfAborted(signal)
       if (response.embeddings.length !== terms.length) throw new Error('The embedding response did not match the requested inputs.')
       terms.forEach((term, index) => vectors.set(term, response.embeddings[index]))
     }
+    if (embeddingFailed) break
 
     const nextFrontier: FrontierEntry[] = []
     for (let groupIndex = 0; groupIndex < candidateGroups.length; groupIndex++) {
-      const current = frontier[groupIndex]
+      const current = available[groupIndex].current
       for (const candidate of candidateGroups[groupIndex]) {
         if ((outgoingCounts.get(current.word) ?? 0) >= request.maxConnectionsPerNode) {
           if (candidate.audit) { candidate.audit.status = 'rejected'; candidate.audit.reason = 'max_outgoing_connections' }
@@ -197,7 +216,9 @@ export async function generateWordGraph(request: WordGraphGenerationRequest, ass
   }
 
   throwIfAborted(signal)
+  if (failedRequests && accepted.length === 0) throw firstFailure
   const graph = buildGraph(root, accepted)
   assertValidWordGraph(graph, request)
+  if (failedRequests) graph.generation = { status: 'partial', failedRequests }
   return graph
 }

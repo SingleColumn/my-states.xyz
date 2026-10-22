@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWordGraphFixture } from './wordGraphFixture'
+import { buildGraph } from './wordGraphFixture'
+import type { RelationshipType } from './wordGraphTypes'
 import { deleteSavedWordGraph, loadSavedWordGraph, markSavedWordGraphClosed, saveCompletedWordGraph, updateSavedWordGraphPresentation, type SavedWordGraph } from './wordGraphStorage'
 
 const boardIds = new Set<string>()
@@ -15,12 +17,37 @@ afterEach(async () => {
 })
 
 describe('Word Graph recovery storage', () => {
+  it('opens graphs saved with the former labels using the smaller legend', async () => {
+    const id = boardId('older-labels')
+    const graph = buildGraph('dark', [['dark', 'night', 'related']])
+    graph.edges = ['semantic', 'conceptual'].map(label => ({
+      id: `word:dark:${label}:word:night`, source: 'word:dark', target: 'word:night',
+      relationship: label as RelationshipType,
+    }))
+    await saveCompletedWordGraph(id, graph, {
+      enabledRelationshipTypes: ['semantic', 'conceptual', 'emotional', 'opposite'] as RelationshipType[],
+    })
+
+    const restored = await loadSavedWordGraph(id)
+    expect(restored?.graph.edges).toEqual([{
+      id: 'word:dark:related:word:night', source: 'word:dark', target: 'word:night', relationship: 'related',
+    }])
+    expect(restored?.presentation.enabledRelationshipTypes).toEqual(['related', 'feeling', 'opposite'])
+  })
+
+  it('restores the incomplete warning marker with a partial graph', async () => {
+    const id = boardId('partial')
+    const graph = { ...createWordGraphFixture('dark'), generation: { status: 'partial' as const, failedRequests: 1 } }
+    await saveCompletedWordGraph(id, graph)
+    expect((await loadSavedWordGraph(id))?.graph.generation).toEqual(graph.generation)
+  })
+
   it('saves and restores graph data and the complete presentation', async () => {
     const id = boardId('complete')
     const graph = createWordGraphFixture('dark')
     const presentation: SavedWordGraph['presentation'] = {
       expandedNodeIds: ['word:dark', 'word:night'],
-      enabledRelationshipTypes: ['semantic', 'opposite'],
+      enabledRelationshipTypes: ['related', 'opposite'],
       nodePositions: { 'word:night': { x: 41, y: -23 } },
       viewport: { x: 17, y: -9, zoom: 1.6 },
       window: { x: 180, y: 120, width: 760, height: 540, maximized: true },
@@ -43,7 +70,7 @@ describe('Word Graph recovery storage', () => {
       updateSavedWordGraphPresentation(id, { nodePositions: { 'word:night': { x: 80, y: 45 } } }),
       updateSavedWordGraphPresentation(id, { viewport: { x: -25, y: 18, zoom: 1.3 } }),
       updateSavedWordGraphPresentation(id, { expandedNodeIds: ['word:dark', 'word:night'] }),
-      updateSavedWordGraphPresentation(id, { enabledRelationshipTypes: ['semantic', 'sensory'] }),
+      updateSavedWordGraphPresentation(id, { enabledRelationshipTypes: ['related', 'sensory'] }),
       updateSavedWordGraphPresentation(id, { window: { x: 90, y: 75, width: 680, height: 460, maximized: false } }),
     ])
 
@@ -51,7 +78,7 @@ describe('Word Graph recovery storage', () => {
       nodePositions: { 'word:night': { x: 80, y: 45 } },
       viewport: { x: -25, y: 18, zoom: 1.3 },
       expandedNodeIds: ['word:dark', 'word:night'],
-      enabledRelationshipTypes: ['semantic', 'sensory'],
+      enabledRelationshipTypes: ['related', 'sensory'],
       window: { x: 90, y: 75, width: 680, height: 460, maximized: false },
     })
   })

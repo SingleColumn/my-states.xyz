@@ -43,7 +43,7 @@ function saved(boardId: string, word = 'dark'): SavedWordGraph {
     graph: { ...graph, rootWord: word },
     presentation: {
       expandedNodeIds: [`word:${word}`, 'word:night'],
-      enabledRelationshipTypes: ['semantic', 'conceptual', 'emotional', 'symbolic', 'opposite'],
+      enabledRelationshipTypes: ['related', 'feeling', 'opposite'],
       nodePositions: { 'word:night': { x: 44, y: -31 } },
       viewport: { x: 19, y: -13, zoom: 1.4 },
       window: { x: 210, y: 150, width: 640, height: 420, maximized: true },
@@ -86,7 +86,7 @@ describe('Word Graph recovery UI', () => {
     expect(screen.getByTestId('graph-viewport').getAttribute('transform')).toBe('translate(19 -13) scale(1.4)')
     expect(document.querySelector('[data-node-id="word:night"]')?.getAttribute('transform')).toBe('translate(44 -31)')
     expect(document.querySelector('[data-node-id="word:dreams"]')).not.toBeNull()
-    expect((screen.getByRole('checkbox', { name: 'sensory' }) as HTMLInputElement).checked).toBe(false)
+    expect((screen.getByRole('checkbox', { name: 'Sensory' }) as HTMLInputElement).checked).toBe(false)
     expect(screen.getByRole('button', { name: 'Restore Word Graph' })).not.toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore Word Graph' }))
@@ -96,7 +96,7 @@ describe('Word Graph recovery UI', () => {
     expect(dialog.getAttribute('style')).toContain('height: 420px')
     expect(mocks.update).toHaveBeenCalledWith('board-a', { window: { x: 210, y: 150, width: 640, height: 420, maximized: false } })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'sensory' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sensory' }))
     expect(mocks.update).toHaveBeenCalledWith('board-a', expect.objectContaining({ enabledRelationshipTypes: expect.arrayContaining(['sensory']) }))
   })
 

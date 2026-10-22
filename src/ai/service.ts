@@ -26,11 +26,11 @@ function responseSummary(operation: AiOperation, body: any): unknown {
 
 async function post(operation: AiOperation, payload: Record<string, unknown>, signal?: AbortSignal, entries?: AiAuditEntry[], callId?: string) {
   const key = getOpenAiCredential()
-  if (!key) throw new Error('Configure an OpenAI API key in Settings → AI Providers first.')
+  if (!key) throw new Error('Configure an OpenAI API key in Settings → API keys first.')
   const started = performance.now()
   const startedAt = new Date().toISOString()
   const wireOperation = operation === 'generate_associations' ? 'associations' : 'embeddings'
-  const expectedModel = operation === 'generate_embeddings' ? 'text-embedding-3-small' : 'gpt-4o-mini'
+  const expectedModel = operation === 'generate_embeddings' ? 'text-embedding-3-small' : 'gpt-6-luna'
   let status: number | undefined
   let body: any = null
   let failure: unknown
@@ -59,6 +59,8 @@ async function post(operation: AiOperation, payload: Record<string, unknown>, si
         ...(body ? { response: responseSummary(operation, body) } : {}),
         status,
         ...(failure ? { error: failure instanceof Error ? failure.message : 'Unknown error' } : {}),
+        ...(typeof body?.errorCode === 'string' ? { errorCode: body.errorCode } : {}),
+        ...(typeof body?.upstreamStatus === 'number' ? { upstreamStatus: body.upstreamStatus } : {}),
         durationMs: Math.round(performance.now() - started), startedAt, usage, estimatedCostUsd,
         costStatus: !usage || usage.inputTokens === undefined || usage.totalTokens === undefined || (operation === 'generate_associations' && usage.outputTokens === undefined)
           ? 'usage_unavailable' : estimatedCostUsd === null ? 'pricing_unavailable' : 'estimated',
@@ -98,7 +100,8 @@ export async function requestWordGraph(request: WordGraphGenerationRequest, sign
       signal, observer,
     )
     if (report) {
-      report.run.status = 'completed'
+      report.run.status = graph.generation?.status === 'partial' ? 'partial' : 'completed'
+      if (graph.generation) report.warnings.push(`${graph.generation.failedRequests} AI request(s) failed; the graph is incomplete.`)
       report.final_graph = graph
       finishReport(report, started)
     }

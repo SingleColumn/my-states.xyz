@@ -35,7 +35,7 @@ function mockedProxy(responses: Record<string, Array<{ word: string; relationshi
     }
     return new Response(JSON.stringify({
       candidates: responses[payload.word!] ?? [],
-      model: options?.model ?? 'gpt-4o-mini',
+      model: options?.model ?? 'gpt-6-luna',
       providerRequestId: `resp-${payload.word}`,
       ...(options?.usage === false ? {} : { usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 } }),
     }), { status: 200 })
@@ -48,10 +48,10 @@ describe('candidate decision instrumentation', () => {
   it('records below, equal and above threshold distances and pre-embedding rejections without changing the graph', async () => {
     const decisions: WordGraphCandidateDecision[] = []
     const associations = vi.fn(async ({ word }: { word: string }) => ({ candidates: word === 'love' ? [
-      { word: '', relationship: 'semantic' as const },
-      { word: 'near', relationship: 'semantic' as const },
-      { word: 'NEAR', relationship: 'semantic' as const },
-      { word: 'boundary', relationship: 'conceptual' as const },
+      { word: '', relationship: 'related' as const },
+      { word: 'near', relationship: 'related' as const },
+      { word: 'NEAR', relationship: 'related' as const },
+      { word: 'boundary', relationship: 'related' as const },
       { word: 'remote', relationship: 'opposite' as const },
     ] : [] }))
     const embeddings = vi.fn(async ({ input }: { input: string[] }) => ({ embeddings: input.map(word =>
@@ -70,7 +70,7 @@ describe('candidate decision instrumentation', () => {
     expect(decisions.map(decision => decision.cosineDistance)).toEqual([null, 0, null, 1, 2])
     expect(decisions.map(decision => decision.passedRemoteness)).toEqual([null, true, null, true, false])
     expect(decisions[3].maxRemoteness).toBe(1)
-    expect(decisions[1].edgeId).toBe('word:love:semantic:word:near')
+    expect(decisions[1].edgeId).toBe('word:love:related:word:near')
     expect(embeddings.mock.calls[0][0].input).not.toContain('')
   })
 
@@ -78,8 +78,8 @@ describe('candidate decision instrumentation', () => {
     const decisions: WordGraphCandidateDecision[] = []
     const skipped: string[] = []
     const responses: Record<string, Array<{ word: string; relationship: RelationshipType }>> = {
-      love: [{ word: 'a', relationship: 'semantic' }, { word: 'b', relationship: 'semantic' }],
-      a: [{ word: 'b', relationship: 'emotional' }, { word: 'c', relationship: 'semantic' }, { word: 'd', relationship: 'semantic' }],
+      love: [{ word: 'a', relationship: 'related' }, { word: 'b', relationship: 'related' }],
+      a: [{ word: 'b', relationship: 'feeling' }, { word: 'c', relationship: 'related' }, { word: 'd', relationship: 'related' }],
     }
     const associations = async ({ word }: { word: string }) => ({ candidates: responses[word] ?? [] })
     const embeddings = async ({ input }: { input: string[] }) => ({ embeddings: input.map(() => [1, 0]) })
@@ -108,8 +108,8 @@ describe('candidate decision instrumentation', () => {
     const decisions: WordGraphCandidateDecision[] = []
     const configured = { ...request, maxTotalNodes: 6 }
     const associations = async ({ word }: { word: string }) => ({ candidates: word === 'love'
-      ? ['a', 'b', 'c', 'd'].map(target => ({ word: target, relationship: 'semantic' as const }))
-      : word === 'a' ? ['leaf-1', 'leaf-2', 'leaf-3'].map(target => ({ word: target, relationship: 'semantic' as const }))
+      ? ['a', 'b', 'c', 'd'].map(target => ({ word: target, relationship: 'related' as const }))
+      : word === 'a' ? ['leaf-1', 'leaf-2', 'leaf-3'].map(target => ({ word: target, relationship: 'related' as const }))
       : [] })
     const embeddings = async ({ input }: { input: string[] }) => ({ embeddings: input.map(() => [1, 0]) })
     const graph = await generateWordGraph(configured, associations, embeddings, undefined, { onCandidateProposed: decision => decisions.push(decision) })
@@ -126,7 +126,7 @@ describe('candidate decision instrumentation', () => {
     const decisions: WordGraphCandidateDecision[] = []
     let release!: (value: { embeddings: number[][] }) => void
     const embeddings = () => new Promise<{ embeddings: number[][] }>(resolve => { release = resolve })
-    const generation = generateWordGraph(request, async () => ({ candidates: [{ word: 'late', relationship: 'semantic' }] }), embeddings, controller.signal, {
+    const generation = generateWordGraph(request, async () => ({ candidates: [{ word: 'late', relationship: 'related' }] }), embeddings, controller.signal, {
       onCandidateProposed: decision => decisions.push(decision),
     })
     await vi.waitFor(() => expect(decisions).toHaveLength(1))
@@ -146,17 +146,17 @@ describe('request usage and audit persistence', () => {
     expect(report.audit_schema_version).toBe('1.1')
     expect(report.run.status).toBe('completed')
     expect(report.entries.map(entry => entry.operation)).toEqual(['generate_associations', 'generate_embeddings', 'generate_associations'])
-    expect(report.entries[0]).toMatchObject({ model: 'gpt-4o-mini', providerRequestId: 'resp-love', usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 }, estimatedCostUsd: 0.000027 })
+    expect(report.entries[0]).toMatchObject({ model: 'gpt-6-luna', providerRequestId: 'resp-love', usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 }, estimatedCostUsd: 0.00002 })
     expect(report.entries[1]).toMatchObject({ model: 'text-embedding-3-small', usage: { inputTokens: 10, totalTokens: 10 } })
     expect(report.entries[1].estimatedCostUsd).toBeCloseTo(0.0000002, 12)
     expect(report.metrics).toMatchObject({
       api_calls: 3, association_requests: 2, embedding_requests: 1,
       candidates_proposed: 1, candidates_evaluated_for_remoteness: 1, candidates_accepted: 1, candidates_rejected: 0,
       distinct_nodes_admitted: 1, edges_admitted: 1, actual_input_tokens: 210, actual_output_tokens: 40, actual_total_tokens: 250,
-      usage_complete: true, cost_complete: true, estimated_association_cost_usd: 0.000054,
+      usage_complete: true, cost_complete: true, estimated_association_cost_usd: 0.00004,
     })
     expect(report.metrics?.estimated_embedding_cost_usd).toBeCloseTo(0.0000002, 12)
-    expect(report.metrics?.estimated_cost_usd).toBeCloseTo(0.0000542, 12)
+    expect(report.metrics?.estimated_cost_usd).toBeCloseTo(0.0000402, 12)
     expect(report.candidate_decisions[0].edgeId).toBe(graph.edges[0].id)
     expect(report.warnings).toEqual([])
   })
@@ -179,7 +179,7 @@ describe('request usage and audit persistence', () => {
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
       const payload = JSON.parse(String(init.body)) as { operation: string; word?: string }
       if (payload.operation === 'embeddings') return new Response(JSON.stringify({ embeddings: [[1, 0], [1, 0]], model: 'text-embedding-3-small', usage: { prompt_tokens: 10, total_tokens: 10 } }), { status: 200 })
-      return new Response(JSON.stringify({ candidates: payload.word === 'love' ? [{ word: 'hate', relationship: 'opposite' }] : [], model: 'gpt-4o-mini', usage: { input_tokens: 100, total_tokens: 120 } }), { status: 200 })
+      return new Response(JSON.stringify({ candidates: payload.word === 'love' ? [{ word: 'hate', relationship: 'opposite' }] : [], model: 'gpt-6-luna', usage: { input_tokens: 100, total_tokens: 120 } }), { status: 200 })
     }))
     await requestWordGraph(request)
     const report = readAiAuditReport()!
@@ -225,12 +225,12 @@ describe('request usage and audit persistence', () => {
   it('explains the deterministic Love scenario and produces the same graph with recording disabled', async () => {
     const first = ['hate', 'compassion', 'duality', 'darkness', 'trust', 'devotion', 'desire', 'conflict', 'creation']
     const responses: Record<string, Array<{ word: string; relationship: string }>> = {
-      love: first.map((word, index) => ({ word, relationship: index === 0 ? 'opposite' : 'semantic' })),
+      love: first.map((word, index) => ({ word, relationship: index === 0 ? 'opposite' : 'related' })),
     }
     for (const word of first.slice(0, 4)) responses[word] = [
-      { word: 'love', relationship: 'emotional' },
-      { word: `${word}-remote`, relationship: 'conceptual' },
-      ...Array.from({ length: 8 }, (_, index) => ({ word: `${word}-${index}`, relationship: 'semantic' })),
+      { word: 'love', relationship: 'feeling' },
+      { word: `${word}-remote`, relationship: 'related' },
+      ...Array.from({ length: 8 }, (_, index) => ({ word: `${word}-${index}`, relationship: 'related' })),
     ]
     const remoteWords = first.slice(0, 4).map(word => `${word}-remote`)
     setAiAuditEnabled(true)
@@ -259,12 +259,13 @@ describe('request usage and audit persistence', () => {
       const payload = JSON.parse(String(init.body)) as { operation: string; word?: string }
       if (payload.word === 'hate') return new Response(JSON.stringify({ error: 'failed' }), { status: 502 })
       if (payload.operation === 'embeddings') return new Response(JSON.stringify({ embeddings: [[1, 0], [1, 0]], model: 'text-embedding-3-small', usage: { prompt_tokens: 10, total_tokens: 10 } }), { status: 200 })
-      return new Response(JSON.stringify({ candidates: [{ word: 'hate', relationship: 'opposite' }], model: 'gpt-4o-mini', usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 } }), { status: 200 })
+      return new Response(JSON.stringify({ candidates: [{ word: 'hate', relationship: 'opposite' }], model: 'gpt-6-luna', usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 } }), { status: 200 })
     })
     vi.stubGlobal('fetch', fetch)
-    await expect(requestWordGraph(request)).rejects.toThrow('failed')
+    const graph = await requestWordGraph(request)
+    expect(graph.generation).toEqual({ status: 'partial', failedRequests: 1 })
     const report = readAiAuditReport()!
-    expect(report.run.status).toBe('failed')
+    expect(report.run.status).toBe('partial')
     expect(report.metrics?.api_calls).toBe(3)
     expect(report.metrics?.actual_input_tokens).toBe(110)
     expect(report.metrics?.estimated_cost_usd).toBeNull()
@@ -281,7 +282,7 @@ describe('request usage and audit persistence', () => {
       if (payload.operation === 'embeddings') return pending
       return new Response(JSON.stringify({
         candidates: [{ word: 'hate', relationship: 'opposite' }],
-        model: 'gpt-4o-mini', usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+        model: 'gpt-6-luna', usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
       }), { status: 200 })
     })
     vi.stubGlobal('fetch', fetch)
@@ -300,36 +301,39 @@ describe('request usage and audit persistence', () => {
     expect(report.candidate_decisions).toMatchObject([{ status: 'unresolved', reason: 'cancelled', cosineDistance: null }])
   })
 
-  it('retains all concurrent request attempts and unprocessed proposals when a level fails', async () => {
+  it('retains successful concurrent proposals when another branch fails', async () => {
     setAiAuditEnabled(true)
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
       const payload = JSON.parse(String(init.body)) as { operation: string; word?: string; input?: string[] }
       if (payload.operation === 'embeddings') return new Response(JSON.stringify({ embeddings: payload.input!.map(() => [1, 0]), model: 'text-embedding-3-small', usage: { prompt_tokens: 10, total_tokens: 10 } }), { status: 200 })
       if (payload.word === 'b') return new Response(JSON.stringify({ error: 'association failure' }), { status: 502 })
       const candidates = payload.word === 'love'
-        ? [{ word: 'a', relationship: 'semantic' }, { word: 'b', relationship: 'semantic' }]
-        : [{ word: 'unprocessed', relationship: 'semantic' }]
-      return new Response(JSON.stringify({ candidates, model: 'gpt-4o-mini', usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 } }), { status: 200 })
+        ? [{ word: 'a', relationship: 'related' }, { word: 'b', relationship: 'related' }]
+        : [{ word: 'unprocessed', relationship: 'related' }]
+      return new Response(JSON.stringify({ candidates, model: 'gpt-6-luna', usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 } }), { status: 200 })
     }))
-    await expect(requestWordGraph(request)).rejects.toThrow('association failure')
+    const graph = await requestWordGraph(request)
+    expect(graph.generation).toEqual({ status: 'partial', failedRequests: 1 })
+    expect(graph.nodes.some(node => node.normalizedWord === 'unprocessed')).toBe(true)
     const report = readAiAuditReport()!
-    expect(report.run.status).toBe('failed')
+    expect(report.run.status).toBe('partial')
     expect(report.metrics?.association_requests).toBe(3)
-    expect(report.metrics?.embedding_requests).toBe(1)
-    expect(report.candidate_decisions.find(decision => decision.proposedTarget === 'unprocessed')).toMatchObject({ status: 'unresolved', reason: 'generation_failed', cosineDistance: null })
-    expect(report.metrics?.candidates_unresolved).toBe(1)
+    expect(report.metrics?.embedding_requests).toBe(2)
+    expect(report.candidate_decisions.find(decision => decision.proposedTarget === 'unprocessed')).toMatchObject({ status: 'accepted' })
+    expect(report.metrics?.candidates_unresolved).toBe(0)
     expect(report.metrics?.cost_complete).toBe(false)
-    expect(report.warnings).toEqual([])
+    expect(report.warnings).toContain('1 AI request(s) failed; the graph is incomplete.')
+    expect(report.expansion_decisions).toContainEqual(expect.objectContaining({ sourceWord: 'b', reason: 'request_failed' }))
   })
 })
 
 describe('pricing and summary arithmetic', () => {
   it('uses reviewed model rates, cached input and full precision', () => {
-    expect(AI_MODEL_PRICING['gpt-4o-mini'].source).toContain('developers.openai.com')
-    expect(estimateRequestCost('gpt-4o-mini', { inputTokens: 100, cachedInputTokens: 40, outputTokens: 20, totalTokens: 120 })).toBe(0.000024)
+    expect(AI_MODEL_PRICING['gpt-6-luna'].source).toContain('developers.openai.com')
+    expect(estimateRequestCost('gpt-6-luna', { inputTokens: 100, cachedInputTokens: 40, outputTokens: 20, totalTokens: 120 })).toBe(0.0000164)
     expect(estimateRequestCost('text-embedding-3-small', { inputTokens: 1, totalTokens: 1 })).toBe(0.00000002)
     expect(estimateRequestCost('unknown-model', { inputTokens: 100, outputTokens: 20, totalTokens: 120 })).toBeNull()
-    expect(estimateRequestCost('gpt-4o-mini', null)).toBeNull()
+    expect(estimateRequestCost('gpt-6-luna', null)).toBeNull()
   })
 
   it('reconciles candidate totals and known usage without turning partial cost into a complete total', () => {

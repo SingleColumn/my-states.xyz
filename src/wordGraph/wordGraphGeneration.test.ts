@@ -28,7 +28,7 @@ function fixture(responses: Record<string, Candidate[]>, rejectedWords: string[]
 }
 
 function numbered(prefix: string, count: number): Candidate[] {
-  return Array.from({ length: count }, (_, index) => ({ word: `${prefix}-${index + 1}`, relationship: 'semantic' }))
+  return Array.from({ length: count }, (_, index) => ({ word: `${prefix}-${index + 1}`, relationship: 'related' }))
 }
 
 function expectValid(graph: WordGraph, request: WordGraphGenerationRequest) {
@@ -38,6 +38,39 @@ function expectValid(graph: WordGraph, request: WordGraphGenerationRequest) {
 }
 
 describe('Word Graph generation constraints', () => {
+  it('keeps successful branches after a sibling association request fails', async () => {
+    const responses: Record<string, Candidate[]> = {
+      root: [{ word: 'a', relationship: 'related' }, { word: 'b', relationship: 'related' }],
+      a: [{ word: 'child', relationship: 'related' }],
+    }
+    const mocks = fixture(responses)
+    const associations = vi.fn(async (payload: { word: string }) => {
+      if (payload.word === 'b') throw new Error('temporary failure')
+      return mocks.associations(payload)
+    })
+    const graph = await generateWordGraph(baseRequest, associations, mocks.embeddings)
+    expect(graph.generation).toEqual({ status: 'partial', failedRequests: 1 })
+    expect(graph.nodes.map(node => node.normalizedWord)).toContain('child')
+    expectValid(graph, baseRequest)
+  })
+
+  it('keeps an already validated level when a later embedding call fails', async () => {
+    const mocks = fixture({ root: [{ word: 'a', relationship: 'related' }], a: [{ word: 'child', relationship: 'related' }] })
+    let calls = 0
+    const embeddings = vi.fn(async (payload: { input: string[] }) => {
+      if (++calls === 2) throw new Error('embedding failure')
+      return mocks.embeddings(payload)
+    })
+    const graph = await generateWordGraph(baseRequest, mocks.associations, embeddings)
+    expect(graph.generation).toEqual({ status: 'partial', failedRequests: 1 })
+    expect(graph.nodes.map(node => node.normalizedWord)).toEqual(['root', 'a'])
+    expectValid(graph, baseRequest)
+  })
+
+  it('still reports an error when no relationship could be generated', async () => {
+    await expect(generateWordGraph(baseRequest, async () => { throw new Error('root failed') }, async () => ({ embeddings: [] }))).rejects.toThrow('root failed')
+  })
+
   it('counts the root in the total-node budget and stops before orphaning excess candidates', async () => {
     const responses: Record<string, Candidate[]> = { root: numbered('level-1', 12) }
     for (let index = 1; index <= 12; index++) responses[`level-1-${index}`] = numbered(`level-2-${index}`, 12)
@@ -64,11 +97,11 @@ describe('Word Graph generation constraints', () => {
 
   it('honors a node limit below the first response size and deduplicates near exhaustion', async () => {
     const mocks = fixture({ root: [
-      { word: 'Alpha', relationship: 'semantic' },
-      { word: 'ALPHA', relationship: 'semantic' },
-      { word: 'beta', relationship: 'conceptual' },
-      { word: 'beta', relationship: 'conceptual' },
-      { word: 'gamma', relationship: 'emotional' },
+      { word: 'Alpha', relationship: 'related' },
+      { word: 'ALPHA', relationship: 'related' },
+      { word: 'beta', relationship: 'related' },
+      { word: 'beta', relationship: 'related' },
+      { word: 'gamma', relationship: 'feeling' },
     ] })
     const request = { ...baseRequest, depth: 1, maxTotalNodes: 3, maxConnectionsPerNode: 10 }
     const graph = await generateWordGraph(request, mocks.associations, mocks.embeddings)
@@ -81,11 +114,11 @@ describe('Word Graph generation constraints', () => {
 
   it('does not expand maximum-depth nodes and calculates cross-link depth from the visual topology', async () => {
     const mocks = fixture({
-      root: [{ word: 'a', relationship: 'semantic' }, { word: 'b', relationship: 'semantic' }],
-      a: [{ word: 'c', relationship: 'conceptual' }],
-      b: [{ word: 'c', relationship: 'emotional' }],
-      c: [{ word: 'depth-3', relationship: 'semantic' }],
-      'depth-3': [{ word: 'depth-4', relationship: 'semantic' }],
+      root: [{ word: 'a', relationship: 'related' }, { word: 'b', relationship: 'related' }],
+      a: [{ word: 'c', relationship: 'related' }],
+      b: [{ word: 'c', relationship: 'feeling' }],
+      c: [{ word: 'depth-3', relationship: 'related' }],
+      'depth-3': [{ word: 'depth-4', relationship: 'related' }],
     })
     const graph = await generateWordGraph(baseRequest, mocks.associations, mocks.embeddings)
 
@@ -98,12 +131,12 @@ describe('Word Graph generation constraints', () => {
 
   it('limits outgoing accepted relationships per source without charging duplicates or rejections', async () => {
     const mocks = fixture({ root: [
-      { word: 'remote', relationship: 'semantic' },
-      { word: 'a', relationship: 'semantic' },
-      { word: 'A', relationship: 'semantic' },
-      { word: 'b', relationship: 'conceptual' },
-      { word: 'c', relationship: 'emotional' },
-      { word: 'd', relationship: 'symbolic' },
+      { word: 'remote', relationship: 'related' },
+      { word: 'a', relationship: 'related' },
+      { word: 'A', relationship: 'related' },
+      { word: 'b', relationship: 'related' },
+      { word: 'c', relationship: 'feeling' },
+      { word: 'd', relationship: 'related' },
       { word: 'e', relationship: 'sensory' },
     ] }, ['remote'])
     const request = { ...baseRequest, depth: 1 }
@@ -118,13 +151,13 @@ describe('Word Graph generation constraints', () => {
 
   it('applies the same outgoing budget to relationships targeting existing nodes', async () => {
     const mocks = fixture({
-      root: [{ word: 'a', relationship: 'semantic' }, { word: 'b', relationship: 'semantic' }],
+      root: [{ word: 'a', relationship: 'related' }, { word: 'b', relationship: 'related' }],
       a: [
-        { word: 'b', relationship: 'conceptual' },
-        { word: 'b', relationship: 'conceptual' },
+        { word: 'b', relationship: 'related' },
+        { word: 'b', relationship: 'related' },
         { word: 'root', relationship: 'opposite' },
-        { word: 'c', relationship: 'emotional' },
-        { word: 'd', relationship: 'symbolic' },
+        { word: 'c', relationship: 'feeling' },
+        { word: 'd', relationship: 'related' },
         { word: 'e', relationship: 'sensory' },
       ],
     })
@@ -140,9 +173,9 @@ describe('Word Graph generation constraints', () => {
 
   it('never schedules or materializes a node whose connecting edge is rejected', async () => {
     const mocks = fixture({
-      root: [{ word: 'rejected-parent', relationship: 'semantic' }, { word: 'kept', relationship: 'semantic' }],
-      'rejected-parent': [{ word: 'orphan', relationship: 'semantic' }],
-      kept: [{ word: 'root', relationship: 'opposite' }, { word: 'rejected-link', relationship: 'conceptual' }],
+      root: [{ word: 'rejected-parent', relationship: 'related' }, { word: 'kept', relationship: 'related' }],
+      'rejected-parent': [{ word: 'orphan', relationship: 'related' }],
+      kept: [{ word: 'root', relationship: 'opposite' }, { word: 'rejected-link', relationship: 'related' }],
     }, ['rejected-parent', 'rejected-link'])
     const graph = await generateWordGraph(baseRequest, mocks.associations, mocks.embeddings)
 
@@ -179,7 +212,7 @@ describe('Word Graph generation constraints', () => {
     const controller = new AbortController()
     const generation = generateWordGraph(baseRequest, associations, embeddings, controller.signal)
     controller.abort()
-    release({ candidates: [{ word: 'late', relationship: 'semantic' }] })
+    release({ candidates: [{ word: 'late', relationship: 'related' }] })
 
     await expect(generation).rejects.toMatchObject({ name: 'AbortError' })
     expect(embeddings).not.toHaveBeenCalled()
@@ -188,11 +221,11 @@ describe('Word Graph generation constraints', () => {
   it('keeps the deterministic Love regression fixture structurally compliant', async () => {
     const responses: Record<string, Candidate[]> = {
       love: [
-        { word: 'hate', relationship: 'opposite' }, { word: 'compassion', relationship: 'emotional' },
-        { word: 'duality', relationship: 'conceptual' }, { word: 'darkness', relationship: 'symbolic' },
-        { word: 'trust', relationship: 'emotional' }, { word: 'devotion', relationship: 'semantic' },
-        { word: 'desire', relationship: 'sensory' }, { word: 'conflict', relationship: 'conceptual' },
-        { word: 'creation', relationship: 'symbolic' },
+        { word: 'hate', relationship: 'opposite' }, { word: 'compassion', relationship: 'feeling' },
+        { word: 'duality', relationship: 'related' }, { word: 'darkness', relationship: 'related' },
+        { word: 'trust', relationship: 'feeling' }, { word: 'devotion', relationship: 'related' },
+        { word: 'desire', relationship: 'sensory' }, { word: 'conflict', relationship: 'related' },
+        { word: 'creation', relationship: 'related' },
       ],
     }
     for (const source of ['hate', 'compassion', 'duality', 'darkness']) {
@@ -226,9 +259,9 @@ describe('Word Graph structural validation', () => {
         { id: 'word:orphan', label: 'orphan', normalizedWord: 'orphan', depth: Infinity },
       ],
       edges: [
-        { id: 'edge-1', source: 'word:root', target: 'word:a', relationship: 'semantic' },
-        { id: 'edge-2', source: 'word:root', target: 'word:a', relationship: 'semantic' },
-        { id: 'edge-3', source: 'word:root', target: 'word:missing', relationship: 'conceptual' },
+        { id: 'edge-1', source: 'word:root', target: 'word:a', relationship: 'related' },
+        { id: 'edge-2', source: 'word:root', target: 'word:a', relationship: 'related' },
+        { id: 'edge-3', source: 'word:root', target: 'word:missing', relationship: 'related' },
       ],
     }
     const result = validateWordGraphStructure(graph, { maxTotalNodes: 2, depth: 0, maxConnectionsPerNode: 1 })

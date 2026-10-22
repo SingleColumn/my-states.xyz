@@ -9,6 +9,7 @@ import { requestWordGraph } from '../ai/service'
 import type { WordGraph } from './wordGraphTypes'
 import { relationshipTypes } from './wordGraphTypes'
 import type { SavedWordGraph } from './wordGraphStorage'
+import { readWordGraphSettings } from './wordGraphSettings'
 
 interface Rect { x: number; y: number; width: number; height: number }
 function viewport(): Rect {
@@ -67,7 +68,7 @@ export function WordGraphWindow({ request, onGraphReady, onPresentationChange, o
     setLoading(true)
     setError(null)
     setGraph(null)
-    void requestWordGraph({ word: request.word, context: request.context, depth: 2, maxConnectionsPerNode: 4, maxTotalNodes: 30, maxRemoteness: .65, relationshipTypes: [...relationshipTypes] }, controller.signal)
+    void requestWordGraph({ word: request.word, context: request.context, ...readWordGraphSettings(), relationshipTypes: [...relationshipTypes] }, controller.signal)
       .then(value => completeGeneration(id, value))
       .catch(value => failGeneration(id, value))
   }
@@ -151,7 +152,10 @@ export function WordGraphWindow({ request, onGraphReady, onPresentationChange, o
       <button className="card-icon-button" aria-label={maximized ? 'Restore Word Graph' : 'Maximize Word Graph'} onClick={() => setMaximized(value => { const next = !value; maximizedRef.current = next; changeWindow(rectRef.current, next); return next })}>{maximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
       <button className="card-icon-button" aria-label="Close Word Graph" onClick={onClose}><X size={16} /></button>
     </header>
-    <div className="word-graph-content">{loading ? <p className="word-graph-status">Generating associations…</p> : error ? <div className="word-graph-status"><p>{error}</p><button type="button" className="app-chrome-control" onClick={generate}>Try again</button></div> : graph ? <WordGraphView graph={graph} presentation={request.restoredPresentation} onPresentationChange={changePresentation} /> : null}</div>
+    <div className="word-graph-content">{loading ? <p className="word-graph-status">Generating associations…</p> : error ? <div className="word-graph-status"><p>{error}</p><button type="button" className="app-chrome-control" onClick={generate}>Try again</button></div> : graph ? <>
+      {graph.generation?.status === 'partial' ? <div className="word-graph-incomplete" role="status"><span>Graph incomplete: {graph.generation.failedRequests} AI request{graph.generation.failedRequests === 1 ? '' : 's'} failed.</span><button type="button" className="app-chrome-control" onClick={generate}>Try again</button></div> : null}
+      <WordGraphView graph={graph} presentation={request.restoredPresentation} onPresentationChange={changePresentation} />
+    </> : null}</div>
     {!maximized ? <div role="separator" aria-label="Resize Word Graph" title="Drag to resize" className="word-graph-resize" onPointerDown={event => begin(event, 'resize')} /> : null}
   </section>, document.body)
 }

@@ -45,7 +45,7 @@ describe('word selection', () => {
 describe('graph data and reachability', () => {
   const graph = createWordGraphFixture('dark')
   it('deduplicates normalized words and edges while retaining multiple relationship types', () => {
-    const graph = buildGraph('ROOT', [['ROOT', 'Caf\u00e9', 'semantic'], ['ROOT', 'CAFE\u0301', 'emotional'], ['ROOT', 'Caf\u00e9', 'semantic']])
+    const graph = buildGraph('ROOT', [['ROOT', 'Caf\u00e9', 'related'], ['ROOT', 'CAFE\u0301', 'feeling'], ['ROOT', 'Caf\u00e9', 'related']])
     expect(graph.nodes).toHaveLength(2)
     expect(graph.edges).toHaveLength(2)
     expect(graph.nodes[1].depth).toBe(1)
@@ -57,22 +57,22 @@ describe('graph data and reachability', () => {
   })
   it('filters relationships through connectivity and restores preserved expansion', () => {
     const expanded = ids('dark', 'night')
-    const enabled = new Set(relationshipTypes.filter(type => type !== 'semantic'))
+    const enabled = new Set(relationshipTypes.filter(type => type !== 'related'))
     expect(labels(visibleGraph(graph, expanded, enabled))).not.toContain('night')
     expect(labels(visibleGraph(graph, expanded, enabled))).not.toContain('dreams')
     expect(labels(visibleGraph(graph, expanded, all))).toContain('dreams')
     expect(expanded.has('word:night')).toBe(true)
   })
   it('keeps shared nodes reachable through another expanded and enabled path', () => {
-    const graph = buildGraph('root', [['root', 'a', 'semantic'], ['root', 'b', 'emotional'], ['a', 'shared', 'semantic'], ['b', 'shared', 'emotional'], ['shared', 'leaf', 'sensory']])
+    const graph = buildGraph('root', [['root', 'a', 'related'], ['root', 'b', 'feeling'], ['a', 'shared', 'related'], ['b', 'shared', 'feeling'], ['shared', 'leaf', 'sensory']])
     const result = visibleGraph(graph, ids('root', 'b', 'shared'), all)
     expect(labels(result)).toContain('shared')
     expect(labels(result)).toContain('leaf')
     expect(result.edges.some(edge => edge.source === 'word:a')).toBe(false)
-    expect(labels(visibleGraph(graph, ids('root', 'b', 'shared'), new Set(['semantic'])))).not.toContain('shared')
+    expect(labels(visibleGraph(graph, ids('root', 'b', 'shared'), new Set(['related'])))).not.toContain('shared')
   })
   it('terminates on cycles and traverses each reachable node once', () => {
-    const graph = buildGraph('a', [['a', 'b', 'semantic'], ['b', 'c', 'semantic'], ['c', 'a', 'opposite']])
+    const graph = buildGraph('a', [['a', 'b', 'related'], ['b', 'c', 'related'], ['c', 'a', 'opposite']])
     expect(visibleGraph(graph, ids('a', 'b', 'c'), all).nodes).toHaveLength(3)
     expect(visibleGraph(graph, ids('a', 'b', 'c'), all).edges).toHaveLength(3)
     expect(graph.nodes.map(node => node.depth)).toEqual([0, 1, 1])

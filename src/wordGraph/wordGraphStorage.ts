@@ -1,5 +1,5 @@
 import { openDB } from 'idb'
-import type { RelationshipType, WordGraph, WordGraphNode, WordGraphEdge } from './wordGraphTypes'
+import { relationshipTypes, type RelationshipType, type WordGraph, type WordGraphNode, type WordGraphEdge } from './wordGraphTypes'
 
 export interface SavedWordGraph {
   schemaVersion: 1
@@ -7,7 +7,7 @@ export interface SavedWordGraph {
   graphId: string
   createdAt: string
   updatedAt: string
-  graph: { rootId: string; rootWord: string; nodes: WordGraphNode[]; edges: WordGraphEdge[] }
+  graph: { rootId: string; rootWord: string; nodes: WordGraphNode[]; edges: WordGraphEdge[]; generation?: WordGraph['generation'] }
   presentation: { expandedNodeIds: string[]; enabledRelationshipTypes: RelationshipType[]; nodePositions?: Record<string, { x: number; y: number }>; viewport?: { x: number; y: number; zoom: number }; window?: { x: number; y: number; width: number; height: number; maximized: boolean }; isOpen: boolean }
 }
 interface GraphDb { graphs: { key: string; value: SavedWordGraph } }
@@ -15,7 +15,32 @@ const db = openDB<GraphDb>('my-states-word-graphs', 1, { upgrade(database) { dat
 const writes = new Map<string, Promise<void>>()
 
 function valid(value: unknown): value is SavedWordGraph { const item = value as SavedWordGraph; return Boolean(item && item.schemaVersion === 1 && item.boardId && item.graphId && item.graph?.rootId && Array.isArray(item.graph.nodes) && Array.isArray(item.graph.edges) && item.presentation && Array.isArray(item.presentation.expandedNodeIds) && Array.isArray(item.presentation.enabledRelationshipTypes)) }
-async function readSavedWordGraph(boardId: string) { const item = await (await db).get('graphs', boardId); return valid(item) ? item : null }
+function currentRelationship(value: string): RelationshipType | null {
+  if (relationshipTypes.includes(value as RelationshipType)) return value as RelationshipType
+  if (value === 'semantic' || value === 'conceptual' || value === 'symbolic') return 'related'
+  if (value === 'emotional') return 'feeling'
+  return null
+}
+function migrateRelationships(item: SavedWordGraph): SavedWordGraph {
+  // Recovery data from earlier sessions should still open with the smaller legend.
+  const edges = item.graph.edges.flatMap(edge => {
+    const relationship = currentRelationship(edge.relationship)
+    return relationship ? [{ ...edge, id: `${edge.source}:${relationship}:${edge.target}`, relationship }] : []
+  })
+  const seen = new Set<string>()
+  const uniqueEdges = edges.filter(edge => {
+    if (seen.has(edge.id)) return false
+    seen.add(edge.id)
+    return true
+  })
+  const enabled = [...new Set(item.presentation.enabledRelationshipTypes.flatMap(type => currentRelationship(type) ?? []))]
+  return {
+    ...item,
+    graph: { ...item.graph, edges: uniqueEdges },
+    presentation: { ...item.presentation, enabledRelationshipTypes: enabled },
+  }
+}
+async function readSavedWordGraph(boardId: string) { const item = await (await db).get('graphs', boardId); return valid(item) ? migrateRelationships(item) : null }
 async function afterPendingWrites(boardId: string) { await writes.get(boardId) }
 function enqueueWrite<T>(boardId: string, operation: () => Promise<T>): Promise<T> {
   const previous = writes.get(boardId) ?? Promise.resolve()
@@ -37,11 +62,11 @@ export function saveCompletedWordGraph(boardId: string, graph: WordGraph, presen
       graphId: previous?.graphId ?? crypto.randomUUID(),
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
-      graph: { rootId: graph.rootId, rootWord: graph.nodes.find(node => node.id === graph.rootId)?.label ?? graph.rootId, nodes: graph.nodes, edges: graph.edges },
+      graph: { rootId: graph.rootId, rootWord: graph.nodes.find(node => node.id === graph.rootId)?.label ?? graph.rootId, nodes: graph.nodes, edges: graph.edges, ...(graph.generation ? { generation: graph.generation } : {}) },
       presentation: {
         ...presentation,
         expandedNodeIds: presentation.expandedNodeIds ?? [graph.rootId],
-        enabledRelationshipTypes: presentation.enabledRelationshipTypes ?? ['semantic', 'conceptual', 'emotional', 'symbolic', 'sensory', 'opposite'],
+        enabledRelationshipTypes: presentation.enabledRelationshipTypes ?? [...relationshipTypes],
         isOpen: presentation.isOpen ?? true,
       },
     }

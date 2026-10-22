@@ -6,18 +6,18 @@ import { cameraTransform, createBoardFromToolbar, describeCanvas, dragFrom, drag
 const aiCalls = new WeakMap<Page, { count: number }>()
 const associations: Record<string, Array<{ word: string; relationship: string }>> = {
   dark: [
-    { word: 'night', relationship: 'semantic' }, { word: 'fear', relationship: 'emotional' },
-    { word: 'mystery', relationship: 'conceptual' }, { word: 'shadow', relationship: 'sensory' },
-    { word: 'unknown', relationship: 'symbolic' }, { word: 'light', relationship: 'opposite' },
+    { word: 'night', relationship: 'related' }, { word: 'fear', relationship: 'feeling' },
+    { word: 'mystery', relationship: 'related' }, { word: 'shadow', relationship: 'sensory' },
+    { word: 'unknown', relationship: 'related' }, { word: 'light', relationship: 'opposite' },
   ],
   night: [
-    { word: 'silence', relationship: 'sensory' }, { word: 'dreams', relationship: 'conceptual' },
+    { word: 'silence', relationship: 'sensory' }, { word: 'dreams', relationship: 'related' },
     { word: 'day', relationship: 'opposite' },
   ],
-  fear: [{ word: 'danger', relationship: 'conceptual' }, { word: 'anxiety', relationship: 'emotional' }],
-  mystery: [{ word: 'secret', relationship: 'semantic' }],
+  fear: [{ word: 'danger', relationship: 'related' }, { word: 'anxiety', relationship: 'feeling' }],
+  mystery: [{ word: 'secret', relationship: 'related' }],
   shadow: [{ word: 'silhouette', relationship: 'sensory' }],
-  light: [{ word: 'hope', relationship: 'symbolic' }],
+  light: [{ word: 'hope', relationship: 'related' }],
 }
 
 test.beforeEach(async ({ page }) => {
@@ -31,7 +31,7 @@ test.beforeEach(async ({ page }) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ embeddings: (body.input ?? []).map(() => [1, 0, 0]) }) })
       return
     }
-    const candidates = associations[body.word?.toLocaleLowerCase() ?? ''] ?? [{ word: 'night', relationship: 'semantic' }]
+    const candidates = associations[body.word?.toLocaleLowerCase() ?? ''] ?? [{ word: 'night', relationship: 'related' }]
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ candidates }) })
   })
 })
@@ -63,12 +63,49 @@ async function selectAndOpen(page: Page, word = 'dark') {
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
   })
   await page.mouse.click(p.x, p.y, { button: 'right' })
-  await page.getByRole('button', { name: 'Explore associations' }).click()
+  const explore = page.getByRole('button', { name: 'Word graph', exact: true })
+  const link = page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name: 'Link' })
+  expect((await explore.boundingBox())!.x).toBeGreaterThan((await link.boundingBox())!.x)
+  await explore.click()
   const dialog = page.getByRole('dialog', { name: 'Word Graph', exact: true })
   await expect(dialog).toBeVisible()
   return { dialog, body }
 }
 const node = (page: Page, word: string) => page.locator(`.word-graph-svg [data-node-id="word:${word}"]`)
+
+test('a failed expansion leaves a visible, recoverable incomplete graph', async ({ page }) => {
+  let failFear = true
+  await page.route('**/api/ai', async route => {
+    const payload = route.request().postDataJSON() as { operation: string; word?: string; input?: string[] }
+    if (payload.operation === 'embeddings') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ embeddings: payload.input!.map(() => [1, 0]) }) })
+      return
+    }
+    if (payload.word === 'fear' && failFear) {
+      await route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Could not reach OpenAI.', errorCode: 'connection_failed' }) })
+      return
+    }
+    const candidates = payload.word === 'dark'
+      ? [{ word: 'night', relationship: 'related' }, { word: 'fear', relationship: 'feeling' }]
+      : [{ word: 'dream', relationship: 'related' }]
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ candidates }) })
+  })
+  await openApp(page)
+  const boardId = (await describeCanvas(page)).board!.id
+  const { dialog } = await selectAndOpen(page)
+  await expect(dialog.getByRole('status')).toContainText('Graph incomplete: 1 AI request failed.')
+  await expect(node(page, 'night')).toBeVisible()
+  await expect.poll(async () => (await readStoredWordGraph(page, boardId))?.graph?.nodes?.some((item: { id: string }) => item.id === 'word:dream')).toBe(true)
+  await expect.poll(async () => (await readStoredWordGraph(page, boardId))?.graph?.generation?.status).toBe('partial')
+  await page.reload()
+  const restored = page.getByRole('dialog', { name: 'Word Graph', exact: true })
+  await expect(restored.getByRole('status')).toContainText('Graph incomplete')
+  await expect(node(page, 'night')).toBeVisible()
+  failFear = false
+  await restored.getByRole('button', { name: 'Try again' }).click()
+  await expect(restored.getByText('Graph incomplete', { exact: false })).toHaveCount(0)
+  await expect.poll(async () => (await readStoredWordGraph(page, boardId))?.graph?.generation ?? null).toBeNull()
+})
 
 test('audit recording follows Settings while graph recovery remains available', async ({ page }) => {
   await openApp(page)
@@ -82,6 +119,9 @@ test('audit recording follows Settings while graph recovery remains available', 
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
   await settings.getByRole('button', { name: 'Developer' }).click()
+  await expect(settings.getByRole('heading', { name: 'Word Graph generation audit' })).toHaveCount(0)
+  await settings.getByRole('button', { name: 'Graph', exact: true }).click()
+  await expect(settings.getByRole('heading', { name: 'Word Graph generation audit' })).toBeVisible()
   await settings.getByRole('checkbox', { name: 'Record the last generation report' }).check()
   await page.keyboard.press('Escape')
   const second = await selectAndOpen(page)
@@ -94,13 +134,38 @@ test('audit recording follows Settings while graph recovery remains available', 
   await second.dialog.getByRole('button', { name: 'Close Word Graph' }).click()
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await settings.getByRole('button', { name: 'Developer' }).click()
+  await settings.getByRole('button', { name: 'Graph', exact: true }).click()
   await settings.getByRole('checkbox', { name: 'Record the last generation report' }).uncheck()
   await page.keyboard.press('Escape')
   const third = await selectAndOpen(page)
   await expect(node(page, 'dark')).toBeVisible()
   expect(await page.evaluate(() => sessionStorage.getItem('my-states:ai-audit-last'))).toBe(reportBefore)
   await third.dialog.getByRole('button', { name: 'Close Word Graph' }).click()
+})
+
+test('Graph settings control new generation and remain saved', async ({ page }) => {
+  await openApp(page)
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+  await settings.getByRole('button', { name: 'Graph', exact: true }).click()
+  await expect(settings.getByLabel('Maximum words (including the starting word)')).toHaveValue('30')
+  await settings.getByLabel('Maximum words (including the starting word)').fill('1')
+  await settings.getByRole('button', { name: 'Save graph settings' }).click()
+  await expect(settings.getByRole('status')).toContainText('Graph settings saved')
+  await page.keyboard.press('Escape')
+
+  const before = aiCalls.get(page)!.count
+  const { dialog } = await selectAndOpen(page)
+  await expect(node(page, 'dark')).toBeVisible()
+  await expect(dialog.locator('.word-graph-svg [data-node-id]')).toHaveCount(1)
+  expect(aiCalls.get(page)!.count).toBe(before)
+  await dialog.getByRole('button', { name: 'Close Word Graph' }).click()
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await settings.getByRole('button', { name: 'Graph', exact: true }).click()
+  await expect(settings.getByLabel('Maximum words (including the starting word)')).toHaveValue('1')
+  await settings.getByRole('button', { name: 'Reset to defaults' }).click()
+  await expect(settings.getByLabel('Maximum words (including the starting word)')).toHaveValue('30')
 })
 
 test('selected Unicode word opens outside the canvas without altering notes or shapes; a new request replaces it', async ({ page }) => {
@@ -116,7 +181,7 @@ test('selected Unicode word opens outside the canvas without altering notes or s
   await selectAndOpen(page, 'night')
   await expect(page.locator('.word-graph-window')).toHaveCount(1)
   await expect(node(page, 'night')).toBeVisible()
-  await expect(dialog).toContainText('Sample associations')
+  await expect(dialog).toContainText('Word associations')
   await page.screenshot({ path: test.info().outputPath('word-graph.png') })
 })
 
@@ -127,7 +192,9 @@ test('invalid multi-word selection leaves the contextual action disabled', async
   await body.press('Control+a')
   const p = await body.boundingBox()
   await page.mouse.click(p!.x + 30, p!.y + 12, { button: 'right' })
-  await expect(page.getByRole('button', { name: 'Explore associations' })).toBeDisabled()
+  const wordGraph = page.getByRole('button', { name: 'Word graph', exact: true })
+  await expect(wordGraph).toBeDisabled()
+  await expect(wordGraph.locator('..')).toHaveAttribute('title', 'Select a word')
 })
 
 test('header drag, resize, maximize and restore preserve graph and canvas', async ({ page }) => {
@@ -193,11 +260,11 @@ test('expansion, collapse and filtering preserve expansion and keep the root', a
   await node(page, 'night').focus()
   await page.keyboard.press('Enter')
   await expect(node(page, 'dreams')).toBeVisible()
-  await dialog.getByRole('checkbox', { name: 'semantic', exact: true }).uncheck()
-  await expect(page.locator('.word-graph-svg [data-relationship="semantic"]')).toHaveCount(0)
+  await dialog.getByRole('checkbox', { name: 'Related', exact: true }).uncheck()
+  await expect(page.locator('.word-graph-svg [data-relationship="related"]')).toHaveCount(0)
   await expect(node(page, 'night')).toHaveCount(0)
   await expect(node(page, 'dreams')).toHaveCount(0)
-  await dialog.getByRole('checkbox', { name: 'semantic', exact: true }).check()
+  await dialog.getByRole('checkbox', { name: 'Related', exact: true }).check()
   await expect(node(page, 'dreams')).toBeVisible()
   for (const checkbox of await dialog.getByRole('checkbox').all()) await checkbox.uncheck()
   await expect(page.locator('.word-graph-svg [data-node-id]')).toHaveCount(1)
@@ -291,7 +358,7 @@ test('graph exploration and floating-window state survive reload without another
   await dragLocator(page, node(page, 'night'), { dx: 38, dy: 24 })
   await node(page, 'night').click()
   await expect(node(page, 'dreams')).toBeVisible()
-  await dialog.getByRole('checkbox', { name: 'emotional', exact: true }).uncheck()
+  await dialog.getByRole('checkbox', { name: 'Feeling', exact: true }).uncheck()
   const svg = page.locator('.word-graph-svg')
   const area = (await svg.boundingBox())!
   await dragFrom(page, { x: area.x + 18, y: area.y + 18 }, { dx: 46, dy: 28 })
@@ -307,7 +374,7 @@ test('graph exploration and floating-window state survive reload without another
   await expect(dialog.getByRole('button', { name: 'Restore Word Graph' })).toBeVisible()
   await expect.poll(async () => (await readStoredWordGraph(page, boardId))?.presentation).toMatchObject({
     expandedNodeIds: expect.arrayContaining(['word:dark', 'word:night']),
-    enabledRelationshipTypes: expect.not.arrayContaining(['emotional']),
+    enabledRelationshipTypes: expect.not.arrayContaining(['feeling']),
     window: expect.objectContaining({ maximized: true }),
   })
 
@@ -319,7 +386,7 @@ test('graph exploration and floating-window state survive reload without another
   await expect(node(page, 'dreams')).toBeVisible()
   await expect(node(page, 'night')).toHaveAttribute('transform', nodeTransform!)
   await expect(page.getByTestId('graph-viewport')).toHaveAttribute('transform', viewportTransform!)
-  await expect(restored.getByRole('checkbox', { name: 'emotional', exact: true })).not.toBeChecked()
+  await expect(restored.getByRole('checkbox', { name: 'Feeling', exact: true })).not.toBeChecked()
   await expect(restored.getByRole('button', { name: 'Restore Word Graph' })).toBeVisible()
   expect(aiCalls.get(page)!.count).toBe(requestsBeforeReload)
 
@@ -384,7 +451,7 @@ test('a single word selected inside a sentence captures the word without editing
   })
   const count = await page.locator('.tl-shape').count()
   await page.mouse.click(p.x, p.y, { button: 'right' })
-  await page.getByRole('button', { name: 'Explore associations' }).click()
+  await page.getByRole('button', { name: 'Word graph', exact: true }).click()
   await expect(node(page, 'dark')).toBeVisible()
   await expect(body).toHaveText('A dark night')
   await expect(page.locator('.tl-shape')).toHaveCount(count)

@@ -18,6 +18,8 @@ export interface AiAuditEntry {
   response?: unknown
   status?: number
   error?: string
+  errorCode?: string
+  upstreamStatus?: number
   durationMs: number
   startedAt: string
   usage: AiTokenUsage | null
@@ -51,7 +53,7 @@ export interface AiAuditMetrics {
 }
 export interface AiAuditReport {
   audit_schema_version: '1.1'
-  run: { run_id: string; started_at: string; finished_at: string | null; status: 'running' | 'completed' | 'failed' | 'cancelled'; duration_ms: number }
+  run: { run_id: string; started_at: string; finished_at: string | null; status: 'running' | 'completed' | 'partial' | 'failed' | 'cancelled'; duration_ms: number }
   input: { original_word: string; context: string; parameters: unknown }
   entries: AiAuditEntry[]
   candidate_decisions: WordGraphCandidateDecision[]
@@ -73,10 +75,10 @@ export function clearAiAuditReport() { window.sessionStorage.removeItem(REPORT_K
 export function saveAiAuditReport(report: AiAuditReport) { window.sessionStorage.setItem(REPORT_KEY, JSON.stringify(report)) }
 export function auditId(prefix: string) { return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}` }
 
-// Standard API rates, USD per million tokens. Reviewed 2026-10-21 against
-// https://developers.openai.com/api/docs/models/gpt-4o-mini and
-// https://developers.openai.com/api/docs/models/text-embedding-3-small.
+// Standard API rates, USD per million tokens. The older rate remains so saved
+// reports from earlier runs can still show their original estimate.
 export const AI_MODEL_PRICING = {
+  'gpt-6-luna': { inputPerMillion: 0.10, cachedInputPerMillion: 0.01, outputPerMillion: 0.50, source: 'https://developers.openai.com/api/docs/models/gpt-6-luna', reviewedOn: '2026-10-22' },
   'gpt-4o-mini': { inputPerMillion: 0.15, cachedInputPerMillion: 0.075, outputPerMillion: 0.60, source: 'https://developers.openai.com/api/docs/models/gpt-4o-mini', reviewedOn: '2026-10-21' },
   'gpt-4o-mini-2024-07-18': { inputPerMillion: 0.15, cachedInputPerMillion: 0.075, outputPerMillion: 0.60, source: 'https://developers.openai.com/api/docs/models/gpt-4o-mini', reviewedOn: '2026-10-21' },
   'text-embedding-3-small': { inputPerMillion: 0.02, cachedInputPerMillion: null, outputPerMillion: null, source: 'https://developers.openai.com/api/docs/models/text-embedding-3-small', reviewedOn: '2026-10-21' },

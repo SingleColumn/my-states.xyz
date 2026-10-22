@@ -2,7 +2,7 @@
 
 ## A. Summary
 
-Select a word in Writing, right-click, and choose **Explore associations**.
+Select a word in Writing, right-click, and choose **Word graph**.
 The temporary Word Graph opens near the editor with sample associations.
 It supports header movement, corner resizing, maximize/restore, close/Escape,
 node dragging, graph pan/zoom, expansion/collapse and six relationship filters.

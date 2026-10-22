@@ -3,13 +3,13 @@ import type { RelationshipType, WordGraph, WordGraphNode } from './wordGraphType
 
 type Association = readonly [string, string, RelationshipType]
 export const sampleAssociations: readonly Association[] = [
-  ['dark', 'night', 'semantic'], ['dark', 'fear', 'emotional'],
-  ['dark', 'mystery', 'conceptual'], ['dark', 'shadow', 'sensory'],
-  ['dark', 'unknown', 'symbolic'], ['dark', 'light', 'opposite'],
-  ['night', 'silence', 'sensory'], ['night', 'dreams', 'conceptual'], ['night', 'day', 'opposite'],
-  ['fear', 'danger', 'conceptual'], ['fear', 'anxiety', 'emotional'],
-  ['mystery', 'secret', 'semantic'], ['shadow', 'silhouette', 'sensory'],
-  ['light', 'hope', 'symbolic'], ['day', 'sunrise', 'conceptual'],
+  ['dark', 'night', 'related'], ['dark', 'fear', 'feeling'],
+  ['dark', 'mystery', 'related'], ['dark', 'shadow', 'sensory'],
+  ['dark', 'unknown', 'related'], ['dark', 'light', 'opposite'],
+  ['night', 'silence', 'sensory'], ['night', 'dreams', 'related'], ['night', 'day', 'opposite'],
+  ['fear', 'danger', 'related'], ['fear', 'anxiety', 'feeling'],
+  ['mystery', 'secret', 'related'], ['shadow', 'silhouette', 'sensory'],
+  ['light', 'hope', 'related'], ['day', 'sunrise', 'related'],
 ]
 
 /** Directed associations: expanding a source reveals its outgoing connections. */
