@@ -1,6 +1,6 @@
 # my-states.xyz
 
-my-states.xyz is a local-first, desktop-oriented creative workspace. It places a Spotify playlist player, image slideshow, and Markdown editor on a persistent infinite canvas, so you can arrange music, visual references, and writing in one place.
+my-states.xyz is a desktop-oriented creative workspace, hosted at [www.my-states.xyz](https://www.my-states.xyz). It places a Spotify playlist player, image slideshow, and Markdown editor on a persistent infinite canvas, so you can arrange music, visual references, and writing in one place.
 
 The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other than Spotify authentication). Its only server-side component is a pair of small read-only endpoints that let the Music panel search Spotify's public catalog before anyone has connected a Spotify account; everything else runs in the browser.
 

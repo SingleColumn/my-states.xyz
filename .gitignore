@@ -52,6 +52,9 @@ test-results/
 # Local planning/session notes
 project_docs/
 
+# Sample writing kept beside the app. Not project documentation.
+reference-samples/
+
 # Temporary files
 tmp/
 temp/
