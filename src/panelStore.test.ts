@@ -28,7 +28,7 @@ describe('panel shape schema', () => {
   })
 
   it('rejects a slideshow index, interval or transition that nothing downstream would correct', () => {
-    // AppState.tsx only resets currentIndex once it has outgrown the image
+    // slideshowState.ts only resets currentIndex once it has outgrown the image
     // count, never a negative one; a sub-100ms interval would put the
     // slideshow's own timer in a near-continuous loop. Bounds live here, at
     // the one gate every source of configuration writes through, not only

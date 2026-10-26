@@ -323,7 +323,7 @@ describe('portable board archives', () => {
     await expect(importBoardArchive(oversized)).rejects.toThrow('exceeds the 260 MB limit')
 
     // A negative index or a sub-100ms interval would reach the canvas
-    // uncorrected (AppState.tsx only resets an index the image count has
+    // uncorrected (slideshowState.ts only resets an index the image count has
     // outgrown, never a negative one, and a tiny interval would put the
     // slideshow's own timer in a near-continuous loop).
     const outOfBoundsIndex = { ...entries }

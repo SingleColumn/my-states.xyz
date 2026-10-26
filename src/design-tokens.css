@@ -302,7 +302,7 @@
    * canvas cards. Shared shell tokens are identical across all three; only
    * --accent and --bg (set per card below) should differ. New cards adopt
    * the shell by pairing these tokens with the .card-* classes in
-   * styles.css instead of duplicating header/footer/button rules.
+   * styles/panel-shell.css instead of duplicating header/footer/button rules.
    */
   --card-radius: max(0px, calc(var(--radius-large) - 2px));
   --content-radius: var(--radius-medium);
@@ -423,7 +423,7 @@
    are the same six-rung shape, each rung scaled by one factor so the ratio
    between rungs is preserved. The weight and letter-spacing that go with
    each (so the two ends read as a style rather than a zoom level) are in
-   styles.css, beside the rest of .card-title and .panel's own rules. */
+   styles/panel-shell.css, beside the rest of .card-title and .panel's own rules. */
 :root[data-type-scale="compact"] {
   --type-xs: 10.5px;
   --type-sm: 12px;

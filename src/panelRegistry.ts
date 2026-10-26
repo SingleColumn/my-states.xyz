@@ -103,7 +103,7 @@ const MIN_SLIDESHOW_INTERVAL_MS = 100
 export const slideshowSettingsValidator: T.Validator<SlideshowSettings> = T.object({
   folderName: T.nullable(T.string),
   imageSource: imageCollectionSourceValidator,
-  // A negative index is never corrected elsewhere (AppState.tsx only
+  // A negative index is never corrected elsewhere (slideshowState.ts only
   // resets an index the image count has outgrown, not a negative one), so
   // it is rejected here, at the one gate every source of configuration -
   // live edit, import, agent command - writes through.

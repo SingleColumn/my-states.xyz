@@ -1,5 +1,5 @@
 import type { TLShape } from 'tldraw'
-import type { Board, Panel, PanelContent } from './types'
+import type { Board, CanvasCamera, Panel, PanelContent } from './types'
 import { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 import { panelShapeProps, type PanelShape } from './panelShapeSchema'
 import { getPanelDefinition, isPanelType } from './panelRegistry'
@@ -59,6 +59,24 @@ export interface PanelArchitectureReport {
 
 export interface PanelArchitectureEditor {
   getCurrentPageShapesSorted(): readonly TLShape[]
+  getCamera?(): CanvasCamera
+}
+
+/**
+ * What is happening in the running page, as opposed to what is stored. The
+ * caller reads it from the live modules so this file stays free of them; a
+ * report built without it simply has no runtime checks.
+ */
+export interface PanelRuntimeSnapshot {
+  saves: { storeUpdates: number; boardUpdates: number; writes: number }
+  slideshows: Array<{
+    panelId: string
+    isPlaying: boolean
+    imageCount: number
+    currentIndex: number
+    timerSet: boolean
+    lookAhead: { index: number; status: string } | null
+  }>
 }
 
 /**
@@ -68,7 +86,7 @@ export interface PanelArchitectureEditor {
  * persists the document and nothing else about panels, and the rules the
  * registry declares (one of a singleton kind) hold.
  */
-export function buildPanelArchitectureReport(board: Board, editor: PanelArchitectureEditor): PanelArchitectureReport {
+export function buildPanelArchitectureReport(board: Board, editor: PanelArchitectureEditor, runtime?: PanelRuntimeSnapshot): PanelArchitectureReport {
   const shapes = editor.getCurrentPageShapesSorted().filter(isPanelShapeRecord)
   const checks: PanelArchitectureCheck[] = []
   const addCheck = (id: string, label: string, status: ArchitectureCheckStatus, details: string) => {
@@ -161,6 +179,51 @@ export function buildPanelArchitectureReport(board: Board, editor: PanelArchitec
     unpersisted.length ? 'WARNING' : 'PASS',
     unpersisted.length ? `${unpersisted.length} shape(s) not yet saved (a save is debounced)` : 'Canvas and document agree',
   )
+
+  const camera = editor.getCamera?.()
+  const saved = board.camera
+  if (camera && saved) {
+    const settled = Math.abs(saved.x - camera.x) < 0.01 && Math.abs(saved.y - camera.y) < 0.01 && Math.abs(saved.z - camera.z) < 0.0001
+    addCheck(
+      'camera-persisted',
+      'The saved camera is where the canvas is looking',
+      settled ? 'PASS' : 'WARNING',
+      settled ? 'Saved view matches the canvas' : 'The view has moved since the last save (a save is debounced)',
+    )
+  }
+
+  if (runtime) {
+    const { saves } = runtime
+    addCheck(
+      'save-activity',
+      'Saves follow board changes (counts since the page loaded)',
+      'PASS',
+      `${saves.storeUpdates} canvas updates: ${saves.boardUpdates} changed the board, ${saves.storeUpdates - saves.boardUpdates} touched only hover or selection and were not saved; ${saves.writes} writes`,
+    )
+
+    const slideshowFaults = runtime.slideshows.flatMap((show) => {
+      if (!show.isPlaying) {
+        return show.timerSet || show.lookAhead ? [`${show.panelId}: stopped but still has a timer or a queued picture`] : []
+      }
+      if (show.imageCount < 2) return []
+      if (!show.timerSet) return [`${show.panelId}: playing with no timer`]
+      if (!show.lookAhead) return [`${show.panelId}: playing with no picture queued`]
+      const { index } = show.lookAhead
+      if (!Number.isInteger(index) || index < 0 || index >= show.imageCount || index === show.currentIndex) {
+        return [`${show.panelId}: queued picture ${index} is not a different picture in the collection of ${show.imageCount}`]
+      }
+      return []
+    })
+    const playing = runtime.slideshows.filter((show) => show.isPlaying && show.imageCount > 1)
+    addCheck(
+      'slideshow-look-ahead',
+      'A playing slideshow has its next picture queued; a stopped one has nothing queued',
+      slideshowFaults.length ? 'ERROR' : 'PASS',
+      slideshowFaults.length
+        ? slideshowFaults.join('; ')
+        : `${runtime.slideshows.length} slideshow panel(s), ${playing.length} playing${playing.map((show) => ` (${show.panelId}: next ${show.lookAhead?.index}, ${show.lookAhead?.status})`).join('')}`,
+    )
+  }
 
   const errors = checks.filter((check) => check.status === 'ERROR').length
   const warnings = checks.filter((check) => check.status === 'WARNING').length

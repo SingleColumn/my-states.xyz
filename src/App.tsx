@@ -3,7 +3,7 @@ import { usePostHog } from '@posthog/react'
 import { createTLSchemaFromUtils, defaultBindingUtils, defaultShapeUtils, Editor, Tldraw, TLShape, getSnapshot, loadSnapshot, type TLUiOverrides } from 'tldraw'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { AppChromeMenuPanel, AppChromePropsProvider, type AppChromeRect } from './AppChrome'
-import { AppStateProvider, useAppState } from './AppState'
+import { AppStateProvider, panelRuntime, useAppState } from './AppState'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { createCanvasApi } from './canvasApi'
 import { PanelShape, PanelShapeUtil } from './PanelShape'
@@ -11,14 +11,14 @@ import { documentSchemaMatchesEditor } from './panelShapeSchema'
 import { getCanonicalPanelLayout, getPanelFocusViewSize, isPanelInFocusView } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { getPanelDefinition } from './panelRegistry'
-import { expandPanelFromStartingHeight, getPanelShape, isPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
+import { expandPanelFromStartingHeight, getPanelShape, isPanelShape, listPanels, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, withPanelEdit, writePanelShape } from './panelStore'
 import { PanelCommandsProvider } from './PanelHeader'
 import { isTextInputTarget } from './panelSurface'
 import { forgetFullScreen, readFullScreen, rememberFullScreen } from './fullScreenMemory'
 import { debounce } from './utils'
 import { prepareCanvasRestore, withRestoreWriteAccess } from './canvasRestore'
-import { registerHiddenCanvasPersistence } from './canvasPersistence'
-import { buildPanelArchitectureReport, type PanelArchitectureReport } from './panelArchitectureReport'
+import { diffChangesBoard, registerHiddenCanvasPersistence, saveActivity } from './canvasPersistence'
+import { buildPanelArchitectureReport, type PanelArchitectureReport, type PanelRuntimeSnapshot } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
 import { AppSettings } from './AppSettings'
@@ -219,6 +219,7 @@ function AppContent() {
     const saveNow = () => {
       const boardId = canvasBoardIdRef.current
       if (restoringCanvasRef.current || !boardId) return
+      saveActivity.writes += 1
       boardsRef.current.updateDocument(boardId, getSnapshot(editor.store).document, editor.getCamera())
     }
     const persist = debounce(saveNow, 300)
@@ -256,8 +257,15 @@ function AppContent() {
     const saveWhenHidden = () => { if (document.visibilityState === 'hidden') saveWhenLeaving() }
     document.addEventListener('visibilitychange', saveWhenHidden)
     window.addEventListener('pagehide', saveWhenLeaving)
-    const removeStoreListener = editor.store.listen(() => {
-      if (!restoringCanvasRef.current) persist()
+    // Listens to every scope because the camera is session-scoped; the
+    // predicate then drops transactions that only touched hover, selection
+    // or other session state, which a board does not keep.
+    const removeStoreListener = editor.store.listen(({ changes }) => {
+      if (restoringCanvasRef.current) return
+      saveActivity.storeUpdates += 1
+      if (!diffChangesBoard(editor.store, changes)) return
+      saveActivity.boardUpdates += 1
+      persist()
     }, { source: 'all', scope: 'all' })
     const removeHiddenPersistence = registerHiddenCanvasPersistence(editor.store,
       () => document.visibilityState === 'hidden' && !restoringCanvasRef.current,
@@ -591,18 +599,33 @@ function AppContent() {
     setChromeBottom((current) => Math.abs(current - rect.bottom) < 0.5 ? current : rect.bottom)
   }, [])
 
+  const readRuntime = useCallback((editor: Editor): PanelRuntimeSnapshot => ({
+    saves: { ...saveActivity },
+    slideshows: listPanels(editor).filter((panel) => panel.type === 'slideshow').map((panel) => {
+      const state = panelRuntime.slideshow.forPanel(panel.id) as unknown as { isPlaying: boolean, images: unknown[], currentIndex: number, timerId: number | null, lookAhead: { index: number, status: string } | null }
+      return {
+        panelId: panel.id,
+        isPlaying: state.isPlaying,
+        imageCount: state.images.length,
+        currentIndex: state.currentIndex,
+        timerSet: state.timerId !== null,
+        lookAhead: state.lookAhead ? { index: state.lookAhead.index, status: state.lookAhead.status } : null,
+      }
+    }),
+  }), [])
+
   // The report reads the board as last written, not the one in React state,
   // because the document is kept out of state.
   const openArchitectureReport = useCallback(() => {
     const editor = editorRef.current
     const board = boards.getActiveBoardRecord()
     if (!editor || !board) return
-    setArchitectureReport(buildPanelArchitectureReport(board, editor))
-  }, [boards])
+    setArchitectureReport(buildPanelArchitectureReport(board, editor, readRuntime(editor)))
+  }, [boards, readRuntime])
 
   const latestBoard = boards.getActiveBoardRecord()
   const displayedArchitectureReport = architectureReport && latestBoard && editorRef.current
-    ? buildPanelArchitectureReport(latestBoard, editorRef.current)
+    ? buildPanelArchitectureReport(latestBoard, editorRef.current, readRuntime(editorRef.current))
     : architectureReport
 
   const openHelpAbout = useCallback(() => {

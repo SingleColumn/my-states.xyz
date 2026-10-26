@@ -1,0 +1,461 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+.app-root {
+  position: fixed;
+  inset: 0;
+  background: var(--background-app);
+}
+
+.app-loading {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+/* Replaces the app entirely on phones and tablets (see main.tsx). */
+.desktop-only-notice {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  gap: var(--space-detail-5);
+  padding: 32px 24px;
+  max-width: 34rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.desktop-only-notice h1 {
+  margin: 0;
+  font-size: var(--type-2xl);
+  font-weight: var(--font-weight-display);
+}
+
+.desktop-only-notice p {
+  margin: 0;
+  font-size: var(--type-lg);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.tlui-layout__top {
+  pointer-events: none;
+}
+
+.tlui-layout__top__left {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-tldraw-controls);
+  display: block;
+  width: 100%;
+  height: max-content;
+  pointer-events: none;
+}
+
+.app-chrome {
+  display: grid;
+  grid-template-areas: "boards canvas spacer tldraw";
+  grid-template-columns: auto auto minmax(8px, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-app-chrome-group-gap);
+  width: calc(100% - 2 * var(--space-top-toolbar-edge));
+  min-height: var(--size-top-toolbar-height);
+  margin: var(--space-top-toolbar-edge);
+  padding: var(--space-top-toolbar-padding-block) var(--space-top-toolbar-padding-inline);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-top-toolbar);
+  background: var(--background-app-badge);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+  /* Set here, not per control: the toolbar renders inside tldraw's layout,
+     whose container fixes 12px, and every plain button would otherwise
+     inherit that while the dropdowns beside it follow the type scale. */
+  font-size: var(--font-size-app-badge-meta);
+  pointer-events: auto;
+}
+
+.board-toolbar {
+  position: relative;
+  grid-area: boards;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-top-toolbar-gap);
+  min-width: 0;
+}
+
+.board-toolbar select {
+  width: min(var(--size-board-selector-width), 22vw);
+  height: var(--size-top-toolbar-control);
+  min-height: var(--size-top-toolbar-control);
+  padding: 0 var(--space-detail-3);
+}
+
+.board-toolbar .card-icon-button {
+  width: var(--size-top-toolbar-control);
+  height: var(--size-top-toolbar-control);
+  min-width: var(--size-top-toolbar-control);
+}
+
+.board-action-transfer,
+.board-action-delete {
+  position: relative;
+  margin-left: 6px;
+}
+
+.board-action-transfer::before,
+.board-action-delete::before {
+  position: absolute;
+  top: var(--space-divider-inset);
+  bottom: var(--space-divider-inset);
+  left: calc(-1 * var(--space-divider-inset));
+  width: 1px;
+  background: var(--color-panel-divider);
+  content: "";
+}
+
+.board-action-delete:hover:not(:disabled),
+.board-actions-menu .is-destructive:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.board-toolbar .board-actions-menu-trigger {
+  display: none;
+}
+
+.board-actions-menu {
+  position: absolute;
+  top: calc(100% + var(--space-popover-offset));
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: max-content;
+  min-width: var(--size-board-menu-min-width);
+  padding: var(--space-menu-padding);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+}
+
+.board-actions-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-app-badge-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.board-actions-menu button:hover:not(:disabled) {
+  background: var(--card-button-bg-hover);
+}
+
+.board-actions-menu button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.board-toolbar-error {
+  position: absolute;
+  top: calc(100% + var(--space-detail-2));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: var(--size-board-error-max-width);
+  padding: var(--space-menu-padding) var(--space-menu-item-padding-x);
+  border-radius: var(--button-radius);
+  background: var(--background-toast);
+  color: var(--color-danger);
+  font-size: var(--font-size-app-badge-meta);
+  line-height: var(--line-height-toast);
+}
+
+.tl-watermark_SE {
+  display: none !important;
+}
+
+.tl-background {
+  background-color: transparent !important;
+  background-image: var(--canvas-pattern);
+  background-size: var(--size-grid) var(--size-grid);
+}
+
+.app-chrome-tldraw {
+  grid-area: tldraw;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-top-toolbar-gap);
+  padding-left: var(--space-rich-content-inset);
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
+  min-width: 0;
+}
+
+.app-chrome-tldraw .tlui-toolbar,
+.app-chrome-tldraw .tlui-buttons__horizontal {
+  gap: var(--space-top-toolbar-gap);
+}
+
+.app-chrome-tldraw .tlui-buttons__horizontal > * {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.app-chrome-tldraw .tlui-button {
+  width: var(--size-tldraw-control-button);
+  min-width: var(--size-tldraw-control-button);
+  height: var(--size-tldraw-control-button);
+  min-height: var(--size-tldraw-control-button);
+  padding: 0;
+  border: var(--border-width-hairline) solid transparent;
+  border-radius: var(--button-radius);
+  color: var(--card-button-icon-color);
+  transition:
+    transform var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.app-chrome-tldraw .tlui-page-menu__trigger {
+  width: var(--size-tldraw-page-selector-width);
+  min-width: var(--size-tldraw-page-selector-width);
+  padding: 0 var(--space-control-padding-x);
+  justify-content: space-between;
+  background: var(--card-button-bg);
+  font-size: var(--font-size-app-badge-meta);
+  font-weight: var(--font-weight-medium);
+}
+
+.app-chrome-tldraw .tlui-page-menu__name {
+  min-width: 0;
+}
+
+.app-chrome-tldraw .tlui-button::after {
+  inset: 0;
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg-hover);
+}
+
+.app-chrome-tldraw .tlui-button:not(:disabled):hover {
+  color: var(--card-button-active-icon);
+  border-color: var(--card-button-border);
+}
+
+.app-chrome-tldraw .tlui-button:not(:disabled):active {
+  transform: translateY(var(--active-control-translate-y));
+}
+
+.app-chrome-tldraw .tlui-button:disabled {
+  color: var(--color-text-muted);
+  opacity: var(--opacity-disabled);
+}
+
+.app-chrome-tldraw .tlui-button[data-isactive="true"],
+.app-chrome-tldraw .tlui-button[aria-expanded="true"] {
+  color: var(--card-button-active-icon);
+  border-color: var(--card-button-active-border);
+}
+
+.app-chrome-tldraw .tlui-button[data-isactive="true"]::after,
+.app-chrome-tldraw .tlui-button[aria-expanded="true"]::after {
+  background: var(--card-button-active-bg);
+  opacity: 1;
+}
+
+.app-chrome-tldraw .tlui-icon {
+  width: var(--size-tldraw-icon);
+  height: var(--size-tldraw-icon);
+}
+
+.app-chrome-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-detail-2);
+  min-height: var(--size-top-toolbar-control);
+  padding: 0 var(--space-detail-3);
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg);
+  color: var(--card-button-icon-color);
+  cursor: pointer;
+}
+
+.app-chrome-canvas {
+  grid-area: canvas;
+  display: flex;
+  align-items: center;
+  gap: var(--space-top-toolbar-gap);
+  padding-left: var(--space-rich-content-inset);
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
+.app-chrome-spacer {
+  grid-area: spacer;
+}
+
+.canvas-control-label-short {
+  display: none;
+}
+
+.canvas-view-menu-section {
+  padding-top: var(--space-detail-2);
+  border-top: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
+.canvas-view-menu-heading {
+  display: block;
+  padding: var(--space-detail-2) var(--space-control-padding-x);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-app-badge-meta);
+}
+
+.app-chrome-control:hover:not(:disabled) {
+  color: var(--card-button-active-icon);
+  background: var(--card-button-bg-hover);
+}
+
+.app-chrome-control[aria-pressed="true"],
+.app-chrome-control[aria-expanded="true"] {
+  color: var(--card-button-active-icon);
+  border-color: var(--card-button-active-border);
+  background: var(--card-button-active-bg);
+}
+
+.app-chrome-control:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.about-launcher-pulse {
+  animation: about-launcher-pulse var(--about-pulse-duration, 20s) ease-in-out 1;
+}
+
+/* Each pulse rises over ~1.4s, holds ~1.6s, then fades over ~2s, so the glow
+   lingers long enough to be noticed rather than reading as a blink. */
+@keyframes about-launcher-pulse {
+  0%,
+  5%,
+  30%,
+  38%,
+  63%,
+  71%,
+  96%,
+  100% {
+    border-color: var(--card-button-border);
+    background: var(--card-button-bg);
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 0 0 transparent;
+  }
+  12%,
+  20%,
+  45%,
+  53%,
+  78%,
+  86% {
+    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-button-border));
+    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-button-bg));
+    box-shadow:
+      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
+      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-launcher-pulse {
+    animation: none;
+  }
+}
+
+.canvas-view-controls {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+}
+
+.app-chrome-menu-trigger {
+  width: var(--size-top-toolbar-control);
+  justify-content: center;
+  padding: 0;
+}
+
+.canvas-view-menu {
+  position: absolute;
+  top: calc(100% + var(--space-popover-offset));
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: max-content;
+  min-width: var(--size-canvas-menu-min-width);
+  padding: var(--space-menu-padding);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+}
+
+.canvas-view-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-app-badge-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.canvas-view-menu button:hover:not(:disabled) {
+  background: var(--card-button-bg-hover);
+}
+
+.canvas-view-menu button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.callback-toast {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--app-chrome-height, 52px) + var(--space-toast-top));
+  z-index: var(--z-toast);
+  transform: translateX(-50%);
+  max-width: min(var(--size-toast-max-width), calc(100vw - var(--size-toast-viewport-inset)));
+  padding: var(--space-toast-padding-y) var(--space-toast-padding-x);
+  border: var(--border-width-hairline) solid var(--color-toast-border);
+  border-radius: var(--radius-toast);
+  background: var(--background-toast);
+  box-shadow: var(--shadow-panel);
+  color: var(--color-toast-text);
+}

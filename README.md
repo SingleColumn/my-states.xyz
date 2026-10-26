@@ -159,7 +159,7 @@ npm run test:browser
 `npm run test:browser:headed` runs the same suite in a visible window.
 tldraw's pointer handling can differ subtly between headless and headed
 Chromium, so a change to `PanelShape.tsx`, the handlers in `App.tsx`, or the
-pointer rules in `styles.css` should be checked both ways. A failed run
+pointer rules in `src/styles/panel-shell.css` should be checked both ways. A failed run
 leaves a screenshot and a trace under `test-results/`; open a trace with
 `npx playwright show-trace <path-to-trace.zip>`.
 

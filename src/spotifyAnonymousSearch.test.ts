@@ -104,16 +104,16 @@ function deferred<T>() {
 }
 
 async function mountSpotifyState(panels: PanelsState) {
-  const { useSpotifyState } = await import('./AppState')
+  const { useSpotifyState } = await import('./spotifyState')
   return renderHook(() => useSpotifyState(null, panels))
 }
 
-// Loading the app module pulls in tldraw, which under a full parallel run can
+// Loading the hook's module pulls in tldraw, which under a full parallel run can
 // take longer than a single test is allowed. Without this the first test to
 // run pays for the load inside its own clock, times out, and every hook it
 // would have returned is null. Loaded once, before any test's clock starts.
 beforeAll(async () => {
-  await import('./AppState')
+  await import('./spotifyState')
 }, 120_000)
 
 beforeEach(() => {
@@ -555,7 +555,7 @@ describe('A song lookup that is overtaken', () => {
     const slow = deferred<unknown>()
     spotifyApi.spotifyFetch.mockImplementation((path: string) => (path.startsWith('/tracks/') ? slow.promise : Promise.resolve(undefined)))
     const { panels } = panelsStub()
-    const { useSpotifyState } = await import('./AppState')
+    const { useSpotifyState } = await import('./spotifyState')
     const view = renderHook(({ boardId }: { boardId: string }) => useSpotifyState({ id: boardId } as never, panels), { initialProps: { boardId: 'm1' } })
     let lookup!: Promise<void>
     await act(async () => { lookup = view.result.current.lookupTrack('t1') })

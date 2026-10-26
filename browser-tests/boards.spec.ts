@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   addPanelFromToolbar,
+  cameraTransform,
+  cameraZoom,
+  centerOf,
   clickAt,
   createBoardFromToolbar,
   describeCanvas,
@@ -106,6 +109,53 @@ test('panels, hiding, settings and stacking order survive a reload', async ({ pa
     .toEqual(before.map((panel) => ({ panelId: panel.panelId, ...persistedShape(panel) })))
   expect(after.find((panel) => panel.panelId === music.panelId)?.visible).toBe(false)
   await expectArchitectureReportPass(page)
+})
+
+test('the camera survives a reload after a pan and a zoom', async ({ page }) => {
+  await openApp(page)
+  const boardId = (await describeCanvas(page)).board?.id ?? ''
+  await expectCanvasSaved(page)
+  const before = (await readStorage(page, boardId)).camera
+  const notes = await panelOfType(page, 'notes')
+  // Over the canvas itself, just above a panel: a wheel pans, Ctrl+wheel zooms.
+  const { x, y } = await centerOf(await titleOf(page, notes.panelId))
+  await page.mouse.move(x, y - 60)
+  await page.mouse.wheel(140, 90)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -300)
+  await page.keyboard.up('Control')
+  const onScreen = await cameraTransform(page)
+  // The layer's translate carries a sub-pixel offset of tldraw's, so only
+  // the zoom is compared directly with what storage holds.
+  const zoom = await cameraZoom(page)
+  await expect.poll(async () => (await readStorage(page, boardId)).camera, { message: 'the pan and zoom reach storage' }).not.toEqual(before)
+  await expect.poll(async () => Math.abs(((await readStorage(page, boardId)).camera?.z ?? 0) - zoom), { message: 'the stored zoom is the one on screen' }).toBeLessThan(0.0001)
+  // The pan and the zoom were separate saves; wait out the debounce so the
+  // reload cannot land between them.
+  await page.waitForTimeout(600)
+  await page.reload()
+  await waitForCanvas(page)
+  await expect.poll(() => cameraTransform(page)).toBe(onScreen)
+})
+
+test('hovering and selecting a panel do not write the board again', async ({ page }) => {
+  await openApp(page)
+  const boardId = (await describeCanvas(page)).board?.id ?? ''
+  await expectCanvasSaved(page)
+  // Let any save still in flight from opening land before taking the mark.
+  await page.waitForTimeout(800)
+  const { updatedAt } = await readStorage(page, boardId)
+  const notes = await panelOfType(page, 'notes')
+  const images = await panelOfType(page, 'slideshow')
+  for (const panelId of [images.panelId, notes.panelId]) {
+    const { x, y } = await centerOf(await titleOf(page, panelId))
+    await page.mouse.move(x, y, { steps: 4 })
+  }
+  await selectPanel(page, notes.panelId)
+  await page.keyboard.press('Escape')
+  // Longer than the 300ms debounce, so a scheduled save would have landed.
+  await page.waitForTimeout(1000)
+  expect((await readStorage(page, boardId)).updatedAt).toBe(updatedAt)
 })
 
 test('export writes a .board.zip and import brings the board back, listed in the picker at once', async ({ page }, testInfo) => {

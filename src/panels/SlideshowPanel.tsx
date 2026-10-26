@@ -260,6 +260,9 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             id: 'focus-view',
             label: focusView ? 'Expand panel to full view' : 'Adjust panel to focus view',
             icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
+            // Focus view is the picture on its own; with the collection browser open there is no picture,
+            // and the header that holds the way back is hidden, so it is not offered.
+            disabled: isBrowsingCollections && !focusView,
             onSelect: () => commands.togglePanelFocusView(panelId),
           },
         ]}

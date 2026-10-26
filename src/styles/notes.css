@@ -1,0 +1,920 @@
+.panel-notes-surface .card-title {
+  font-size: var(--font-size-notes-panel-title);
+}
+
+.panel-notes-surface .card-footer-meta,
+.panel-notes-surface .card-footer-status {
+  font-size: var(--font-size-notes-footer);
+}
+
+.note-title-group {
+  display: grid;
+  gap: var(--space-note-kicker-title-gap);
+  flex: 1;
+  min-width: 0;
+}
+
+.note-title-group .card-eyebrow {
+  margin-bottom: 0;
+}
+
+/* A column rather than a fixed grid of rows: what the body holds varies --
+   the note controls only outside writing mode, the writing tools only once
+   a note is open -- and a row template has to be rewritten for each of
+   those. Everything above the writing takes its own height; the writing
+   takes what is left. */
+.notes-body {
+  /* Scale the reading measure with the writer's chosen text size rather than
+     fixing it in pixels. The wider 68em surface gives long-form prose room
+     to breathe while remaining capped by the panel on smaller screens. */
+  /* The paper width is a user choice and stays fixed when text size changes.
+     The prose column remains inset so the frame reads as a sheet, not a box
+     fitted tightly around the text. */
+  --writing-paper-width: min(100%, var(--notes-paper-width, 794px));
+  --writing-measure: min(100%, calc(var(--writing-paper-width) - 160px));
+  /* A4 proportions in pixels. The width above contains a percentage, which
+     cannot resolve in a height, so the sheet's height is derived from the
+     pixel width instead. */
+  --writing-paper-height: calc(var(--notes-paper-width, 794px) * 1.414);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-notes-gap);
+}
+
+.notes-body > * {
+  flex: 0 0 auto;
+}
+
+.notes-body > .notes-editor,
+.notes-body > .notes-empty-state {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* One column: the note's name moved into its first line, so the choice of
+   note is the only control left standing here. */
+.notes-document-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-control-gap);
+  align-items: end;
+  min-width: 0;
+}
+
+.note-control-field {
+  display: grid;
+  gap: var(--space-menu-item-gap);
+  min-width: 0;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-notes-control-label);
+  font-weight: var(--font-weight-semibold);
+}
+
+.note-select {
+  width: 100%;
+  height: var(--size-input-height);
+  padding: 0 var(--size-input-padding-x);
+  line-height: var(--line-height-control);
+}
+
+.cm-editor {
+  height: 100%;
+  overflow: hidden;
+  border: var(--border-width-hairline) solid var(--color-editor-border);
+  border-radius: var(--radius-editor);
+  background: var(--color-editor-bg);
+}
+
+.cm-scroller {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-code-editor);
+  line-height: var(--line-height-code);
+}
+
+.notes-editor {
+  /* A measure is counted in characters, not pixels: about 68 of them, which
+     is what 34 times the text size comes to for this face. Fixed in pixels
+     it was a different measure at every size -- generous at the smallest,
+     seven words a line at the largest. Declared here rather than with the
+     other tokens because a custom property resolves the var()s inside it
+     where it is declared, and this is the first element that knows the
+     size the writer chose. Capped at the panel so the largest sizes simply
+     fill it. */
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-editor-bg);
+}
+
+.notes-rich-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--color-input-text);
+}
+
+/* The element NotesEditor hands to Milkdown (see there for why it exists).
+   It takes no part in layout, so the scroll box below is still a flex child
+   of the editor and gets a height to scroll within. */
+.notes-editor-mount {
+  display: contents;
+}
+
+/* Milkdown wraps the editable in one `.milkdown` div. It is the scroll box:
+   the editable inside grows with the note and this box clips and scrolls
+   it, so a long note scrolls within the panel instead of overflowing it. */
+.notes-rich-editor .milkdown {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.notes-editor-content {
+  min-height: 100%;
+  padding: var(--card-padding);
+  color: var(--color-input-text);
+  font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
+  line-height: var(--notes-editor-line-height, var(--line-height-rich-content));
+}
+
+.notes-editor-content:focus {
+  outline: none;
+}
+
+/* A link is only openable with a modifier held, so that is when it offers
+   itself as one. Without this the only way to learn is to be told. */
+.notes-editor-content.is-link-armed .notes-link {
+  cursor: pointer;
+  text-decoration-thickness: 2px;
+}
+
+/* The hint on an empty note. NotesEditor marks the one empty paragraph with
+   the text; drawing it here keeps it out of the document. Floated at zero
+   height so the caret sits at the start of the line, over the hint. */
+.notes-editor-content .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* ProseMirror's own selected-node outline is a fixed light blue; the app's
+   focus ring is the theme's. */
+.notes-editor-content .ProseMirror-selectednode {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+.notes-editor-content p,
+.notes-editor-content ul,
+.notes-editor-content ol,
+.notes-editor-content blockquote,
+.notes-editor-content pre,
+.notes-editor-content table {
+  margin-top: 0;
+  margin-bottom: var(--space-rich-content-block);
+}
+
+/* Headings are a fixed multiple of the paragraph, so the proportions hold
+   at every text size: title 1.5x, h1 1.4x, h2 1.25x, h3 1.1x. A gentle
+   ratio suits long-form reading; weight and spacing carry the rest of the
+   hierarchy. */
+.notes-editor-content {
+  --note-text-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
+  --note-title-size: calc(var(--note-text-size) * 1.5);
+}
+
+.notes-editor-content h1,
+.notes-editor-content h2,
+.notes-editor-content h3 {
+  margin: 0 0 var(--space-rich-content-block);
+  color: var(--color-note-title);
+  font-family: var(--font-family-display);
+  line-height: var(--line-height-tight);
+}
+
+.notes-editor-content h1 {
+  font-size: calc(var(--note-text-size) * 1.4);
+}
+
+.notes-editor-content h2 {
+  font-size: calc(var(--note-text-size) * 1.25);
+}
+
+.notes-editor-content h3 {
+  font-size: calc(var(--note-text-size) * 1.1);
+}
+
+/* The first line is the note's name, so it is drawn as one -- whatever it is
+   made of. Nothing in the document marks a title: the line is an ordinary
+   paragraph until the writer makes it a heading, and the name is taken from
+   it either way. So the styling follows position, and a plain first line
+   reads at the same size and weight a heading would.
+
+   This is the only thing saying the first line names the note. Without it a
+   writer has a title and no way to know it, which is what the form field
+   this replaced said out loud. Declared after the heading rules because it
+   matches them for specificity and has to win when the first line is one. */
+.notes-editor-content > :first-child {
+  margin: 0 0 var(--space-rich-content-block);
+  color: var(--color-note-title);
+  font-family: var(--font-family-display);
+  font-size: var(--note-title-size);
+  font-weight: var(--font-weight-note-title);
+  line-height: var(--line-height-tight);
+}
+
+/* The hint on an empty note is a sentence about the editor, not a name, so
+   it stays at reading size however large the line carrying it is drawn. */
+.notes-editor-content > :first-child.is-empty::before {
+  font-family: var(--font-family-ui);
+  font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-rich-content);
+}
+
+.notes-editor-content blockquote {
+  padding-left: var(--space-rich-content-inset);
+  border-left: var(--border-width-rich-content) solid var(--color-control-border-hover);
+  color: var(--color-text-soft);
+}
+
+/*
+ * A picture in a note, with a handle on its right edge to pull. The handle
+ * shows on hover and while the picture is selected, so an unpicked picture
+ * is only a picture; it is a little wider than it looks, because a 4px
+ * target is a target nobody hits.
+ */
+.notes-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.notes-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-small);
+}
+
+.notes-image-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--size-image-handle-target);
+  height: 100%;
+  cursor: ew-resize;
+  opacity: 0;
+  touch-action: none;
+}
+
+/* A grip, not a hairline. The first version was a 2px rule the colour of
+   the accent, which at a glance was indistinguishable from the edge of the
+   picture; this is a pill with its own edge, sitting half over the picture
+   and half off it, which is what a thing you can take hold of looks like. */
+.notes-image-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: var(--size-image-handle-grip-width);
+  height: var(--size-image-handle-grip);
+  transform: translateY(-50%);
+  border: var(--border-width-hairline) solid var(--color-panel-border);
+  border-radius: var(--size-image-handle-grip-width);
+  background: var(--accent-notes, var(--color-focus-ring));
+  box-shadow: var(--shadow-app-badge);
+}
+
+/* Shown whenever the picture is the thing being dealt with -- pointed at,
+   picked, or being pulled -- rather than only while the pointer is on the
+   few pixels of the handle itself. */
+.notes-image:hover .notes-image-handle,
+.notes-image.is-selected .notes-image-handle,
+.notes-image.is-resizing .notes-image-handle,
+.notes-image-handle:focus-visible {
+  opacity: 1;
+}
+
+/* And the picture says it is the one picked, which is also the cue that
+   there is a handle on it. */
+.notes-image.is-selected img,
+.notes-image.is-resizing img {
+  outline: var(--border-width-rich-content) solid var(--accent-notes, var(--color-focus-ring));
+  outline-offset: var(--border-width-hairline);
+}
+
+.notes-image-handle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Nothing else may be doing anything while a width is being pulled. */
+.notes-image.is-resizing img {
+  user-select: none;
+}
+
+/* A wash rather than a colour of its own: mixed from the panel's accent, so
+   every theme gets a highlight that belongs to it and none of them need a
+   token of their own. The words keep the text colour they had, which is
+   what keeps them legible under it. */
+.notes-editor-content mark {
+  padding: 0 var(--space-detail-1);
+  border-radius: var(--radius-small);
+  background: var(--color-note-highlight);
+  color: inherit;
+}
+
+.notes-editor-content code,
+.notes-editor-content pre {
+  font-family: var(--font-family-code);
+}
+
+.notes-editor-content pre {
+  overflow: auto;
+  padding: var(--space-code-block-padding);
+  border: var(--border-width-hairline) solid var(--color-panel-divider);
+  border-radius: var(--radius-control);
+  background: var(--color-code-block-bg);
+}
+
+/* Matches the Images empty stage: an outcome heading above the primary action,
+   so the three panels' empty states read as one set. */
+.notes-empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--empty-stage-block-gap);
+  place-self: center;
+  text-align: center;
+}
+
+/* The line under an empty state's heading: why there is nothing here, when
+   that is not obvious from the heading alone. */
+.notes-empty-hint {
+  max-width: var(--size-board-error-max-width);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+  line-height: var(--line-height-hint);
+}
+
+.notes-empty-state h3 {
+  margin: 0;
+  font-size: var(--type-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.empty-note-button {
+  place-self: center;
+}
+
+/*
+ * Writing mode - the Notes panel at full screen.
+ *
+ * The panel sheds its form chrome and becomes a page: prose is held to a
+ * readable measure, the title sits in the same column as the text, and the
+ * editor's own box is removed so the writing surface *is* the panel rather
+ * than a field sitting inside one. The contextual bar and the insert menu
+ * float on the body and need nothing here. The default panel size is left
+ * untouched, so the two treatments can be compared side by side.
+ */
+.panel-body.notes-body-writing {
+  gap: 0;
+  padding: 0;
+}
+
+/* No wash behind the page at full screen: the diagonal accent gradient is the
+   card's frame treatment, and there the frame is the whole window, so it only
+   distracts from the writing. What stays is the card's own opaque colour (the
+   last layer of --card-bg-gradient) and the theme's texture. */
+.canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode {
+  background: var(--panel-texture), var(--bg);
+}
+
+.notes-editor.is-writing {
+  flex-direction: column;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: auto;
+}
+
+/* At full screen the header is a strip the writing has to live under, so
+   it gives back what it can. Panel chrome is sized against the panel, which
+   at full screen is the whole window: the button alone was taller than this
+   whole strip now is. */
+.panel-notes-surface.is-writing-mode {
+  --card-header-button-size: 30px;
+}
+
+.panel-notes-surface.is-writing-mode .card-header {
+  padding-block: calc(var(--card-padding) / 3);
+}
+
+.panel-notes-surface.is-writing-mode .card-title {
+  font-size: var(--type-md);
+}
+
+/* Reserving the scrollbar on both edges keeps the centred text column on the
+   same axis as the title above it once the note grows past one screen. */
+.notes-editor.is-writing .milkdown {
+  scrollbar-gutter: stable both-edges;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+/* The contenteditable stays full width so clicking anywhere still places the
+   caret; only the blocks inside it are held to the measure. */
+.notes-editor.is-writing .notes-editor-content > * {
+  max-width: var(--writing-measure);
+  margin-inline: auto;
+}
+
+.notes-editor.is-writing .notes-editor-content {
+  /* Keep the first-line title from touching the editor's top edge after the
+     writing surface sheds its normal card padding. */
+  box-sizing: border-box;
+  /* The view's zoom scales the sheet as a whole -- text, margins, images --
+     which is not the same as the text size, a choice made against the sheet.
+     Percentages inside a zoomed box are scaled with it, so the available
+     width is divided by the zoom to land on the window's edge. */
+  zoom: var(--notes-zoom, 1);
+  width: min(var(--notes-paper-width, 794px), calc((100% - (var(--card-padding) * 2)) / var(--notes-zoom, 1)));
+  min-height: var(--writing-paper-height);
+  margin-inline: auto;
+  padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom);
+  /* The surrounding surface keeps its existing colour; this line is the
+     only visual cue that marks the paper boundary. */
+  border: var(--border-width-hairline) solid color-mix(in srgb, var(--color-editor-border) 72%, transparent);
+  border-radius: var(--radius-editor);
+}
+
+/* Flattening the editor wrapper makes the scroll box a sibling of the title,
+   so the title sits above the whole document inside the same column. */
+.notes-editor.is-writing .notes-rich-editor {
+  display: contents;
+}
+
+/*
+ * The formatting bar over a text selection. It lives on the body, not in the
+ * panel (see NotesFormattingTooltip), so it is drawn with the root-level
+ * menu tokens rather than the panel-scoped button ones, which would not
+ * reach it there. floating-ui writes `left`/`top`; the plugin toggles
+ * `data-show`.
+ */
+.notes-formatting-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-editor-float);
+  display: flex;
+  gap: var(--space-detail-1);
+  padding: var(--space-detail-1);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.notes-formatting-tooltip[data-show="false"] {
+  display: none;
+}
+
+.notes-formatting-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-menu-item-height);
+  height: var(--size-menu-item-height);
+  border: 0;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.notes-formatting-button:hover:not(:disabled) {
+  background: var(--card-button-bg-hover);
+}
+
+/* The Link tool with nothing to act on: a bare caret, no selection and no
+   link under it. Dimmed rather than removed, so the row of tools does not
+   reflow as the caret moves. */
+.notes-formatting-button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+/* The bar floats over the Writing panel, so it takes that panel's accent
+   for its pressed state; the per-panel --accent alias is out of reach on
+   the body. */
+.notes-formatting-button.is-active {
+  background: var(--card-button-active-bg);
+  color: var(--accent-notes);
+}
+
+.notes-formatting-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/*
+ * The link editor: a small popover that replaces a native `window.prompt`,
+ * asked for by the Link button on either bar, or by Ctrl-K. Same floating
+ * home and tokens as the formatting bar it sits beside -- see
+ * NotesLinkEditor.tsx for why a prompt was not good enough.
+ */
+.notes-link-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-editor-float);
+  display: flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+  padding: var(--space-detail-1);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.notes-link-editor[data-show="false"] {
+  display: none;
+}
+
+.notes-link-editor-input {
+  width: var(--size-link-editor-input-width);
+  height: var(--size-menu-item-height);
+  padding: 0 var(--space-detail-3);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-dropdown);
+}
+
+.notes-link-editor-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.notes-link-editor-input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* Same rule the panel-header menu uses for its own destructive item: only
+   coloured on the hover/focus that means "about to act," not at rest. */
+.notes-link-editor .is-destructive:hover,
+.notes-link-editor .is-destructive:focus-visible {
+  color: var(--color-danger);
+}
+
+/*
+ * The insert menu under the caret after a `/`. Same home and tokens as the
+ * formatting bar above; floating-ui writes `left`/`top`, the plugin toggles
+ * `data-show`.
+ */
+.notes-insert-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-editor-float);
+  display: grid;
+  /* The emoji list is long enough to need a window onto it; the structure
+     list is shorter than this and so is unaffected. */
+  max-height: var(--size-insert-menu-max-height);
+  overflow-y: auto;
+  min-width: var(--size-board-menu-min-width);
+  padding: var(--space-menu-padding);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.notes-insert-menu[data-show="false"] {
+  display: none;
+}
+
+.notes-insert-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
+  border: 0;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+/* The highlight follows the arrow keys and the pointer alike, so it is one
+   class rather than :hover, or the two would fight. */
+.notes-insert-item.is-active {
+  background: var(--card-button-bg-hover);
+}
+
+.notes-insert-item[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.notes-insert-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: var(--size-control-icon);
+  justify-content: center;
+}
+
+/* An emoji sits in the slot an icon would, drawn a size up so it reads as
+   the thing being inserted rather than as decoration beside a word. */
+/*
+ * The writing tools, above the note and always on show. The right-click bar
+ * and the slash menu can do all of this too, but both are gestures a writer
+ * has to be told about; this is what makes them optional.
+ */
+/* Hidden rather than unmounted: the editor draws the tools into this
+   element when it starts, so it has to stay where it was put. */
+.notes-writing-toolbar-host.is-hidden {
+  display: none;
+}
+
+/*
+ * The tools are chrome for the writing, not a strip of application. So they
+ * begin where the words begin -- the same column the text is held to -- and
+ * carry no rule under them: a line across the page would cut the note in
+ * two above its own title. What separates them from the writing is space.
+ *
+ * The host is the column; the bar inside it is only as wide as the tools,
+ * with a frame to say they are one set. Spreading them across the column
+ * instead made the gaps grow with the text size, which at the larger sizes
+ * left the icons looking scattered rather than placed.
+ */
+.notes-writing-toolbar-host {
+  flex: 0 0 auto;
+  display: flex;
+  width: 100%;
+  /* Enough room above for the header's own rule not to crowd it, which some
+     themes draw heavily. */
+  padding-block: var(--space-detail-5) var(--space-detail-2);
+}
+
+/* At full screen the writing is held to a column, so the tools begin where
+   the words do. Everywhere else the text fills the panel and there is no
+   such column: held to one there, the tools were centred on a measure
+   nothing else on the panel used, and so lined up with nothing at all. They
+   follow the panel's own edge instead -- the same edge as the note's title
+   field and the editor below it. */
+.panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Full-screen writing has a readable paper column; the ordinary panel keeps
+   its tools aligned with the panel edge because there is no separate column
+   for them to follow. */
+.canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
+  width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
+  max-width: var(--writing-paper-width);
+  margin-inline: auto;
+}
+
+.notes-writing-toolbar {
+  display: flex;
+  /* One row, always. Wrapping put three of the tools on a second line
+     inside the frame the board the content came within a few pixels of
+     the column, which reads as a mistake rather than as a layout. When
+     there is genuinely not enough room the style menu gives up width
+     instead -- it has a min-width of nothing for exactly that. */
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-detail-1);
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: var(--space-detail-1);
+  border: var(--border-width-hairline) solid var(--color-panel-border);
+  border-radius: var(--radius-control);
+}
+
+/* Between what a line is, how its words are marked and what can be put in.
+   Inside a frame the groups need only a wider gap to be read as groups. */
+.notes-writing-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+  margin-left: var(--space-detail-3);
+}
+
+/* The loudest thing on the bar was this control's own box: the app's
+   dropdown is a form field, drawn with a fill and a border so it reads as
+   something to fill in. Here it is a menu of what the line already is, so
+   it is drawn like the buttons beside it -- nothing until it is pointed at
+   -- rather than borrowing .app-dropdown and then fighting its !important. */
+.notes-style-select {
+  height: var(--size-menu-item-height);
+  min-height: var(--size-menu-item-height);
+  /* Wide enough for "Small heading", the longest of them, so the control
+     does not resize as the caret moves between lines. */
+  flex: 0 1 var(--size-notes-style-select-width);
+  min-width: 0;
+  padding-inline: var(--space-detail-2);
+  /* An outline and no fill: the buttons beside it are actions and carry
+     nothing until pointed at, but this is a choice with a name in it, and
+     without an edge its chevron floats away from the word at the widths a
+     fixed control needs. */
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-dropdown);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
+}
+
+.notes-style-select:hover {
+  border-color: var(--card-button-border-hover, var(--card-button-border));
+  background: var(--card-button-bg-hover);
+}
+
+.notes-style-select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* The list the browser opens is its own window: it needs a real surface
+   under it whatever the control looks like when closed. */
+.notes-style-select option {
+  background: var(--color-dropdown-bg);
+  color: var(--color-dropdown-text);
+  font-family: var(--font-family-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+/* In a panel too narrow for the row, the style menu gives up its width
+   rather than letting the buttons wrap: a lone button on a second line
+   reads as a mistake, and the menu still shows enough of a name to be
+   recognised. */
+@container panel-shell (max-width: 520px) {
+  .notes-writing-group {
+    margin-left: var(--space-detail-2);
+  }
+}
+
+
+
+/* Between what a line is and how its words are marked: two jobs on one
+   short, crowded bar, and the eye needs to be told where one ends. The
+   writing tools say the same thing with distance instead. */
+.notes-formatting-divider {
+  align-self: stretch;
+  width: var(--border-width-hairline);
+  margin: var(--space-detail-2) var(--space-detail-1);
+  background: var(--color-app-badge-border);
+}
+
+.notes-insert-emoji {
+  font-size: var(--type-lg);
+  line-height: 1;
+}
+
+.notes-insert-label {
+  flex: 1;
+}
+
+.notes-insert-hint {
+  font-size: var(--type-xs);
+  color: var(--color-text-muted);
+}
+
+/* The grip in the Images panel's transport row that a note takes the panel
+   by. Drawn as a button so it reads as a control, but it is not one. */
+.slideshow-drag-handle {
+  cursor: grab;
+  margin-left: auto;
+}
+
+.slideshow-drag-handle:active {
+  cursor: grabbing;
+}
+
+/*
+ * A panel embedded in a note (see notesEmbed.tsx). One figure, three
+ * faces: a poster naming the source, the live frame once asked for, or a
+ * note that the source is gone. It keeps the writing measure and the
+ * note's own rhythm rather than bringing a panel's chrome into the page.
+ */
+.notes-embed {
+  margin: 0 auto var(--space-rich-content-block);
+  border: var(--border-width-hairline) solid var(--color-panel-divider);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--color-code-block-bg);
+}
+
+.notes-embed.is-selected {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+.notes-embed-poster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-detail-2);
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-detail-6);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.notes-embed-poster.is-missing {
+  cursor: default;
+  color: var(--color-text-muted);
+}
+
+.notes-embed-title {
+  font-weight: var(--font-weight-medium);
+}
+
+.notes-embed-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-detail-1);
+  font-size: var(--type-sm);
+  color: var(--color-text-muted);
+}
+
+.notes-embed-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 0;
+  background: transparent;
+}
+
+.notes-embed-picture {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+.notes-embed:has(.notes-embed-picture) {
+  position: relative;
+}
+
+/* The corner a picture is resized by; shown only while it is selected. */
+.notes-embed-resize {
+  position: absolute;
+  right: var(--space-detail-2);
+  bottom: var(--space-detail-2);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-focus-ring);
+  border-radius: 4px;
+  background: var(--color-code-block-bg);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+/* ProseMirror's drop cursor between blocks, in the theme's accent. */
+.notes-drop-cursor {
+  background: var(--accent-notes);
+}
+
+.writing-note-picker {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.writing-note-picker .note-select {
+  width: var(--size-writing-note-select-width);
+  height: var(--card-header-button-size);
+  padding-block: 0;
+}

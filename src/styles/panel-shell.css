@@ -1,0 +1,634 @@
+.canvas-panel-shell {
+  overflow: hidden;
+  border: var(--border-width-hairline) solid var(--color-panel-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: var(--blur-panel);
+  contain: strict;
+  container-name: panel-shell;
+  container-type: size;
+  pointer-events: none !important;
+}
+
+/* A real DOM node purely as an anchor for the native wheel listener in
+   PanelShape.tsx -- see useNativeWheelScrollScope there. `display: contents`
+   keeps it out of layout entirely, so .panel still sizes directly against
+   .canvas-panel-shell as if this wrapper were not there. */
+.canvas-panel-wheel-scope {
+  display: contents;
+}
+
+/* The rule (src/panelSurface.ts): a declared content region gets the pointer
+   back, and its text becomes selectable; everything else on the panel stays
+   transparent, so a press there reaches tldraw's canvas and behaves like a
+   press on any shape. This is the only pointer-events rule a panel needs. */
+.canvas-panel-shell [data-panel-content] {
+  pointer-events: auto !important;
+  user-select: text;
+}
+
+/* A clickable piece of panel frame: unlike content, this restores DOM hit
+   testing without stopping pointer-down from reaching tldraw. */
+.canvas-panel-shell [data-panel-frame-action] {
+  pointer-events: auto !important;
+}
+
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  /* tldraw's shape container sets `color: var(--color-text-1)`; theme.css
+     hands tldraw that name from the app's palette, so this only re-anchors
+     the panel on the primary text colour rather than the softer one. */
+  color: var(--color-text);
+  font-size: var(--font-size-panel-body);
+}
+
+.panel-spotify-surface {
+  background: var(--card-bg-gradient);
+}
+
+.panel-spotify-surface .panel-body {
+  display: flex;
+  flex-direction: column;
+  /* The results are snapped to fit the room left over, so this column has
+     nothing to scroll and shows no bar of its own — the list keeps the only
+     one. It stays "auto" rather than "hidden" for the case the snapping
+     cannot reach: a panel too short even for the controls and the fields
+     around them, where clipping would put the playback controls somewhere
+     nobody could get to. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.panel-slideshow-surface {
+  display: grid;
+  /* A column that may shrink below its widest content: without this a long
+     footer message sets the column width, and the panel is wider than its
+     frame with the header buttons pushed out of sight. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  background: var(--card-bg-gradient);
+}
+
+/* Focus view — the picture and nothing else. Header, controls and footer are
+   all unrendered, so the stage takes the whole panel edge to edge and Escape
+   is the way back. */
+.panel-slideshow-surface.is-focus-view {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.panel-slideshow-surface.is-collection-browser {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* Pills drawn over a picture sit on the picture, not on the theme's surface,
+   so they keep one dark scrim with light text in every theme and mode. */
+:root {
+  --image-overlay-bg: rgba(14, 14, 18, 0.78);
+  --image-overlay-text: #f5f3ee;
+  --image-overlay-text-muted: rgba(245, 243, 238, 0.72);
+}
+
+.panel-slideshow-surface.is-collection-browser .slideshow-stage {
+  align-self: stretch;
+  justify-self: stretch;
+  width: calc(100% - (var(--image-panel-stage-inset-x) * 2));
+  height: auto;
+  aspect-ratio: auto;
+  max-height: none;
+}
+
+.panel-slideshow-surface.is-focus-view .slideshow-stage {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.panel-notes-surface {
+  background: var(--card-bg-gradient);
+}
+
+.panel-video-surface {
+  background: var(--card-bg-gradient);
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-panel-body-top) var(--space-panel-body-x) var(--space-panel-body-bottom);
+}
+
+/*
+ * Card shell — shared header/content/footer/button rules for the canvas
+ * cards (Media, Spotify, Notes). Tokens live in design-tokens.css; each
+ * card supplies --accent/--bg and these classes render its shell so the
+ * three cards stay visually consistent without duplicating this CSS.
+ */
+.card-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-panel-header-gap);
+  padding: var(--card-padding);
+  border-bottom: var(--card-border);
+}
+
+/* Header styles, chosen by a theme (`panel.headerStyle`) and carried as
+   data-header-style on the root. Plain is the rules above. A band is a
+   solid strip in the panel's accent with everything on it recoloured to
+   read against it; an underline keeps the plain header and draws a rule
+   beneath it in the accent. Both are colour and border only: the header's
+   size and its buttons' positions do not move, so the frame the pointer
+   rules rely on is the same in every style. */
+:root[data-header-style="band"] .card-header {
+  border-bottom: 0;
+  background: var(--card-header-band, var(--accent));
+}
+
+:root[data-header-style="band"] .card-header .card-title,
+:root[data-header-style="band"] .card-header .card-eyebrow {
+  color: var(--card-header-band-foreground);
+}
+
+:root[data-header-style="band"] .card-header .card-icon-button {
+  border-color: color-mix(in srgb, var(--card-header-band-foreground) 35%, transparent);
+  background: color-mix(in srgb, var(--card-header-band-foreground) 10%, transparent);
+  color: var(--card-header-band-foreground);
+}
+
+:root[data-header-style="band"] .card-header .card-icon-button:hover,
+:root[data-header-style="band"] .card-header .card-icon-button.is-active {
+  background: color-mix(in srgb, var(--card-header-band-foreground) 22%, transparent);
+  color: var(--card-header-band-foreground);
+}
+
+:root[data-header-style="band"] .card-header .card-header-group + .card-header-group {
+  border-left-color: color-mix(in srgb, var(--card-header-band-foreground) 30%, transparent);
+}
+
+:root[data-header-style="underline"] .card-header {
+  border-bottom: 2px solid var(--card-header-rule, var(--accent));
+}
+
+/* Panel density, chosen by a theme (`panel.density`) and carried as
+   data-panel-density on the root. Snug is a step short of slim. Slim trims the padding around the header
+   and footer strips and nothing else: the buttons keep their size, so they
+   stay as easy to hit. The footer's min-height is re-declared on .panel
+   because it is computed from the padding there, not at the point of use. */
+:root[data-panel-density="snug"] .card-header {
+  padding-block: calc(var(--card-padding) * 0.7);
+}
+:root[data-panel-density="snug"] .panel {
+  --space-card-footer-padding-y: 8px;
+  --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
+}
+:root[data-panel-density="slim"] .card-header {
+  padding-block: calc(var(--card-padding) * 0.4);
+  border-bottom-width: 1px;
+}
+:root[data-panel-density="slim"] .panel {
+  --space-card-footer-padding-y: 5px;
+  --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
+}
+
+/* Type scales, chosen by a theme (`typography.scale`) and carried as
+   data-type-scale on the root. Standard is the rules below, using
+   --card-title-weight and no extra tracking. The size ladder itself
+   (--type-*) is in design-tokens.css, next to its standard values; this is
+   just the weight and letter-spacing that make compact read as denser
+   rather than only smaller, and spacious as more open rather than only
+   larger. The weight is a nudge off --card-title-weight, not a fixed
+   number: a theme that sets its own heading weight (Paper's bold serif at
+   700) keeps its own identity, heavier or lighter by the same amount as
+   Midnight's default, rather than being pulled to one absolute value. */
+:root[data-type-scale="compact"] .panel {
+  letter-spacing: -0.006em;
+}
+:root[data-type-scale="compact"] .card-title {
+  font-weight: calc(var(--card-title-weight) + 120);
+  letter-spacing: -0.01em;
+}
+:root[data-type-scale="spacious"] .panel {
+  letter-spacing: 0.008em;
+}
+:root[data-type-scale="spacious"] .card-title {
+  font-weight: calc(var(--card-title-weight) - 120);
+  letter-spacing: 0.01em;
+}
+
+.card-header h2,
+.card-header p {
+  margin: 0;
+}
+
+.card-eyebrow {
+  margin-bottom: var(--space-card-eyebrow-bottom);
+  color: var(--card-eyebrow-color);
+  font-size: var(--card-eyebrow-size);
+  font-weight: var(--card-eyebrow-weight);
+  letter-spacing: var(--card-eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.card-title {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--card-title-color);
+  font-family: var(--font-family-display);
+  font-size: var(--card-title-size);
+  font-weight: var(--card-title-weight);
+  line-height: var(--line-height-panel-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-header-group-gap);
+}
+
+/* Header actions are grouped by what they act on - the content, the note, the
+   panel - and every group after the first carries a rule on its left. */
+.card-header-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-inner-gap);
+}
+
+.card-header-group + .card-header-group {
+  padding-left: var(--space-header-group-gap);
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
+/* The panel menu: one ... button at the right of the header and, below it, a
+   single column of every action the panel offers, anchored to the header's
+   right edge. It shares its look with the board and canvas-view menus so
+   the three read as one kind of thing. The menu is a static flex item so it
+   sits with the header's buttons; the list is absolute and anchored to the
+   header's right padding, exactly where the pickers open. */
+.card-header-menu-root {
+  display: flex;
+  align-items: center;
+}
+
+.card-header-menu {
+  position: absolute;
+  top: calc(100% + var(--space-popover-offset));
+  right: var(--card-padding);
+  z-index: 4;
+  display: grid;
+  width: max-content;
+  min-width: var(--size-canvas-menu-min-width);
+  padding: var(--space-menu-padding);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+  backdrop-filter: var(--blur-app-badge);
+  color: var(--color-app-badge-text);
+}
+
+.card-header-menu-section {
+  display: grid;
+}
+
+.card-header-menu-section + .card-header-menu-section {
+  margin-top: var(--space-detail-2);
+  padding-top: var(--space-detail-2);
+  border-top: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
+.card-header-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
+  border: 0;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.card-header-menu button:hover:not(:disabled) {
+  background: var(--card-button-bg-hover);
+}
+
+.card-header-menu button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.card-header-menu .is-destructive:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.card-header-menu-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: var(--size-control-icon);
+  justify-content: center;
+}
+
+.card-header-menu-label {
+  flex: 1;
+}
+
+.card-header-menu-check {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.app-chrome-panel-add-control {
+  width: 112px;
+  padding-right: var(--space-detail-2);
+}
+
+.card-header > .card-title { min-width: 0; }
+
+/* The theme's figure on every panel: a bow, a star, nothing. Centred on the
+   top edge, in the gap between the title and the buttons, like a bow on a
+   parcel. Drawn by the shell, over the header, outside the pointer. */
+.canvas-panel-shell::after {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  z-index: 3;
+  width: 40px;
+  height: 26px;
+  background: var(--panel-ornament) center / contain no-repeat;
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.card-icon-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--card-header-button-size);
+  height: var(--card-header-button-size);
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg);
+  color: var(--card-button-icon-color);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.card-icon-button:hover {
+  background: var(--card-button-bg-hover);
+}
+
+.card-icon-button:active {
+  transform: translateY(var(--active-control-translate-y));
+}
+
+.card-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.card-icon-button.is-active {
+  background: var(--card-button-active-bg);
+  border-color: var(--card-button-active-border);
+  color: var(--card-button-active-icon);
+}
+
+.card-icon-button.is-primary {
+  background: var(--card-primary-bg);
+  border-color: var(--card-primary-border);
+  color: var(--card-primary-icon);
+}
+
+.card-icon-button.is-large {
+  width: var(--size-play-button);
+  height: var(--size-play-button);
+}
+
+.card-icon-button svg {
+  width: var(--size-control-icon);
+  height: var(--size-control-icon);
+}
+
+.card-icon-button.is-large svg {
+  width: var(--size-primary-icon);
+  height: var(--size-primary-icon);
+}
+
+.card-icon-button.is-wide {
+  width: auto;
+  min-width: var(--size-primary-button-min);
+  height: var(--size-play-button);
+  padding: 0 var(--size-primary-button-padding-x);
+  gap: var(--space-control-inner-gap);
+  font-weight: var(--font-weight-control);
+}
+
+.card-content {
+  border: var(--card-border);
+  border-radius: var(--content-radius);
+  background: var(--card-content-bg);
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-control-gap);
+  /* A floor set by the tallest thing a footer can hold, so footers that carry
+     only text line up across the canvas with ones that carry a button. */
+  min-height: var(--size-card-footer-min-height);
+  padding: var(--space-card-footer-padding-y) var(--card-padding);
+  border-top: var(--card-border);
+}
+
+.card-footer-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--card-footer-meta-color);
+  font-size: var(--card-footer-meta-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-footer-status {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-control-inner-gap);
+  color: var(--color-text-muted);
+  font-size: var(--card-footer-meta-size);
+  max-width: 58%;
+  min-width: 0;
+}
+
+.card-footer-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Service attribution in a footer: reads as a quiet label, not as status. */
+.card-footer-service {
+  color: var(--card-eyebrow-color);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+}
+
+.card-footer-button {
+  width: var(--card-footer-button-size);
+  height: var(--card-footer-button-size);
+}
+
+
+.visually-hidden-file-input {
+  position: fixed;
+  width: var(--size-empty-file-input);
+  height: var(--size-empty-file-input);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+input,
+select {
+  min-width: 0;
+  border: var(--border-width-hairline) solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
+  outline: none;
+}
+
+/* Labels that provide names for controls should remain available to assistive
+   technology without taking up space in a compact toolbar. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.app-dropdown {
+  border: var(--border-width-hairline) solid var(--card-button-border) !important;
+  border-radius: var(--button-radius) !important;
+  background: var(--color-dropdown-bg) !important;
+  color: var(--color-dropdown-text) !important;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-dropdown) !important;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
+}
+
+.app-dropdown:hover {
+  border-color: var(--card-button-border-hover, var(--card-button-border)) !important;
+  background: var(--color-dropdown-bg) !important;
+}
+
+.app-dropdown option {
+  background: var(--color-dropdown-bg);
+  color: var(--color-dropdown-text);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-dropdown);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Sliders draw their own track and thumb so a theme can make them a pencil
+   line and an ink dot as easily as a pill and a disc. The two vendor blocks
+   say the same thing; a browser drops a rule whose selector it does not
+   know, so they cannot be combined. */
+input[type="range"] {
+  height: 20px;
+  margin: 0;
+  border-color: var(--range-well-border);
+  background: var(--range-well);
+  accent-color: var(--range-accent);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--range-track);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--range-thumb);
+  appearance: none;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--range-track);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--range-thumb);
+}
+
+input[type="range"]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* The outline tldraw draws around the selected panel follows the panel's
+   corner radius and the theme's stroke width; its colour comes through the
+   bridge in theme.css. `rx` is a presentation attribute, so the property
+   wins over the value PanelShape.tsx writes. */
+.tl-shape-indicator {
+  stroke-width: calc(var(--selection-stroke-width) * var(--tl-scale));
+  stroke-linejoin: round;
+}
+
+.tl-shape-indicator rect {
+  rx: var(--radius-panel);
+  ry: var(--radius-panel);
+}
+
+/* Icons are strokes; a theme sets their weight. Lucide writes the width as
+   an attribute, which a property overrides. */
+.panel svg,
+.app-chrome svg,
+.help-about-dialog svg {
+  stroke-width: var(--icon-stroke-width);
+}

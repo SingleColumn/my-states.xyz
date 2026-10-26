@@ -11,7 +11,7 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 // and is slow to load, and awaited in the test body that cost lands inside
 // the test's own timeout, where a loaded parallel run can exhaust it.
 // vi.mock is hoisted above this, so the mocks below still apply.
-import { useSpotifyState } from './AppState'
+import { useSpotifyState } from './spotifyState'
 import type { PanelsState } from './AppState'
 
 const tokens = { accessToken: 'test-token', refreshToken: 'refresh', expiresAt: Date.now() + 600_000 }

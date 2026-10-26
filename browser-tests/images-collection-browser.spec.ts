@@ -33,6 +33,28 @@ test.describe('Images collection browser', () => {
     await expect(browser.locator('.collection-browser-cover')).toHaveCount(1)
   })
 
+  test('offers focus view only when there is a picture to focus on', async ({ page }) => {
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    const shape = await shapeOf(page, images.panelId)
+    const item = page.getByRole('menuitem', { name: 'Adjust panel to focus view' })
+
+    // Browsing collections, as a grid and as a carousel: nothing to focus on.
+    await shape.getByRole('button', { name: 'Images panel actions' }).click()
+    await expect(item).toBeDisabled()
+    await page.keyboard.press('Escape')
+    await choosePanelMenuItem(shape, 'Show collection carousel')
+    await shape.getByRole('button', { name: 'Images panel actions' }).click()
+    await expect(item).toBeDisabled()
+    await page.keyboard.press('Escape')
+
+    // With a collection chosen the picture is there, and the option works.
+    await shape.getByRole('button', { name: /^Use .+ collection$/ }).click()
+    await expect(shape.locator('img.slideshow-image-layer')).toBeVisible()
+    await shape.getByRole('button', { name: 'Images panel actions' }).click()
+    await expect(item).toBeEnabled()
+  })
+
   test('browses one collection at a time and changes sources non-destructively', async ({ page }) => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')

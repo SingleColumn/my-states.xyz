@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TLShape, TLStoreSnapshot } from 'tldraw'
-import { buildPanelArchitectureReport } from './panelArchitectureReport'
+import { buildPanelArchitectureReport, type PanelRuntimeSnapshot } from './panelArchitectureReport'
 import { createPanelProps } from './panelStore'
 import type { Board, PanelType } from './types'
 
@@ -117,5 +117,48 @@ describe('panel architecture report', () => {
 
     expect(check(report, 'document-correlation')).toBe('WARNING')
     expect(report.summary.status).toBe('WARNING')
+  })
+
+  describe('runtime checks', () => {
+    const saves = { storeUpdates: 10, boardUpdates: 3, writes: 3 }
+    const show = (patch: Partial<PanelRuntimeSnapshot['slideshows'][number]> = {}) => ({ panelId: 'panel-a', isPlaying: true, imageCount: 5, currentIndex: 0, timerSet: true, lookAhead: { index: 1, status: 'pending' }, ...patch })
+    const run = (slideshows: PanelRuntimeSnapshot['slideshows']) => {
+      const shape = makeShape('slideshow', 'panel-a', 'shape:a')
+      return buildPanelArchitectureReport(makeBoard([shape]), editorWith(shape), { saves, slideshows })
+    }
+
+    it('has no runtime checks unless the caller supplies the runtime', () => {
+      const shape = makeShape('notes', 'panel-a', 'shape:a')
+      const report = buildPanelArchitectureReport(makeBoard([shape]), editorWith(shape))
+      expect(report.checks.map((item) => item.id)).not.toContain('save-activity')
+      expect(report.checks.map((item) => item.id)).not.toContain('slideshow-look-ahead')
+    })
+
+    it('reports how many canvas updates were session-only and so not saved', () => {
+      const details = run([]).checks.find((item) => item.id === 'save-activity')?.details
+      expect(details).toContain('10 canvas updates: 3 changed the board, 7 touched only hover or selection')
+    })
+
+    it('passes a playing slideshow with a different picture queued, and a stopped one with nothing', () => {
+      expect(check(run([show()]), 'slideshow-look-ahead')).toBe('PASS')
+      expect(check(run([show({ isPlaying: false, timerSet: false, lookAhead: null })]), 'slideshow-look-ahead')).toBe('PASS')
+    })
+
+    it.each([
+      ['playing with no picture queued', { lookAhead: null }],
+      ['playing with no timer', { timerSet: false }],
+      ['queued picture is the one showing', { lookAhead: { index: 0, status: 'pending' } }],
+      ['queued picture is outside the collection', { lookAhead: { index: 9, status: 'pending' } }],
+      ['stopped but a picture is still queued', { isPlaying: false, timerSet: false }],
+    ])('flags a slideshow that is %s', (_name, patch) => {
+      expect(check(run([show(patch)]), 'slideshow-look-ahead')).toBe('ERROR')
+    })
+
+    it('compares the saved camera with the live one', () => {
+      const shape = makeShape('notes', 'panel-a', 'shape:a')
+      const at = (x: number) => ({ ...editorWith(shape), getCamera: () => ({ x, y: 0, z: 1 }) })
+      expect(check(buildPanelArchitectureReport(makeBoard([shape]), at(0)), 'camera-persisted')).toBe('PASS')
+      expect(check(buildPanelArchitectureReport(makeBoard([shape]), at(40)), 'camera-persisted')).toBe('WARNING')
+    })
   })
 })

@@ -1,0 +1,259 @@
+/* A full-screen panel is a place to work inside, not a shape to manipulate.
+   The selection outline and resize handles would otherwise frame the page.
+   tldraw's watermark is deliberately left alone - it is a licence term, not
+   decoration. */
+.app-root[data-panel-full-screen='true'] .tl-selection__fg,
+.app-root[data-panel-full-screen='true'] .tl-shape-indicator,
+.app-root[data-panel-full-screen='true'] .tl-handle {
+  display: none;
+}
+
+/*
+ * At full screen the panel is the window, so the card it is the rest of the
+ * time gives up the things that only make sense against a canvas: its
+ * rounded corners have nothing behind them at the window edge, and its
+ * border and shadow frame a page no one can see past.
+ *
+ * `border-width: 0`, not a transparent colour -- a transparent border is
+ * still a border, and the canvas shows through the 1px band it leaves,
+ * which reads as a gap between the toolbar and the page.
+ */
+.canvas-panel-shell.is-full-screen {
+  border-width: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* And the toolbar stops floating: it becomes the band across the top of
+   that page, holding only its lower edge as the rule between the two. */
+.app-root[data-panel-full-screen='true'] .app-chrome {
+  width: 100%;
+  margin: 0;
+  border-width: 0 0 var(--border-width-hairline);
+  border-radius: 0;
+}
+
+/* Two bands of text stacked on each other have to share a left column, or
+   the seam between them reads as careless. The panel's title is moved to
+   where the board's name is laid out -- measured, because that column is
+   the toolbar's inset plus the dropdown's own border and padding plus what
+   the browser adds inside it, and the first three are the theme's to
+   choose. AppChrome measures it; see --app-board-text-left there.
+
+   Multiplied by --tl-scale because the two are not in the same units. The
+   toolbar is drawn at screen size, while a panel is drawn inside tldraw's
+   canvas and scaled by the camera, so a padding written here renders at
+   only `zoom` times its value. --tl-scale is 1/zoom, which turns the
+   measured screen pixels back into the panel's own. The fallback is the
+   same column before a theme touches it, for the frame before the toolbar
+   has been measured. */
+.canvas-panel-shell.is-full-screen .card-header {
+  padding-left: calc(var(--app-board-text-left, 25px) * var(--tl-scale));
+}
+
+@container panel-shell (max-width: 520px) {
+  .panel-spotify-surface .transport-row {
+    flex-wrap: wrap;
+  }
+
+  .panel-spotify-surface .volume-control {
+    flex-basis: 100%;
+  }
+
+  /* One scroller, not two. The body stays clipped (as it is at every wider
+     size) and the results take the space left over, so the list scrolls and
+     nothing scrolls behind it. */
+  /* Results sit above the playback controls now, so they take the room that
+     is left rather than stopping at a cap and leaving a gap under themselves. */
+  .panel-spotify-surface .playlist-list {
+    flex: 1 1 0;
+    min-height: var(--size-playlist-height-min);
+  }
+
+}
+
+/* Stacking every slider onto its own row costs about 80px of panel height, so
+   it waits until the panel is too narrow to hold two side by side. */
+@container panel-shell (max-width: 400px) {
+  .range-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zoom-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .zoom-row label {
+    grid-column: 1 / -1;
+  }
+}
+
+@container panel-shell (max-height: 520px) {
+  .panel {
+    --space-panel-body-top: 8px;
+    --space-panel-body-bottom: 8px;
+    --space-row-bottom: var(--space-divider-inset);
+    --space-now-playing-bottom: var(--space-divider-inset);
+    --space-input-row-top: 6px;
+  }
+
+  .panel-spotify-surface {
+    --size-album-frame-max: clamp(64px, 14cqmin, 100px);
+  }
+
+  .panel-spotify-surface .track-meta {
+    -webkit-line-clamp: 1;
+  }
+
+  /* A short panel gives the results whatever the controls do not need, down
+     to a floor low enough that the controls are never pushed out of sight. */
+  .panel-spotify-surface .playlist-list {
+    flex: 1 1 0;
+    min-height: var(--size-playlist-height-short);
+  }
+
+  .slideshow-controls {
+    max-height: 42cqb;
+  }
+
+  .notes-document-controls {
+    gap: 7px;
+  }
+}
+
+@container panel-shell (min-width: 900px) and (min-height: 700px) {
+  .notes-document-controls {
+    gap: clamp(16px, 2cqmin, 24px);
+  }
+
+  .panel-spotify-surface .playlist-list {
+    min-height: var(--size-playlist-height-large);
+  }
+
+  .slideshow-controls {
+    max-height: var(--size-slideshow-controls-height-large);
+  }
+}
+
+@media (max-width: 1399px) {
+  .app-chrome {
+    column-gap: 12px;
+    padding-inline: 12px;
+  }
+
+  .board-toolbar select {
+    width: clamp(180px, 20vw, 220px);
+  }
+
+  .canvas-control-label-long {
+    display: none;
+  }
+
+  .canvas-control-label-short {
+    display: inline;
+  }
+
+  .app-chrome-tldraw .tlui-page-menu__trigger {
+    width: 104px;
+    min-width: 104px;
+  }
+}
+
+@media (max-width: 1199px) {
+  .board-action-secondary,
+  .board-theme-control {
+    display: none !important;
+  }
+
+  .board-toolbar .board-actions-menu-trigger {
+    display: inline-flex;
+  }
+
+  .board-toolbar select {
+    width: clamp(160px, 22vw, 200px);
+  }
+
+  .canvas-control-label-short {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .app-chrome-pan-control {
+    width: var(--size-top-toolbar-control);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-chrome-tldraw .tlui-page-menu__trigger {
+    width: 96px;
+    min-width: 96px;
+  }
+
+  .board-toolbar-error {
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (max-width: 799px) {
+  .app-chrome {
+    grid-template-areas:
+      "boards boards boards"
+      "canvas spacer tldraw";
+    grid-template-columns: auto minmax(8px, 1fr) auto;
+    row-gap: var(--space-top-toolbar-gap);
+    column-gap: var(--space-app-chrome-compact-gap);
+  }
+
+  .board-toolbar {
+    justify-content: flex-end;
+  }
+
+  .app-chrome-canvas {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .board-toolbar select {
+    width: clamp(130px, 30vw, 190px);
+  }
+}
+
+@media (max-width: 520px) {
+  .app-chrome {
+    grid-template-areas:
+      "boards boards"
+      "canvas spacer"
+      "tldraw tldraw";
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .board-toolbar select {
+    width: clamp(105px, 28vw, 145px);
+  }
+
+  .app-chrome-tldraw {
+    justify-content: center;
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .board-toolbar select {
+    width: 100px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: var(--motion-reduced-duration) !important;
+    animation-duration: var(--motion-reduced-duration) !important;
+    scroll-behavior: auto !important;
+  }
+}

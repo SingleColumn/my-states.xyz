@@ -238,13 +238,15 @@ export async function readStorage(page: Page, boardId: string) {
       request.onerror = () => reject(request.error)
     })
     interface StoredShape { typeName: string; index: string; x: number; y: number; props: { panelId: string; w: number; h: number; visible: boolean; focusView: boolean; panel: { config: unknown } } }
-    const board = await read<{ document: { store: Record<string, StoredShape> } } | undefined>('boards', (store) => store.get(id))
+    const board = await read<{ document: { store: Record<string, StoredShape> }; camera: { x: number; y: number; z: number } | null; updatedAt: number } | undefined>('boards', (store) => store.get(id))
     const notes = await read<Array<{ boardId: string; title: string; content: string; document?: { schemaVersion: number; doc: { content?: Array<{ type: string }> } } }>>('notes', (store) => store.getAll())
     db.close()
     const shapes = board ? Object.values(board.document.store).filter((record) => record.typeName === 'shape') : []
     shapes.sort((left, right) => (left.index < right.index ? -1 : left.index > right.index ? 1 : 0))
     return {
       found: !!board,
+      camera: board?.camera ?? null,
+      updatedAt: board?.updatedAt ?? null,
       panels: shapes.map((shape, order) => ({ panelId: shape.props.panelId, x: shape.x, y: shape.y, w: shape.props.w, h: shape.props.h, visible: shape.props.visible, focusView: shape.props.focusView, order, config: shape.props.panel.config })),
       notes: notes.filter((note) => note.boardId === id).map((note) => ({ title: note.title, content: note.content, document: note.document ?? null })),
     }
