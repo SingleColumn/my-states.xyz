@@ -12,7 +12,32 @@ export const collectionManualCaptionHandoffMs = Math.round(collectionManualCover
 // The first cover should change soon after entering the browser. Subsequent
 // rotations use the longer reading interval above.
 export const collectionInitialRotationDelayMs = 250
+// Used until the grid has been measured (and wherever it cannot be, such as
+// tests). After that, the page holds as many cards as the panel has room for.
 export const collectionsPerGridPage = 6
+
+export interface GridFit {
+  columns: number
+  rows: number
+}
+
+/**
+ * Works out how many cards fit in a grid of the given size. Columns follow the
+ * minimum card width. Rows aim for roughly square cards, so a tall panel gains
+ * rows rather than stretching two rows of portrait cards, but never shrink a
+ * row below the minimum height.
+ */
+export function fitGridCards(
+  width: number,
+  height: number,
+  { minColumnWidth, minRowHeight, columnGap, rowGap }: { minColumnWidth: number; minRowHeight: number; columnGap: number; rowGap: number },
+): GridFit {
+  const columns = Math.max(1, Math.floor((width + columnGap) / (minColumnWidth + columnGap)))
+  const columnWidth = (width - columnGap * (columns - 1)) / columns
+  const maxRows = Math.floor((height + rowGap) / (minRowHeight + rowGap))
+  const squareRows = Math.round((height + rowGap) / (Math.max(columnWidth, minRowHeight) + rowGap))
+  return { columns, rows: Math.max(1, Math.min(maxRows, squareRows)) }
+}
 
 export function initialCollectionIndex(collectionCount: number, randomValue = Math.random()) {
   if (collectionCount <= 0) return 0
@@ -82,6 +107,44 @@ export function CollectionBrowser({
   const transitionDurationRef = useRef(collectionCoverTransitionMs)
   const hasScheduledInitialRotationRef = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
+  const [gridElement, setGridElement] = useState<HTMLDivElement | null>(null)
+  const [gridFit, setGridFit] = useState<GridFit | null>(null)
+
+  // Resizing the panel changes how many cards fit, so the page size follows
+  // the grid's measured space rather than a fixed count. The sizing rules are
+  // read from the stylesheet so compact panels keep their smaller minimums.
+  useEffect(() => {
+    if (!gridElement || typeof ResizeObserver === 'undefined') return
+    const measure = () => {
+      const style = getComputedStyle(gridElement)
+      const width = gridElement.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      const height = gridElement.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      if (width <= 0 || height <= 0) return
+      const next = fitGridCards(width, height, {
+        minColumnWidth: parseFloat(style.getPropertyValue('--collection-grid-min-column')) || 150,
+        minRowHeight: parseFloat(style.getPropertyValue('--collection-grid-min-row')) || 110,
+        columnGap: parseFloat(style.columnGap) || 0,
+        rowGap: parseFloat(style.rowGap) || 0,
+      })
+      setGridFit((current) => (current?.columns === next.columns && current.rows === next.rows ? current : next))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(gridElement)
+    return () => observer.disconnect()
+  }, [gridElement])
+
+  const pageSize = gridFit ? gridFit.columns * gridFit.rows : collectionsPerGridPage
+  const pageSizeRef = useRef(pageSize)
+
+  // Keep the first card the person was looking at on screen when the page
+  // size changes, instead of jumping back to an unrelated page.
+  useEffect(() => {
+    const previousPageSize = pageSizeRef.current
+    pageSizeRef.current = pageSize
+    if (previousPageSize === pageSize) return
+    setGridPage((page) => Math.floor((page * previousPageSize) / pageSize))
+  }, [pageSize])
 
   useEffect(() => {
     if (!collections.length) {
@@ -99,10 +162,10 @@ export function CollectionBrowser({
   const captionIndex = Math.max(0, collections.findIndex((collection) => collection.id === captionCollectionId))
   const captionCollection = collections[captionIndex] ?? currentCollection
   const isPaused = isHovered || hasFocusWithin
-  const gridPageCount = Math.max(1, Math.ceil(collections.length / collectionsPerGridPage))
+  const gridPageCount = Math.max(1, Math.ceil(collections.length / pageSize))
   const gridCollections = collections.slice(
-    gridPage * collectionsPerGridPage,
-    (gridPage + 1) * collectionsPerGridPage,
+    gridPage * pageSize,
+    (gridPage + 1) * pageSize,
   )
 
   // Warm the browser cache with the covers on the other grid pages so paging
@@ -111,7 +174,7 @@ export function CollectionBrowser({
   useEffect(() => {
     if (viewMode !== 'grid') return
     const urls = collections
-      .map((collection, index) => ({ url: collection.gridCoverUrl ?? collection.coverUrl, distance: Math.abs(Math.floor(index / collectionsPerGridPage) - gridPage) }))
+      .map((collection, index) => ({ url: collection.gridCoverUrl ?? collection.coverUrl, distance: Math.abs(Math.floor(index / pageSize) - gridPage) }))
       .filter((cover) => cover.url && cover.distance > 0)
       .sort((a, b) => a.distance - b.distance)
     const preloaders = urls.map((cover) => {
@@ -121,7 +184,7 @@ export function CollectionBrowser({
       return image
     })
     return () => { preloaders.forEach((image) => { image.src = '' }) }
-  }, [collections, gridPage, viewMode])
+  }, [collections, gridPage, pageSize, viewMode])
 
   useEffect(() => {
     setGridPage((page) => Math.min(page, gridPageCount - 1))
@@ -130,7 +193,7 @@ export function CollectionBrowser({
   useEffect(() => {
     if (hasLocatedInitialGridPageRef.current || !collections.length) return
     hasLocatedInitialGridPageRef.current = true
-    setGridPage(gridPageForCollection(collections, initialCollectionId))
+    setGridPage(gridPageForCollection(collections, initialCollectionId, pageSizeRef.current))
   }, [collections, initialCollectionId])
 
   // Prepare both layers before the browser paints the new current cover. A
@@ -213,7 +276,13 @@ export function CollectionBrowser({
   } else if (viewMode === 'grid') {
     content = (
       <div className="collection-browser-grid-layout">
-        <div className="collection-browser-grid" role="list" aria-label="Available image collections">
+        <div
+          ref={setGridElement}
+          className={`collection-browser-grid${gridFit ? ' is-measured' : ''}`}
+          role="list"
+          aria-label="Available image collections"
+          style={gridFit ? { '--collection-grid-columns': gridFit.columns, '--collection-grid-rows': gridFit.rows } as CSSProperties : undefined}
+        >
           {gridCollections.map((collection) => {
             const creatorLabel = collection.creators.length === 1
               ? collection.creators[0]
@@ -237,7 +306,7 @@ export function CollectionBrowser({
               </div>
             )
           })}
-          {Array.from({ length: collectionsPerGridPage - gridCollections.length }, (_, index) => (
+          {Array.from({ length: pageSize - gridCollections.length }, (_, index) => (
             <div className="collection-grid-item is-placeholder" aria-hidden="true" key={`placeholder-${index}`} />
           ))}
         </div>
@@ -368,8 +437,8 @@ function initialId(collections: CollectionSummary[], preferredId: string | undef
   return collections[initialCollectionIndex(collections.length, randomValue)].id
 }
 
-function gridPageForCollection(collections: CollectionSummary[], preferredId: string | undefined) {
+function gridPageForCollection(collections: CollectionSummary[], preferredId: string | undefined, pageSize = collectionsPerGridPage) {
   if (!preferredId) return 0
   const index = collections.findIndex((collection) => collection.id === preferredId)
-  return index < 0 ? 0 : Math.floor(index / collectionsPerGridPage)
+  return index < 0 ? 0 : Math.floor(index / pageSize)
 }

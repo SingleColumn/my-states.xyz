@@ -13,6 +13,7 @@ import {
   collectionManualCoverTransitionMs,
   collectionRotationIntervalMs,
   collectionsPerGridPage,
+  fitGridCards,
   initialCollectionIndex,
   shuffleCollectionOrder,
   type CollectionBrowserProps,
@@ -173,6 +174,16 @@ describe('CollectionBrowser', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Previous collection page' }))
     expect(container.querySelectorAll('.collection-grid-card')).toHaveLength(6)
     expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+  })
+
+  it('fits more cards into a larger grid and never fewer than one', () => {
+    const rules = { minColumnWidth: 150, minRowHeight: 110, columnGap: 10, rowGap: 10 }
+
+    expect(fitGridCards(800, 470, rules)).toEqual({ columns: 5, rows: 3 })
+    expect(fitGridCards(1600, 940, rules)).toEqual({ columns: 10, rows: 6 })
+    // A short, wide grid uses one row rather than squashing cards into two.
+    expect(fitGridCards(800, 230, rules)).toEqual({ columns: 5, rows: 1 })
+    expect(fitGridCards(100, 50, rules)).toEqual({ columns: 1, rows: 1 })
   })
 
   it('opens the grid page containing the selected collection', () => {
