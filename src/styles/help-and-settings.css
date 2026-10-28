@@ -374,10 +374,14 @@
 }
 
 .notes-zoom-value {
-  /* Sized from the button, not the surrounding text: the button is a fixed
-     square, and "100%" has to fit inside it at any panel scale. */
-  padding: 0;
-  font-size: calc(var(--card-header-button-size) * 0.3);
+  /* A readable size that the button grows to hold, rather than a size shrunk
+     to fit a fixed square: at full screen the button is only 30px wide, and
+     "100%" shrunk into that was about 9px. Both scale together with the
+     panel, so the label keeps its fit at any canvas zoom. */
+  width: auto;
+  min-width: var(--card-header-button-size);
+  padding: 0 6px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }

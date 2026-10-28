@@ -9,7 +9,9 @@ import { isWebAddress } from './themes/validate'
  * While a panel is full screen its footer (the word count) fills the bottom
  * left of the window, where the credit normally sits. The credit then moves to
  * the right of the footer, on the same line as the count, just left of the
- * note total.
+ * note total. Only the writing footer is short enough to share its line: other
+ * panels fill the footer's left side with a long name, which the credit would
+ * cover, so they keep the credit where it was.
  */
 export function ThemeCredit({ url, fullScreen = false }: { url?: string; fullScreen?: boolean }) {
   const linkRef = useRef<HTMLAnchorElement>(null)
@@ -25,7 +27,7 @@ export function ThemeCredit({ url, fullScreen = false }: { url?: string; fullScr
     let frame = 0
     let last = ''
     const place = () => {
-      const footer = document.querySelector('.canvas-panel-shell.is-full-screen .card-footer')
+      const footer = document.querySelector('.canvas-panel-shell.is-full-screen .panel-notes-surface .card-footer')
       if (footer) {
         const line = (footer.querySelector('.card-footer-meta') ?? footer).getBoundingClientRect()
         const status = footer.querySelector('.card-footer-status')?.getBoundingClientRect()
