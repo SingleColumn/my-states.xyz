@@ -765,7 +765,7 @@ function AppContent() {
           </WordGraphProvider>
         </AppChromePropsProvider>
       </PanelCommandsProvider>
-      <ThemeCredit url={appearance.effective.definition.inspiredBy} />
+      <ThemeCredit url={appearance.effective.definition.inspiredBy} fullScreen={Boolean(fullScreenPanelId)} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
       <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />

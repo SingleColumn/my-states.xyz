@@ -374,8 +374,10 @@
 }
 
 .notes-zoom-value {
-  font-size: 0.85em;
-  min-width: 4ch;
+  /* Sized from the button, not the surrounding text: the button is a fixed
+     square, and "100%" has to fit inside it at any panel scale. */
+  padding: 0;
+  font-size: calc(var(--card-header-button-size) * 0.3);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
