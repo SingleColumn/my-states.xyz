@@ -14,6 +14,7 @@ import {
   setActiveBoardId,
 } from './storage'
 import { SaveQueue } from './saveQueue'
+import { createSaveStatusStore } from './saveStatus'
 import { deleteSavedWordGraph } from './wordGraph/wordGraphStorage'
 import { BoardOperation } from './boardOperation'
 
@@ -24,7 +25,14 @@ export function useBoardState() {
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const activeBoardRef = useRef<Board | null>(null)
-  const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save the board. Keep this tab open and try again.')))
+  const [saveStatus] = useState(createSaveStatusStore)
+  const [saveQueue] = useState(() => new SaveQueue(
+    (caught) => {
+      saveStatus.markFailed()
+      setError(caught instanceof Error ? caught.message : 'Could not save the board. Keep this tab open and try again.')
+    },
+    (busy) => saveStatus.markBusy(busy),
+  ))
   const [operation] = useState(() => new BoardOperation())
   const canvasFlushRef = useRef<(() => void | Promise<void>) | null>(null)
   const canvasRestoreRef = useRef<((board: Board) => (() => void)) | null>(null)
@@ -213,6 +221,7 @@ export function useBoardState() {
     boards,
     activeBoard,
     error,
+    saveStatus,
     create,
     open,
     rename,

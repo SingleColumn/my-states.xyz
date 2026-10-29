@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
 import { useBoardThemeOptions } from './BoardThemeSelect'
 import { peekBoardArchiveName } from './boardArchive'
+import { BoardSaveStatus } from './BoardSaveStatus'
 import { nextDuplicateName } from './utils'
 
 export function BoardToolbar() {
@@ -136,83 +137,53 @@ export function BoardToolbar() {
       >
         <FilePlus2 size={17} />
       </button>
-      <button
-        className="card-icon-button board-action-secondary"
-        type="button"
-        title="Rename board"
-        aria-label="Rename board"
-        disabled={busy || !boards.activeBoard}
-        onClick={renameBoard}
-      >
-        <Pencil size={16} />
-      </button>
-      <button
-        className="card-icon-button board-action-secondary"
-        type="button"
-        title="Duplicate board"
-        aria-label="Duplicate board"
-        disabled={busy || !boards.activeBoard}
-        onClick={() => void run(boards.duplicate)}
-      >
-        <Copy size={16} />
-      </button>
-      <button className="card-icon-button board-action-secondary board-action-transfer" type="button" title="Export board" aria-label="Export board" disabled={busy || !boards.activeBoard} onClick={() => void run(boards.exportActive)}>
-        <Download size={17} />
-      </button>
-      <button className="card-icon-button board-action-secondary" type="button" title="Import board" aria-label="Import board" disabled={busy} onClick={() => inputRef.current?.click()}>
-        <FolderUp size={17} />
-      </button>
-      <button
-        className="card-icon-button board-action-secondary board-action-delete"
-        type="button"
-        title="Delete board"
-        aria-label="Delete board"
-        disabled={busy || !boards.activeBoard}
-        onClick={deleteBoard}
-      >
-        <Trash2 size={17} />
-      </button>
-      <button
-        ref={menuTriggerRef}
-        className="card-icon-button board-actions-menu-trigger"
-        type="button"
-        title="More board actions"
-        aria-label="More board actions"
-        aria-haspopup="menu"
-        aria-expanded={isMenuOpen}
-        disabled={busy}
-        onClick={() => setIsMenuOpen((open) => !open)}
-      >
-        <MoreHorizontal size={17} aria-hidden="true" />
-      </button>
-      {isMenuOpen ? (
-        <div ref={menuRef} className="board-actions-menu" role="menu" aria-label="Board actions">
-          <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(renameBoard)}>
-            <Pencil size={16} aria-hidden="true" /><span>Rename board</span>
-          </button>
-          <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => void run(boards.duplicate))}>
-            <Copy size={16} aria-hidden="true" /><span>Duplicate board</span>
-          </button>
-          <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => void run(boards.exportActive))}>
-            <Download size={17} aria-hidden="true" /><span>Export board</span>
-          </button>
-          <button type="button" role="menuitem" onClick={() => runMenuAction(() => inputRef.current?.click())}>
-            <FolderUp size={17} aria-hidden="true" /><span>Import board</span>
-          </button>
-          <button className="is-destructive" type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(deleteBoard)}>
-            <Trash2 size={17} aria-hidden="true" /><span>Delete board</span>
-          </button>
-          <div className="canvas-view-menu-section" role="group" aria-label="Theme for this board">
-            <span className="canvas-view-menu-heading">Theme</span>
-            {theme.options.map((option) => (
-              <button key={option.id} type="button" role="menuitemradio" aria-checked={option.id === theme.pinnedThemeId} disabled={!boards.activeBoard} onClick={() => runMenuAction(() => chooseTheme(option.id))}>
-                {option.id === theme.pinnedThemeId ? <Check size={16} aria-hidden="true" /> : <span className="board-theme-menu-spacer" aria-hidden="true" />}
-                <span>{option.label}</span>
-              </button>
-            ))}
+      <span className="board-menu-anchor">
+        <button
+          ref={menuTriggerRef}
+          className="card-icon-button board-actions-menu-trigger"
+          type="button"
+          title="More board options"
+          aria-label="More board actions"
+          aria-haspopup="menu"
+          aria-expanded={isMenuOpen}
+          disabled={busy}
+          onClick={() => setIsMenuOpen((open) => !open)}
+        >
+          <MoreHorizontal size={17} aria-hidden="true" />
+        </button>
+        {isMenuOpen ? (
+          <div ref={menuRef} className="board-actions-menu" role="menu" aria-label="Board actions">
+            <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(renameBoard)}>
+              <Pencil size={16} aria-hidden="true" /><span>Rename board</span>
+            </button>
+            <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => void run(boards.duplicate))}>
+              <Copy size={16} aria-hidden="true" /><span>Duplicate board</span>
+            </button>
+            <div className="board-actions-menu-divider" role="separator" />
+            <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => void run(boards.exportActive))}>
+              <Download size={17} aria-hidden="true" /><span>Export board</span>
+            </button>
+            <button type="button" role="menuitem" onClick={() => runMenuAction(() => inputRef.current?.click())}>
+              <FolderUp size={17} aria-hidden="true" /><span>Import board</span>
+            </button>
+            <div className="board-actions-menu-divider" role="separator" />
+            <button className="is-destructive" type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(deleteBoard)}>
+              <Trash2 size={17} aria-hidden="true" /><span>Delete board</span>
+            </button>
+            {/* On a wide window the theme has its own selector in the toolbar; this copy is for narrow ones. */}
+            <div className="canvas-view-menu-section board-actions-menu-theme" role="group" aria-label="Theme for this board">
+              <span className="canvas-view-menu-heading">Theme</span>
+              {theme.options.map((option) => (
+                <button key={option.id} type="button" role="menuitemradio" aria-checked={option.id === theme.pinnedThemeId} disabled={!boards.activeBoard} onClick={() => runMenuAction(() => chooseTheme(option.id))}>
+                  {option.id === theme.pinnedThemeId ? <Check size={16} aria-hidden="true" /> : <span className="board-theme-menu-spacer" aria-hidden="true" />}
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </span>
+      <BoardSaveStatus />
       <input
         ref={inputRef}
         className="visually-hidden-file-input"

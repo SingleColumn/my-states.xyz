@@ -15,6 +15,7 @@ import {
   loadSampleImages,
   boardPicker,
   boardPickerNames,
+  chooseBoardMenuItem,
   noteBodyOf,
   openApp,
   panelById,
@@ -177,7 +178,7 @@ test('export writes a .board.zip and import brings the board back, listed in the
   const exported = (await describeCanvas(page)).panels.map(persistedShape)
 
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export board' }).click()
+  await chooseBoardMenuItem(page, 'Export board')
   const download = await downloading
   expect(download.suggestedFilename()).toMatch(/\.board\.zip$/)
   const archivePath = testInfo.outputPath(download.suggestedFilename())
@@ -212,7 +213,7 @@ test('Duplicate board makes an independent, already-open copy named "(copy)", ne
   if (!source) throw new Error('No board is open')
   const sourcePanels = (await describeCanvas(page)).panels.map(persistedShape)
 
-  await page.getByRole('button', { name: 'Duplicate board' }).click()
+  await chooseBoardMenuItem(page, 'Duplicate board')
   await expect.poll(async () => (await describeCanvas(page)).board?.id).not.toBe(source.id)
   const duplicate = (await describeCanvas(page)).board
   if (!duplicate) throw new Error('No board is open after duplicating')
@@ -227,7 +228,7 @@ test('importing an archive whose name collides with an existing board offers a n
   await createBoardFromToolbar(page, 'Kept aside')
 
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export board' }).click()
+  await chooseBoardMenuItem(page, 'Export board')
   const download = await downloading
   const archivePath = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(archivePath)
@@ -258,7 +259,7 @@ test('declining the rename-or-import prompt for a colliding name adds nothing', 
   await createBoardFromToolbar(page, 'Kept aside')
 
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export board' }).click()
+  await chooseBoardMenuItem(page, 'Export board')
   const download = await downloading
   const archivePath = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(archivePath)

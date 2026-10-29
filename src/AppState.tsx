@@ -23,6 +23,7 @@ import {
   type PanelWriteOptions,
 } from './panelStore'
 import { useBoardState } from './boardState'
+import type { SaveStatusStore } from './saveStatus'
 import { getNotesPanelRuntimeState, useNotesState, type NotesState } from './notesState'
 import { getSlideshowPanelRuntimeState, useSlideshowState, type SlideshowState } from './slideshowState'
 import { useSpotifyState, type SpotifyState } from './spotifyState'
@@ -34,6 +35,8 @@ interface BoardsState {
   boards: BoardSummary[]
   activeBoard: Board | null
   error: string | null
+  /** Whether the open board's changes have reached storage. Subscribe to it; it is not React state. */
+  saveStatus: SaveStatusStore
   create(name: string): Promise<void>
   open(boardId: string): Promise<void>
   rename(name: string): Promise<void>
@@ -108,6 +111,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       boards: boardCore.boards,
       activeBoard: boardCore.activeBoard,
       error: boardCore.error ?? notes.error,
+      saveStatus: boardCore.saveStatus,
       create: (name) => boardCore.operation.run(async () => {
         await notes.flush()
         await boardCore.flush()

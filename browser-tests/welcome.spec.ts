@@ -43,7 +43,7 @@ test.describe('welcome card', () => {
     await expect(card).toBeHidden()
 
     // ...until it is asked for again.
-    await page.getByRole('button', { name: 'About' }).click()
+    await page.getByRole('button', { name: /^my-states.xyz/ }).click()
     await page.getByRole('button', { name: 'Show the welcome message again' }).click()
     await expect(card).toBeVisible()
     await expect(page.getByRole('dialog', { name: 'How it works' })).toBeHidden()
@@ -57,7 +57,7 @@ test.describe('welcome card', () => {
     await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
     await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
 
-    await page.getByRole('button', { name: 'About' }).click()
+    await page.getByRole('button', { name: /^my-states.xyz/ }).click()
     await page.getByRole('button', { name: 'Show the welcome message again' }).click()
     const card = page.getByRole('region', { name: 'Welcome to my-states.xyz' })
     await expect(card).toBeVisible()
@@ -68,7 +68,7 @@ test.describe('welcome card', () => {
 
   test('the help index scrolls to a section', async ({ page }) => {
     await openApp(page)
-    await page.getByRole('button', { name: 'About' }).click()
+    await page.getByRole('button', { name: /^my-states.xyz/ }).click()
     const dialog = page.getByRole('dialog', { name: 'How it works' })
     await dialog.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Themes' }).click()
     await expect(dialog.getByRole('heading', { name: 'Themes' })).toBeFocused()

@@ -29,6 +29,28 @@ describe('durable save queue', () => {
     expect(queue.hasPending).toBe(false)
   })
 
+  it('reports when it becomes busy and when it empties, once per run of writes', async () => {
+    const busy: boolean[] = []
+    const queue = new SaveQueue(vi.fn(), (isBusy) => busy.push(isBusy))
+    queue.enqueue('a', async () => {})
+    queue.enqueue('b', async () => {})
+    expect(busy).toEqual([true])
+    await queue.flush()
+    expect(busy).toEqual([true, false])
+  })
+
+  it('reports the error before it stops being busy, and is busy again on a retry', async () => {
+    const events: string[] = []
+    const write = vi.fn().mockRejectedValueOnce(new Error('Disk full')).mockResolvedValue(undefined)
+    const queue = new SaveQueue(() => events.push('error'), (isBusy) => events.push(isBusy ? 'busy' : 'idle'))
+    queue.enqueue('board', write)
+    await expect(queue.flush()).rejects.toThrow('Disk full')
+    expect(events).toEqual(['busy', 'error', 'idle'])
+    queue.enqueue('board', write)
+    await queue.flush()
+    expect(events).toEqual(['busy', 'error', 'idle', 'busy', 'idle'])
+  })
+
   it('coalesces waiting snapshots without dropping another board or note', async () => {
     let complete!: () => void
     const first = new Promise<void>((resolve) => { complete = resolve })

@@ -670,7 +670,7 @@ function AppContent() {
   }, [restoreCanvas, boards.activeBoard?.id])
 
   // tldraw remounts components.MenuPanel whenever its reference changes, which would wipe
-  // AppChrome's internal state (e.g. the About-button pulse) on almost every interaction.
+  // AppChrome's internal state (e.g. which menu is open) on almost every interaction.
   // AppChromeMenuPanel is a stable reference that reads these props from context instead.
   const appChromeProps = {
     isCanvasReady,

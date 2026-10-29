@@ -305,6 +305,15 @@ export async function addPanelFromToolbar(page: Page, type: PanelType): Promise<
   return added
 }
 
+/**
+ * Opens the board `···` menu and chooses one item: Rename board, Duplicate
+ * board, Export board, Import board or Delete board. They live only there.
+ */
+export async function chooseBoardMenuItem(page: Page, itemName: string) {
+  await page.getByRole('button', { name: 'More board actions' }).click()
+  await page.getByRole('menuitem', { name: itemName }).click()
+}
+
 /** The board picker in the toolbar. */
 export function boardPicker(page: Page) {
   return page.getByRole('combobox', { name: 'Open board' })
