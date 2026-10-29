@@ -192,11 +192,59 @@
 
 .help-about-close:hover { background: var(--card-button-bg-hover); }
 
+/* Index on the left, text on the right; only the text scrolls, so the index
+   stays in view while someone reads. */
+.help-about-body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.help-about-index {
+  overflow: auto;
+  padding: 20px 12px 20px 20px;
+  border-right: 1px solid var(--color-panel-divider);
+}
+
+.help-about-index ul { margin: 0; padding: 0; list-style: none; }
+
+.help-about-index button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.help-about-index button:hover,
+.help-about-index button:focus-visible { background: var(--card-button-bg-hover); }
+
 .help-about-content {
   overflow: auto;
   padding: 24px;
   font-size: 16px;
   line-height: 1.55;
+}
+
+.help-about-content h3:focus { outline: none; }
+
+/* A button that reads as a link in running text. */
+.help-about-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--card-button-active-icon);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .help-about-content section {
@@ -223,7 +271,130 @@
   .help-about-backdrop { padding: 10px; }
   .help-about-dialog { max-height: 94vh; }
   .help-about-header, .help-about-content { padding: 16px; }
+  /* The index becomes a row of links along the top. */
+  .help-about-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .help-about-index { padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--color-panel-divider); }
+  .help-about-index ul { display: flex; gap: 4px; }
+  .help-about-index button { width: auto; white-space: nowrap; }
 }
+
+/* First-visit welcome: centred so it is the first thing seen, below dialogs.
+   It is not a modal: the canvas behind it stays usable. */
+@property --welcome-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Icy glass between the canvas and the card: panels stay visible, softened. */
+.welcome-frost {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  /* A cool blue-white tint over a light blur: the colour of ice. */
+  background: rgb(190 222 255 / 16%);
+  -webkit-backdrop-filter: blur(4px) saturate(1.2) brightness(1.1);
+  backdrop-filter: blur(4px) saturate(1.2) brightness(1.1);
+}
+
+/* Without blur support, a plain tint stands in for the frost. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .welcome-frost { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+}
+
+.welcome-card {
+  position: relative;
+  width: min(660px, calc(100vw - 24px));
+  padding: 14px 20px;
+  /* A soft yellow edge, mixed with the theme's own border colour, tells the
+     card apart from the panels without shouting in any theme. */
+  border: 1px solid color-mix(in srgb, #e3b93c 60%, var(--color-dialog-border));
+  border-radius: var(--radius-card);
+  background: var(--background-dialog);
+  color: var(--color-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #e3b93c 14%, transparent), var(--shadow-dialog);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* A short yellow arc travelling round the frame. Three laps, then it stops:
+   a border that moves for ever would pull the eye away from writing. */
+.welcome-card::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 2px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--welcome-angle), transparent 0 72%, #e3b93c 92%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+  animation: welcome-card-lap 3s linear 3;
+}
+
+@keyframes welcome-card-lap {
+  to { --welcome-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-card::after { animation: none; display: none; }
+}
+
+.welcome-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.welcome-card-header h2 { margin: 0; font-family: var(--font-family-display); font-size: 19px; }
+
+.welcome-card-close {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.welcome-card-close:hover { background: var(--card-button-bg-hover); color: var(--color-text); }
+.welcome-card-list { margin: 10px 0; padding-left: 20px; }
+.welcome-card-list li + li { margin-top: 6px; }
+/* Checkbox and buttons share a row to save height; they stack when narrow. */
+.welcome-card-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+/* A picture of the real "···" button, so people can match it to what they see on the panels. */
+.welcome-card-more-button {
+  display: inline-grid;
+  width: 26px;
+  height: 22px;
+  place-items: center;
+  vertical-align: middle;
+  border: 1px solid var(--color-control-border-hover);
+  border-radius: 6px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+}
+
+.welcome-card-check { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); cursor: pointer; }
+.welcome-card-actions { display: flex; gap: 8px; }
+
+.welcome-card-primary,
+.welcome-card-secondary {
+  padding: 6px 14px;
+  border: 1px solid var(--color-control-border-hover);
+  border-radius: 8px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.welcome-card-primary:hover,
+.welcome-card-secondary:hover { background: var(--card-button-bg-hover); }
+.welcome-card-primary { font-weight: 600; }
 
 /* Settings: the same dialog shell as Help & About, with a section nav on
    the left. Every colour here is a theme token, so the dialog repaints as

@@ -21,6 +21,8 @@ import { diffChangesBoard, registerHiddenCanvasPersistence, saveActivity } from 
 import { buildPanelArchitectureReport, type PanelArchitectureReport, type PanelRuntimeSnapshot } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
+import { WelcomeCard } from './WelcomeCard'
+import { isWelcomeHidden, setWelcomeHidden } from './welcomePreference'
 import { AppSettings } from './AppSettings'
 import { WordGraphProvider } from './wordGraph/WordGraphController'
 import { ThemeCredit } from './ThemeCredit'
@@ -63,6 +65,9 @@ function AppContent() {
   const [chromeBottom, setChromeBottom] = useState(0)
   const [architectureReport, setArchitectureReport] = useState<PanelArchitectureReport | null>(null)
   const [isHelpAboutOpen, setIsHelpAboutOpen] = useState(false)
+  // Shown on every visit until "Don't show this again" is ticked; closing it
+  // without the tick hides it for this visit only.
+  const [isWelcomeVisible, setIsWelcomeVisible] = useState(() => !isWelcomeHidden())
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   // previousPanelGeometryRef stays the source of truth for restoring geometry;
   // this mirrors it purely so the root element re-renders when a panel enters
@@ -636,6 +641,22 @@ function AppContent() {
 
   const closeHelpAbout = useCallback(() => setIsHelpAboutOpen(false), [])
 
+  const closeWelcome = useCallback((dontShowAgain: boolean) => {
+    if (dontShowAgain) setWelcomeHidden(true)
+    setIsWelcomeVisible(false)
+  }, [])
+
+  const openHelpFromWelcome = useCallback((dontShowAgain: boolean) => {
+    closeWelcome(dontShowAgain)
+    openHelpAbout()
+  }, [closeWelcome, openHelpAbout])
+
+  const showWelcomeAgain = useCallback(() => {
+    setWelcomeHidden(false)
+    setIsHelpAboutOpen(false)
+    setIsWelcomeVisible(true)
+  }, [])
+
   const openSettings = useCallback(() => {
     settingsReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setIsSettingsOpen(true)
@@ -767,7 +788,8 @@ function AppContent() {
       </PanelCommandsProvider>
       <ThemeCredit url={appearance.effective.definition.inspiredBy} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
-      <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} />
+      {isWelcomeVisible && !fullScreenPanelId ? <WelcomeCard onClose={closeWelcome} onOpenHelp={openHelpFromWelcome} /> : null}
+      <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} onShowWelcome={showWelcomeAgain} />
       <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />
       {boards.error ? <div className="callback-toast" role="alert">{boards.error} <button type="button" onClick={() => { void boards.flush().catch(() => {}) }}>Retry save</button></div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
