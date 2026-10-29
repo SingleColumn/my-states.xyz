@@ -788,7 +788,7 @@ function AppContent() {
       </PanelCommandsProvider>
       <ThemeCredit url={appearance.effective.definition.inspiredBy} fullScreen={Boolean(fullScreenPanelId)} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
-      {isWelcomeVisible && !fullScreenPanelId ? <WelcomeCard onClose={closeWelcome} onOpenHelp={openHelpFromWelcome} /> : null}
+      {isWelcomeVisible ? <WelcomeCard onClose={closeWelcome} onOpenHelp={openHelpFromWelcome} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} onShowWelcome={showWelcomeAgain} />
       <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />
       {boards.error ? <div className="callback-toast" role="alert">{boards.error} <button type="button" onClick={() => { void boards.flush().catch(() => {}) }}>Retry save</button></div> : null}

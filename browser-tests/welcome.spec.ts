@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { openApp } from './helpers'
+import { openApp, panelOfType, shapeOf } from './helpers'
 
 test.describe('welcome card', () => {
   test('appears on a first visit and returns after "Got it"', async ({ page }) => {
@@ -47,6 +47,23 @@ test.describe('welcome card', () => {
     await page.getByRole('button', { name: 'Show the welcome message again' }).click()
     await expect(card).toBeVisible()
     await expect(page.getByRole('dialog', { name: 'How it works' })).toBeHidden()
+  })
+
+  test('"Show the welcome message again" works while a panel is at full screen', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const shape = await shapeOf(page, notes.panelId)
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
+    await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
+
+    await page.getByRole('button', { name: 'About' }).click()
+    await page.getByRole('button', { name: 'Show the welcome message again' }).click()
+    const card = page.getByRole('region', { name: 'Welcome to my-states.xyz' })
+    await expect(card).toBeVisible()
+    // It is on top of the full-screen page, so its buttons can be pressed.
+    await card.getByRole('button', { name: 'Got it' }).click()
+    await expect(card).toBeHidden()
   })
 
   test('the help index scrolls to a section', async ({ page }) => {
