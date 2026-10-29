@@ -786,7 +786,7 @@ function AppContent() {
           </WordGraphProvider>
         </AppChromePropsProvider>
       </PanelCommandsProvider>
-      <ThemeCredit url={appearance.effective.definition.inspiredBy} />
+      <ThemeCredit url={appearance.effective.definition.inspiredBy} fullScreen={Boolean(fullScreenPanelId)} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       {isWelcomeVisible && !fullScreenPanelId ? <WelcomeCard onClose={closeWelcome} onOpenHelp={openHelpFromWelcome} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} onShowWelcome={showWelcomeAgain} />
