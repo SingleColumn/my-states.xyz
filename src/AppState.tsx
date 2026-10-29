@@ -100,7 +100,7 @@ const AppStateContext = createContext<AppStateValue | null>(null)
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const boardCore = useBoardState()
   const panels = usePanelsState(boardCore.activeBoard?.id ?? null)
-  const notes = useNotesState(boardCore.activeBoard, panels, boardCore.operation)
+  const notes = useNotesState(boardCore.activeBoard, panels, boardCore.operation, boardCore.saveStatus)
   const slideshow = useSlideshowState(boardCore.activeBoard, panels)
   const spotify = useSpotifyState(boardCore.activeBoard, panels)
   const appearance = useAppearanceState(boardCore.activeBoard)

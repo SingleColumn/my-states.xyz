@@ -26,13 +26,16 @@ export function useBoardState() {
   const [error, setError] = useState<string | null>(null)
   const activeBoardRef = useRef<Board | null>(null)
   const [saveStatus] = useState(createSaveStatusStore)
-  const [saveQueue] = useState(() => new SaveQueue(
-    (caught) => {
-      saveStatus.markFailed()
-      setError(caught instanceof Error ? caught.message : 'Could not save the board. Keep this tab open and try again.')
-    },
-    (busy) => saveStatus.markBusy(busy),
-  ))
+  const [saveQueue] = useState(() => {
+    const boardWrites = saveStatus.source()
+    return new SaveQueue(
+      (caught) => {
+        boardWrites.markFailed()
+        setError(caught instanceof Error ? caught.message : 'Could not save the board. Keep this tab open and try again.')
+      },
+      boardWrites.markBusy,
+    )
+  })
   const [operation] = useState(() => new BoardOperation())
   const canvasFlushRef = useRef<(() => void | Promise<void>) | null>(null)
   const canvasRestoreRef = useRef<((board: Board) => (() => void)) | null>(null)

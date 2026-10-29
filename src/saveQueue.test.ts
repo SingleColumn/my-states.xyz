@@ -51,6 +51,17 @@ describe('durable save queue', () => {
     expect(events).toEqual(['busy', 'error', 'idle', 'busy', 'idle'])
   })
 
+  it('is busy again, and then idle, when a failed write is retried by flush alone', async () => {
+    const events: string[] = []
+    const write = vi.fn().mockRejectedValueOnce(new Error('Disk full')).mockResolvedValue(undefined)
+    const queue = new SaveQueue(() => events.push('error'), (isBusy) => events.push(isBusy ? 'busy' : 'idle'))
+    queue.enqueue('board', write)
+    await expect(queue.flush()).rejects.toThrow('Disk full')
+    // The "Retry save" button flushes without queueing anything new.
+    await queue.flush()
+    expect(events).toEqual(['busy', 'error', 'idle', 'busy', 'idle'])
+  })
+
   it('coalesces waiting snapshots without dropping another board or note', async () => {
     let complete!: () => void
     const first = new Promise<void>((resolve) => { complete = resolve })

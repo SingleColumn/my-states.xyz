@@ -3,6 +3,7 @@ import type { Note, NoteDocument, Panel, Board } from './types'
 import { deleteNote as deleteStoredNote, getNotes, saveNote } from './storage'
 import { createId } from './utils'
 import { SaveQueue } from './saveQueue'
+import type { SaveStatusStore } from './saveStatus'
 import { persistNoteSnapshot } from './notePersistence'
 import { BoardOperation } from './boardOperation'
 import type { NotesEditorHandle } from './panels/NotesEditor'
@@ -65,10 +66,21 @@ export interface NotesState {
   flush(): Promise<void>
 }
 
-export function useNotesState(board: Board | null, panels: PanelsState, operation: BoardOperation): NotesState {
+export function useNotesState(board: Board | null, panels: PanelsState, operation: BoardOperation, saveStatus: SaveStatusStore): NotesState {
   const [notes, setNotes] = useState<Note[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [saveQueue] = useState(() => new SaveQueue((caught) => setError(caught instanceof Error ? caught.message : 'Could not save your note. Keep this tab open and try again.')))
+  const [saveQueue] = useState(() => {
+    // Notes are written through their own queue, so they report into the same
+    // status as the board, or the toolbar would say "Saved" over a failed note.
+    const noteWrites = saveStatus.source()
+    return new SaveQueue(
+      (caught) => {
+        noteWrites.markFailed()
+        setError(caught instanceof Error ? caught.message : 'Could not save your note. Keep this tab open and try again.')
+      },
+      noteWrites.markBusy,
+    )
+  })
   const panelsRef = useRef(panels)
   panelsRef.current = panels
   // Which board `notes` actually holds loaded notes for. A board switch

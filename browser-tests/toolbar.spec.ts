@@ -69,6 +69,21 @@ test.describe('top toolbar', () => {
     await expect(status).toContainText('Saved in this browser')
   })
 
+  test('shows "Not saved" when a note fails to save, not only the board', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await openApp(page)
+    await page.evaluate(() => {
+      const original = IDBObjectStore.prototype.put
+      IDBObjectStore.prototype.put = function failingPut() {
+        IDBObjectStore.prototype.put = original
+        throw new DOMException('The disk is full', 'QuotaExceededError')
+      }
+    })
+    const notes = await panelOfType(page, 'notes')
+    await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: 'words that cannot be kept' })
+    await expect(page.getByRole('alert').filter({ hasText: 'Not saved' })).toBeVisible()
+  })
+
   test('shows "Not saved" when a save fails', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await openApp(page)

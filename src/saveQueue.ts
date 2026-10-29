@@ -42,6 +42,9 @@ export class SaveQueue {
 
   private start(): Promise<void> {
     if (this.running) return this.running
+    // A retry through flush() starts here without an enqueue, so a queue that
+    // went idle on a failure must be marked busy again for it to report done.
+    if (this.pending.size) this.setBusy(true)
     let failed = false
     this.running = this.drain().then(() => {
       // An enqueue between the last write and here keeps the queue busy.
