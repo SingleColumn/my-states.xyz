@@ -6,19 +6,40 @@ interface HelpAboutProps {
   isOpen: boolean
   onClose(): void
   returnFocusRef: RefObject<HTMLElement | null>
+  /** Brings the first-visit welcome card back (and forgets "Don't show this again"). */
+  onShowWelcome?(): void
 }
 
-export const HELP_ABOUT_MAIN_SECTION = 'About'
+export const HELP_ABOUT_MAIN_SECTION = 'What is my-states.xyz'
 export const HELP_ABOUT_LICENSE_URL = '/licenses/tldraw-3.15.6.txt'
 export const HELP_ABOUT_TLDRAW_URL = 'https://tldraw.dev/'
 export const HELP_ABOUT_CONTACT_EMAIL = 'robert.tomas.johnston@gmail.com'
 
 /**
+ * The index and the sections below share this list, so a link can never point
+ * at a heading that was renamed or removed. Practical help comes first; the
+ * story of the project comes after it, because people open this dialog to find
+ * out how something works.
+ */
+export const HELP_ABOUT_SECTIONS = [
+  { id: 'help-about-started', title: 'Getting started' },
+  { id: 'help-about-boards', title: 'How boards work' },
+  { id: 'help-about-writing', title: 'Writing panel' },
+  { id: 'help-about-images', title: 'Images panel' },
+  { id: 'help-about-music', title: 'Music panel' },
+  { id: 'help-about-video', title: 'Video panel' },
+  { id: 'help-about-themes', title: 'Themes' },
+  { id: 'help-about-about', title: HELP_ABOUT_MAIN_SECTION },
+  { id: 'help-about-licenses', title: 'Third-party licences' },
+] as const
+
+/**
  * This view intentionally mirrors docs/about.md. Keep the headings,
  * links, and user-facing instructions aligned when either source changes.
  */
-export function HelpAbout({ isOpen, onClose, returnFocusRef }: HelpAboutProps) {
+export function HelpAbout({ isOpen, onClose, returnFocusRef, onShowWelcome }: HelpAboutProps) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
 
   useEffect(() => {
@@ -49,104 +70,139 @@ export function HelpAbout({ isOpen, onClose, returnFocusRef }: HelpAboutProps) {
 
   if (!isOpen) return null
 
+  // The index uses buttons that scroll the content, not "#" links: a hash
+  // change would alter the page address and the app's history for nothing.
+  function goToSection(id: string) {
+    const target = contentRef.current?.querySelector<HTMLElement>(`#${id}`)
+    if (!target) return
+    target.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    // Moving focus too keeps keyboard and screen-reader users at the new place.
+    target.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true })
+  }
+
   return (
     <div className="help-about-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="help-about-dialog" role="dialog" aria-modal="true" aria-labelledby="help-about-title" tabIndex={-1}>
         <header className="help-about-header">
-          <h2 id="help-about-title">Help &amp; About</h2>
-          <button ref={closeButtonRef} className="help-about-close" type="button" aria-label="Close Help & About" title="Close" onClick={onClose}>
+          <h2 id="help-about-title">How it works</h2>
+          <button ref={closeButtonRef} className="help-about-close" type="button" aria-label="Close How it works" title="Close" onClick={onClose}>
             <X size={18} aria-hidden="true" />
           </button>
         </header>
 
-        <div className="help-about-content">
-          <section aria-labelledby="help-about-about">
-            <h3 id="help-about-about">About</h3>
-            <p>my-states is a private space for people who like writing and are inspired by images and music. I mostly use it to write, but sometimes I just look at images while listening to music.</p>
-            <p>The motivation for this project started with this thought: there are many creators who use AI as a tool for expression and use Instagram to publish their work; but Instagram is not the right place to enjoy and experience these images. We've become predisposed to swipe. If something catches our attention we might linger a little longer, but it will just be a short time.</p>
-            <p>This led me to the question: in what context or medium would it be more natural to spend more time looking at an image that someone has created?</p>
-            <p>Images evoke thoughts, feelings and memories, and I like to write these down. Images also evoke sounds and viceversa.</p>
-            <p>my-states is an infinite canvas that starts with three panels: one for music (currently Spotify playlists), one for images and one with a text editor. Curated Video panels can be added when wanted. The panels can be selected and resized, moved, hidden, deleted or duplicated, except for the music panel. Panels have various buttons at the top, to change their size and how they look. For example, after I've selected a playlist, I make the music panel small and enlarge the text editor panel to focus on writing; and after I've selected a sample collection of images, I select the focus view option, which makes the image occupy the whole panel.</p>
-            <p>my-states offers selected work from image creators that I find inspiring. Each image has a link to the creator's original Instagram post.</p>
-            <p>my-states is private because it is not necessary to register and log in and it doesn't save any information in the server where it is hosted. It only stores information on your browser.</p>
-            <p>Music, images and ideas make up a state, which occurs at a moment in time. In my-states, a board is a combination of music playlist, images and text document that you can name, export and import again some other time.</p>
-            <p>Your boards are stored in your browser, but if you change your browser or close your browser session, the information is lost; but you can export your boards to a hard drive and import them again later.</p>
-            <p>I want my-states to be an expressive tool, that doesn't get in the way of writing down the thoughts that come to mind. I also want it to be a place to contemplate the creations of others and find inspiration.</p>
-            <dl className="help-about-details">
-              <div><dt>Version</dt><dd>{appVersion}</dd></div>
-              <div><dt>Contact</dt><dd><a href={`mailto:${HELP_ABOUT_CONTACT_EMAIL}`}>{HELP_ABOUT_CONTACT_EMAIL}</a></dd></div>
-            </dl>
-            <p>The application uses third-party software. See <a href="#help-about-licenses">Third-party licences</a>.</p>
-          </section>
-
-          <section aria-labelledby="help-about-started">
-            <h3 id="help-about-started">Getting started</h3>
-            <p>The workspace is an infinite canvas with panels for Music, Images, Notes, and optional Video. A panel has a frame and its content. The frame is for arranging the panel on the canvas; the content is for using it.</p>
+        <div className="help-about-body">
+          <nav className="help-about-index" aria-label="Sections">
             <ul>
-              <li>Select a panel by clicking its frame, for example its title.</li>
-              <li>Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.</li>
-              <li>Resize a panel by dragging one of the handles on its selection outline.</li>
-              <li>Pan around the canvas with the usual canvas gestures, or select <strong>Pan canvas</strong> and drag anywhere. Select it again to leave pan mode.</li>
-              <li>Select <strong>Fit all panels</strong> in the panel view menu (the <strong>…</strong> button next to <strong>Add panel</strong>) to bring every panel into view.</li>
-              <li>Undo and redo are in the toolbar at the top right. Deleting a panel by mistake is undoable.</li>
+              {HELP_ABOUT_SECTIONS.map((section) => (
+                <li key={section.id}>
+                  <button type="button" onClick={() => goToSection(section.id)}>{section.title}</button>
+                </li>
+              ))}
             </ul>
+          </nav>
 
-            <h4>Buttons on every panel</h4>
-            <p>The right-hand end of each panel's header carries the same three buttons:</p>
-            <ul>
-              <li><strong>Hide panel</strong> takes the panel off the canvas without deleting anything. Bring it back from the <strong>Hidden panels</strong> list in the panel view menu (the same <strong>…</strong> button).</li>
-              <li><strong>Expand panel to full screen</strong> grows the panel to fill the window; the same button then reads <strong>Restore previous panel size</strong>.</li>
-              <li><strong>Restore panel to default size</strong> returns the panel to the size it started with.</li>
-            </ul>
+          <div ref={contentRef} className="help-about-content">
+            <section id="help-about-started" aria-labelledby="help-about-started-title">
+              <h3 id="help-about-started-title" tabIndex={-1}>Getting started</h3>
+              <p>my-states.xyz is a private space to look at images, listen to music and write. The workspace is an infinite canvas with panels for Music, Images, Writing, and optional Video. A panel has a frame and its content. The frame is for arranging the panel on the canvas; the content is for using it.</p>
+              <p>Wherever you see a <strong>···</strong> button, it opens a menu with more options.</p>
+              <ul>
+                <li>Select a panel by clicking its frame, for example its title.</li>
+                <li>Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.</li>
+                <li>Resize a panel by dragging one of the handles on its selection outline.</li>
+                <li>Pan around the canvas with the usual canvas gestures, or select <strong>Pan canvas</strong> and drag anywhere. Select it again to leave pan mode.</li>
+                <li>Select <strong>Fit all panels</strong> in the panel view menu (the <strong>···</strong> button next to <strong>Add panel</strong>) to bring every panel into view.</li>
+                <li>Undo and redo are in the toolbar at the top right. Deleting a panel by mistake is undoable.</li>
+              </ul>
 
-            <h4>Adding, duplicating and deleting panels</h4>
-            <ul>
-              <li><strong>Add panel</strong> at the top of the canvas adds another Images or Notes panel. There is only ever one Music panel.</li>
-              <li>Use a panel's <strong>…</strong> menu to hide, resize, or delete it. You can also right-click its frame for arrange, reorder, duplicate, and delete options. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.</li>
-              <li>The panel view menu (<strong>…</strong>) also offers <strong>Fit selected panel</strong>, <strong>Reset selected panel size</strong>, <strong>Reset panel layout</strong>, which puts every panel back where it started and unhides any hidden ones, and <strong>Hide selected panel</strong>.</li>
-            </ul>
-          </section>
+              <h4>Buttons on every panel</h4>
+              <p>The right-hand end of each panel's header carries the same three buttons:</p>
+              <ul>
+                <li><strong>Hide panel</strong> takes the panel off the canvas without deleting anything. Bring it back from the <strong>Hidden panels</strong> list in the panel view menu (the same <strong>···</strong> button).</li>
+                <li><strong>Expand panel to full screen</strong> grows the panel to fill the window; the same button then reads <strong>Restore previous panel size</strong>.</li>
+                <li><strong>Restore panel to default size</strong> returns the panel to the size it started with.</li>
+              </ul>
 
-          <section aria-labelledby="help-about-panels">
-            <h3 id="help-about-panels">Panels</h3>
+              <h4>Adding, duplicating and deleting panels</h4>
+              <ul>
+                <li><strong>Add panel</strong> at the top of the canvas adds another Images or Writing panel. There is only ever one Music panel.</li>
+                <li>Use a panel's <strong>···</strong> menu to hide, resize, or delete it. You can also right-click its frame for arrange, reorder, duplicate, and delete options. Ctrl+D duplicates the selected panel and Delete or Backspace removes it. The Music panel cannot be duplicated.</li>
+                <li>The panel view menu (<strong>···</strong>) also offers <strong>Fit selected panel</strong>, <strong>Reset selected panel size</strong>, <strong>Reset panel layout</strong>, which puts every panel back where it started and unhides any hidden ones, and <strong>Hide selected panel</strong>.</li>
+              </ul>
 
-            <h4>Music</h4>
-            <p>Search Spotify for playlists or songs straight away: no Spotify account is needed to look, and the panel also suggests a few playlists to start from. Select a result or a suggestion to choose it. Playing it is the step that needs Spotify, so select <strong>Connect Spotify</strong> and you are brought back to what you chose. Once connected you can also paste a Spotify playlist URL or URI and load it, and use the previous, play/pause, next, seek, and volume controls while a track is playing. <strong>Reset fields</strong> clears the search and URL fields. Spotify playback requires an eligible Spotify Premium account. Select <strong>Log out</strong> to disconnect.</p>
-            <p>The panel shows the playlist that is loaded, with its cover. To keep only the playlist, the current track, and the playback controls while you work elsewhere, select <strong>Reduce panel to focus view</strong> in the panel header; the panel becomes smaller and stays that way until you select <strong>Expand panel to full view</strong> in the same place.</p>
+              {onShowWelcome ? (
+                <p><button className="help-about-link-button" type="button" onClick={onShowWelcome}>Show the welcome message again</button></p>
+              ) : null}
+            </section>
 
-            <h4>Images</h4>
-            <p>An empty Images panel browses the available image collections one cover at a time. Use the arrows to browse, or wait for the cover to change, then select the cover or <strong>Use this collection</strong>. To load supported images from your computer instead, open the panel menu (<strong>…</strong>) and select <strong>Choose a local folder</strong>. Where the browser cannot open a folder directly, the file picker is used instead.</p>
-            <p>The panel menu also has <strong>Show loaded images</strong>, which opens a list of thumbnails you can pick from, and, when the images come from a local folder, <strong>Remove local images</strong>, which removes them from the panel. <strong>Show collection grid</strong> displays six collections at a time so you can choose one directly, with page controls when more are available, and <strong>Show collection carousel</strong> shows them one at a time. Opening either leaves the current images in place until you make a new choice.</p>
-            <p>Below the picture, use <strong>Previous image</strong>, <strong>Start slideshow</strong> (which becomes <strong>Pause slideshow</strong>), <strong>Next image</strong>, <strong>Stop slideshow</strong> and <strong>Shuffle images</strong> to control the slideshow. Adjust <strong>Speed</strong>, <strong>Fade</strong>, and <strong>Zoom</strong> with their sliders; <strong>Reset zoom</strong> returns the zoom to its default value.</p>
-            <p>Every picture in a collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.</p>
-            <p>To look at the pictures on their own, select <strong>Adjust panel to focus view</strong> in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Click the picture to pause or resume the slideshow, and press <strong>Esc</strong> to bring the controls back; the panel reminds you of both whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.</p>
+            <section id="help-about-boards" aria-labelledby="help-about-boards-title">
+              <h3 id="help-about-boards-title" tabIndex={-1}>How boards work</h3>
+              <p>Your boards are saved automatically in this browser, on this computer. They are not sent to a server. Clearing the site's browser data, or opening my-states.xyz in a different browser, means they will not be there. Use <strong>Export board</strong> to keep a copy on your computer, and <strong>Import board</strong> to bring it back later.</p>
+              <p>A board is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, each Video panel's selected catalogue entry, and your notes.</p>
+              <p>The controls at the top left of the canvas manage boards. Pick one from <strong>Open board</strong>, create one with <strong>New board</strong>, and use <strong>Rename board</strong>, <strong>Duplicate board</strong>, or <strong>Delete board</strong> on the current one; the <strong>···</strong> button beside them repeats these actions. <strong>Duplicate board</strong> makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a board removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.</p>
+              <p>Use <strong>Export board</strong> to download a portable <code>.board.zip</code> archive, and <strong>Import board</strong> to load one. An imported board brings its canvas layout, settings, Markdown notes, and embedded local images; if a board with that name already exists, you are offered a new name for the import, with a suggestion already filled in, or you can keep the original name to add it as a separate board with the same name on purpose. Spotify login tokens and live playback data are never included.</p>
+              <p>The browser keeps the boards themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Searching Spotify before you connect goes through this site rather than your browser, so that the app can ask Spotify on its own behalf; it asks only about the public catalogue, and nothing about you is sent or kept. Browser storage limits apply, and a remembered folder may ask for permission again after a restart.</p>
+            </section>
 
-            <h4>Video</h4>
-            <p>Add a Video panel and use <strong>Choose video</strong> to select from the public Instagram posts and Reels curated by the application owner. The list is part of the deployed application; it does not accept pasted links or arbitrary web addresses. Each Video panel remembers its own selection, so several Video panels can show different catalogue entries.</p>
-            <p>Instagram supplies the player and its controls. Selecting a video loads Instagram's official embed and therefore makes a request to Instagram. Public posts can still fail to appear when they have been deleted, made private, age-restricted, or had embedding disabled. When the embed cannot load, use <strong>Open on Instagram</strong> if it is available. <strong>Adjust panel to focus view</strong> hides the selector while retaining the selected video.</p>
+            <section id="help-about-writing" aria-labelledby="help-about-writing-title">
+              <h3 id="help-about-writing-title" tabIndex={-1}>Writing panel</h3>
+              <p>Select <strong>New note</strong> in the header, or <strong>Create new note</strong> in the <strong>Choose a note</strong> list, to start a note. <strong>Choose a note</strong> switches between your notes. Write in the editor; changes save automatically. The first line is the note's name, so whatever you write at the top is what the note is called. Type <code>#</code> at the start of a line for a heading or <code>-</code> for a list item.</p>
+              <p>There is no formatting toolbar: the page stays quiet. Right-click in the note for a small bar with bold, italic, code and link, which acts on whatever is selected. It is asked for rather than offered, so selecting a phrase to re-read it never puts buttons over the words. Cut, copy and paste keep their usual keys: Ctrl+X, Ctrl+C and Ctrl+V. Type <code>/</code> at the start of a line (or after a space) for a menu of things to add: headings, a quote, lists, a divider, or the picture the Images panel is showing; keep typing to narrow the list, use the arrow keys and Enter to choose, or Esc to dismiss it. Markdown shortcuts work too: <code>#</code> for a heading, <code>-</code> for a list, <code>&gt;</code> for a quote, <code>**bold**</code> and <code>*italic*</code>. To open a link in a note, hold <strong>Ctrl</strong> or <strong>Shift</strong> and select it: the pointer changes shape while you hold the key, to show which words will open. A plain click puts the cursor in the link instead, so you can change its words. The header menu offers four text sizes, from <strong>Small</strong> to <strong>Extra large</strong>; the choice is remembered.</p>
+              <p>A note can also hold a picture from the Images panel. Drag the grip at the right of the Images panel's playback controls into a note and an embed appears there for the picture on show at that moment, and it stays on that picture. Select the picture and drag the square at its bottom-right corner to make it smaller or larger. If the panel or the picture is later removed, the embed shows nothing. In the note's Markdown the embed is a single link line, so it travels with an exported board.</p>
+              <p><strong>Expand panel to full screen</strong> turns the Writing panel into a writing page: the form controls step aside, the title sits above the text, and the footer counts words instead of characters. <strong>Restore previous panel size</strong> brings the panel view back.</p>
+              <p>Use <strong>Save markdown file</strong> to download the current note as a <code>.md</code> file, and <strong>Delete note</strong> to remove it after confirmation. Notes cannot be imported one at a time; they travel with a board when it is exported and imported.</p>
+            </section>
 
-            <h4>Notes</h4>
-            <p>Select <strong>New note</strong> in the header, or <strong>Create new note</strong> in the <strong>Choose a note</strong> list, to start a note. <strong>Choose a note</strong> switches between your notes. Write in the editor; changes save automatically. The first line is the note's name, so whatever you write at the top is what the note is called. Type <code>#</code> at the start of a line for a heading or <code>-</code> for a list item.</p>
-            <p>There is no formatting toolbar: the page stays quiet. Right-click in the note for a small bar with bold, italic, code and link, which acts on whatever is selected. It is asked for rather than offered, so selecting a phrase to re-read it never puts buttons over the words. Cut, copy and paste keep their usual keys: Ctrl+X, Ctrl+C and Ctrl+V. Type <code>/</code> at the start of a line (or after a space) for a menu of things to add: headings, a quote, lists, a divider, or the picture the Images panel is showing; keep typing to narrow the list, use the arrow keys and Enter to choose, or Esc to dismiss it. Markdown shortcuts work too: <code>#</code> for a heading, <code>-</code> for a list, <code>&gt;</code> for a quote, <code>**bold**</code> and <code>*italic*</code>. To open a link in a note, hold <strong>Ctrl</strong> or <strong>Shift</strong> and select it: the pointer changes shape while you hold the key, to show which words will open. A plain click puts the cursor in the link instead, so you can change its words. The header menu offers four text sizes, from <strong>Small</strong> to <strong>Extra large</strong>; the choice is remembered.</p>
-            <p>A note can also hold a picture from the Images panel. Drag the grip at the right of the Images panel's playback controls into a note and an embed appears there for the picture on show at that moment, and it stays on that picture. Select the picture and drag the square at its bottom-right corner to make it smaller or larger. If the panel or the picture is later removed, the embed shows nothing. In the note's Markdown the embed is a single link line, so it travels with an exported board.</p>
-            <p><strong>Expand panel to full screen</strong> turns the Notes panel into a writing page: the form controls step aside, the title sits above the text, and the footer counts words instead of characters. <strong>Restore previous panel size</strong> brings the panel view back.</p>
-            <p>Use <strong>Save markdown file</strong> to download the current note as a <code>.md</code> file, and <strong>Delete note</strong> to remove it after confirmation. Notes cannot be imported one at a time; they travel with a board when it is exported and imported.</p>
-          </section>
+            <section id="help-about-images" aria-labelledby="help-about-images-title">
+              <h3 id="help-about-images-title" tabIndex={-1}>Images panel</h3>
+              <p>An empty Images panel browses the available image collections one cover at a time. Use the arrows to browse, or wait for the cover to change, then select the cover or <strong>Use this collection</strong>. To load supported images from your computer instead, open the panel menu (<strong>···</strong>) and select <strong>Choose a local folder</strong>. Where the browser cannot open a folder directly, the file picker is used instead.</p>
+              <p>The panel menu also has <strong>Show loaded images</strong>, which opens a list of thumbnails you can pick from, and, when the images come from a local folder, <strong>Remove local images</strong>, which removes them from the panel. <strong>Show collection grid</strong> displays six collections at a time so you can choose one directly, with page controls when more are available, and <strong>Show collection carousel</strong> shows them one at a time. Opening either leaves the current images in place until you make a new choice.</p>
+              <p>Below the picture, use <strong>Previous image</strong>, <strong>Start slideshow</strong> (which becomes <strong>Pause slideshow</strong>), <strong>Next image</strong>, <strong>Stop slideshow</strong> and <strong>Shuffle images</strong> to control the slideshow. Adjust <strong>Speed</strong>, <strong>Fade</strong>, and <strong>Zoom</strong> with their sliders; <strong>Reset zoom</strong> returns the zoom to its default value.</p>
+              <p>Every picture in a collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.</p>
+              <p>To look at the pictures on their own, select <strong>Adjust panel to focus view</strong> in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Click the picture to pause or resume the slideshow, and press <strong>Esc</strong> to bring the controls back; the panel reminds you of both whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.</p>
+            </section>
 
-          <section aria-labelledby="help-about-boards">
-            <h3 id="help-about-boards">Boards</h3>
-            <p>A board is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, each Video panel's selected catalogue entry, and your Notes.</p>
-            <p>The controls at the top left of the canvas manage boards. Pick one from <strong>Open board</strong>, create one with <strong>New board</strong>, and use <strong>Rename board</strong>, <strong>Duplicate board</strong>, or <strong>Delete board</strong> on the current one; the <strong>…</strong> button beside them repeats these actions. <strong>Duplicate board</strong> makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a board removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.</p>
-            <p>Use <strong>Export board</strong> to download a portable <code>.board.zip</code> archive, and <strong>Import board</strong> to load one. An imported board brings its canvas layout, settings, Markdown notes, and embedded local images; if a board with that name already exists, you are offered a new name for the import, with a suggestion already filled in, or you can keep the original name to add it as a separate board with the same name on purpose. Spotify login tokens and live playback data are never included.</p>
-            <p><strong>Themes</strong> change how everything looks: the canvas, the toolbar, the panels and their menus. Open <strong>Settings</strong> (the gear button at the top right) and choose a theme under <strong>Appearance</strong>; every board follows that choice unless it picks its own from the <strong>Theme</strong> list in the board toolbar, where <strong>Global (…)</strong> means "follow Settings". Settings also has a light/dark mode preference, an <strong>Import theme…</strong> button for <code>.theme.json</code> files, and a <strong>Reset appearance</strong> button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a board that used a deleted theme falls back to the global one.</p>
-            <p>Boards live in your browser's storage, not on a server. The browser keeps the boards themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Searching Spotify before you connect goes through this site rather than your browser, so that the app can ask Spotify on its own behalf; it asks only about the public catalogue, and nothing about you is sent or kept. Clearing the site's browser data removes all of it, browser storage limits apply, and a remembered folder may ask for permission again after a restart. Export a board when you need a backup.</p>
-          </section>
+            <section id="help-about-music" aria-labelledby="help-about-music-title">
+              <h3 id="help-about-music-title" tabIndex={-1}>Music panel</h3>
+              <p>Search Spotify for playlists or songs straight away: no Spotify account is needed to look, and the panel also suggests a few playlists to start from. Select a result or a suggestion to choose it. Playing it is the step that needs Spotify, so select <strong>Connect Spotify</strong> and you are brought back to what you chose. Once connected you can also paste a Spotify playlist URL or URI and load it, and use the previous, play/pause, next, seek, and volume controls while a track is playing. <strong>Reset fields</strong> clears the search and URL fields. Spotify playback requires an eligible Spotify Premium account. Select <strong>Log out</strong> to disconnect.</p>
+              <p>The panel shows the playlist that is loaded, with its cover. To keep only the playlist, the current track, and the playback controls while you work elsewhere, select <strong>Reduce panel to focus view</strong> in the panel header; the panel becomes smaller and stays that way until you select <strong>Expand panel to full view</strong> in the same place.</p>
+            </section>
 
-          <section id="help-about-licenses" aria-labelledby="help-about-licenses-heading">
-            <h3 id="help-about-licenses-heading">Third-party licences</h3>
-            <p>my-states uses third-party software. <ExternalLink href={HELP_ABOUT_TLDRAW_URL}>tldraw</ExternalLink> is the canvas SDK used to provide the drawing surface, canvas interactions, and canvas UI.</p>
-            <p>This application includes tldraw version <strong>3.15.6</strong>. Read the <ExternalLink href={HELP_ABOUT_LICENSE_URL}>tldraw licence</ExternalLink>.</p>
-          </section>
+            <section id="help-about-video" aria-labelledby="help-about-video-title">
+              <h3 id="help-about-video-title" tabIndex={-1}>Video panel</h3>
+              <p>Add a Video panel and use <strong>Choose video</strong> to select from the public Instagram posts and Reels curated by the application owner. The list is part of the deployed application; it does not accept pasted links or arbitrary web addresses. Each Video panel remembers its own selection, so several Video panels can show different catalogue entries.</p>
+              <p>Instagram supplies the player and its controls. Selecting a video loads Instagram's official embed and therefore makes a request to Instagram. Public posts can still fail to appear when they have been deleted, made private, age-restricted, or had embedding disabled. When the embed cannot load, use <strong>Open on Instagram</strong> if it is available. <strong>Adjust panel to focus view</strong> hides the selector while retaining the selected video.</p>
+            </section>
+
+            <section id="help-about-themes" aria-labelledby="help-about-themes-title">
+              <h3 id="help-about-themes-title" tabIndex={-1}>Themes</h3>
+              <p>Themes change how everything looks: the canvas, the toolbar, the panels and their menus. Open <strong>Settings</strong> (the gear button at the top right) and choose a theme under <strong>Appearance</strong>; every board follows that choice unless it picks its own from the <strong>Theme</strong> list in the board toolbar, where <strong>Global (…)</strong> means "follow Settings". Settings also has a light/dark mode preference, an <strong>Import theme…</strong> button for <code>.theme.json</code> files, and a <strong>Reset appearance</strong> button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a board that used a deleted theme falls back to the global one.</p>
+            </section>
+
+            <section id="help-about-about" aria-labelledby="help-about-about-title">
+              <h3 id="help-about-about-title" tabIndex={-1}>{HELP_ABOUT_MAIN_SECTION}</h3>
+              <p>my-states is a private space for people who like writing and are inspired by images and music. I mostly use it to write, but sometimes I just look at images while listening to music.</p>
+              <p>The motivation for this project started with this thought: there are many creators who use AI as a tool for expression and use Instagram to publish their work; but Instagram is not the right place to enjoy and experience these images. We've become predisposed to swipe. If something catches our attention we might linger a little longer, but it will just be a short time.</p>
+              <p>This led me to the question: in what context or medium would it be more natural to spend more time looking at an image that someone has created?</p>
+              <p>Images evoke thoughts, feelings and memories, and I like to write these down. Images also evoke sounds and viceversa.</p>
+              <p>my-states is an infinite canvas that starts with three panels: one for music (currently Spotify playlists), one for images and one with a text editor. Curated Video panels can be added when wanted. The panels can be selected and resized, moved, hidden, deleted or duplicated, except for the music panel. Panels have various buttons at the top, to change their size and how they look. For example, after I've selected a playlist, I make the music panel small and enlarge the text editor panel to focus on writing; and after I've selected a sample collection of images, I select the focus view option, which makes the image occupy the whole panel.</p>
+              <p>my-states offers selected work from image creators that I find inspiring. Each image has a link to the creator's original Instagram post.</p>
+              <p>my-states is private because it is not necessary to register and log in and it doesn't save any information in the server where it is hosted. It only stores information on your browser.</p>
+              <p>Music, images and ideas make up a state, which occurs at a moment in time. In my-states, a board is a combination of music playlist, images and text document that you can name, export and import again some other time.</p>
+              <p>I want my-states to be an expressive tool, that doesn't get in the way of writing down the thoughts that come to mind. I also want it to be a place to contemplate the creations of others and find inspiration.</p>
+              <dl className="help-about-details">
+                <div><dt>Version</dt><dd>{appVersion}</dd></div>
+                <div><dt>Contact</dt><dd><a href={`mailto:${HELP_ABOUT_CONTACT_EMAIL}`}>{HELP_ABOUT_CONTACT_EMAIL}</a></dd></div>
+              </dl>
+              <p>The application uses third-party software. See <button className="help-about-link-button" type="button" onClick={() => goToSection('help-about-licenses')}>Third-party licences</button>.</p>
+            </section>
+
+            <section id="help-about-licenses" aria-labelledby="help-about-licenses-heading">
+              <h3 id="help-about-licenses-heading" tabIndex={-1}>Third-party licences</h3>
+              <p>my-states uses third-party software. <ExternalLink href={HELP_ABOUT_TLDRAW_URL}>tldraw</ExternalLink> is the canvas SDK used to provide the drawing surface, canvas interactions, and canvas UI.</p>
+              <p>This application includes tldraw version <strong>3.15.6</strong>. Read the <ExternalLink href={HELP_ABOUT_LICENSE_URL}>tldraw licence</ExternalLink>.</p>
+            </section>
+          </div>
         </div>
       </section>
     </div>

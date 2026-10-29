@@ -20,9 +20,12 @@ export type { CanvasCommand, CanvasDescription, PanelDescription }
  * On a themed project (playwright.config.ts) the project's theme is then
  * selected as the global theme, so every test that follows runs under it.
  */
-export async function openApp(page: Page) {
+export async function openApp(page: Page, options: { showWelcome?: boolean } = {}) {
   const pageErrors: Error[] = []
   page.on('pageerror', (error) => pageErrors.push(error))
+  // The welcome card comes back on every visit until dismissed for good, and
+  // it would sit over panels these tests press. welcome.spec.ts covers it.
+  if (!options.showWelcome) await page.addInitScript(() => window.localStorage.setItem('mic:welcome-hidden', '1'))
   await page.goto('/')
   await waitForCanvas(page)
   const themeId = test.info().project.metadata.themeId as string | undefined
