@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { unzipSync, strFromU8 } from 'fflate'
-import { cameraTransform, createBoardFromToolbar, describeCanvas, dragFrom, dragLocator, expectCanvasSaved, noteBodyOf, openApp, panelOfType, selectPanel, shapeOf, switchBoard, waitForCanvas } from './helpers'
+import { cameraTransform, chooseBoardMenuItem, createBoardFromToolbar, describeCanvas, dragFrom, dragLocator, expectCanvasSaved, noteBodyOf, openApp, panelOfType, selectPanel, shapeOf, switchBoard, waitForCanvas } from './helpers'
 
 const aiCalls = new WeakMap<Page, { count: number }>()
 const associations: Record<string, Array<{ word: string; relationship: string }>> = {
@@ -324,7 +324,7 @@ test('recovery stays outside board archives and remains scoped while switching b
   const originalBoard = (await describeCanvas(page)).board!
   const original = (await describeCanvas(page)).panels
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export board' }).click()
+  await chooseBoardMenuItem(page, 'Export board')
   const download = await downloading
   const path = info.outputPath('word-graph.board.zip')
   await download.saveAs(path)
@@ -356,7 +356,7 @@ test('deleting a board also removes the Word Graph kept for recovery', async ({ 
   const boardId = (await describeCanvas(page)).board!.id
   await expect.poll(() => readStoredWordGraph(page, boardId)).toBeTruthy()
   page.once('dialog', dialog => void dialog.accept())
-  await page.getByRole('button', { name: 'Delete board' }).click()
+  await chooseBoardMenuItem(page, 'Delete board')
   await expect.poll(async () => (await describeCanvas(page)).board?.id).not.toBe(boardId)
   await expect.poll(() => readStoredWordGraph(page, boardId)).toBeUndefined()
 })

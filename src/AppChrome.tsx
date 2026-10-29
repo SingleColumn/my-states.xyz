@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiMenuActionItem, TldrawUiToolbar, useCanRedo, useCanUndo } from 'tldraw'
 import { Hand, Settings } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
@@ -36,7 +36,8 @@ interface AppChromeProps {
   onAddPanel(panelType: PanelType): void
 }
 
-export const HELP_ABOUT_LABEL = 'About'
+/** The name beside the logo at the far left; selecting either opens the guide. */
+export const HELP_ABOUT_LABEL = 'my-states.xyz'
 
 // Panel actions live on the panel itself. Keeping only history controls here
 // avoids a distant Delete or Duplicate button whose target is easy to miss.
@@ -51,10 +52,6 @@ function UndoRedoQuickActions() {
     </>
   )
 }
-
-// Draws first-time visitors' attention to the About button without blocking the canvas.
-const ABOUT_PULSE_SEEN_KEY = 'mic:about-pulse-seen'
-const ABOUT_PULSE_DURATION_MS = 20000
 
 export function AppChrome({
   isCanvasReady,
@@ -76,33 +73,6 @@ export function AppChrome({
   onAddPanel,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const [pulseAbout, setPulseAbout] = useState(false)
-  // Read once at mount (a lazy initializer is safe under StrictMode's dev
-  // double-invoke). Re-reading localStorage from inside the effect below
-  // would break under that same double-invoke: the first invocation writes
-  // the "seen" flag, so a second invocation reading it fresh would see its
-  // own write and skip setting up the timer that turns the pulse back off.
-  const [wasAlreadySeen] = useState(() => {
-    try {
-      return window.localStorage.getItem(ABOUT_PULSE_SEEN_KEY) === '1'
-    } catch {
-      return true
-    }
-  })
-
-  useEffect(() => {
-    if (wasAlreadySeen) return
-
-    setPulseAbout(true)
-    try {
-      window.localStorage.setItem(ABOUT_PULSE_SEEN_KEY, '1')
-    } catch {
-      // Private browsing or storage disabled: pulse will simply reappear next visit.
-    }
-    const timeout = window.setTimeout(() => setPulseAbout(false), ABOUT_PULSE_DURATION_MS)
-    return () => window.clearTimeout(timeout)
-  }, [wasAlreadySeen])
-
   useLayoutEffect(() => {
     const element = rootRef.current
     if (!element) return
@@ -129,7 +99,19 @@ export function AppChrome({
 
   return (
     <div ref={rootRef} className="app-chrome" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-      <BoardToolbar />
+      <div className="app-chrome-boards">
+        <button
+          className="app-chrome-brand"
+          type="button"
+          aria-label={`${HELP_ABOUT_LABEL}: how it works`}
+          title="How it works"
+          onClick={onOpenHelpAbout}
+        >
+          <img className="app-chrome-brand-logo" src="/favicon.svg" alt="" width={26} height={26} />
+          <span className="app-chrome-brand-name">{HELP_ABOUT_LABEL}</span>
+        </button>
+        <BoardToolbar />
+      </div>
 
       <section className="app-chrome-canvas" aria-label="Canvas view controls">
         <button
@@ -180,17 +162,6 @@ export function AppChrome({
           <Settings size={16} aria-hidden="true" />
         </button>
         <BoardThemeSelect />
-        <button
-          className={`app-chrome-control about-launcher${pulseAbout ? ' about-launcher-pulse' : ''}`}
-          type="button"
-          onClick={() => {
-            setPulseAbout(false)
-            onOpenHelpAbout()
-          }}
-          title="About my-states.xyz"
-        >
-          {HELP_ABOUT_LABEL}
-        </button>
       </nav>
     </div>
   )
@@ -207,7 +178,7 @@ export function AppChromePropsProvider({ value, children }: { value: AppChromePr
  * unmounts and remounts that slot whenever the component reference changes, so
  * this reads AppChrome's props from context instead of closing over them
  * directly - closing over them would give a new function (and a lost AppChrome
- * state, e.g. the About-button pulse) on every render that touched any prop.
+ * state, e.g. the open menus) on every render that touched any prop.
  */
 export function AppChromeMenuPanel() {
   const props = useContext(AppChromePropsContext)

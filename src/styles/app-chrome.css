@@ -96,9 +96,41 @@ button {
   pointer-events: auto;
 }
 
+/* The logo and name, then the board controls: one group in the first column. */
+.app-chrome-boards {
+  grid-area: boards;
+  display: flex;
+  align-items: center;
+  gap: var(--space-app-chrome-group-gap);
+  min-width: 0;
+}
+
+.app-chrome-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-detail-3);
+  min-height: var(--size-top-toolbar-control);
+  padding: 0 var(--space-detail-3) 0 var(--space-detail-2);
+  border: var(--border-width-hairline) solid transparent;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-app-badge-text);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.app-chrome-brand:hover,
+.app-chrome-brand:focus-visible {
+  border-color: var(--card-button-border);
+  background: var(--card-button-bg-hover);
+}
+
+.app-chrome-brand-logo { display: block; flex: 0 0 auto; }
+
 .board-toolbar {
   position: relative;
-  grid-area: boards;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -119,36 +151,19 @@ button {
   min-width: var(--size-top-toolbar-control);
 }
 
-.board-action-transfer,
-.board-action-delete {
-  position: relative;
-  margin-left: 6px;
-}
-
-.board-action-transfer::before,
-.board-action-delete::before {
-  position: absolute;
-  top: var(--space-divider-inset);
-  bottom: var(--space-divider-inset);
-  left: calc(-1 * var(--space-divider-inset));
-  width: 1px;
-  background: var(--color-panel-divider);
-  content: "";
-}
-
-.board-action-delete:hover:not(:disabled),
 .board-actions-menu .is-destructive:hover:not(:disabled) {
   color: var(--color-danger);
 }
 
-.board-toolbar .board-actions-menu-trigger {
-  display: none;
+.board-menu-anchor {
+  position: relative;
+  display: inline-flex;
 }
 
 .board-actions-menu {
   position: absolute;
   top: calc(100% + var(--space-popover-offset));
-  right: 0;
+  left: 0;
   z-index: 30;
   display: grid;
   width: max-content;
@@ -172,6 +187,34 @@ button {
   color: var(--color-app-badge-text);
   cursor: pointer;
   text-align: left;
+}
+
+.board-actions-menu-divider {
+  height: var(--border-width-hairline);
+  margin: var(--space-detail-2) var(--space-menu-item-padding-x);
+  background: var(--color-panel-divider);
+}
+
+/* The theme has its own selector in the toolbar on a wide window. */
+.board-actions-menu-theme { display: none; }
+
+/* Quiet by design: once people know where their work is kept they stop
+   reading it, so it is small and muted, and only a failure changes colour. */
+.board-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-detail-2);
+  padding-left: var(--space-detail-2);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.board-save-status.is-failed {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-medium);
+  opacity: 1;
 }
 
 .board-actions-menu button:hover:not(:disabled) {
@@ -351,47 +394,6 @@ button {
 .app-chrome-control:disabled {
   cursor: not-allowed;
   opacity: var(--opacity-disabled);
-}
-
-.about-launcher-pulse {
-  animation: about-launcher-pulse var(--about-pulse-duration, 20s) ease-in-out 1;
-}
-
-/* Each pulse rises over ~1.4s, holds ~1.6s, then fades over ~2s, so the glow
-   lingers long enough to be noticed rather than reading as a blink. */
-@keyframes about-launcher-pulse {
-  0%,
-  5%,
-  30%,
-  38%,
-  63%,
-  71%,
-  96%,
-  100% {
-    border-color: var(--card-button-border);
-    background: var(--card-button-bg);
-    box-shadow:
-      0 0 0 0 transparent,
-      0 0 0 0 transparent;
-  }
-  12%,
-  20%,
-  45%,
-  53%,
-  78%,
-  86% {
-    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-button-border));
-    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-button-bg));
-    box-shadow:
-      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
-      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .about-launcher-pulse {
-    animation: none;
-  }
 }
 
 .canvas-view-controls {

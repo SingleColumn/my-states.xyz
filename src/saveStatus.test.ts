@@ -1,0 +1,71 @@
+import { describe, expect, it, vi } from 'vitest'
+import { createSaveStatusStore } from './saveStatus'
+
+describe('save status', () => {
+  it('starts saved, shows saving while a writer is busy, and returns to saved', () => {
+    const store = createSaveStatusStore()
+    const board = store.source()
+    expect(store.get()).toBe('saved')
+    board.markBusy(true)
+    expect(store.get()).toBe('saving')
+    board.markBusy(false)
+    expect(store.get()).toBe('saved')
+  })
+
+  it('keeps a failure on show when the queue empties, until the next write starts', () => {
+    const store = createSaveStatusStore()
+    const board = store.source()
+    board.markBusy(true)
+    board.markFailed()
+    board.markBusy(false)
+    expect(store.get()).toBe('failed')
+    board.markBusy(true)
+    expect(store.get()).toBe('saving')
+    board.markBusy(false)
+    expect(store.get()).toBe('saved')
+  })
+
+  it('combines writers: a failed note is not hidden by a saved board', () => {
+    const store = createSaveStatusStore()
+    const board = store.source()
+    const notes = store.source()
+    notes.markBusy(true)
+    notes.markFailed()
+    board.markBusy(true)
+    board.markBusy(false)
+    expect(store.get()).toBe('failed')
+    notes.markBusy(true)
+    expect(store.get()).toBe('saving')
+    notes.markBusy(false)
+    expect(store.get()).toBe('saved')
+  })
+
+  it('stays saving until every writer has finished', () => {
+    const store = createSaveStatusStore()
+    const board = store.source()
+    const notes = store.source()
+    board.markBusy(true)
+    notes.markBusy(true)
+    board.markBusy(false)
+    expect(store.get()).toBe('saving')
+    notes.markBusy(false)
+    expect(store.get()).toBe('saved')
+  })
+
+  it('tells subscribers only when the combined status changes', () => {
+    const store = createSaveStatusStore()
+    const board = store.source()
+    const notes = store.source()
+    const listener = vi.fn()
+    const unsubscribe = store.subscribe(listener)
+    board.markBusy(true)
+    notes.markBusy(true)
+    expect(listener).toHaveBeenCalledTimes(1)
+    board.markBusy(false)
+    notes.markBusy(false)
+    expect(listener).toHaveBeenCalledTimes(2)
+    unsubscribe()
+    board.markBusy(true)
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+})

@@ -6,13 +6,29 @@
 export class SaveQueue {
   private pending = new Map<string, () => Promise<void>>()
   private running: Promise<void> | null = null
+  private busy = false
 
-  constructor(private readonly onError: (error: unknown) => void) {}
+  /**
+   * `onBusyChange` is told when work starts (true) and when the queue has
+   * emptied or failed (false), so a status label can follow it without
+   * polling. A failure is reported through `onError` first.
+   */
+  constructor(
+    private readonly onError: (error: unknown) => void,
+    private readonly onBusyChange?: (busy: boolean) => void,
+  ) {}
 
   get hasPending() { return this.pending.size > 0 }
 
+  private setBusy(busy: boolean) {
+    if (this.busy === busy) return
+    this.busy = busy
+    this.onBusyChange?.(busy)
+  }
+
   enqueue(key: string, write: () => Promise<void>) {
     this.pending.set(key, write)
+    this.setBusy(true)
     // Observe rejection here for background saves, without changing the
     // promise returned to a caller waiting for durable completion.
     void this.start().catch(() => {})
@@ -26,10 +42,18 @@ export class SaveQueue {
 
   private start(): Promise<void> {
     if (this.running) return this.running
+    // A retry through flush() starts here without an enqueue, so a queue that
+    // went idle on a failure must be marked busy again for it to report done.
+    if (this.pending.size) this.setBusy(true)
     let failed = false
-    this.running = this.drain().catch((error) => {
+    this.running = this.drain().then(() => {
+      // An enqueue between the last write and here keeps the queue busy.
+      if (!this.pending.size) this.setBusy(false)
+    }).catch((error) => {
       failed = true
       this.onError(error)
+      // The failed write stays pending for a retry; the next enqueue marks busy again.
+      this.setBusy(false)
       throw error
     }).finally(() => {
       this.running = null

@@ -53,8 +53,8 @@ describe('How it works feature contract', () => {
     expect(withWelcome).toContain('Show the welcome message again')
   })
 
-  it('keeps the toolbar button labelled About until the toolbar is redesigned', () => {
-    expect(HELP_ABOUT_LABEL).toBe('About')
+  it('names the toolbar entry after the site, which opens this guide', () => {
+    expect(HELP_ABOUT_LABEL).toBe('my-states.xyz')
   })
 
   it('defines the story of the project as the main section', () => {

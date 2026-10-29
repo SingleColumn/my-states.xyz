@@ -159,14 +159,34 @@
   }
 }
 
+@media (max-width: 1399px) {
+  /* The words give way to the icon (the tooltip keeps them); a failure keeps its words. */
+  .board-save-status:not(.is-failed) .board-save-status-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 1199px) {
-  .board-action-secondary,
   .board-theme-control {
     display: none !important;
   }
 
-  .board-toolbar .board-actions-menu-trigger {
-    display: inline-flex;
+  .board-actions-menu-theme {
+    display: grid;
+  }
+
+  .app-chrome-brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .board-toolbar select {
@@ -208,8 +228,14 @@
     column-gap: var(--space-app-chrome-compact-gap);
   }
 
-  .board-toolbar {
-    justify-content: flex-end;
+  .app-chrome-boards {
+    justify-content: space-between;
+  }
+
+  /* The board controls sit at the right edge here, so the menu opens leftwards, not off screen. */
+  .board-actions-menu {
+    left: auto;
+    right: 0;
   }
 
   .app-chrome-canvas {

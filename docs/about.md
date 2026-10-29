@@ -4,7 +4,7 @@
 
 my-states.xyz is a private space to look at images, listen to music and write. The workspace is an infinite canvas with panels for Music, Images, Writing, and optional Video. A panel has a frame and its content. The frame is for arranging the panel on the canvas; the content is for using it.
 
-Wherever you see a **···** button, it opens a menu with more options.
+Wherever you see a **···** button, it opens a menu with more options. Select the logo and **my-states.xyz** at the top left of the screen to open this guide at any time.
 
 - Select a panel by clicking its frame, for example its title.
 - Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.
@@ -33,7 +33,7 @@ Your boards are saved automatically in this browser, on this computer. They are 
 
 A board is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, each Video panel's selected catalogue entry, and your notes.
 
-The controls at the top left of the canvas manage boards. Pick one from **Open board**, create one with **New board**, and use **Rename board**, **Duplicate board**, or **Delete board** on the current one; the **···** button beside them repeats these actions. **Duplicate board** makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a board removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
+The controls at the top left of the canvas manage boards. Pick one from **Open board** and create one with **New board**. The **···** button beside them holds the rest: **Rename board**, **Duplicate board**, **Export board**, **Import board** and **Delete board**. A small note beside it says **Saved in this browser** while your changes are being kept, and **Not saved** if something goes wrong. **Duplicate board** makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a board removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
 
 Use **Export board** to download a portable `.board.zip` archive, and **Import board** to load one (in .zip format). An imported board brings its canvas layout, settings, Markdown notes, and embedded local images; if a board with that name already exists, you are offered a new name for the import, with a suggestion already filled in, or you can keep the original name to add it as a separate board with the same name on purpose. Spotify login tokens and live playback data are never included.
 
@@ -77,7 +77,7 @@ Instagram supplies the player and its controls. Selecting a video loads Instagra
 
 ## Themes
 
-Themes change how everything looks: the canvas, the toolbar, the panels and their menus. Open **Settings** (the gear button at the top right) and choose a theme under **Appearance**; every board follows that choice unless it picks its own from the **Theme** list in the board toolbar, where **Global (…)** means "follow Settings". Settings also has a light/dark mode preference, an **Import theme…** button for `.theme.json` files, and a **Reset appearance** button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a board that used a deleted theme falls back to the global one.
+Themes change how everything looks: the canvas, the toolbar, the panels and their menus. Open **Settings** (the gear button at the top right) and choose a theme under **Appearance**; every board follows that choice unless it picks its own from the **Theme** list in the toolbar (in the board **···** menu on a narrow window), where **Global (…)** means "follow Settings". Settings also has a light/dark mode preference, an **Import theme…** button for `.theme.json` files, and a **Reset appearance** button that returns to the built-in theme whatever an imported one did. Built-in themes cannot be deleted; imported ones can, and a board that used a deleted theme falls back to the global one.
 
 ## What is my-states.xyz
 
