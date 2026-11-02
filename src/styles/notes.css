@@ -530,6 +530,7 @@
   width: auto;
   gap: var(--space-detail-1);
   padding-inline: var(--space-detail-2);
+  font-size: var(--type-xs);
   white-space: nowrap;
 }
 
