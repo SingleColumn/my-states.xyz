@@ -1,7 +1,7 @@
 import { useOpenWordGraph } from '../wordGraph/WordGraphController'
 import { captureWordSelection } from '../wordGraph/wordGraphSelection'
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { Bold, Code, Heading1, Heading2, Heading3, Highlighter, Italic, Link as LinkIcon, Pilcrow, Underline as UnderlineIcon } from 'lucide-react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { Bold, ClipboardPaste, Code, Copy, Heading1, Heading2, Heading3, Highlighter, Italic, Link as LinkIcon, Pilcrow, Scissors, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { tooltipFactory, TooltipProvider } from '@milkdown/plugin-tooltip'
 import {
@@ -12,24 +12,19 @@ import {
   wrapInHeadingCommand,
 } from '@milkdown/preset-commonmark'
 import type { EditorState } from '@milkdown/prose/state'
-import type { MarkType } from '@milkdown/prose/model'
+import { DOMParser as ProseDOMParser, type MarkType } from '@milkdown/prose/model'
 import { usePluginViewContext } from '@prosemirror-adapter/react'
 import { markPointerEventHandled } from '../panelSurface'
 import { useNotesEditorActions } from './notesEditorActions'
 import { toggleUnderlineCommand } from './notesUnderline'
 import { toggleHighlightCommand } from './notesHighlight'
+import { pastePlainText } from './notesClipboard'
 import { canEditLink, isOnLink } from './NotesLinkEditor'
 
 /**
- * The contextual formatting bar: what a line is, and the few marks a writer
- * reaches for mid-sentence, asked for by right-clicking rather than offered
- * on every selection. Selecting a phrase to re-read it, or dragging through a line
- * to delete it, should not put a row of buttons over the words -- so the
- * bar waits to be called, the way Typora's does.
- *
- * The cost is the browser's own menu inside the note: a right-click that
- * opens this cannot also open that. Cut, copy and paste keep their
- * keyboard shortcuts, which is where most writers reach for them anyway.
+ * The contextual writing menu is asked for by right-clicking. Alongside
+ * formatting it offers the clipboard actions that replacing the browser's
+ * menu would otherwise take away.
  *
  * Milkdown's tooltip plugin still does the positioning (floating-ui, above
  * the point, flipping below when there is no room); what it no longer does
@@ -51,6 +46,7 @@ export function NotesFormattingTooltip() {
   viewRef.current = view
   const openWordGraph = useOpenWordGraph()
   const { run, openLinkEditor } = useNotesEditorActions()
+  const [clipboardError, setClipboardError] = useState('')
   // Where the writer asked for the bar, and whether they have asked at all.
   // A ref rather than state: the provider's shouldShow, made once, reads it.
   const openAt = useRef<{ x: number; y: number } | null>(null)
@@ -101,6 +97,7 @@ export function NotesFormattingTooltip() {
       const mouse = event as globalThis.MouseEvent
       event.preventDefault()
       event.stopPropagation()
+      setClipboardError('')
       openAt.current = { x: mouse.clientX, y: mouse.clientY }
       const point = openAt.current
       provider.current?.show({
@@ -153,6 +150,60 @@ export function NotesFormattingTooltip() {
     run((ctx) => ctx.get(editorViewCtx).focus())
   }
 
+  function editClipboard(command: 'cut' | 'copy') {
+    const editor = viewRef.current
+    editor.focus()
+    if (!document.execCommand(command)) {
+      setClipboardError(`Could not ${command}. Use the keyboard shortcut instead.`)
+      return
+    }
+    setClipboardError('')
+    openAt.current = null
+    provider.current?.hide()
+  }
+
+  async function paste(plain: boolean) {
+    try {
+      const editor = viewRef.current
+      const clipboard = navigator.clipboard
+      if (!clipboard) throw new Error('Clipboard unavailable')
+      let text = ''
+      let html = ''
+      if (!plain && clipboard.read) {
+        try {
+          const items = await clipboard.read()
+          for (const item of items) {
+            if (item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text()
+            if (item.types.includes('text/html')) html = await (await item.getType('text/html')).text()
+            if (text || html) break
+          }
+        } catch {
+          // Some browsers allow text reads but not the richer read method.
+          text = await clipboard.readText()
+        }
+      } else {
+        text = await clipboard.readText()
+      }
+      if (!text && !html) return
+      // ProseMirror marks its own copied HTML. Keep that formatting, while
+      // outside HTML goes in as words rather than bringing page styles along.
+      if (!plain && html.includes('data-pm-slice')) {
+        const template = document.createElement('template')
+        template.innerHTML = html
+        const slice = ProseDOMParser.fromSchema(editor.state.schema).parseSlice(template.content)
+        editor.dispatch(editor.state.tr.replaceSelection(slice).scrollIntoView())
+      } else {
+        pastePlainText(editor, text)
+      }
+      editor.focus()
+      setClipboardError('')
+      openAt.current = null
+      provider.current?.hide()
+    } catch {
+      setClipboardError('Clipboard access was blocked. Use Ctrl+V instead.')
+    }
+  }
+
   return (
     <div ref={ref} className="notes-formatting-tooltip" role="toolbar" aria-label="Formatting" data-show="false" onKeyDown={handleKeyDown} onPointerDown={markPointerEventHandled}>
       {blockChoices.map(({ level, label, icon }) => (
@@ -179,6 +230,20 @@ export function NotesFormattingTooltip() {
       <FormatButton label="Link" active={isOnLink(state)} disabled={!canEditLink(state)} onActivate={openLinkEditor}>
         <LinkIcon size={16} aria-hidden="true" />
       </FormatButton>
+      <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
+      <FormatButton label="Cut" active={false} disabled={state.selection.empty} worded onActivate={() => editClipboard('cut')}>
+        <Scissors size={16} aria-hidden="true" /> Cut
+      </FormatButton>
+      <FormatButton label="Copy" active={false} disabled={state.selection.empty} worded onActivate={() => editClipboard('copy')}>
+        <Copy size={16} aria-hidden="true" /> Copy
+      </FormatButton>
+      <FormatButton label="Paste" active={false} worded onActivate={() => { void paste(false) }}>
+        <ClipboardPaste size={16} aria-hidden="true" /> Paste
+      </FormatButton>
+      <FormatButton label="Paste as plain text" active={false} worded onActivate={() => { void paste(true) }}>
+        Paste as text
+      </FormatButton>
+      {clipboardError && <span className="notes-clipboard-error" role="status">{clipboardError}</span>}
       <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
       <span className={`word-graph-invoke-container${wordSelection ? '' : ' is-disabled'}`} title={wordSelection ? undefined : 'Select a word'}>
         <button type="button" className="notes-formatting-button word-graph-invoke" disabled={!wordSelection}
@@ -225,18 +290,19 @@ function blockOf(state: EditorState) {
  * The press is swallowed so the editor keeps focus and the selection the
  * command is about to act on; the click that follows is what acts.
  */
-export function FormatButton({ label, active, disabled, onActivate, children }: {
+export function FormatButton({ label, active, disabled, worded, onActivate, children }: {
   label: string
   active: boolean
   /** For a tool with nothing to act on right now -- Link, on a bare caret. */
   disabled?: boolean
+  worded?: boolean
   onActivate: () => void
   children: ReactNode
 }) {
   return (
     <button
       type="button"
-      className={`notes-formatting-button${active ? ' is-active' : ''}`}
+      className={`notes-formatting-button${active ? ' is-active' : ''}${worded ? ' is-worded' : ''}`}
       title={label}
       aria-label={label}
       aria-pressed={active}

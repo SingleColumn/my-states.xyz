@@ -27,8 +27,6 @@ import { $command, $inputRule, $markSchema, $remark, $useKeymap } from '@milkdow
 export const highlightSchema = $markSchema('highlight', () => ({
   parseDOM: [
     { tag: 'mark' },
-    // Word and Google Docs paste the colour rather than the tag.
-    { style: 'background-color', getAttrs: (value) => (value !== '' && value !== 'transparent') as false },
   ],
   toDOM: () => ['mark'],
   parseMarkdown: {

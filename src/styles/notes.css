@@ -526,6 +526,19 @@
   outline-offset: -2px;
 }
 
+.notes-formatting-button.is-worded {
+  width: auto;
+  gap: var(--space-detail-1);
+  padding-inline: var(--space-detail-2);
+  white-space: nowrap;
+}
+
+.notes-clipboard-error {
+  align-self: center;
+  max-width: 180px;
+  font-size: 12px;
+}
+
 /*
  * The link editor: a small popover that replaces a native `window.prompt`,
  * asked for by the Link button on either bar, or by Ctrl-K. Same floating
