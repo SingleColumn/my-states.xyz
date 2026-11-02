@@ -1,5 +1,5 @@
 import { T } from 'tldraw'
-import type { ImageCollectionSource, PanelConfigs, PanelType, SlideshowSettings, SpotifyPlaylistReference } from './types'
+import type { ImageCollectionSource, PanelConfigs, PanelType, SlideshowSettings, SpotifyPlaylistReference, SpotifySavedTrack } from './types'
 import { choice, color, f, mixS, s, type LeafSpec } from './themes/leaf'
 
 /**
@@ -86,7 +86,21 @@ export const spotifyPlaylistReferenceValidator: T.Validator<SpotifyPlaylistRefer
   image: T.optional(T.nullable(T.string)),
 })
 
-export const spotifyConfigValidator: T.Validator<PanelConfigs['spotify']> = T.object({ playlist: spotifyPlaylistReferenceValidator })
+export const spotifySavedTrackValidator: T.Validator<SpotifySavedTrack> = T.object({
+  id: T.string,
+  uri: T.string,
+  name: T.string,
+  artists: T.string,
+  album: T.string,
+  url: T.string,
+  image: T.nullable(T.string),
+  durationMs: T.number,
+})
+
+export const spotifyConfigValidator: T.Validator<PanelConfigs['spotify']> = T.object({
+  playlist: spotifyPlaylistReferenceValidator,
+  track: T.optional(T.nullable(spotifySavedTrackValidator)),
+})
 
 export const imageCollectionSourceValidator: T.Validator<ImageCollectionSource> = T.union('type', {
   none: T.object({ type: T.literal('none') }),
@@ -139,6 +153,22 @@ export function normalizePlaylist(value: unknown): SpotifyPlaylistReference {
   } as SpotifyPlaylistReference
 }
 
+/** A saved song, projected onto its known keys; anything absent or empty is no song. */
+export function normalizeSavedTrack(value: unknown): SpotifySavedTrack | null {
+  if (value === undefined || value === null) return null
+  const input = record(value)
+  return {
+    id: input.id,
+    uri: input.uri,
+    name: input.name,
+    artists: input.artists,
+    album: input.album,
+    url: input.url,
+    image: input.image ?? null,
+    durationMs: input.durationMs ?? 0,
+  } as SpotifySavedTrack
+}
+
 export function normalizeSlideshowSettings(value: unknown): SlideshowSettings {
   const input = record(value)
   const source = input.imageSource === undefined ? { type: 'none' } : record(input.imageSource)
@@ -159,12 +189,17 @@ const spotify: PanelDefinition<'spotify'> = {
   // Just the search box and the connect button: nobody has asked for music yet.
   startingHeight: 280,
   minimumSize: { w: 320, h: 260 },
-  // The Music panel drops the playlist URL, search and results in focus view
-  // and keeps playback, so it needs far less room.
-  focusViewSize: { w: 380, h: 460 },
+  // The Music panel drops the playlist URL, search, results and cover in focus
+  // view and keeps the song's name and playback, so it needs far less room.
+  // Tall enough for a song title that wraps onto a second line.
+  focusViewSize: { w: 380, h: 260 },
   createConfig: () => ({ playlist: { ...defaultSpotifyPlaylistReference } }),
   configValidator: spotifyConfigValidator,
-  normalizeConfig: (value) => spotifyConfigValidator.validate({ playlist: normalizePlaylist(record(value).playlist) }),
+  normalizeConfig: (value) => {
+    const input = record(value)
+    const track = normalizeSavedTrack(input.track)
+    return spotifyConfigValidator.validate({ playlist: normalizePlaylist(input.playlist), ...(track ? { track } : {}) })
+  },
   duplicateConfig: () => null,
   theme: {
     key: 'spotify',

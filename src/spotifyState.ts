@@ -3,6 +3,7 @@ import type {
   Panel,
   Board,
   SpotifyPlaylistReference,
+  SpotifySavedTrack,
   SpotifyTokens,
   SpotifyTrackState,
 } from './types'
@@ -57,6 +58,12 @@ export interface SpotifyState {
    * another route.
    */
   signInFailed: boolean
+  /**
+   * The session ended on its own -- Spotify stopped accepting it -- rather than
+   * by logging out. The panel says so, since nobody chose it; cleared by the
+   * next sign-in or a deliberate log-out.
+   */
+  sessionEnded: boolean
   /** For the ways a callback fails before there is a code to exchange. */
   reportSignInFailure(): void
   playlistsHaveMore: boolean
@@ -70,7 +77,8 @@ export interface SpotifyState {
    * Spotify can do the first, and only the second needs their account.
    */
   selectPlaylist(summary: SpotifyPlaylistSummary, panelId?: string): void
-  selectTrack(summary: SpotifyTrackSummary | null): void
+  /** Holds a song for Play; a song (not null) is also saved in the panel, in place of its playlist. */
+  selectTrack(summary: SpotifyTrackSummary | null, panelId?: string): void
   /** Reads one song's public details by id — how a song chosen before connecting is found again afterwards. */
   lookupTrack(trackId: string): Promise<void>
   playPlaylist(summary?: SpotifyPlaylistSummary, panelId?: string): Promise<void>
@@ -126,6 +134,7 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     setSelectedTrack(next)
   }, [])
   const [signInFailed, setSignInFailed] = useState(false)
+  const [sessionEnded, setSessionEnded] = useState(false)
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
   // Only the connected panel shows this line, and it shows it before the
@@ -174,6 +183,9 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     setTracks([])
     setTrack(null)
     changeSelectedTrack(null)
+    // A line such as "Playing <song>." describes the board just left; the
+    // panel shows it whenever nothing is playing, beside this board's music.
+    setStatus('Choose a playlist to play.')
   }, [board?.id, changeSelectedTrack])
 
   useEffect(() => {
@@ -188,6 +200,7 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     setIsReady(false)
     setTrack(null)
     setStatus('Your Spotify session has expired. Log in again to continue playback.')
+    setSessionEnded(true)
     setError(null)
   }, [])
 
@@ -274,6 +287,24 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     if (panel?.type === 'spotify') current.updateConfig<'spotify'>(panel.id, { playlist: next }, options)
   }, [])
 
+  // Choosing one kind of music replaces the other: a board keeps a playlist or
+  // a song, so the panel never names a playlist beside a song from elsewhere.
+  // Filling in a playlist's artwork (setBoardPlaylist above) is not a choice
+  // and leaves a saved song alone.
+  const chooseBoardPlaylist = useCallback((next: SpotifyPlaylistReference, panelId?: string) => {
+    const current = panelsRef.current
+    const panel = (panelId ? current.get(panelId) : undefined) ?? current.all.find((candidate) => candidate.type === 'spotify')
+    if (panel?.type === 'spotify') current.updateConfig<'spotify'>(panel.id, { playlist: next, track: null })
+  }, [])
+  const chooseBoardTrack = useCallback((next: SpotifySavedTrack, panelId?: string) => {
+    const current = panelsRef.current
+    const panel = (panelId ? current.get(panelId) : undefined) ?? current.all.find((candidate) => candidate.type === 'spotify')
+    // Play pressed again for the saved song is not a new choice, and must not
+    // become one more step for Undo to walk back through.
+    if (panel?.type !== 'spotify' || panel.config.track?.id === next.id) return
+    current.updateConfig<'spotify'>(panel.id, { playlist: { ...defaultSpotifyPlaylistReference }, track: savedTrackFrom(next) })
+  }, [])
+
   // A playlist saved before the panel showed artwork - or restored from an
   // exported board - has a name but no image. Look the artwork up once so the
   // panel can still show which playlist is loaded.
@@ -339,10 +370,12 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     setIsReady(false)
     setTrack(null)
     setStatus('Logged out of Spotify.')
+    setSessionEnded(false)
   }, [])
   const handleCallback = useCallback(async (code: string, state: string | null) => {
     try {
       setTokens(await exchangeSpotifyCode(code, state))
+      setSessionEnded(false)
     } catch (caught) {
       setSignInFailed(true)
       throw caught
@@ -477,11 +510,11 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     // superseded. The player only reports what is playing some boards later,
     // and until it does the held song would still outrank this in the panel.
     changeSelectedTrack(null)
-    setBoardPlaylist(selected, panelId)
+    chooseBoardPlaylist(selected, panelId)
     setPlaylists((current) => [summary, ...current.filter((candidate) => candidate.id !== summary.id)])
     setStatus(`Playing ${summary.name}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, requestSpotify, setBoardPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, chooseBoardPlaylist])
 
   /**
    * Choosing a playlist, which is not the same as playing it. A visitor who
@@ -490,7 +523,7 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
    * separately rather than smuggled into the click that chose the playlist.
    */
   const selectPlaylist = useCallback((summary: SpotifyPlaylistSummary, panelId?: string) => {
-    setBoardPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, panelId)
+    chooseBoardPlaylist({ id: summary.id, uri: summary.uri, name: summary.name, url: summary.url, image: summary.image }, panelId)
     // The newest choice is the one that counts. A song chosen earlier outranks
     // the panel's playlist wherever the panel decides what is chosen, so it has
     // to go, or the panel keeps describing — and, after connecting, plays — the
@@ -498,12 +531,15 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     changeSelectedTrack(null)
     setStatus(`${summary.name} is ready.`)
     setError(null)
-  }, [setBoardPlaylist])
+  }, [chooseBoardPlaylist])
 
-  const selectTrack = useCallback((summary: SpotifyTrackSummary | null) => {
+  const selectTrack = useCallback((summary: SpotifyTrackSummary | null, panelId?: string) => {
     changeSelectedTrack(summary)
-    if (summary) setError(null)
-  }, [])
+    if (summary) {
+      chooseBoardTrack(summary, panelId)
+      setError(null)
+    }
+  }, [chooseBoardTrack])
 
   const lookupTrack = useCallback(async (trackId: string) => {
     if (!tokens) return
@@ -528,12 +564,12 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     // superseded. The player only reports what is playing some boards later,
     // and until it does the held song would still outrank this in the panel.
     changeSelectedTrack(null)
-    setBoardPlaylist(selected, panelId)
+    chooseBoardPlaylist(selected, panelId)
     setStatus(`Playing ${selected.name ?? 'playlist'}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, requestSpotify, panels, setBoardPlaylist])
+  }, [deviceId, ensureFreshTokens, requestSpotify, panels, chooseBoardPlaylist])
 
-  const playTrack = useCallback(async (summary: SpotifyTrackSummary, _panelId?: string) => {
+  const playTrack = useCallback(async (summary: SpotifyTrackSummary, panelId?: string) => {
     if (!deviceId) throw new Error('Spotify browser device is not ready yet.')
     const fresh = await ensureFreshTokens()
     await requestSpotify(() => spotifyFetch<void>('/me/player', fresh.accessToken, { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }))
@@ -545,12 +581,19 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     // replacing the song that was just started. Held, a second press only asks
     // for the same song again. The panel lets it go when the player reports.
     changeSelectedTrack(summary)
+    chooseBoardTrack(summary, panelId)
     setStatus(`Playing ${summary.name} by ${summary.artists}.`)
     setError(null)
-  }, [deviceId, ensureFreshTokens, requestSpotify])
+  }, [chooseBoardTrack, deviceId, ensureFreshTokens, requestSpotify])
 
   const togglePlay = useCallback(async (panelId?: string) => {
-    const panelPlaylist = (panelId ? panels.get(panelId) : undefined)?.type === 'spotify' ? (panels.get(panelId!) as Panel<'spotify'>).config.playlist : undefined
+    const panelConfig = (panelId ? panels.get(panelId) : undefined)?.type === 'spotify' ? (panels.get(panelId!) as Panel<'spotify'>).config : undefined
+    // Nothing playing yet, a board that keeps a song starts that song.
+    if (!track && panelConfig?.track) {
+      await playTrack(panelConfig.track, panelId)
+      return
+    }
+    const panelPlaylist = panelConfig?.playlist
     const selectedPlaylist = panelPlaylist ?? defaultSpotifyPlaylistReference
     const action = getSpotifyPlaybackAction(Boolean(track), selectedPlaylist.uri)
     if (action === 'load-saved-playlist') {
@@ -564,10 +607,10 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     const player = playerRef.current
     if (!player) throw new Error('Spotify browser device is not ready yet.')
     await player.togglePlay()
-  }, [playPlaylist, panels, track])
+  }, [playPlaylist, playTrack, panels, track])
 
   return {
-    tokens, playlists, tracks, track, selectedTrack, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, signInFailed, reportSignInFailure, searchPlaylists, searchTracks, loadPlaylistFromUrl,
+    tokens, playlists, tracks, track, selectedTrack, deviceId, isReady, status, error, login, logout, clearSearchResults, handleCallback, signInFailed, sessionEnded, reportSignInFailure, searchPlaylists, searchTracks, loadPlaylistFromUrl,
     selectPlaylist, selectTrack, lookupTrack, playPlaylist, playTrack,
     playlistsHaveMore, loadMorePlaylists,
     togglePlay,
@@ -628,4 +671,10 @@ function loadSpotifySdk() {
     window.onSpotifyWebPlaybackSDKReady = () => resolve()
     document.body.appendChild(script)
   })
+}
+
+/** Only the song's own fields: a search result may carry more than the board needs to keep. */
+function savedTrackFrom(summary: SpotifyTrackSummary): SpotifySavedTrack {
+  const { id, uri, name, artists, album, url, image, durationMs } = summary
+  return { id, uri, name, artists, album, url, image, durationMs }
 }

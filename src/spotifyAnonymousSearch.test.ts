@@ -310,9 +310,11 @@ describe('Choosing a playlist', () => {
       }, 'panel_music')
     })
 
+    // Choosing a playlist also lets go of any song the board kept: one or the other.
     expect(updateConfig).toHaveBeenCalledWith('panel_music', {
       playlist: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Rain on Glass', url: 'https://open.spotify.com/playlist/p1', image: null },
-    }, undefined)
+      track: null,
+    })
     expect(spotifyApi.spotifyFetch).not.toHaveBeenCalled()
   })
 
@@ -337,19 +339,27 @@ describe('Choosing a playlist', () => {
     expect(written).not.toContain('refresh')
   })
 
-  it('remembers a chosen song only for as long as the page is open', async () => {
+  // A song is kept with the board like a playlist is, so it is still there
+  // after a reload, and travels in an exported board. It replaces the playlist
+  // rather than sitting beside it, or the panel would name both.
+  it('keeps a chosen song in the panel, in place of its playlist', async () => {
     const { panels, updateConfig } = panelsStub()
     const { result } = await mountSpotifyState(panels)
     const song = { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }
 
-    act(() => { result.current.selectTrack(song) })
+    act(() => { result.current.selectTrack(song, 'panel_music') })
     expect(result.current.selectedTrack).toEqual(song)
-    // A song is a step on the way to a playlist, so it is not what a board
-    // is reopened on: nothing is written to the panel.
-    expect(updateConfig).not.toHaveBeenCalled()
+    expect(updateConfig).toHaveBeenCalledWith('panel_music', {
+      playlist: { id: null, uri: null, name: null, url: null },
+      track: song,
+    })
 
+    // Letting go of the held song (a cleared search, playback starting) is
+    // not a choice, and leaves the saved one alone.
+    updateConfig.mockClear()
     act(() => { result.current.selectTrack(null) })
     expect(result.current.selectedTrack).toBeNull()
+    expect(updateConfig).not.toHaveBeenCalled()
   })
 
   // Found in review: a song chosen first outranks the panel's playlist wherever
@@ -371,7 +381,7 @@ describe('Choosing a playlist', () => {
     })
 
     expect(result.current.selectedTrack).toBeNull()
-    expect(updateConfig).toHaveBeenCalledWith('panel_music', expect.objectContaining({ playlist: expect.objectContaining({ id: 'p1' }) }), undefined)
+    expect(updateConfig).toHaveBeenLastCalledWith('panel_music', expect.objectContaining({ playlist: expect.objectContaining({ id: 'p1' }), track: null }))
   })
 
   it('lets a song chosen after a playlist take over, as it always did', async () => {

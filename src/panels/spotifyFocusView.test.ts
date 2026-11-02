@@ -118,7 +118,8 @@ describe('Music panel focus view', () => {
     expect(full).toContain('Play from a Spotify link')
     expect(full).toContain('Search playlists')
     expect(full).toContain('Reset fields')
-    expect(full).toContain('Playlist search results')
+    // No search typed: what is playing fills the room the results would take.
+    expect(full).toContain('is-featured')
   })
 
   // What the search looks for is a setting in the panel menu. It is about the
@@ -171,13 +172,12 @@ describe('Music panel focus view, before Spotify is connected', () => {
     expect(markup).toContain('Connect Spotify')
   })
 
-  // The board saves a playlist so that it is there to play once connected.
-  // Until then it is a name that cannot be played and that this visitor did
-  // not choose, so it is not put in front of them -- here or in the footer.
-  it('does not name the playlist the board happens to have saved', () => {
+  // The board's music is part of the board, connected or not; the focus view
+  // names it once, in the footer.
+  it('names the playlist the board was saved with', () => {
     const markup = renderMusicPanel(true, false)
-    expect(markup).not.toContain('Deep Focus')
-    expect(markup).toContain('No playlist loaded')
+    expect(markup).toContain('Deep Focus')
+    expect(markup).not.toContain('No playlist loaded')
   })
 
   it('leaves out the search, the suggestions and the playback controls', () => {

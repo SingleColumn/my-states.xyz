@@ -99,5 +99,10 @@ export default defineConfig(({ mode }) => ({
     // 5173 stays the default, which is what Spotify's redirect URI is registered
     // against, so plain `npm run dev` is unchanged.
     port: Number(process.env.PORT) || 5173,
+    // Without an assigned PORT, 5173 or nothing. Moved quietly to the next free
+    // port, the app still works until someone connects Spotify, which sends
+    // them back to 5173 and a page that does not load. Refusing to start says
+    // what is wrong while the person who can fix it is looking.
+    strictPort: !process.env.PORT,
   },
 }))

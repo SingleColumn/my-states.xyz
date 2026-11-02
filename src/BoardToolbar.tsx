@@ -4,7 +4,7 @@ import { useAppState } from './AppState'
 import { useBoardThemeOptions } from './BoardThemeSelect'
 import { peekBoardArchiveName } from './boardArchive'
 import { BoardSaveStatus } from './BoardSaveStatus'
-import { nextDuplicateName } from './utils'
+import { importNameSuggestion } from './utils'
 
 export function BoardToolbar() {
   const { boards } = useAppState()
@@ -99,7 +99,7 @@ export function BoardToolbar() {
     }
     const chosen = window.prompt(
       `A board named "${name}" already exists. Choose a name for the imported board (or leave it as "${name}" to import it anyway).`,
-      nextDuplicateName(name, boards.boards.map((existing) => existing.name)),
+      importNameSuggestion(name, file.name, boards.boards.map((existing) => existing.name)),
     )
     if (chosen === null) return
     void run(() => boards.importFile(file, chosen))

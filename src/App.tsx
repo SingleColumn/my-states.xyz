@@ -87,6 +87,11 @@ function AppContent() {
   const appearanceRef = useRef(appearance)
   const previousPanelGeometryRef = useRef(new Map<string, PanelLayout>())
   const preFocusPanelGeometryRef = useRef(new Map<string, PanelLayout>())
+  // Panels that asked to grow while the canvas was paused for a board
+  // operation. A newly opened board's panels mount during that pause, and
+  // tldraw drops every shape change made while it is read-only, so the
+  // request waits for the pause to end instead of being lost.
+  const pendingExpansionsRef = useRef(new Set<string>())
 
   useEffect(() => {
     boardsRef.current = boards
@@ -241,6 +246,10 @@ function AppContent() {
     const unregisterCanvasPause = boards.registerCanvasPause((paused) => {
       editor.updateInstanceState({ isReadonly: paused })
       if (appRootRef.current) appRootRef.current.inert = paused
+      if (!paused) {
+        for (const panelId of pendingExpansionsRef.current) expandPanelFromStartingHeight(editor, panelId)
+        pendingExpansionsRef.current.clear()
+      }
     })
     const unregisterCanvasRestore = boards.registerCanvasRestore((board) => {
       prepareCanvasRestore(editor.store, board)
@@ -469,7 +478,10 @@ function AppContent() {
   }, [])
 
   const expandPanelFromStartingHeightForId = useCallback((panelId: string) => {
-    if (editorRef.current) expandPanelFromStartingHeight(editorRef.current, panelId)
+    const editor = editorRef.current
+    if (!editor) return
+    if (editor.getIsReadonly()) pendingExpansionsRef.current.add(panelId)
+    else expandPanelFromStartingHeight(editor, panelId)
   }, [])
 
   const restorePanelDefaultSizeForId = useCallback((panelId: string) => {

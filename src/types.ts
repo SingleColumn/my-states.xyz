@@ -7,7 +7,7 @@ import type { TLStoreSnapshot } from 'tldraw'
  * by it, so adding a key here is what makes the compiler ask for the rest.
  */
 export interface PanelConfigs {
-  spotify: { playlist: SpotifyPlaylistReference }
+  spotify: { playlist: SpotifyPlaylistReference; track?: SpotifySavedTrack | null }
   slideshow: SlideshowSettings
   notes: { activeNoteId: string | null }
   video: { selectedVideoId: string | null }
@@ -144,6 +144,24 @@ export interface SpotifyPlaylistReference {
   url: string | null
   /** Filled in by the artwork lookup after the playlist is chosen. */
   image?: string | null
+}
+
+/**
+ * A song chosen in the Music panel, kept with the board like the playlist is,
+ * so it is still there after a reload or an export. It is a whole description
+ * rather than an id because the panel names the song and shows its cover
+ * before anyone has connected Spotify, when nothing can be looked up. Absent
+ * on every board saved before songs were kept, which means no song.
+ */
+export interface SpotifySavedTrack {
+  id: string
+  uri: string
+  name: string
+  artists: string
+  album: string
+  url: string
+  image: string | null
+  durationMs: number
 }
 
 export interface CanvasCamera {

@@ -1,18 +1,13 @@
 /* The focus view, with no Spotify session. The full view can offer search
    and six suggestions; this one is a few centimetres tall, so all it says is
-   which playlist is chosen and that playing it needs Spotify. */
+   that playing needs Spotify. The footer names the playlist. */
 .spotify-focus-connect {
   display: grid;
   align-content: center;
+  justify-items: start;
   gap: var(--space-spotify-login-gap);
   min-height: 100%;
   padding: var(--card-padding);
-  text-align: center;
-}
-
-.spotify-focus-connect .loaded-playlist {
-  margin-bottom: 0;
-  justify-items: center;
 }
 
 .spotify-focus-connect p,
@@ -23,95 +18,45 @@
   line-height: var(--line-height-body);
 }
 
-/* Which playlist is loaded: a label, not a card. One line and no cover, the
-   same in every view, so putting the search away leaves these words where
-   they were. With a cover it was the size and shape of a result row and read
-   as one more of them; stacked, the eyebrow and the name spent a line of the
-   panel saying one thing. */
-.loaded-playlist {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  min-width: 0;
-  margin-bottom: var(--space-now-playing-bottom);
-}
-
-.loaded-playlist span {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-control-inner-gap);
-  min-width: 0;
-}
-
-.loaded-playlist small {
-  flex: 0 0 auto;
-}
-
-.loaded-playlist strong {
-  min-width: 0;
-}
-
-.loaded-playlist small,
-.loaded-playlist strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.loaded-playlist small {
-  color: var(--card-eyebrow-color);
-  font-size: var(--card-eyebrow-size);
-  font-weight: var(--card-eyebrow-weight);
-  letter-spacing: var(--card-eyebrow-tracking);
-  text-transform: uppercase;
-}
-
-.loaded-playlist strong {
-  font-size: var(--font-size-playlist-title);
-  font-weight: var(--font-weight-semibold);
-}
-
 /*
  * Focus view — the Music panel shrunk to what someone glances at while they
- * write or look at images. The playlist URL, the search, and the results are
- * not rendered, so this only has to keep what remains centred and give the
- * album art more of the smaller panel than the full layout would.
+ * write or look at images. The search, the results and the cover are not
+ * rendered. The controls take the Images panel's compact sizes so neither
+ * panel's buttons outweigh the other's, and the text keeps one left edge,
+ * wrapping rather than cutting off, as the Images panel's labels do.
  */
 .panel-spotify-surface.is-focus-view .panel-body {
+  --card-header-button-size: 28px;
+  --size-play-button: 38px;
+  --size-control-icon: 16px;
+  --size-primary-icon: 18px;
+  --space-row-bottom: 8px;
   justify-content: center;
   overflow: auto;
 }
 
-.panel-spotify-surface.is-focus-view {
-  --size-album-frame-max: clamp(96px, min(34cqi, 26cqb), 900px);
+/* The body centres what it holds, so a gap under the last row would show as
+   extra room under the volume rather than as space between rows. */
+.panel-spotify-surface.is-focus-view .panel-body > :last-child {
+  margin-bottom: 0;
 }
 
-.album-frame {
-  width: 100%;
-  max-width: var(--size-album-frame-max);
-  aspect-ratio: 1 / 1;
-  margin: 0 auto var(--space-now-playing-bottom);
-  overflow: hidden;
-  box-shadow: var(--shadow-album-art);
-}
-
-.album-frame img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+/* The footer is the only place the focus view names the playlist, so a long
+   name wraps there instead of being cut off. */
+.panel-spotify-surface.is-focus-view .card-footer-meta {
+  white-space: normal;
 }
 
 .album-frame-empty {
-  width: 100%;
-  height: 100%;
   background: var(--background-album-empty);
 }
 
+/* Left-aligned and wrapping in every view, so the song's name shares one
+   edge with the controls below it, as the Images panel's labels do. */
 .track-copy {
   min-width: 0;
   margin-bottom: var(--space-now-playing-bottom);
-  text-align: center;
+  text-align: left;
 }
 
 .track-title-row {
@@ -150,12 +95,10 @@
 
 .track-title {
   margin: 0 0 var(--space-track-title-bottom);
-  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-track-title);
   font-weight: var(--font-weight-track-title);
   line-height: var(--line-height-track-title);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .track-meta {
@@ -274,43 +217,30 @@
   margin-top: 0;
 }
 
-/* With the search put away the artwork takes the room the results had, so the
-   panel fills from the top instead of stranding everything against the header
-   above an empty half. */
-.panel-spotify-surface.is-search-hidden .album-frame {
-  flex: 1 1 0;
-  min-height: 0;
-  width: auto;
-  max-width: none;
-  aspect-ratio: auto;
-  display: grid;
-  place-items: center;
-  /* The frame is only a place to centre the cover in now, so the card border
-     and fill come off and the cover carries its own edge. */
-  border: none;
-  background: none;
-  box-shadow: none;
-}
-
-.panel-spotify-surface.is-search-hidden .album-frame img {
-  width: auto;
-  height: auto;
-  max-width: min(100%, var(--size-album-frame-max-open));
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: var(--content-radius);
-  box-shadow: var(--shadow-album-art);
-}
-
-.panel-spotify-surface.is-search-hidden .album-frame-empty {
-  width: min(100%, var(--size-album-frame-max));
-  aspect-ratio: 1 / 1;
-  height: auto;
-  border-radius: var(--content-radius);
-}
-
 .spotify-show-search {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-control-inner-gap);
+  height: 28px;
   margin-bottom: var(--space-playlist-top);
+  padding: 0 10px;
+  /* A faint frame, so it still reads as something to press without drawing
+     the eye the way a filled button would. */
+  border: var(--border-width-hairline) solid var(--card-button-border);
+  border-radius: var(--button-radius);
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-panel-label);
+  cursor: pointer;
+}
+
+.spotify-show-search:hover,
+.spotify-show-search:focus-visible {
+  background: var(--card-button-bg-hover);
+  color: var(--color-text);
 }
 
 /* Connecting Spotify sits in the same row as Reset fields, which is styled
@@ -504,6 +434,101 @@
 
 .spotify-chosen .track-copy {
   margin: 0;
+}
+
+/* The chosen song or playlist with its cover, laid out like a result row
+   but not one: it is not a button, and is not counted among the results. */
+.spotify-chosen-item {
+  display: grid;
+  grid-template-columns: var(--size-playlist-art) minmax(0, 1fr);
+  gap: var(--space-playlist-image-gap);
+  align-items: center;
+}
+
+.spotify-chosen-item > img,
+.spotify-chosen-item > div:first-child {
+  width: var(--size-playlist-art);
+  height: var(--size-playlist-art);
+  border-radius: var(--radius-playlist-art);
+  background: var(--color-control);
+  object-fit: cover;
+}
+
+/* The music shown as an album -- with the search open and nothing typed, or
+   with the search put away: the cover takes whatever height the column has
+   left and stays square within it, the words sit under it. */
+.spotify-chosen.is-featured {
+  flex: 1 1 0;
+  min-height: 0;
+  /* A column centred as one block, so the words stay under the picture.
+     Short of room, the cover is what gives way: it is the only part that
+     can shrink, and the words and the step to play stay readable. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: var(--space-playlist-top);
+}
+
+/* With the search put away nothing sits above the cover to keep apart from. */
+.panel-spotify-surface.is-search-hidden .spotify-chosen.is-featured {
+  margin-top: 0;
+}
+
+/* Nothing chosen and nothing to suggest: a line on how to start, in the
+   middle of the room the music would take. */
+.spotify-empty {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.spotify-empty p {
+  margin: 0;
+}
+
+.spotify-featured-cover {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.spotify-featured-cover img,
+.spotify-featured-cover .album-frame-empty {
+  min-height: 0;
+  width: auto;
+  height: auto;
+  max-width: min(100%, var(--size-album-frame-max-open));
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--content-radius);
+  box-shadow: var(--shadow-album-art);
+}
+
+.spotify-featured-cover .album-frame-empty {
+  width: min(100%, var(--size-album-frame-max));
+}
+
+/* Centred under the cover they belong to, as on a record sleeve; the
+   left edge the player's rows share does not exist in this view. */
+.spotify-chosen.is-featured .track-copy,
+.spotify-chosen.is-featured .spotify-chosen-note {
+  margin: 0;
+  text-align: center;
+}
+
+.spotify-chosen.is-featured .track-title-row {
+  justify-content: center;
+}
+
+/* What to do next is not part of the song's description, so it stands
+   apart from the title and artist rather than reading as a third line. */
+.spotify-chosen.is-featured .spotify-chosen-note {
+  margin-top: var(--space-now-playing-bottom);
 }
 
 .spotify-chosen-note {

@@ -77,8 +77,15 @@ export function useSlideshowState(board: Board | null, panels: PanelsState): Sli
     .filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow')
     .map((panel) => `${panel.id}=${imageSourceKey(panel.config.imageSource)}`)
     .join('|')
+  // The board the loaded pictures were read for. Opening a board puts its
+  // panels on the canvas a moment before `board` names it, so a load in that
+  // gap asks the previous board for the new panels' pictures and finds none.
+  // Once the board catches up, everything is read again rather than trusted.
+  const loadedForBoardRef = useRef('')
   useEffect(() => {
     let cancelled = false
+    const boardChanged = loadedForBoardRef.current !== loadKey
+    loadedForBoardRef.current = loadKey
     const slideshowPanels = loadKey ? panelsRef.current.all.filter((panel): panel is Panel<'slideshow'> => panel.type === 'slideshow') : []
     const activeIds = new Set(slideshowPanels.map((panel) => panel.id))
     for (const [panelId, state] of slideshowPanelRuntimeStates) {
@@ -88,7 +95,7 @@ export function useSlideshowState(board: Board | null, panels: PanelsState): Sli
         slideshowPanelRuntimeStates.delete(panelId)
       }
     }
-    const toLoad = slideshowPanels.filter((panel) => getSlideshowPanelRuntimeState(panel.id).sourceKey !== imageSourceKey(panel.config.imageSource))
+    const toLoad = slideshowPanels.filter((panel) => boardChanged || getSlideshowPanelRuntimeState(panel.id).sourceKey !== imageSourceKey(panel.config.imageSource))
     for (const panel of toLoad) {
       const state = getSlideshowPanelRuntimeState(panel.id)
       cancelAdvance(state)
