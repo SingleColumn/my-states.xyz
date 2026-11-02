@@ -67,3 +67,17 @@ export function nextDuplicateName(sourceName: string, existingNames: readonly st
     if (!taken.has(candidate)) return candidate
   }
 }
+
+/**
+ * The name offered when an imported board's own name is already taken. The
+ * file's name comes first: the name stored inside an archive is whatever the
+ * board was called when exported -- often the starter "A new board", which
+ * every fresh browser also has -- while a renamed file is usually what the
+ * person means the board to be called. A file still named after the board, or
+ * one whose name is taken too, gets a numbered copy name instead.
+ */
+export function importNameSuggestion(archiveName: string, fileName: string, existingNames: readonly string[]): string {
+  const fromFile = fileName.replace(/\.board\.zip$|\.zip$/i, '').trim().slice(0, 80).trim()
+  const base = fromFile || archiveName
+  return existingNames.includes(base) ? nextDuplicateName(base, existingNames) : base
+}

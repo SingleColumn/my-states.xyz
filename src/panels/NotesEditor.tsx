@@ -17,6 +17,7 @@ import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
 import { configureHighlightStringify, highlightInputRule, highlightKeymap, highlightRemark, highlightSchema, toggleHighlightCommand } from './notesHighlight'
+import { pastePlainText } from './notesClipboard'
 import { NotesWritingToolbar } from './NotesWritingToolbar'
 import { configureImageSize, imageSizeRemark, NotesImageView } from './notesImage'
 import '@milkdown/prose/view/style/prosemirror.css'
@@ -187,7 +188,22 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         // The class the theme's prose rules already target; ProseMirror puts
         // it on the contenteditable itself, so the writing surface is styled
         // like the previous editor's content area was.
-        ctx.set(editorViewOptionsCtx, { attributes: { class: 'notes-editor-content' } })
+        ctx.set(editorViewOptionsCtx, {
+          attributes: { class: 'notes-editor-content' },
+          handlePaste: (view, event) => {
+            const data = event.clipboardData
+            if (!data) return false
+            const html = data.getData('text/html')
+            const text = data.getData('text/plain')
+            // ProseMirror tags copies from this editor so its own formatting
+            // can survive a round trip. Outside HTML is page styling, not a
+            // request to color or format the note.
+            if (html.includes('data-pm-slice') || !text) return false
+            event.preventDefault()
+            pastePlainText(view, text)
+            return true
+          },
+        })
         // A class, not a title: the mark's own attributes are spread after
         // these and its null title would blank one out.
         ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))

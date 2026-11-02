@@ -22,7 +22,7 @@
 .word-graph-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; }
 .word-graph-resize::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 9px; height: 9px; border-right: 2px solid var(--color-text-muted); border-bottom: 2px solid var(--color-text-muted); }
 
-.word-graph-invoke { width: auto; padding: 0 10px; white-space: nowrap; font: inherit; }
+.word-graph-invoke { width: auto; padding: 0 10px; white-space: nowrap; font: inherit; font-size: var(--type-xs); }
 .word-graph-invoke-container { display: inline-flex; }
 .word-graph-invoke-container.is-disabled { cursor: help; }
 /* Disabled buttons do not reliably surface native hover titles, so the wrapper owns the hint. */

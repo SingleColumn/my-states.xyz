@@ -31,13 +31,13 @@ describe('panel geometry commands', () => {
 
   it('shrinks a panel to its focus view size where one exists, leaving it in place', () => {
     const layout = { panelId: 'panel-a', x: 123, y: 456, w: 900, h: 700 }
-    expect(applyPanelFocusViewSize(layout, 'spotify')).toEqual({ ...layout, w: 380, h: 460 })
+    expect(applyPanelFocusViewSize(layout, 'spotify')).toEqual({ ...layout, w: 380, h: 260 })
     // The Images panel has no focus view size: it gives the room its controls
     // used to take to the picture instead of shrinking away from it.
     expect(applyPanelFocusViewSize(layout, 'slideshow')).toEqual(layout)
     expect(applyPanelFocusViewSize(layout, 'notes')).toEqual(layout)
     expect(applyPanelFocusViewSize(layout, 'video')).toEqual(layout)
-    expect(getPanelFocusViewSize('spotify')).toEqual({ w: 380, h: 460 })
+    expect(getPanelFocusViewSize('spotify')).toEqual({ w: 380, h: 260 })
     expect(getPanelFocusViewSize('slideshow')).toBeNull()
     expect(getPanelFocusViewSize('video')).toBeNull()
   })

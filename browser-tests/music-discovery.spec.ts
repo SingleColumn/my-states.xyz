@@ -234,11 +234,11 @@ test.describe('the Music panel, before Spotify is connected', () => {
     expect(measured.gap / zoom - measured.reach).toBeGreaterThanOrEqual(measured.betweenButtons - 0.5)
   })
 
-  // The board saves a playlist so it is there to play once connected. Until
-  // then it is a name that cannot be played and that this visitor did not just
-  // choose, so it stays out of sight -- and out of the button's glow -- until
-  // they choose one now.
-  test('keeps a playlist saved in the board out of sight until one is chosen now', async ({ page }) => {
+  // The music saved in a board is part of the board, shown whether or not
+  // Spotify is connected: someone opening an imported or shared board chose it
+  // along with the board. The glow on the button follows a click, not the
+  // board, so a playlist saved some other day does not set it off.
+  test('shows a playlist saved in the board, and glows only once one is chosen now', async ({ page }) => {
     await withDiscovery(page)
     const { shape, music } = await openMusicPanel(page)
     await dispatch(page, {
@@ -250,20 +250,19 @@ test.describe('the Music panel, before Spotify is connected', () => {
     await expect.poll(async () => (await describeCanvas(page)).panels.find((panel) => panel.panelId === music.panelId)?.config)
       .toMatchObject({ playlist: { id: 's1', name: 'Saved Earlier' } })
 
-    // ...and the panel does not say so, in the body or the footer, and has
-    // nothing to explain and nothing to glow about.
-    await expect(shape.getByText('Saved Earlier')).toHaveCount(0)
-    await expect(shape.locator('.loaded-playlist')).toHaveCount(0)
-    await expect(shape.getByRole('status')).toHaveCount(0)
-    await expect(shape.locator('.card-footer-meta')).toHaveText('No playlist loaded')
+    // ...and the panel shows it, large, with the step left to play it -- but
+    // nothing glows, since nobody has clicked anything.
+    await expect(shape.locator('.spotify-chosen.is-featured')).toContainText('Saved Earlier')
+    await expect(shape.getByRole('status')).toContainText('Connect Spotify to play this playlist here')
+    await expect(shape.locator('.card-footer-meta')).toHaveText('Saved Earlier')
     const connect = shape.getByRole('button', { name: /connect spotify/i })
     await expect(connect).not.toHaveClass(/is-inviting/)
 
     await shape.getByLabel('Search playlists').fill('rain')
     await shape.getByRole('button', { name: /Rain on Glass/ }).click()
 
-    // Chosen now: it is named, explained, and the button glows.
-    await expect(shape.locator('.loaded-playlist')).toContainText('Rain on Glass')
+    // Chosen now: named in the row under the results, explained, and the button glows.
+    await expect(shape.locator('.spotify-chosen-item')).toContainText('Rain on Glass')
     await expect(shape.locator('.card-footer-meta')).toHaveText('Rain on Glass')
     await expect(shape.getByRole('status')).toContainText('Connect Spotify to play this playlist here')
     await expect(connect).toHaveClass(/is-inviting/)
@@ -483,7 +482,7 @@ test.describe('the Music panel, after a sign-in that did not succeed', () => {
     await expect(shape.getByLabel('Search playlists')).toHaveValue('rain')
     await expect(shape.getByRole('button', { name: /Rain on Glass/ })).toBeVisible()
     // The playlist is named again, with what happens next, and they are still signed out.
-    await expect(shape.locator('.loaded-playlist')).toContainText('Rain on Glass')
+    await expect(shape.locator('.spotify-chosen-item')).toContainText('Rain on Glass')
     await expect(shape.getByRole('status')).toContainText('Connect Spotify to play this playlist here')
     await expect(shape.getByRole('button', { name: /connect spotify/i })).toHaveCount(1)
     expect(await page.evaluate(() => window.sessionStorage.getItem('mic:spotify-return-context'))).toBeNull()
@@ -497,7 +496,7 @@ test.describe('the Music panel, after a sign-in that did not succeed', () => {
     const shape = await panelShape(page)
 
     await expect(shape.getByLabel('Search playlists')).toHaveValue('rain')
-    await expect(shape.locator('.loaded-playlist')).toContainText('Rain on Glass')
+    await expect(shape.locator('.spotify-chosen-item')).toContainText('Rain on Glass')
     await expect(shape.getByRole('button', { name: /connect spotify/i })).toHaveCount(1)
   })
 

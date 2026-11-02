@@ -254,6 +254,28 @@ test('importing an archive whose name collides with an existing board offers a n
   await expectArchitectureReportPass(page)
 })
 
+// A board exported without being renamed carries the starter name every
+// fresh browser also has. The file is what the person named, so the prompt
+// offers that.
+test('a colliding import from a renamed file suggests the file\'s name', async ({ page }, testInfo) => {
+  await openApp(page)
+
+  const downloading = page.waitForEvent('download')
+  await chooseBoardMenuItem(page, 'Export board')
+  const download = await downloading
+  const archivePath = testInfo.outputPath('both-sides-now.board.zip')
+  await download.saveAs(archivePath)
+
+  page.once('dialog', (dialog) => {
+    expect(dialog.message()).toContain('"A new board"')
+    expect(dialog.defaultValue()).toBe('both-sides-now')
+    void dialog.accept(dialog.defaultValue())
+  })
+  await page.locator('.board-toolbar input[type="file"]').setInputFiles(archivePath)
+
+  await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe('both-sides-now')
+})
+
 test('declining the rename-or-import prompt for a colliding name adds nothing', async ({ page }, testInfo) => {
   await openApp(page)
   await createBoardFromToolbar(page, 'Kept aside')

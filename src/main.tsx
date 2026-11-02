@@ -5,6 +5,7 @@ import type { PostHogInterface } from 'posthog-js'
 import { Analytics } from '@vercel/analytics/react'
 import { DesktopOnlyNotice } from './DesktopOnlyNotice'
 import { currentDeviceHints, isMobileDevice } from './deviceSupport'
+import { localOriginToUse } from './localOrigin'
 import 'tldraw/tldraw.css'
 // Self-hosted so the demo renders identically offline and on every machine.
 // Two entries: upright and italic, both variable on the weight axis. The
@@ -30,34 +31,41 @@ const posthogOptions = {
   },
 } as const
 
-const root = ReactDOM.createRoot(document.getElementById('root')!)
-
-if (isMobileDevice(currentDeviceHints())) {
-  // Nothing else is loaded on a phone: the canvas and editor bundles are
-  // large and would only render a UI that cannot be operated by touch.
-  root.render(
-    <React.StrictMode>
-      <PostHogProvider
-        apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
-        options={posthogOptions}
-      >
-        <DesktopOnlyNotice />
-      </PostHogProvider>
-    </React.StrictMode>,
-  )
+// Before anything reads storage: a local copy opened at the wrong one of its
+// two addresses would show, and save into, a different set of boards.
+const localOrigin = localOriginToUse(window.location.href, import.meta.env.VITE_SPOTIFY_REDIRECT_URI?.trim())
+if (localOrigin) {
+  window.location.replace(`${localOrigin}${window.location.pathname}${window.location.search}${window.location.hash}`)
 } else {
-  // Imported lazily so the mobile branch above never pays for it.
-  import('./App').then(({ default: App }) => {
+  const root = ReactDOM.createRoot(document.getElementById('root')!)
+
+  if (isMobileDevice(currentDeviceHints())) {
+    // Nothing else is loaded on a phone: the canvas and editor bundles are
+    // large and would only render a UI that cannot be operated by touch.
     root.render(
       <React.StrictMode>
         <PostHogProvider
           apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
           options={posthogOptions}
         >
-          <App />
-          <Analytics />
+          <DesktopOnlyNotice />
         </PostHogProvider>
       </React.StrictMode>,
     )
-  })
+  } else {
+    // Imported lazily so the mobile branch above never pays for it.
+    import('./App').then(({ default: App }) => {
+      root.render(
+        <React.StrictMode>
+          <PostHogProvider
+            apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
+            options={posthogOptions}
+          >
+            <App />
+            <Analytics />
+          </PostHogProvider>
+        </React.StrictMode>,
+      )
+    })
+  }
 }

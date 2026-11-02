@@ -208,6 +208,20 @@ describe('portable board archives', () => {
     expect(assets).toEqual([])
   })
 
+  it('carries the song a Music panel keeps, cover and all, so the imported board names the same song', async () => {
+    const song = { id: 't1', uri: 'spotify:track:t1', name: 'Both Sides Now', artists: 'Frank Sinatra', album: 'Cycles', url: 'https://open.spotify.com/track/t1', image: 'https://i.scdn.co/image/cover', durationMs: 200_000 }
+    const panels = createDefaultPanels().map((panel): Panel => panel.type === 'spotify'
+      ? { ...panel, config: { playlist: { id: null, uri: null, name: null, url: null }, track: song } }
+      : panel)
+    const source = await storeBoard('With a song', panels)
+
+    const { board: imported } = await importBoardArchive(asFile(await exportBoardArchive(source.id)))
+    const spotify = panelsOf(await getBoard(imported.id)).find((panel): panel is Panel<'spotify'> => panel.type === 'spotify')
+
+    expect(spotify?.config.track).toEqual(song)
+    expect(spotify?.config.playlist.name).toBeNull()
+  })
+
   it('continues to import portable archives written in format version 2', async () => {
     const entries = await archiveEntries(await createCompleteArchive())
     const previous = manifest(entries)

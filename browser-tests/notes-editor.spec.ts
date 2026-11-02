@@ -75,6 +75,63 @@ test.describe('Notes editor', () => {
 })
 
 test.describe('formatting tooltip', () => {
+  test('keeps formatting when pasting words copied from the editor', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('Bold words')
+    await page.keyboard.press('Control+Shift+ArrowLeft')
+    await page.keyboard.press('Control+b')
+    await page.keyboard.press('Control+c')
+    await page.keyboard.press('End')
+    await page.keyboard.type(' ')
+    await page.keyboard.press('Control+v')
+    await expect(body.locator('strong')).toHaveText('words words')
+  })
+
+  test('offers clipboard actions and pastes website text without its background color', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    const bar = page.getByRole('toolbar', { name: 'Formatting' })
+    await body.click()
+    await page.keyboard.type('A first line')
+    await page.keyboard.press('Control+a')
+    await body.click({ button: 'right' })
+    await bar.getByRole('button', { name: 'Copy', exact: true }).click()
+    await expect(bar).toBeHidden()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('A first line')
+
+    await body.click({ button: 'right' })
+    await bar.getByRole('button', { name: 'Cut', exact: true }).click()
+    await expect(body).not.toContainText('A first line')
+    await body.click({ button: 'right' })
+    await bar.getByRole('button', { name: 'Paste', exact: true }).click()
+    await expect(body).toContainText('A first line')
+
+    await page.evaluate(async () => {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/plain': new Blob(['Website words'], { type: 'text/plain' }),
+        'text/html': new Blob(['<strong><span style="background-color: white">Website words</span></strong>'], { type: 'text/html' }),
+      })])
+    })
+    await page.keyboard.press('End')
+    await page.keyboard.type(' ')
+    await page.keyboard.press('Control+v')
+    await expect(body).toContainText('Website words')
+    await expect(body.locator('mark')).toHaveCount(0)
+    await expect(body.locator('strong')).toHaveCount(0)
+
+    const beforePlain = await body.innerText()
+    await body.click({ button: 'right' })
+    await bar.getByRole('button', { name: 'Paste as plain text' }).click()
+    await expect.poll(async () => (await body.innerText()).length).toBe(beforePlain.length + 'Website words'.length)
+    await expect(body.locator('mark')).toHaveCount(0)
+  })
+
   test('is asked for by right-clicking, applies bold, and is dismissed by Escape', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
