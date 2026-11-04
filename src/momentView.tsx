@@ -45,6 +45,9 @@ export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, sl
       .map((panel) => panel.id)
     for (const panelId of playingPanelIds) slideshowRef.current.setIsPlaying(false, panelId)
 
+    // Before anything is hidden, while the writing areas still have their size.
+    rememberNoteHeights()
+
     const { x, y, z } = editor.getCamera()
     restoreRef.current = { toolId: editor.getCurrentToolId(), camera: { x, y, z }, playingPanelIds }
 
@@ -121,6 +124,20 @@ export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, sl
   return { isOn, enter }
 }
 
+/**
+ * A note's card takes the height of the writing area it had in the panel, so
+ * that sizing the panel decides how the screenshot looks. The area's height is
+ * the panel's less its header, its footer and whatever controls are open, which
+ * only the laid-out panel knows. offsetHeight, because a rect would come back
+ * scaled by the canvas's zoom and the card is laid out in the panel's own units.
+ */
+function rememberNoteHeights() {
+  for (const surface of document.querySelectorAll<HTMLElement>('.panel-notes-surface')) {
+    const writingArea = surface.querySelector<HTMLElement>('.notes-editor')
+    if (writingArea) surface.style.setProperty('--moment-note-height', `${writingArea.offsetHeight}px`)
+  }
+}
+
 const MOMENT_EDGE_MARGIN = 16
 
 /**
@@ -139,10 +156,11 @@ export function momentVerticalShift(top: number, bottom: number, viewportHeight:
 
 /**
  * Measured from what is on screen rather than from the panels' stored positions,
- * because only the drawn result knows which panels this view has left out.
+ * because only the drawn result knows which panels this view has left out and
+ * how far each card reaches: a card ends with what it holds, not with its panel.
  */
 function centreMomentVertically(editor: Editor) {
-  const shown = [...document.querySelectorAll('.canvas-panel-shell')]
+  const shown = [...document.querySelectorAll('.slideshow-stage, .panel-notes-surface, .spotify-chosen.is-featured')]
     .map((shell) => shell.getBoundingClientRect())
     .filter((rect) => rect.width > 0 && rect.height > 0)
   if (!shown.length) return

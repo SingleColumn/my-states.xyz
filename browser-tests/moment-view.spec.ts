@@ -73,7 +73,7 @@ test.describe('Moment view', () => {
     const imageCard = page.locator('.slideshow-stage')
     const tops = [
       await boxOf(imageCard),
-      await boxOf((await shapeOf(page, notes.panelId)).locator('.canvas-panel-shell')),
+      await boxOf((await shapeOf(page, notes.panelId)).locator('.panel-notes-surface')),
       await boxOf(musicShape.locator('.spotify-chosen.is-featured')),
     ].map((box) => box.y)
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(2)
@@ -99,14 +99,87 @@ test.describe('Moment view', () => {
   test('the message about leaving does not cover the panels, in a small window too', async ({ page }) => {
     await page.setViewportSize({ width: 1228, height: 636 })
     await openApp(page)
-    const notes = await panelOfType(page, 'notes')
-    const noteShape = await shapeOf(page, notes.panelId)
+    const images = await panelOfType(page, 'slideshow')
+    await loadSampleImages(page, images.panelId)
 
     await prepareForScreenshot(page)
 
     const hint = await boxOf(page.getByRole('status').filter({ hasText: 'Esc' }))
-    const note = await boxOf(noteShape.locator('.canvas-panel-shell'))
-    expect(hint.y + hint.height).toBeLessThanOrEqual(note.y)
+    expect(hint.y + hint.height).toBeLessThanOrEqual((await boxOf(page.locator('.slideshow-stage'))).y)
+  })
+
+  test('the note looks as it did in the panel: same space under the text, same line breaks, and its panel sets both', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const noteShape = await shapeOf(page, notes.panelId)
+    await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: 'First line of the note\n\nA second paragraph, long enough to wrap at least once across the width of the panel so that its line breaks can be compared between the two views.' })
+    const paragraph = noteShape.locator('.notes-editor-content > p').last()
+    await expect(paragraph).toContainText('A second paragraph')
+
+    const heightIn = async (panelHeight: number) => {
+      await dispatch(page, { kind: 'panel.resize', panelId: notes.panelId, w: notes.w, h: panelHeight })
+      // Measured at each size, because a panel's margins scale with the panel.
+      await expect.poll(async () => (await panelById(page, notes.panelId)).h).toBe(panelHeight)
+      const textBefore = await boxOf(paragraph)
+      const areaBefore = await boxOf(noteShape.locator('.notes-editor'))
+      await prepareForScreenshot(page)
+      const card = await boxOf(noteShape.locator('.panel-notes-surface'))
+      const text = await boxOf(paragraph)
+      expect(Math.abs(text.width - textBefore.width)).toBeLessThanOrEqual(2)
+      expect(Math.abs(text.height - textBefore.height)).toBeLessThanOrEqual(2)
+      const spaceBefore = areaBefore.y + areaBefore.height - (textBefore.y + textBefore.height)
+      const space = card.y + card.height - (text.y + text.height)
+      expect(Math.abs(space - spaceBefore)).toBeLessThanOrEqual(3)
+      await page.keyboard.press('Escape')
+      return card.height
+    }
+    // Sizing the panel is how the space under the text is chosen.
+    const tall = await heightIn(notes.h)
+    const short = await heightIn(notes.h - 200)
+    expect(tall - short).toBeGreaterThan(100)
+  })
+
+  test('all three cards are as wide as their panels, with a tall picture in a short panel too', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    const notes = await panelOfType(page, 'notes')
+    const music = await panelOfType(page, 'spotify')
+    await loadSampleImages(page, images.panelId)
+    await dispatch(page, { kind: 'panel.update', panelId: music.panelId, config: { track: { id: 't1', uri: 'spotify:track:t1', name: 'Both Sides Now', artists: 'Joni Mitchell', album: 'Clouds', url: 'https://open.spotify.com/track/t1', image: null, durationMs: 180000 } } })
+    for (const panel of [images, notes, music]) await dispatch(page, { kind: 'panel.resize', panelId: panel.panelId, w: 460, h: 420 })
+
+    await prepareForScreenshot(page)
+
+    const noteCard = await boxOf((await shapeOf(page, notes.panelId)).locator('.panel-notes-surface'))
+    const imageCard = await boxOf((await shapeOf(page, images.panelId)).locator('.slideshow-stage'))
+    const songCard = await boxOf((await shapeOf(page, music.panelId)).locator('.spotify-chosen.is-featured'))
+    expect(Math.abs(imageCard.width - noteCard.width)).toBeLessThanOrEqual(2)
+    expect(Math.abs(songCard.width - noteCard.width)).toBeLessThanOrEqual(2)
+
+    // Too tall for this panel, so it is cropped to fit, not squashed or overflowing.
+    const shell = await boxOf((await shapeOf(page, images.panelId)).locator('.canvas-panel-shell'))
+    expect(imageCard.height).toBeLessThanOrEqual(shell.height + 1)
+    await expect(picture(page)).toHaveCSS('object-fit', 'cover')
+  })
+
+  test('a note too long for its panel stops at the panel and scrolls', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const noteShape = await shapeOf(page, notes.panelId)
+    await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: Array.from({ length: 60 }, (_, line) => `Paragraph number ${line}.`).join('\n\n') })
+    await expect(noteShape.locator('.notes-editor-content')).toContainText('Paragraph number 59.')
+
+    await prepareForScreenshot(page)
+
+    const shell = await boxOf(noteShape.locator('.canvas-panel-shell'))
+    const card = await boxOf(noteShape.locator('.panel-notes-surface'))
+    expect(card.height).toBeLessThanOrEqual(shell.height + 1)
+    const scroller = noteShape.locator('.milkdown')
+    expect(await scroller.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true)
+    await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2)
+    await page.mouse.wheel(0, 300)
+    await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(0)
   })
 
   test('the panels sit in the middle of the window, each with a slight border', async ({ page }) => {
@@ -123,12 +196,18 @@ test.describe('Moment view', () => {
 
     await prepareForScreenshot(page)
 
-    const note = await boxOf(noteShape.locator('.canvas-panel-shell'))
-    expect(Math.abs(note.y - (1000 - (note.y + note.height)))).toBeLessThanOrEqual(2)
+    const cards = [
+      await boxOf(page.locator('.slideshow-stage')),
+      await boxOf(noteShape.locator('.panel-notes-surface')),
+      await boxOf(musicShape.locator('.spotify-chosen.is-featured')),
+    ]
+    const top = Math.min(...cards.map((card) => card.y))
+    const bottom = Math.max(...cards.map((card) => card.y + card.height))
+    expect(Math.abs(top - (1000 - bottom))).toBeLessThanOrEqual(2)
 
     for (const [locator, property] of [
       [page.locator('.slideshow-stage'), 'border-top-style'],
-      [noteShape.locator('.canvas-panel-shell'), 'border-top-style'],
+      [noteShape.locator('.panel-notes-surface'), 'border-top-style'],
       [musicShape.locator('.spotify-chosen.is-featured'), 'border-top-style'],
     ] as const) await expect(locator).toHaveCSS(property, 'solid')
 

@@ -13,10 +13,6 @@
   --moment-card-padding: 14px;
 }
 
-:root[data-moment-view] .canvas-panel-shell {
-  border-color: var(--moment-card-border);
-}
-
 /* Hidden rather than removed: the toolbar is measured to lay out full-screen
    panels, and at no size at all it would report a height of nothing. */
 :root[data-moment-view] .app-chrome {
@@ -64,13 +60,11 @@
   pointer-events: auto !important;
 }
 
-/* The picture and the song each draw a card of their own that fits what they
-   hold, so the panel behind them goes: a picture or a cover is rarely the shape
-   of its panel, and what they do not fill should show the canvas rather than a
-   band of panel colour. A panel also clips what it holds, which here would cut
-   off the card's shadow. */
-:root[data-moment-view] .canvas-panel-shell:has(.panel-slideshow-surface),
-:root[data-moment-view] .canvas-panel-shell:has(.panel-spotify-surface) {
+/* The picture, the writing and the song each draw a card of their own that fits
+   what they hold, so the panel behind them goes: what they do not fill should
+   show the canvas rather than a band of panel colour. A panel also clips what it
+   holds, which here would cut off the card's shadow. */
+:root[data-moment-view] .canvas-panel-shell {
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -106,7 +100,7 @@
   align-items: center;
   align-self: start;
   gap: 8px;
-  width: fit-content;
+  width: 100%;
   height: fit-content;
   max-height: none;
   margin: 0;
@@ -114,16 +108,25 @@
   aspect-ratio: auto;
 }
 
+/* Room for a line of credit under the picture, for pictures that have one. */
+:root[data-moment-view] .slideshow-stage:has(.image-attribution) {
+  --moment-credit-room: 28px;
+}
+
 /* In the card's flow rather than laid over the stage, so the card can fit it.
-   The whole picture, whatever its zoom: the zoom is a crop for looking at a
-   picture, and here it would cut off edges the card is there to show. A theme's
-   tilt goes too, since a tilted picture would cross the card's edge. */
+   As wide as the panel, like the note and the song: the panel's width is what
+   someone set, and a tall picture must not narrow its card. One too tall for the
+   panel at that width loses its top and bottom evenly rather than being squashed.
+   The panel's zoom does not apply: it is a crop for looking at a picture, and
+   would cut off edges the card is there to show. A theme's tilt goes too, since
+   a tilted picture would cross the card's edge. */
 :root[data-moment-view] .panel-slideshow-surface .slideshow-image-layer {
   position: static;
-  max-width: calc(100cqw - 2 * var(--moment-card-padding));
-  /* Leaves room for one line of credit under the picture. */
-  max-height: calc(100cqh - 2 * var(--moment-card-padding) - 28px);
+  width: calc(100cqw - 2 * var(--moment-card-padding));
+  max-width: none;
+  max-height: calc(100cqh - 2 * var(--moment-card-padding) - var(--moment-credit-room, 0px));
   margin: 0;
+  object-fit: cover;
   /* The same corners as the song's cover, so the two cards match. */
   border-radius: var(--content-radius);
   transform: none !important;
@@ -158,18 +161,41 @@
   color: var(--color-text);
 }
 
-/* The note as one sheet of writing. In a panel the editor is a box inside a
-   padded body, which with the rest gone would read as a frame within a frame,
-   so it fills the panel instead. Its scroll bar and the prompt in an empty line
-   are both for someone writing, and would land in the screenshot. */
+/* The note as one sheet of writing, exactly as tall as its writing area was in
+   the panel (measured on entering; see momentView.tsx). What someone sets by
+   sizing the panel is what the screenshot shows, with the same space under the
+   last line, and a note that scrolled in the panel scrolls here. */
+:root[data-moment-view] .panel-notes-surface {
+  height: var(--moment-note-height, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  border: var(--border-width-hairline) solid var(--moment-card-border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg-gradient);
+  box-shadow: var(--shadow-panel);
+}
+
+/* In a panel the editor is a box inside a padded body, which with the rest gone
+   would read as a frame within a frame, so it fills the card instead. */
 :root[data-moment-view] .notes-body {
   padding: 0;
+  overflow: hidden;
 }
 
 :root[data-moment-view] .notes-body > .notes-editor {
   border: 0;
   border-radius: 0;
 }
+
+/* The room the body's padding and the editor's border took now goes inside the
+   text's own margins, so lines are as wide as in the panel and break in the same
+   places. */
+:root[data-moment-view] .notes-editor-content {
+  padding-inline: calc(var(--card-padding) + var(--space-panel-body-x) + var(--border-width-hairline));
+}
+
+/* Its scroll bar and the prompt in an empty line are both for someone writing,
+   and would land in the screenshot. */
 
 :root[data-moment-view] .notes-rich-editor .milkdown {
   scrollbar-width: none;
@@ -200,9 +226,13 @@
   overflow: visible;
 }
 
+/* As wide as the panel, like the note and the picture, with the cover and its
+   name centred in it when the panel is too short for the cover to fill that. */
 :root[data-moment-view] .spotify-chosen.is-featured {
   flex: 0 0 auto;
+  align-items: center;
   gap: var(--space-playlist-top);
+  width: 100%;
   margin: 0;
 }
 
