@@ -1,0 +1,296 @@
+/*
+ * Moment view (src/momentView.tsx): the board ready for a screenshot, showing
+ * a picture, a piece of writing and a song on the canvas and nothing else.
+ * Everything here hangs off the one root attribute, so leaving the view undoes
+ * all of it at once.
+ */
+
+/* The edge of each card. Stronger than a panel's own border, which has a header
+   and controls to help define it and here has nothing else. Mixed from the
+   theme's text colour so it stands out on dark and light themes alike. */
+:root[data-moment-view] {
+  --moment-card-border: color-mix(in srgb, var(--color-panel-border), var(--color-text) 30%);
+  --moment-card-padding: 14px;
+}
+
+:root[data-moment-view] .canvas-panel-shell {
+  border-color: var(--moment-card-border);
+}
+
+/* Hidden rather than removed: the toolbar is measured to lay out full-screen
+   panels, and at no size at all it would report a height of nothing. */
+:root[data-moment-view] .app-chrome {
+  visibility: hidden;
+}
+
+:root[data-moment-view] .theme-credit,
+:root[data-moment-view] .welcome-card,
+:root[data-moment-view] .tl-overlays,
+:root[data-moment-view] .notes-formatting-tooltip,
+:root[data-moment-view] .notes-insert-menu,
+:root[data-moment-view] .notes-link-editor {
+  display: none !important;
+}
+
+/* The panel parts that are about operating it, not what it shows. */
+:root[data-moment-view] .card-header,
+:root[data-moment-view] .card-footer,
+:root[data-moment-view] .slideshow-controls,
+:root[data-moment-view] .image-expand-button,
+:root[data-moment-view] .focus-view-hint,
+:root[data-moment-view] .notes-document-controls,
+:root[data-moment-view] .notes-writing-toolbar-host,
+:root[data-moment-view] .current-playback-link {
+  display: none;
+}
+
+/* Video is not part of a moment. A panel with nothing to show is not either.
+   Hidden rather than unmounted, so a video does not reload on leaving. */
+:root[data-moment-view] .canvas-panel-shell:has([data-panel="video"]),
+:root[data-moment-view] .canvas-panel-shell:has(.is-moment-empty) {
+  display: none;
+}
+
+/* Nothing here is operated, so a press on any of it reaches the canvas and a
+   drag frames the shot from anywhere. The note is the one exception, because
+   the wheel has to land on it for it to scroll. */
+:root[data-moment-view] .canvas-panel-shell [data-panel-content],
+:root[data-moment-view] .canvas-panel-shell [data-panel-frame-action] {
+  pointer-events: none !important;
+  user-select: none;
+}
+
+:root[data-moment-view] .canvas-panel-shell .notes-editor[data-panel-content] {
+  pointer-events: auto !important;
+}
+
+/* The picture and the song each draw a card of their own that fits what they
+   hold, so the panel behind them goes: a picture or a cover is rarely the shape
+   of its panel, and what they do not fill should show the canvas rather than a
+   band of panel colour. A panel also clips what it holds, which here would cut
+   off the card's shadow. */
+:root[data-moment-view] .canvas-panel-shell:has(.panel-slideshow-surface),
+:root[data-moment-view] .canvas-panel-shell:has(.panel-spotify-surface) {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  contain: size layout style;
+}
+
+/* What the two cards share. Sized from the panel (the shell is a size container)
+   because a card takes its size from what it holds, so a percentage would have
+   nothing to resolve against. Border and padding together come to the padding
+   those sizes allow for, or a card as wide as its panel would be too wide. */
+:root[data-moment-view] .panel-slideshow-surface .slideshow-stage,
+:root[data-moment-view] .spotify-chosen.is-featured {
+  padding: calc(var(--moment-card-padding) - var(--border-width-hairline));
+  border: var(--border-width-hairline) solid var(--moment-card-border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg-gradient);
+  box-shadow: var(--shadow-panel);
+}
+
+:root[data-moment-view] .panel-slideshow-surface {
+  grid-template-rows: minmax(0, 1fr);
+  background: transparent;
+}
+
+/* The picture and its credit as one card, at the top of the panel so it lines
+   up with the note and the song. */
+:root[data-moment-view] .panel-slideshow-surface .slideshow-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: start;
+  gap: 8px;
+  width: fit-content;
+  height: fit-content;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  aspect-ratio: auto;
+}
+
+/* In the card's flow rather than laid over the stage, so the card can fit it.
+   The whole picture, whatever its zoom: the zoom is a crop for looking at a
+   picture, and here it would cut off edges the card is there to show. A theme's
+   tilt goes too, since a tilted picture would cross the card's edge. */
+:root[data-moment-view] .panel-slideshow-surface .slideshow-image-layer {
+  position: static;
+  max-width: calc(100cqw - 2 * var(--moment-card-padding));
+  /* Leaves room for one line of credit under the picture. */
+  max-height: calc(100cqh - 2 * var(--moment-card-padding) - 28px);
+  margin: 0;
+  /* The same corners as the song's cover, so the two cards match. */
+  border-radius: var(--content-radius);
+  transform: none !important;
+  rotate: none;
+}
+
+/* A fade under way as the view opens would otherwise add a second picture. */
+:root[data-moment-view] .panel-slideshow-surface .slideshow-image-outgoing {
+  display: none;
+}
+
+/* The credit as a caption: in the card, under the picture, in the card's own
+   colours rather than the dark pill it needs when laid over a picture. */
+:root[data-moment-view] .panel-slideshow-surface .image-attribution {
+  position: static;
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--color-text-muted);
+  opacity: 1;
+  transform: none;
+}
+
+:root[data-moment-view] .panel-slideshow-surface .image-attribution-label {
+  color: var(--color-text-muted);
+}
+
+:root[data-moment-view] .panel-slideshow-surface .image-attribution-creator {
+  color: var(--color-text);
+}
+
+/* The note as one sheet of writing. In a panel the editor is a box inside a
+   padded body, which with the rest gone would read as a frame within a frame,
+   so it fills the panel instead. Its scroll bar and the prompt in an empty line
+   are both for someone writing, and would land in the screenshot. */
+:root[data-moment-view] .notes-body {
+  padding: 0;
+}
+
+:root[data-moment-view] .notes-body > .notes-editor {
+  border: 0;
+  border-radius: 0;
+}
+
+:root[data-moment-view] .notes-rich-editor .milkdown {
+  scrollbar-width: none;
+}
+
+:root[data-moment-view] .notes-editor-content .is-empty::before {
+  content: none;
+}
+
+/* The song as a sleeve. A cover is square and a panel rarely is, so a panel-sized
+   card would leave empty bands around it. The card hugs the cover and its name
+   instead and sits at the top of the panel, level with the picture and the
+   note, at whatever size the panel allows. */
+:root[data-moment-view] .panel-spotify-surface {
+  /* Room under the cover for two lines of title and one of artist. */
+  --moment-name-room: 5.5em;
+  --moment-cover-size: min(
+    calc(100cqw - 2 * var(--moment-card-padding)),
+    calc(100cqh - 2 * var(--moment-card-padding) - var(--moment-name-room))
+  );
+  background: transparent;
+}
+
+:root[data-moment-view] .panel-spotify-surface .panel-body {
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  overflow: visible;
+}
+
+:root[data-moment-view] .spotify-chosen.is-featured {
+  flex: 0 0 auto;
+  gap: var(--space-playlist-top);
+  margin: 0;
+}
+
+/* Elsewhere the cover gives way when room is short. Here its size is already
+   worked out to fit, and a holder that shrank would leave the cover spilling out
+   of the card with the song's name on top of it. */
+:root[data-moment-view] .spotify-featured-cover {
+  flex: 0 0 auto;
+}
+
+:root[data-moment-view] .spotify-featured-cover img,
+:root[data-moment-view] .spotify-featured-cover .album-frame-empty {
+  width: var(--moment-cover-size);
+  height: var(--moment-cover-size);
+  max-width: none;
+  max-height: none;
+}
+
+:root[data-moment-view] .spotify-chosen.is-featured .track-copy {
+  width: var(--moment-cover-size);
+}
+
+:root[data-moment-view] .spotify-chosen.is-featured .track-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* In a wide panel the height is what limits the cover, so the name moves beside
+   it rather than taking height from it. */
+@container panel-shell (min-aspect-ratio: 5 / 4) {
+  :root[data-moment-view] .panel-spotify-surface {
+    --moment-cover-size: min(
+      calc(100cqh - 2 * var(--moment-card-padding)),
+      55cqw
+    );
+  }
+
+  :root[data-moment-view] .spotify-chosen.is-featured {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  :root[data-moment-view] .spotify-chosen.is-featured .track-copy {
+    width: auto;
+    max-width: calc(100cqw - var(--moment-cover-size) - 3 * var(--moment-card-padding));
+    text-align: left;
+  }
+
+  :root[data-moment-view] .spotify-chosen.is-featured .track-title-row {
+    justify-content: flex-start;
+  }
+}
+
+/* The way out is said once and then gets out of the way, since anything still
+   on screen would be in the screenshot. It takes no pointer, so it cannot get
+   in the way of framing the shot while it fades. */
+.moment-view-hint {
+  /* Small and close to the top edge, to fit in the space the centred panels
+     leave above them rather than land on the writing below it. */
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  z-index: 1000;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--image-overlay-bg);
+  color: var(--image-overlay-text);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: moment-view-hint-fade 600ms ease 4s forwards;
+}
+
+.moment-view-hint kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--image-overlay-text-muted);
+  border-radius: 4px;
+  font: inherit;
+}
+
+@keyframes moment-view-hint-fade {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}

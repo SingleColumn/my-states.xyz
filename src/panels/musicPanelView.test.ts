@@ -167,3 +167,22 @@ describe('musicPanelView', () => {
       }
   })
 })
+
+describe('musicPanelView in a moment', () => {
+  it('shows the music on its own, whatever the panel was doing', () => {
+    for (const connected of [false, true]) for (const focusView of [false, true]) for (const searchState of ['waiting', 'results'] as const) {
+      const result = view({ momentView: true, connected, focusView, searchState, boardTrack: song, cameBackToPlay: true })
+      expect(result).toMatchObject({ connectOnly: false, showSearch: false, middle: 'cover', namer: 'cover', nextStep: null, showPlayer: false })
+      expect(result.music?.title).toBe('Both Sides Now')
+    }
+  })
+
+  it('shows a playlist when no song is chosen, and what is playing above either', () => {
+    expect(view({ momentView: true, boardPlaylist: playlist }).music?.title).toBe('A Moveable Feast')
+    expect(view({ momentView: true, connected: true, boardTrack: song, playing }).music?.title).toBe('Xtal')
+  })
+
+  it('has nothing to show when no music is chosen', () => {
+    expect(view({ momentView: true, connected: true })).toMatchObject({ middle: 'none', music: null, namer: null, showPlayer: false })
+  })
+})

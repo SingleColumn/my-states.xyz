@@ -5,6 +5,7 @@ import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { markdownNamedAsCopy } from '../noteTitle'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
+import { useMomentView } from '../momentView'
 import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
 
@@ -60,6 +61,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   }
 
   const found = panels.get(panelId)
+  const momentView = useMomentView()
   const activeNoteId = found?.type === 'notes' ? (found as Panel<'notes'>).config.activeNoteId : undefined
   // A note is written by one panel at a time. This one may be holding a
   // reference to a note another panel already has open -- which is what a
@@ -147,7 +149,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   ) : null
 
   return (
-    <section className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}`}>
+    <section className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}${momentView && !activeNote ? ' is-moment-empty' : ''}`}>
       <PanelHeader
         panelId={panelId}
         panelType="notes"
@@ -289,6 +291,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           >
             <NotesEditor
               key={activeNote.id}
+              readOnly={momentView}
               toolbarHost={toolbarHostRef}
               markdown={activeNote.content}
               document={activeNote.document}

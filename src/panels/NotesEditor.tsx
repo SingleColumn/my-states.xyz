@@ -77,6 +77,8 @@ interface NotesEditorProps {
   markdown: string
   document: NoteDocument | undefined
   placeholder: string
+  /** The note can be read and scrolled but not changed, and shows no caret. */
+  readOnly?: boolean
   /**
    * Where the writing tools are drawn. The panel owns the element so the
    * toolbar can sit above the note's title rather than inside the text, and
@@ -153,7 +155,7 @@ function prefersMarkdown() {
   }
 }
 
-function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolbarHost, onChange, onHandle, editorRef, keyHandlers }: NotesEditorProps & {
+function NotesEditorInner({ markdown, document: noteDocument, placeholder, readOnly = false, toolbarHost, onChange, onHandle, editorRef, keyHandlers }: NotesEditorProps & {
   editorRef: MutableRefObject<Editor | undefined>
   keyHandlers: MutableRefObject<Set<(event: KeyboardEvent) => boolean>>
 }) {
@@ -166,6 +168,18 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
   onChangeRef.current = onChange
   const handleRef = useRef(onHandle)
   handleRef.current = onHandle
+  // Read through a ref for the same reason: changing it must not recreate the
+  // editor, which would lose the place the note was scrolled to.
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
+
+  useEffect(() => {
+    const ready = editorRef.current
+    if (ready?.status !== EditorStatus.Created) return
+    // ProseMirror asks `editable` again on any update, and an empty one is
+    // enough to make it take the contenteditable attribute off the text.
+    ready.action((ctx) => ctx.get(editorViewCtx).setProps({}))
+  }, [readOnly, editorRef])
 
   useEffect(() => {
     const host = hostRef.current
@@ -190,6 +204,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, toolb
         // like the previous editor's content area was.
         ctx.set(editorViewOptionsCtx, {
           attributes: { class: 'notes-editor-content' },
+          editable: () => !readOnlyRef.current,
           handlePaste: (view, event) => {
             const data = event.clipboardData
             if (!data) return false

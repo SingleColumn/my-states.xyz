@@ -26,6 +26,8 @@ export interface MusicItem {
 export interface MusicPanelInputs {
   connected: boolean
   focusView: boolean
+  /** The board is showing as a moment: the music and nothing to operate. */
+  momentView?: boolean
   /** The person put the search away. Only means anything when connected. */
   searchCollapsed: boolean
   searchState: MusicSearchState
@@ -97,6 +99,22 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
   const music: MusicItem | null = playing
     ? { kind: 'track', id: playing.url ?? playing.title, title: playing.title, meta: `${playing.artist} - ${playing.album}`, image: playing.albumArt, url: playing.url }
     : chosen
+
+  // A moment shows which song it is, whatever the panel was doing: a search
+  // left open or a panel in its focus view gives way to the cover, and no
+  // connecting step or player belongs in a picture of the board.
+  if (inputs.momentView) {
+    return {
+      connectOnly: false,
+      showSearch: false,
+      middle: music ? 'cover' : 'none',
+      music,
+      chosen,
+      namer: music ? 'cover' : null,
+      nextStep: null,
+      showPlayer: false,
+    }
+  }
 
   // The focus view is the panel at its smallest: no search and no cover.
   // Not connected, all it can usefully offer is the way to connect; the

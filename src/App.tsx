@@ -8,6 +8,7 @@ import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPan
 import { createCanvasApi } from './canvasApi'
 import { PanelShape, PanelShapeUtil } from './PanelShape'
 import { documentSchemaMatchesEditor } from './panelShapeSchema'
+import { MomentViewProvider, useMomentViewMode } from './momentView'
 import { getCanonicalPanelLayout, getPanelFocusViewSize, isPanelInFocusView } from './panelLayout'
 import { applyPanelFocusViewSize, getFullScreenPanelLayout, restorePanelDefaultLayout, restorePanelDefaultSize } from './panelGeometry'
 import { getPanelDefinition } from './panelRegistry'
@@ -598,6 +599,10 @@ function AppContent() {
     setFullScreenPanelId(null)
   }, [])
 
+  const slideshowRef = useRef(appState.slideshow)
+  slideshowRef.current = appState.slideshow
+  const momentView = useMomentViewMode(editorRef, slideshowRef)
+
   const togglePanMode = useCallback(() => {
     const editor = editorRef.current
     if (!editor) return
@@ -689,6 +694,7 @@ function AppContent() {
     isPanMode,
     canUseSelectedPanel: selectedPanelId !== null,
     onTogglePanMode: togglePanMode,
+    onEnterMomentView: momentView.enter,
     onFitAllPanels: fitAllPanels,
     onFitSelectedPanel: fitSelectedPanel,
     onResetSelectedPanel: resetSelectedPanel,
@@ -786,18 +792,21 @@ function AppContent() {
     >
       <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId }}>
         <AppChromePropsProvider value={appChromeProps}>
-          <WordGraphProvider boardId={boards.activeBoard.id}>
-            <Tldraw
-              shapeUtils={shapeUtils}
-              components={components}
-              overrides={uiOverrides}
-              options={editorOptions}
-              onMount={handleMount}
-              licenseKey={TLDRAW_LICENSE_KEY}
-            />
-          </WordGraphProvider>
+          <MomentViewProvider value={momentView.isOn}>
+            <WordGraphProvider boardId={boards.activeBoard.id}>
+              <Tldraw
+                shapeUtils={shapeUtils}
+                components={components}
+                overrides={uiOverrides}
+                options={editorOptions}
+                onMount={handleMount}
+                licenseKey={TLDRAW_LICENSE_KEY}
+              />
+            </WordGraphProvider>
+          </MomentViewProvider>
         </AppChromePropsProvider>
       </PanelCommandsProvider>
+      {momentView.isOn ? <p className="moment-view-hint" role="status">Take your screenshot, then press <kbd>Esc</kbd> to go back</p> : null}
       <ThemeCredit url={appearance.effective.definition.inspiredBy} fullScreen={Boolean(fullScreenPanelId)} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}
       {isWelcomeVisible ? <WelcomeCard onClose={closeWelcome} onOpenHelp={openHelpFromWelcome} /> : null}

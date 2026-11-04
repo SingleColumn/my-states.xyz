@@ -20,6 +20,7 @@ interface AppChromeProps {
   isPanMode: boolean
   canUseSelectedPanel: boolean
   onTogglePanMode(): void
+  onEnterMomentView(): void
   onFitAllPanels(): void
   onFitSelectedPanel(): void
   onResetSelectedPanel(): void
@@ -58,6 +59,7 @@ export function AppChrome({
   isPanMode,
   canUseSelectedPanel,
   onTogglePanMode,
+  onEnterMomentView,
   onFitAllPanels,
   onFitSelectedPanel,
   onResetSelectedPanel,
@@ -138,6 +140,7 @@ export function AppChrome({
           hiddenPanels={hiddenPanels}
           onHideSelectedPanel={onHideSelectedPanel}
           onRestorePanel={onRestorePanel}
+          onEnterMomentView={onEnterMomentView}
         />
       </section>
 

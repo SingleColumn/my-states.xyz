@@ -6,6 +6,7 @@ import type { ImageItem, Panel } from '../types'
 import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 import { useFeaturedImageCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
+import { useMomentView } from '../momentView'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
 import { panelContentProps, panelFrameActionProps } from '../panelSurface'
@@ -39,6 +40,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // Focus view leaves the picture alone on the panel: every control is dropped,
   // including the header, so Escape is the only way back out.
   const focusView = panel?.focusView === true
+  const momentView = useMomentView()
   const collectionSource = useFeaturedImageCollections()
   const panelImages = slideshow.imagesFor(panelId)
   const panelStatus = slideshow.statusFor(panelId)
@@ -142,7 +144,8 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   }
 
   useEffect(() => {
-    if (!focusView) return
+    // While the board is a moment, Escape leaves the moment and nothing else.
+    if (!focusView || momentView) return
     focusViewStack.push(panelId)
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -165,7 +168,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
       const index = focusViewStack.lastIndexOf(panelId)
       if (index >= 0) focusViewStack.splice(index, 1)
     }
-  }, [focusView, panelId, commands])
+  }, [focusView, momentView, panelId, commands])
 
   // The hint names the only way out, so it shows on entry and whenever the
   // pointer is over a panel that has no visible controls.
@@ -219,7 +222,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
 
   return (
     <section
-      className={`panel panel-slideshow-surface${focusView ? ' is-focus-view' : ''}${isBrowsingCollections ? ' is-collection-browser' : ''}`}
+      className={`panel panel-slideshow-surface${focusView ? ' is-focus-view' : ''}${isBrowsingCollections ? ' is-collection-browser' : ''}${momentView && (isBrowsingCollections || !currentImage) ? ' is-moment-empty' : ''}`}
       onPointerMove={focusView ? revealFocusHint : undefined}
       onPointerLeave={focusView ? hideFocusHint : undefined}
     >
@@ -288,7 +291,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
 
       {/* Focus view drops the aspect-ratio box so the stage fills the panel and the
           picture, which is contained inside it, gets every pixel the panel allows. */}
-      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView || isBrowsingCollections ? undefined : stageAspectRatio }} {...(stageIsContent ? panelContentProps : {})}>
+      <div className="slideshow-stage card-content" style={{ aspectRatio: focusView || momentView || isBrowsingCollections ? undefined : stageAspectRatio }} {...(stageIsContent ? panelContentProps : {})}>
         {isBrowsingCollections ? (
           <CollectionBrowser
             collections={browserCollections}
@@ -307,8 +310,8 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             image={currentImage}
             transitionMs={panelSettings.transitionMs}
             zoom={panelSettings.zoom}
-            onActivate={focusView ? togglePlayback : undefined}
-            activationLabel={focusView ? (isPlaying ? 'Pause slideshow' : 'Start slideshow') : undefined}
+            onActivate={focusView && !momentView ? togglePlayback : undefined}
+            activationLabel={focusView && !momentView ? (isPlaying ? 'Pause slideshow' : 'Start slideshow') : undefined}
           />
           {attribution ? <ImageAttributionOverlay attribution={attribution} /> : null}
           <button
