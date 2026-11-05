@@ -24,6 +24,7 @@ export function useMomentView() {
 interface SlideshowPlayback {
   isPlayingFor(panelId: string): boolean
   setIsPlaying(value: boolean, panelId?: string): void
+  holdPlayback(panelId: string): void
 }
 
 export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, slideshowRef: MutableRefObject<SlideshowPlayback>) {
@@ -36,14 +37,13 @@ export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, sl
     const editor = editorRef.current
     if (!editor || restoreRef.current) return
 
-    // Held before the canvas goes read-only: pausing keeps the picture on
-    // show by writing its position to the panel, and tldraw drops every shape
-    // write made while read-only. Without the hold a picture could change just
-    // as the screenshot is taken.
+    // Without the hold a picture could change just as the screenshot is taken.
+    // A hold rather than a pause, because a pause saves the picture it stopped
+    // on, and looking at the board this way must not change the board.
     const playingPanelIds = listPanels(editor)
       .filter((panel) => panel.type === 'slideshow' && slideshowRef.current.isPlayingFor(panel.id))
       .map((panel) => panel.id)
-    for (const panelId of playingPanelIds) slideshowRef.current.setIsPlaying(false, panelId)
+    for (const panelId of playingPanelIds) slideshowRef.current.holdPlayback(panelId)
 
     // Before anything is hidden, while the writing areas still have their size.
     rememberNoteHeights()
@@ -76,6 +76,13 @@ export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, sl
     for (const panelId of restore.playingPanelIds) slideshowRef.current.setIsPlaying(true, panelId)
     setIsOn(false)
   }, [editorRef, slideshowRef])
+
+  /**
+   * The view to save with the board while this one is on, and null otherwise.
+   * The camera here is only framing a shot, and the page can be closed or
+   * reloaded before leaving puts it back.
+   */
+  const boardCamera = useCallback(() => restoreRef.current?.camera ?? null, [])
 
   // A layout effect, so that the view is hidden, measured and moved before the
   // browser draws: nothing is seen at the old position first.
@@ -121,7 +128,7 @@ export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, sl
     }
   }, [isOn, leave, editorRef])
 
-  return { isOn, enter }
+  return { isOn, enter, boardCamera }
 }
 
 /**

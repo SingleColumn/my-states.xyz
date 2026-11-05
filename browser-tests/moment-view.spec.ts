@@ -5,14 +5,17 @@ import {
   describeCanvas,
   dispatch,
   dragLocator,
+  expectCanvasSaved,
   geometryOf,
   loadSampleImages,
   noteBodyOf,
   openApp,
   panelById,
   panelOfType,
+  readStorage,
   shapeOf,
   tldrawCursor,
+  waitForCanvas,
 } from './helpers'
 
 /**
@@ -285,11 +288,50 @@ test.describe('Moment view', () => {
     expect(end.y).toBeGreaterThan(start.y + 10)
   })
 
+  test('holding a running slideshow does not save the picture it stopped on', async ({ page }) => {
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    await loadSampleImages(page, images.panelId)
+    await dispatch(page, { kind: 'panel.update', panelId: images.panelId, config: { intervalMs: 1000 } })
+    await dispatch(page, { kind: 'images.play', panelId: images.panelId })
+    const picture = (await shapeOf(page, images.panelId)).locator('img.slideshow-image-layer').first()
+    const first = await picture.getAttribute('src')
+    await expect.poll(() => picture.getAttribute('src'), { timeout: 15_000 }).not.toBe(first)
+    const savedIndex = () => panelById(page, images.panelId).then((panel) => (panel.config as { currentIndex: number }).currentIndex)
+    const before = await savedIndex()
+
+    await prepareForScreenshot(page)
+    await page.waitForTimeout(500)
+    expect(await savedIndex()).toBe(before)
+
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(100)
+    expect(await savedIndex()).toBe(before)
+  })
+
+  test('a board reloaded during this view keeps its own view, not the framing of the shot', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    await expectCanvasSaved(page)
+    const { board } = await describeCanvas(page)
+    const before = (await readStorage(page, board!.id)).camera
+    const noteShape = await shapeOf(page, notes.panelId)
+
+    await prepareForScreenshot(page)
+    await dragLocator(page, noteShape, { dx: 90, dy: 60 })
+    await page.waitForTimeout(600) // Past the delay before a change is saved.
+    expect((await readStorage(page, board!.id)).camera).toEqual(before)
+
+    await page.reload()
+    await waitForCanvas(page)
+    expect((await readStorage(page, board!.id)).camera).toEqual(before)
+  })
+
   test('a running slideshow holds its picture, and carries on afterwards', async ({ page }) => {
     await openApp(page)
     const images = await panelOfType(page, 'slideshow')
     await loadSampleImages(page, images.panelId)
-    await dispatch(page, { kind: 'panel.update', panelId: images.panelId, config: { intervalMs: 250 } })
+    await dispatch(page, { kind: 'panel.update', panelId: images.panelId, config: { intervalMs: 1000 } })
     await dispatch(page, { kind: 'images.play', panelId: images.panelId })
     const picture = (await shapeOf(page, images.panelId)).locator('img.slideshow-image-layer:not(.slideshow-image-outgoing)')
     const sources = async () => {

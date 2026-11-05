@@ -93,6 +93,10 @@ function AppContent() {
   // tldraw drops every shape change made while it is read-only, so the
   // request waits for the pause to end instead of being lost.
   const pendingExpansionsRef = useRef(new Set<string>())
+  const slideshowRef = useRef(appState.slideshow)
+  slideshowRef.current = appState.slideshow
+  const momentView = useMomentViewMode(editorRef, slideshowRef)
+  const { boardCamera } = momentView
 
   useEffect(() => {
     boardsRef.current = boards
@@ -231,7 +235,7 @@ function AppContent() {
       const boardId = canvasBoardIdRef.current
       if (restoringCanvasRef.current || !boardId) return
       saveActivity.writes += 1
-      boardsRef.current.updateDocument(boardId, getSnapshot(editor.store).document, editor.getCamera())
+      boardsRef.current.updateDocument(boardId, getSnapshot(editor.store).document, boardCamera() ?? editor.getCamera())
     }
     const persist = debounce(saveNow, 300)
     persistCanvasRef.current = persist
@@ -598,10 +602,6 @@ function AppContent() {
     preFocusPanelGeometryRef.current.clear()
     setFullScreenPanelId(null)
   }, [])
-
-  const slideshowRef = useRef(appState.slideshow)
-  slideshowRef.current = appState.slideshow
-  const momentView = useMomentViewMode(editorRef, slideshowRef)
 
   const togglePanMode = useCallback(() => {
     const editor = editorRef.current
