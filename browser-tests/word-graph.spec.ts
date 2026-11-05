@@ -349,6 +349,30 @@ test('recovery stays outside board archives and remains scoped while switching b
   await expect(page.locator('.word-graph-window')).toHaveCount(0)
 })
 
+test('the board and panel menus can be used with a Word Graph window open over them', async ({ page }) => {
+  await openApp(page)
+  const { dialog } = await selectAndOpen(page)
+  await expect(node(page, 'night')).toBeVisible()
+  const boardMenu = page.getByRole('button', { name: 'More board actions' })
+
+  await boardMenu.click()
+  await expect(dialog).toBeHidden()
+  const rename = page.getByRole('menuitem', { name: 'Rename board' })
+  const box = (await rename.boundingBox())!
+  const onTop = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="menuitem"]')?.textContent, { x: box.x + box.width / 2, y: box.y + box.height / 2 })
+  expect(onTop).toContain('Rename board')
+
+  // Closing the menu brings the window back with its graph intact.
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+  await expect(node(page, 'night')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Open panel view and layout actions' }).click()
+  await expect(dialog).toBeHidden()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+})
+
 test('deleting a board also removes the Word Graph kept for recovery', async ({ page }) => {
   await openApp(page)
   await selectAndOpen(page)

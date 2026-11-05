@@ -168,7 +168,8 @@ test.describe('focus view and undo', () => {
     await choosePanelMenuItem(await shapeOf(page, images.panelId), 'Adjust panel to focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
 
-    await page.mouse.click(720, 860)
+    // No click on the canvas first: tldraw counts clearing a selection as a step
+    // of its own, so the undo would bring the selection back instead.
     await undo(page)
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(false)
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(moved)

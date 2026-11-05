@@ -1297,10 +1297,10 @@ test.describe('links and text size', () => {
     const shape = await shapeOf(page, notes.panelId)
     await expect(noteBodyOf(shape)).toBeVisible()
     const ladder = [
-      ['Small', '16px', '25px'],
-      ['Large', '20px', '34px'],
-      ['Extra large', '23px', '40px'],
-      ['Medium', '18px', '30px'],
+      ['Small', '17px', '25px'],
+      ['Large', '21px', '34px'],
+      ['Extra large', '24px', '40px'],
+      ['Medium', '19px', '30px'],
     ]
     for (const [label, fontSize, lineHeight] of ladder) {
       await shape.getByRole('button', { name: 'Writing panel actions' }).click()
@@ -1459,16 +1459,16 @@ test.describe('what a line is', () => {
 
     await ask()
     // Ordinary writing says so before anything is chosen.
-    await expect(bar.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(bar.getByRole('button', { name: 'Text', exact: true })).toHaveAttribute('aria-pressed', 'true')
     await bar.getByRole('button', { name: 'Subheading' }).click()
     await expect(body.locator('h2')).toHaveText('A line of writing')
 
     await ask()
     await expect(bar.getByRole('button', { name: 'Subheading' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(bar.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'false')
+    await expect(bar.getByRole('button', { name: 'Text', exact: true })).toHaveAttribute('aria-pressed', 'false')
 
     // And the way back, which the editor had no route to before.
-    await bar.getByRole('button', { name: 'Text' }).click()
+    await bar.getByRole('button', { name: 'Text', exact: true }).click()
     await expect(body.locator('h2')).toHaveCount(0)
     const { board } = await describeCanvas(page)
     await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('A line of writing\n')
@@ -1706,7 +1706,9 @@ test.describe('a note from before the structured document existed', () => {
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
 
-    await expect(again.locator('h1')).toHaveText('A heading from before')
+    // The record kept a name of its own, and an old note with a separate title
+    // and a headed body keeps both: its name becomes the first line.
+    await expect(again.locator('h1')).toHaveText(['placeholder', 'A heading from before'])
     await expect(again.locator('strong')).toHaveText('bold')
     await expect(again.locator('em')).toHaveText('italic')
     await expect(again.locator('a')).toHaveAttribute('href', 'https://example.com')

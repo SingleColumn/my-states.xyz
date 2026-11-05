@@ -729,9 +729,9 @@
 
 /*
  * The tools are chrome for the writing, not a strip of application. So they
- * begin where the words begin -- the same column the text is held to -- and
- * carry no rule under them: a line across the page would cut the note in
- * two above its own title. What separates them from the writing is space.
+ * sit centred over the writing and carry no rule under them: a line across the
+ * page would cut the note in two above its own title. What separates them from
+ * the writing is space.
  *
  * The host is the column; the bar inside it is only as wide as the tools,
  * with a frame to say they are one set. Spreading them across the column
@@ -747,21 +747,15 @@
   padding-block: var(--space-detail-5) var(--space-detail-2);
 }
 
-/* At full screen the writing is held to a column, so the tools begin where
-   the words do. Everywhere else the text fills the panel and there is no
-   such column: held to one there, the tools were centred on a measure
-   nothing else on the panel used, and so lined up with nothing at all. They
-   follow the panel's own edge instead -- the same edge as the note's title
-   field and the editor below it. */
+/* At full screen the writing is held to a column, so the tools are centred on
+   that. Everywhere else the text fills the panel and there is no such column,
+   so they are centred on the panel instead. */
 .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
   width: 100%;
   max-width: none;
   margin-inline: 0;
 }
 
-/* Full-screen writing has a readable paper column; the ordinary panel keeps
-   its tools aligned with the panel edge because there is no separate column
-   for them to follow. */
 .canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode .notes-writing-toolbar-host {
   width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2)));
   max-width: var(--writing-paper-width);
