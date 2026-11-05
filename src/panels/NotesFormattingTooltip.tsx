@@ -1,7 +1,7 @@
 import { useOpenWordGraph } from '../wordGraph/WordGraphController'
 import { captureWordSelection } from '../wordGraph/wordGraphSelection'
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { Bold, ClipboardPaste, Code, Copy, Heading1, Heading2, Heading3, Highlighter, Italic, Link as LinkIcon, Pilcrow, Scissors, Underline as UnderlineIcon } from 'lucide-react'
+import { Bold, ClipboardPaste, Code, Copy, Heading1, Heading2, Heading3, Highlighter, Italic, Link as LinkIcon, Pilcrow, Quote, Scissors, Underline as UnderlineIcon } from 'lucide-react'
 import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { tooltipFactory, TooltipProvider } from '@milkdown/plugin-tooltip'
 import {
@@ -20,21 +20,21 @@ import { toggleUnderlineCommand } from './notesUnderline'
 import { toggleHighlightCommand } from './notesHighlight'
 import { pastePlainText } from './notesClipboard'
 import { canEditLink, isOnLink } from './NotesLinkEditor'
+import { blockStyleOf, setBlockStyle } from './NotesWritingToolbar'
+import { applyTextStyle, textStyleAt, textStyleChoices, type TextStyleKind } from './notesTextStyle'
 
 /**
  * The contextual writing menu is asked for by right-clicking. Alongside
  * formatting it offers the clipboard actions that replacing the browser's
  * menu would otherwise take away.
  *
- * Milkdown's tooltip plugin still does the positioning (floating-ui, above
- * the point, flipping below when there is no room); what it no longer does
- * is decide when to show, which is this component's `open` flag.
+ * It sits in one place, along the bottom of the window, rather than beside the
+ * words, where a bar this long covered the writing around them. Milkdown's
+ * tooltip plugin only says when it shows; the stylesheet says where.
  *
- * It is mounted on `document.body`, not inside the panel. The panel body
- * clips its overflow, so a bar anchored to the first line would otherwise
- * be pushed below the selection or cut off; and outside tldraw's scaled
- * layer the bar keeps the same size as the rest of the app's chrome
- * whatever the canvas zoom.
+ * It is mounted on `document.body`, not inside the panel. The panel body clips
+ * its overflow, and outside tldraw's scaled layer the bar keeps the same size
+ * as the rest of the app's chrome whatever the canvas zoom.
  */
 export const formattingTooltip = tooltipFactory('notesFormatting')
 
@@ -47,9 +47,12 @@ export function NotesFormattingTooltip() {
   const openWordGraph = useOpenWordGraph()
   const { run, openLinkEditor } = useNotesEditorActions()
   const [clipboardError, setClipboardError] = useState('')
-  // Where the writer asked for the bar, and whether they have asked at all.
-  // A ref rather than state: the provider's shouldShow, made once, reads it.
-  const openAt = useRef<{ x: number; y: number } | null>(null)
+  // Whether the writer has asked for the bar. A ref rather than state: the
+  // provider's shouldShow, made once, reads it.
+  const isOpen = useRef(false)
+  // Set by the font, size and colour menus. A look is usually several choices
+  // in a row, so unlike the other tools one of them does not close the bar.
+  const keepOpenAfterEdit = useRef(false)
 
   useEffect(() => {
     const element = ref.current
@@ -58,29 +61,17 @@ export function NotesFormattingTooltip() {
       content: element,
       root: document.body,
       debounce: 0,
-      offset: 8,
       // The bar is asked for, never offered: an update only keeps it up
       // while the request stands.
-      shouldShow: () => openAt.current !== null,
+      shouldShow: () => isOpen.current,
     })
-    // A wheel over the canvas pans or zooms it under a bar anchored to the
-    // old place. Hide while the wheel turns, then put the bar back where
-    // the selection now is. The re-show has to be asked for: the selection
-    // itself has not changed, so the editor dispatches nothing that would
-    // otherwise prompt the provider to look again.
-    const close = () => {
-      if (!openAt.current) return
-      openAt.current = null
+    // A press anywhere else is the writer moving on, so the request has lapsed.
+    // A wheel is not: the bar is not attached to anything that it moves.
+    const onPointerDown = (event: PointerEvent) => {
+      if (element.contains(event.target as Node) || !isOpen.current) return
+      isOpen.current = false
       provider.current?.hide()
     }
-    // A wheel moves the canvas under a bar anchored to a point on it, and a
-    // press anywhere else is the writer moving on: either way the request
-    // has lapsed.
-    const onWheel = () => close()
-    const onPointerDown = (event: PointerEvent) => {
-      if (!element.contains(event.target as Node)) close()
-    }
-    window.addEventListener('wheel', onWheel, { capture: true, passive: true })
     window.addEventListener('pointerdown', onPointerDown, true)
 
     // The request itself. The browser's menu is given up here, which is the
@@ -94,21 +85,16 @@ export function NotesFormattingTooltip() {
     // away was killing this before it ever fired.
     const editorDom = viewRef.current.dom
     const onContextMenu = (event: Event) => {
-      const mouse = event as globalThis.MouseEvent
       event.preventDefault()
       event.stopPropagation()
       setClipboardError('')
-      openAt.current = { x: mouse.clientX, y: mouse.clientY }
-      const point = openAt.current
-      provider.current?.show({
-        getBoundingClientRect: () => new DOMRect(point.x, point.y, 0, 0),
-      }, viewRef.current)
+      isOpen.current = true
+      provider.current?.show()
     }
     editorDom.addEventListener('contextmenu', onContextMenu, { capture: true })
 
     return () => {
       editorDom.removeEventListener('contextmenu', onContextMenu, { capture: true })
-      window.removeEventListener('wheel', onWheel, { capture: true })
       window.removeEventListener('pointerdown', onPointerDown, true)
       provider.current?.destroy()
     }
@@ -118,8 +104,10 @@ export function NotesFormattingTooltip() {
   // the request the bar was opened for, so it closes; a bare selection
   // change leaves it alone, since the writer may be choosing what to format.
   useEffect(() => {
-    if (openAt.current && prevState && !prevState.doc.eq(view.state.doc)) {
-      openAt.current = null
+    const keepOpen = keepOpenAfterEdit.current
+    keepOpenAfterEdit.current = false
+    if (!keepOpen && isOpen.current && prevState && !prevState.doc.eq(view.state.doc)) {
+      isOpen.current = false
       provider.current?.hide()
       return
     }
@@ -130,6 +118,14 @@ export function NotesFormattingTooltip() {
   const wordSelection = captureWordSelection(state)
   const marks = state.schema.marks
   const block = blockOf(state)
+  const isQuote = blockStyleOf(state) === 'quote'
+
+  function chooseTextStyle(kind: TextStyleKind, value: string) {
+    keepOpenAfterEdit.current = true
+    applyTextStyle(viewRef.current, kind, value || null)
+    // Back to the editor, which still holds the selection the menu acted on.
+    viewRef.current.focus()
+  }
 
   function setBlock(level: number) {
     run((ctx) => {
@@ -145,7 +141,7 @@ export function NotesFormattingTooltip() {
     if (event.key !== 'Escape') return
     event.preventDefault()
     event.stopPropagation()
-    openAt.current = null
+    isOpen.current = false
     provider.current?.hide()
     run((ctx) => ctx.get(editorViewCtx).focus())
   }
@@ -158,7 +154,7 @@ export function NotesFormattingTooltip() {
       return
     }
     setClipboardError('')
-    openAt.current = null
+    isOpen.current = false
     provider.current?.hide()
   }
 
@@ -197,7 +193,7 @@ export function NotesFormattingTooltip() {
       }
       editor.focus()
       setClipboardError('')
-      openAt.current = null
+      isOpen.current = false
       provider.current?.hide()
     } catch {
       setClipboardError('Clipboard access was blocked. Use Ctrl+V instead.')
@@ -207,9 +203,31 @@ export function NotesFormattingTooltip() {
   return (
     <div ref={ref} className="notes-formatting-tooltip" role="toolbar" aria-label="Formatting" data-show="false" onKeyDown={handleKeyDown} onPointerDown={markPointerEventHandled}>
       {blockChoices.map(({ level, label, icon }) => (
-        <FormatButton key={level} label={label} active={block === level} onActivate={() => setBlock(level)}>
+        <FormatButton key={level} label={label} active={!isQuote && block === level} onActivate={() => setBlock(level)}>
           {icon}
         </FormatButton>
+      ))}
+      <FormatButton label="Quote" active={isQuote} onActivate={() => run((ctx) => {
+        setBlockStyle(ctx, isQuote ? 'text' : 'quote')
+        ctx.get(editorViewCtx).focus()
+      })}>
+        <Quote size={16} aria-hidden="true" />
+      </FormatButton>
+      <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
+      {textStyleMenus.map(({ kind, label, defaultLabel }) => (
+        <select
+          key={kind}
+          className="app-dropdown notes-text-style-select"
+          aria-label={label}
+          title={label}
+          value={textStyleAt(state, kind) ?? ''}
+          onChange={(event) => chooseTextStyle(kind, event.target.value)}
+        >
+          <option value="">{defaultLabel}</option>
+          {textStyleChoices[kind].map((choice) => (
+            <option key={choice.value} value={choice.value}>{choice.label}</option>
+          ))}
+        </select>
       ))}
       <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
       <FormatButton label="Bold" active={isMarkActive(state, marks.strong)} onActivate={() => run((ctx) => ctx.get(commandsCtx).call(toggleStrongCommand.key))}>
@@ -231,14 +249,16 @@ export function NotesFormattingTooltip() {
         <LinkIcon size={16} aria-hidden="true" />
       </FormatButton>
       <span className="notes-formatting-divider" role="separator" aria-orientation="vertical" />
-      <FormatButton label="Cut" active={false} disabled={state.selection.empty} worded onActivate={() => editClipboard('cut')}>
-        <Scissors size={16} aria-hidden="true" /> Cut
+      {/* Icons alone: these three are familiar enough to spare the room, and
+          each still says what it is when pointed at. */}
+      <FormatButton label="Cut" active={false} disabled={state.selection.empty} onActivate={() => editClipboard('cut')}>
+        <Scissors size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Copy" active={false} disabled={state.selection.empty} worded onActivate={() => editClipboard('copy')}>
-        <Copy size={16} aria-hidden="true" /> Copy
+      <FormatButton label="Copy" active={false} disabled={state.selection.empty} onActivate={() => editClipboard('copy')}>
+        <Copy size={16} aria-hidden="true" />
       </FormatButton>
-      <FormatButton label="Paste" active={false} worded onActivate={() => { void paste(false) }}>
-        <ClipboardPaste size={16} aria-hidden="true" /> Paste
+      <FormatButton label="Paste" active={false} onActivate={() => { void paste(false) }}>
+        <ClipboardPaste size={16} aria-hidden="true" />
       </FormatButton>
       <FormatButton label="Paste as plain text" active={false} worded onActivate={() => { void paste(true) }}>
         Paste as text
@@ -253,7 +273,7 @@ export function NotesFormattingTooltip() {
             const captured = captureWordSelection(viewRef.current.state)
             if (!captured) return
             const anchor = viewRef.current.coordsAtPos(viewRef.current.state.selection.from)
-            openAt.current = null
+            isOpen.current = false
             provider.current?.hide()
             openWordGraph({ ...captured, anchor: { x: anchor.left + 24, y: anchor.bottom + 12 }, returnFocus: viewRef.current.dom })
           }}>Word graph</button>
@@ -272,6 +292,13 @@ const blockChoices = [
   { level: 1, label: 'Heading', icon: <Heading1 size={16} aria-hidden="true" /> },
   { level: 2, label: 'Subheading', icon: <Heading2 size={16} aria-hidden="true" /> },
   { level: 3, label: 'Small heading', icon: <Heading3 size={16} aria-hidden="true" /> },
+]
+
+/** Says what each menu is about when it is showing its default, as all three start. */
+const textStyleMenus: Array<{ kind: TextStyleKind; label: string; defaultLabel: string }> = [
+  { kind: 'font', label: 'Font', defaultLabel: 'Default font' },
+  { kind: 'size', label: 'Text size', defaultLabel: 'Default size' },
+  { kind: 'color', label: 'Text colour', defaultLabel: 'Default colour' },
 ]
 
 /**

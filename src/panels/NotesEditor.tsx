@@ -17,6 +17,7 @@ import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
 import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
 import { configureHighlightStringify, highlightInputRule, highlightKeymap, highlightRemark, highlightSchema, toggleHighlightCommand } from './notesHighlight'
+import { configureTextStyleStringify, textStyleRemark, textStyleSchema } from './notesTextStyle'
 import { pastePlainText } from './notesClipboard'
 import { NotesWritingToolbar } from './NotesWritingToolbar'
 import { configureImageSize, imageSizeRemark, NotesImageView } from './notesImage'
@@ -224,6 +225,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, readO
         ctx.set(linkAttr.key, () => ({ class: 'notes-link' }))
         configureUnderlineStringify(ctx)
         configureHighlightStringify(ctx)
+        configureTextStyleStringify(ctx)
         configureImageSize(ctx)
         // The tooltip is rendered on the body (see NotesFormattingTooltip
         // for why), so its React portal goes there too.
@@ -252,6 +254,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, readO
       .use(toggleHighlightCommand)
       .use(highlightKeymap)
       .use(highlightInputRule)
+      .use(textStyleRemark)
+      .use(textStyleSchema)
       .use(changeReporter((doc, stats, title) => onChangeRef.current({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: doc.toJSON() as Record<string, unknown> }, stats, title)))
       .use(titleFirstLine())
       .use(placeholderPlugin(placeholder))

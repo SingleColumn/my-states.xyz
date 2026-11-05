@@ -146,16 +146,16 @@ test.describe('formatting tooltip', () => {
     await expect(toolbar).toBeHidden()
 
     // Right-clicking within the selection keeps it and calls the bar, which
-    // sits on the body, outside the panel's clipping box, above the point.
+    // sits on the body, outside the panel's clipping box, at the window's foot.
     const selection = await page.evaluate(() => {
       const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
       return { top: rect.top, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
     })
     await page.mouse.click(selection.x, selection.y, { button: 'right' })
     await expect(toolbar).toBeVisible()
-    // Above the point that asked for it, not over the words being read.
+    // Below the words being read, not over them.
     const barBox = await toolbar.boundingBox()
-    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(selection.y + 1)
+    expect(barBox!.y).toBeGreaterThanOrEqual(selection.y)
 
     const bold = toolbar.getByRole('button', { name: 'Bold' })
     await expect(bold).toHaveAttribute('aria-pressed', 'false')
@@ -218,25 +218,21 @@ test.describe('formatting tooltip', () => {
     const before = await toolbar.boundingBox()
 
     // Ctrl+wheel over the canvas zooms it (tldraw's binding, see the wheel
-    // spec in boundary.spec.ts). The bar hides while the wheel turns and
-    // comes back over the selection once it stops -- with no help from the
-    // keyboard, since the selection itself never changed.
+    // spec in boundary.spec.ts).
     const bodyBox = await body.boundingBox()
     await page.mouse.move(bodyBox!.x + 20, bodyBox!.y + bodyBox!.height - 20)
     await page.keyboard.down('Control')
     await page.mouse.wheel(0, -600)
     await page.keyboard.up('Control')
     await expect.poll(() => cameraZoom(page)).toBeGreaterThan(1.05)
-    // The wheel moved the canvas out from under the bar, so the bar goes.
-    await expect(toolbar).toBeHidden()
 
-    // Asked for again at the new zoom, it is the same size as before: the
-    // bar is app chrome, not canvas content.
-    await body.click({ button: 'right', position: { x: 20, y: 10 } })
+    // Still up at the new zoom, in the same place at the same size: the bar is
+    // app chrome, not canvas content.
     await expect(toolbar).toBeVisible()
     const after = await toolbar.boundingBox()
     expect(Math.abs(after!.height - before!.height)).toBeLessThan(1)
     expect(Math.abs(after!.width - before!.width)).toBeLessThan(1)
+    expect(Math.abs(after!.y - before!.y)).toBeLessThan(1)
   })
 })
 
