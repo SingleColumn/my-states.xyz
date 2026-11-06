@@ -668,11 +668,16 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               </>
             ) : null}
 
+            {/* Each of these has a key because they share one spot in the panel,
+                and most are a plain div. Without keys React would reuse one
+                element for all of them, and the height snapToWholeRows writes
+                on the list would stay behind on whatever replaced it. The two
+                lists share a key: that effect runs again when they swap. */}
             {view.middle === 'cover' ? (
               /* The music shown the way an album is: its cover large, the
                  words under it, the next step set apart below them. The same
                  with the search open or put away, connected or not. */
-              <div className="spotify-chosen is-featured" role={view.nextStep ? 'status' : undefined}>
+              <div key="cover" className="spotify-chosen is-featured" role={view.nextStep ? 'status' : undefined}>
                 <div className="spotify-featured-cover">
                   {view.music?.image ? <img src={view.music.image} alt="" /> : <div className="album-frame-empty" />}
                 </div>
@@ -734,7 +739,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                 </button>
               </section>
             ) : view.middle === 'results' && searchType === 'tracks' ? (
-              <div ref={listRef} className="playlist-list" aria-label="Track search results">
+              <div key="results" ref={listRef} className="playlist-list" aria-label="Track search results">
                 {spotify.tracks.map((track) => {
                   // Playback reports a track by its Spotify page, not its
                   // id, so that is what the playing row is recognised by.
@@ -761,7 +766,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                 {searchState === 'no-matches' ? <p className="playlist-list-note">No songs match that search.</p> : null}
               </div>
             ) : view.middle === 'results' ? (
-              <div ref={listRef} className="playlist-list" aria-label="Playlist search results">
+              <div key="results" ref={listRef} className="playlist-list" aria-label="Playlist search results">
                 {spotify.playlists.map((playlist) => {
                   const isChosen = playlist.id === shownPlaylist.id
                   return (
@@ -797,7 +802,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             ) : view.middle === 'empty' ? (
               /* Nothing chosen and nothing to suggest: one line on how to
                  start, rather than a blank panel that reads as broken. */
-              <div className="spotify-empty">
+              <div key="empty" className="spotify-empty">
                 <p className="muted">{`Search for a ${searchType === 'tracks' ? 'song' : 'playlist'} to play with this board.`}</p>
               </div>
             ) : null}

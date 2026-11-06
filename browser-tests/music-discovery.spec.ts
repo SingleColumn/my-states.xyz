@@ -115,6 +115,25 @@ test.describe('the Music panel, before Spotify is connected', () => {
     await expect(shape.locator('.suggestion-card')).toHaveCount(6)
   })
 
+  test('clearing a search gives the cover back its full room', async ({ page }) => {
+    await withDiscovery(page)
+    const { music, shape } = await openMusicPanel(page)
+    await dispatch(page, { kind: 'panel.update', panelId: music.panelId, config: { playlist: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Dune', url: 'https://open.spotify.com/playlist/p1' } } })
+    const card = shape.locator('.spotify-chosen.is-featured')
+    await expect(card).toBeVisible()
+    const heightOf = () => card.evaluate((node: HTMLElement) => node.offsetHeight)
+    await expect.poll(heightOf).toBeGreaterThan(0)
+    const before = await heightOf()
+
+    await shape.getByLabel('Search playlists').fill('rain')
+    await expect(shape.locator('.playlist-list')).toHaveAttribute('style', /min-height/)
+    await shape.getByLabel('Search playlists').fill('')
+
+    await expect(card).toBeVisible()
+    await expect(card).not.toHaveAttribute('style', /.+/)
+    expect(await heightOf()).toBe(before)
+  })
+
   test('deals another set of suggestions without reloading or connecting', async ({ page }) => {
     await withDiscovery(page)
     await withCuratedPool(page, [...curatedIds, 'c7', 'c8', 'c9', 'c10'])
