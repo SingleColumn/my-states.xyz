@@ -103,7 +103,7 @@ Your boards are stored in your browser, but if you change your browser or close 
 
 I want my-states to be an expressive tool, that doesn't get in the way of writing down the thoughts that come to mind. I also want it to be a place to contemplate the creations of others and find inspiration.
 
-If you like it and want to reach out: robert.tomas.johnston@gmail.com.
+If you like it and want to reach out: robert@my-states.xyz.
 
 my-states' own source code is source-available under the Apache License
 2.0, subject to the "Commons Clause" License Condition v1.0: you may

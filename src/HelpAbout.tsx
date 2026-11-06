@@ -13,7 +13,7 @@ interface HelpAboutProps {
 export const HELP_ABOUT_MAIN_SECTION = 'What is my-states.xyz'
 export const HELP_ABOUT_LICENSE_URL = '/licenses/tldraw-3.15.6.txt'
 export const HELP_ABOUT_TLDRAW_URL = 'https://tldraw.dev/'
-export const HELP_ABOUT_CONTACT_EMAIL = 'robert.tomas.johnston@gmail.com'
+export const HELP_ABOUT_CONTACT_EMAIL = 'robert@my-states.xyz'
 
 /**
  * The index and the sections below share this list, so a link can never point
