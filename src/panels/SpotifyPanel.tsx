@@ -30,6 +30,7 @@ import type { CuratedSpotifyPlaylist } from '../config/spotifyCuratedPlaylists'
 import { getSessionSuggestions, shuffleSessionSuggestions } from '../spotifySuggestions'
 import { forgetReturnContext, rememberReturnContext, takeReturnContext, type SpotifyReturnContext } from '../spotifyReturnContext'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
+import { useMomentView } from '../momentView'
 import { musicPanelView, type MusicSearchState } from './musicPanelView'
 import { panelContentProps } from '../panelSurface'
 
@@ -53,6 +54,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // Focus view keeps what someone glances at while they write or look at
   // images: the playlist, the track, and the playback controls.
   const focusView = panel?.focusView === true
+  const momentView = useMomentView()
   // Connecting Spotify is what playback needs. It is not what the panel
   // needs: searching and choosing happen either way, and this flag marks the
   // boundary between the two rather than the door into the panel.
@@ -338,6 +340,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const view = musicPanelView({
     connected,
     focusView,
+    momentView,
     searchCollapsed,
     searchState,
     suggestionCount: suggestionCards.length,
@@ -538,7 +541,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   )
 
   return (
-    <section className={`panel panel-spotify-surface${focusView ? ' is-focus-view' : ''}${searchHidden ? ' is-search-hidden' : ''}`}>
+    <section className={`panel panel-spotify-surface${focusView && !momentView ? ' is-focus-view' : ''}${searchHidden ? ' is-search-hidden' : ''}${momentView && !view.music ? ' is-moment-empty' : ''}`}>
       <PanelHeader
         panelId={panelId}
         panelType="spotify"
@@ -799,7 +802,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               </div>
             ) : null}
 
-            {searchCollapsed && connected && !focusView ? (
+            {searchCollapsed && connected && !focusView && !momentView ? (
               /* Quiet on purpose: with the search put away the artwork leads,
                  and this is only the way back to choosing something else. It
                  says music, not playlist, because a song may be what is loaded. */

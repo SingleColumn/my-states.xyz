@@ -37,6 +37,8 @@ The controls at the top left of the canvas manage boards. Pick one from **Open b
 
 Use **Export board** to download a portable `.board.zip` archive, and **Import board** to load one (in .zip format). An imported board brings its canvas layout, settings, Markdown notes, and embedded local images; if a board with that name already exists, you are offered a new name for the import, with a suggestion already filled in, or you can keep the original name to add it as a separate board with the same name on purpose. Spotify login tokens and live playback data are never included.
 
+To share a moment from a board, select **Prepare board for screenshot** in the panel view menu (the **···** button next to **Add panel**). The toolbar and the panels' headers, footers and controls disappear, leaving your image, your writing and your song as cards on the canvas, centred in the window and ready for a screenshot. Video panels and panels with nothing to show are left out, and a running slideshow holds its picture. Panels cannot be moved or changed in this view, but you can still drag to move around the canvas, zoom, and scroll a note to the right place. Press **Esc** to go back; the board is exactly as you left it.
+
 The browser keeps the boards themselves, their notes and images, and, where it allows it, a remembered image folder. Your Spotify login and a few editor preferences are kept separately in the same browser. Searching Spotify before you connect goes through this site rather than your browser, so that the app can ask Spotify on its own behalf; it asks only about the public catalogue, and nothing about you is sent or kept. Browser storage limits apply, and a remembered folder may ask for permission again after a restart.
 
 ## Writing panel

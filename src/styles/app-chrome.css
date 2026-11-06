@@ -63,6 +63,14 @@ button {
   pointer-events: none;
 }
 
+/* A Word Graph window floats above the whole app, including these menus, and no
+   z-index inside the app can lift a menu over it. Left alone, the window covered
+   the menu just opened and took its clicks. So it steps aside while one is open;
+   it is hidden, not closed, and comes back as it was. */
+body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
+  visibility: hidden;
+}
+
 .tlui-layout__top__left {
   position: absolute;
   inset: 0;

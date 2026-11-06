@@ -136,7 +136,7 @@ const blockStyles: Array<{ value: BlockStyle; label: string }> = [
  * the ancestors rather than the parent, because the caret's own parent
  * inside either of them is an ordinary paragraph.
  */
-function blockStyleOf(state: EditorState): BlockStyle {
+export function blockStyleOf(state: EditorState): BlockStyle {
   const { $from } = state.selection
   for (let depth = $from.depth; depth > 0; depth--) {
     const name = $from.node(depth).type.name
@@ -161,7 +161,7 @@ function blockStyleOf(state: EditorState): BlockStyle {
  * character that ends one, so a writer who wanted a paragraph after a list
  * had to guess at pressing Enter on an empty bullet.
  */
-function setBlockStyle(ctx: Ctx, style: BlockStyle) {
+export function setBlockStyle(ctx: Ctx, style: BlockStyle) {
   const commands = ctx.get(commandsCtx)
   const view = ctx.get(editorViewCtx)
   // Out of any list, one level at a time, then out of any quote. Bounded by

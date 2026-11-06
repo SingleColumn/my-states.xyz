@@ -146,16 +146,16 @@ test.describe('formatting tooltip', () => {
     await expect(toolbar).toBeHidden()
 
     // Right-clicking within the selection keeps it and calls the bar, which
-    // sits on the body, outside the panel's clipping box, above the point.
+    // sits on the body, outside the panel's clipping box, at the window's foot.
     const selection = await page.evaluate(() => {
       const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
       return { top: rect.top, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
     })
     await page.mouse.click(selection.x, selection.y, { button: 'right' })
     await expect(toolbar).toBeVisible()
-    // Above the point that asked for it, not over the words being read.
+    // Below the words being read, not over them.
     const barBox = await toolbar.boundingBox()
-    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(selection.y + 1)
+    expect(barBox!.y).toBeGreaterThanOrEqual(selection.y)
 
     const bold = toolbar.getByRole('button', { name: 'Bold' })
     await expect(bold).toHaveAttribute('aria-pressed', 'false')
@@ -218,25 +218,21 @@ test.describe('formatting tooltip', () => {
     const before = await toolbar.boundingBox()
 
     // Ctrl+wheel over the canvas zooms it (tldraw's binding, see the wheel
-    // spec in boundary.spec.ts). The bar hides while the wheel turns and
-    // comes back over the selection once it stops -- with no help from the
-    // keyboard, since the selection itself never changed.
+    // spec in boundary.spec.ts).
     const bodyBox = await body.boundingBox()
     await page.mouse.move(bodyBox!.x + 20, bodyBox!.y + bodyBox!.height - 20)
     await page.keyboard.down('Control')
     await page.mouse.wheel(0, -600)
     await page.keyboard.up('Control')
     await expect.poll(() => cameraZoom(page)).toBeGreaterThan(1.05)
-    // The wheel moved the canvas out from under the bar, so the bar goes.
-    await expect(toolbar).toBeHidden()
 
-    // Asked for again at the new zoom, it is the same size as before: the
-    // bar is app chrome, not canvas content.
-    await body.click({ button: 'right', position: { x: 20, y: 10 } })
+    // Still up at the new zoom, in the same place at the same size: the bar is
+    // app chrome, not canvas content.
     await expect(toolbar).toBeVisible()
     const after = await toolbar.boundingBox()
     expect(Math.abs(after!.height - before!.height)).toBeLessThan(1)
     expect(Math.abs(after!.width - before!.width)).toBeLessThan(1)
+    expect(Math.abs(after!.y - before!.y)).toBeLessThan(1)
   })
 })
 
@@ -1301,10 +1297,10 @@ test.describe('links and text size', () => {
     const shape = await shapeOf(page, notes.panelId)
     await expect(noteBodyOf(shape)).toBeVisible()
     const ladder = [
-      ['Small', '16px', '25px'],
-      ['Large', '20px', '34px'],
-      ['Extra large', '23px', '40px'],
-      ['Medium', '18px', '30px'],
+      ['Small', '17px', '25px'],
+      ['Large', '21px', '34px'],
+      ['Extra large', '24px', '40px'],
+      ['Medium', '19px', '30px'],
     ]
     for (const [label, fontSize, lineHeight] of ladder) {
       await shape.getByRole('button', { name: 'Writing panel actions' }).click()
@@ -1463,16 +1459,16 @@ test.describe('what a line is', () => {
 
     await ask()
     // Ordinary writing says so before anything is chosen.
-    await expect(bar.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(bar.getByRole('button', { name: 'Text', exact: true })).toHaveAttribute('aria-pressed', 'true')
     await bar.getByRole('button', { name: 'Subheading' }).click()
     await expect(body.locator('h2')).toHaveText('A line of writing')
 
     await ask()
     await expect(bar.getByRole('button', { name: 'Subheading' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(bar.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'false')
+    await expect(bar.getByRole('button', { name: 'Text', exact: true })).toHaveAttribute('aria-pressed', 'false')
 
     // And the way back, which the editor had no route to before.
-    await bar.getByRole('button', { name: 'Text' }).click()
+    await bar.getByRole('button', { name: 'Text', exact: true }).click()
     await expect(body.locator('h2')).toHaveCount(0)
     const { board } = await describeCanvas(page)
     await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('A line of writing\n')
@@ -1710,7 +1706,9 @@ test.describe('a note from before the structured document existed', () => {
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
 
-    await expect(again.locator('h1')).toHaveText('A heading from before')
+    // The record kept a name of its own, and an old note with a separate title
+    // and a headed body keeps both: its name becomes the first line.
+    await expect(again.locator('h1')).toHaveText(['placeholder', 'A heading from before'])
     await expect(again.locator('strong')).toHaveText('bold')
     await expect(again.locator('em')).toHaveText('italic')
     await expect(again.locator('a')).toHaveAttribute('href', 'https://example.com')

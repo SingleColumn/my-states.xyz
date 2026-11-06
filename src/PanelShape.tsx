@@ -17,6 +17,7 @@ import { panelShapeMigrations, panelShapeProps, type PanelShape } from './panelS
 import { createPanelProps, panelFromShape } from './panelStore'
 import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled, panelScrollSelector } from './panelSurface'
 import { usePanelCommands } from './PanelHeader'
+import { useMomentView } from './momentView'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 export type { PanelShape } from './panelShapeSchema'
@@ -82,16 +83,19 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     // that square a full-screen panel leave the panels behind it alone --
     // they are visible again the board the canvas is panned.
     const commands = usePanelCommands()
+    const momentView = useMomentView()
     if (!shape.props.visible) return null
 
     return (
       <HTMLContainer
         className={`canvas-panel-shell${commands.isPanelFullScreen(shape.props.panelId) ? ' is-full-screen' : ''}`}
-        onPointerDownCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
-        onTouchStartCapture={(event) => selectPanelOnPointerDown(editor, shape.id, event)}
-        onPointerDown={claimPointerDownForContent}
-        onTouchStart={claimPointerDownForContent}
-        onContextMenu={(event) => handlePanelContextMenu(editor, shape.id, event)}
+        // In a moment no press belongs to a panel: none selects it, and none
+        // is kept from the canvas, so a drag starting on a note still pans.
+        onPointerDownCapture={momentView ? undefined : (event) => selectPanelOnPointerDown(editor, shape.id, event)}
+        onTouchStartCapture={momentView ? undefined : (event) => selectPanelOnPointerDown(editor, shape.id, event)}
+        onPointerDown={momentView ? undefined : claimPointerDownForContent}
+        onTouchStart={momentView ? undefined : claimPointerDownForContent}
+        onContextMenu={momentView ? undefined : (event) => handlePanelContextMenu(editor, shape.id, event)}
         style={{
           width: shape.props.w,
           height: shape.props.h,

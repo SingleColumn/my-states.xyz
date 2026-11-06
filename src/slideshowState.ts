@@ -40,6 +40,8 @@ export interface SlideshowState {
   resetFolder(panelId: string): Promise<void>
   restoreFolder(panelId: string): Promise<void>
   setIsPlaying(value: boolean, panelId?: string): void
+  /** Stops the timer for now without playback coming to rest: the picture showing is not kept. `setIsPlaying(true)` carries on from it. */
+  holdPlayback(panelId: string): void
   stop(panelId?: string): void
   next(panelId?: string): void
   previous(panelId?: string): void
@@ -417,6 +419,12 @@ export function useSlideshowState(board: Board | null, panels: PanelsState): Sli
         // Playback has come to rest: this is where the picture showing is kept.
         setCurrentIndex(panelId, state.currentIndex, true)
       }
+      touch()
+    },
+    holdPlayback: (panelId) => {
+      const state = getSlideshowPanelRuntimeState(panelId)
+      state.isPlaying = false
+      cancelAdvance(state)
       touch()
     },
     stop, next, previous, updateSettings,

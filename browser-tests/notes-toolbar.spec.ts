@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { describeCanvas, dispatch, noteBodyOf, openApp, openWithTools, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
+import { describeCanvas, dispatch, expectCanvasSaved, noteBodyOf, openApp, openWithTools, panelOfType, readStorage, shapeOf, waitForCanvas } from './helpers'
 
 /**
  * The writing tools above the note: asked for from the panel's menu, and
@@ -216,7 +216,7 @@ test.describe('the writing tools', () => {
 })
 
 test.describe('the writing tools on the page', () => {
-  test('begin where the words begin and keep one shape at every text size', async ({ page }) => {
+  test('sit centred over the writing and keep one shape at every text size', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 820 })
     const { body } = await openWithTools(page)
     await body.click()
@@ -228,11 +228,11 @@ test.describe('the writing tools on the page', () => {
 
     const shapeOfBar = () => page.evaluate(() => {
       const bar = document.querySelector('.notes-writing-toolbar')!.getBoundingClientRect()
-      const text = document.querySelector('.notes-editor-content p')!.getBoundingClientRect()
+      const page = document.querySelector('.notes-editor-content')!.getBoundingClientRect()
       const buttons = Array.from(document.querySelectorAll('.notes-writing-toolbar .notes-formatting-button'))
         .map((button) => button.getBoundingClientRect())
       return {
-        offsetFromText: Math.round(bar.x) - Math.round(text.x),
+        offsetFromCentre: Math.round(bar.x + bar.width / 2 - (page.x + page.width / 2)),
         width: Math.round(bar.width),
         rows: new Set(buttons.map((button) => Math.round(button.y))).size,
       }
@@ -245,8 +245,8 @@ test.describe('the writing tools on the page', () => {
     // The column grows with the text; the tools do not. Spread across it
     // instead, the gaps between them grew too, which at the larger sizes
     // left the icons looking scattered rather than placed.
-    expect(small.offsetFromText).toBe(0)
-    expect(large.offsetFromText).toBe(0)
+    expect(Math.abs(small.offsetFromCentre)).toBeLessThanOrEqual(1)
+    expect(Math.abs(large.offsetFromCentre)).toBeLessThanOrEqual(1)
     expect(large.width).toBe(small.width)
     // And they stay on one row: three tools dropping to a second line inside
     // the frame reads as a mistake.
@@ -254,20 +254,22 @@ test.describe('the writing tools on the page', () => {
     expect(large.rows).toBe(1)
   })
 
-  test('follow the panel’s own edge when there is no column to follow', async ({ page }) => {
+  test('stay centred over the editor when there is no column to follow', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 820 })
     const { body } = await openWithTools(page)
     const notes = await panelOfType(page, 'notes')
     await body.click()
     await page.keyboard.type('A line of writing.')
-    // Larger than its default but not full screen, which is where the tools
-    // were centred on a measure nothing else on the panel used.
+    // Larger than its default but not full screen.
     await dispatch(page, { kind: 'panel.resize', panelId: notes.panelId, w: 820, h: 560 })
 
     await expect.poll(async () => page.evaluate(() => {
-      const left = (selector: string) => Math.round(document.querySelector(selector)!.getBoundingClientRect().x)
-      return [left('.notes-writing-toolbar') - left('.notes-editor')]
-    })).toEqual([0])
+      const middle = (selector: string) => {
+        const rect = document.querySelector(selector)!.getBoundingClientRect()
+        return rect.x + rect.width / 2
+      }
+      return Math.abs(middle('.notes-writing-toolbar') - middle('.notes-editor')) <= 1
+    })).toBe(true)
   })
 
   /*
@@ -320,19 +322,11 @@ function cameraOf(page: Page) {
 }
 
 test.describe('the empty note', () => {
-  test('names where the tools are, since they are not on show', async ({ page }) => {
+  test('invites writing with one short line', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    const hint = await body.locator('.is-empty').getAttribute('data-placeholder')
-    // The tools are off until asked for, so the one page that can say where
-    // they are says so. The slash is offered second, for anyone who types.
-    expect(hint).toContain('···')
-    expect(hint).toContain('Show formatting tools')
-    expect(hint).toContain('/')
-    // ...and that the first line is the note's name, which nothing else on
-    // an empty page says: there is no title field left to say it.
-    expect(hint).toContain('first line names this note')
+    await expect(body.locator('.is-empty')).toHaveAttribute('data-placeholder', 'Start writing to find the words')
   })
 })
 
@@ -346,6 +340,9 @@ test.describe('a panel left at full screen', () => {
     await page.getByRole('menuitem', { name: 'Expand panel to full screen' }).click()
     await expect(page.locator('.canvas-panel-shell.is-full-screen')).toHaveCount(1)
     const before = await look(page)
+    // Saves are debounced, and the point here is what a saved board comes back
+    // as, not a reload racing the save of the panel coming to the front.
+    await expectCanvasSaved(page)
 
     await page.reload()
     await waitForCanvas(page)

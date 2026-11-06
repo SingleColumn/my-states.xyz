@@ -1,4 +1,4 @@
-import { EyeOff, Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop, RotateCcw } from 'lucide-react'
+import { Camera, EyeOff, Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { PanelType } from './types'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
@@ -15,6 +15,7 @@ interface CanvasViewControlsProps {
   hiddenPanels: Array<{ id: string; type: PanelType }>
   onHideSelectedPanel(): void
   onRestorePanel(panelId: string): void
+  onEnterMomentView(): void
 }
 
 export function CanvasViewControls({
@@ -29,6 +30,7 @@ export function CanvasViewControls({
   hiddenPanels,
   onHideSelectedPanel,
   onRestorePanel,
+  onEnterMomentView,
 }: CanvasViewControlsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [panelTypeToAdd, setPanelTypeToAdd] = useState<PanelType | ''>('')
@@ -142,6 +144,15 @@ export function CanvasViewControls({
           >
             <EyeOff size={16} aria-hidden="true" />
             <span>Hide selected panel</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            title="Hide the toolbar and panel controls, leaving your image, writing and song ready for a screenshot"
+            onClick={() => runMenuAction(onEnterMomentView)}
+          >
+            <Camera size={16} aria-hidden="true" />
+            <span>Prepare board for screenshot</span>
           </button>
           {hiddenPanels.length ? (
             <div className="canvas-view-menu-section" role="group" aria-label="Hidden panels">
