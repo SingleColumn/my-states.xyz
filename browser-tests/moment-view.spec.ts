@@ -166,6 +166,32 @@ test.describe('Moment view', () => {
     await expect(picture(page)).toHaveCSS('object-fit', 'cover')
   })
 
+  // The results list is sized to whole rows by writing on the element itself. The
+  // view swaps the list for the cover, and that size must not go with it.
+  test('search results left open do not squash the song\'s card', async ({ page }) => {
+    await page.route('**/api/spotify/search*', (route) => route.fulfill({
+      json: { items: [{ id: 'r1', name: 'Rain on Glass', uri: 'spotify:playlist:r1', url: 'https://open.spotify.com/playlist/r1', image: null, owner: 'Someone', trackCount: 40 }], hasMore: false },
+    }))
+    await openApp(page)
+    const music = await panelOfType(page, 'spotify')
+    await dispatch(page, { kind: 'panel.update', panelId: music.panelId, config: { playlist: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Dune', url: 'https://open.spotify.com/playlist/p1' } } })
+    await dispatch(page, { kind: 'panel.resize', panelId: music.panelId, w: 460, h: 720 })
+    const musicShape = await shapeOf(page, music.panelId)
+    await musicShape.getByLabel('Search playlists').fill('rain')
+    // The list has its size, so this test is about the case that went wrong.
+    await expect(musicShape.locator('.playlist-list')).toHaveAttribute('style', /min-height/)
+
+    await prepareForScreenshot(page)
+
+    const card = musicShape.locator('.spotify-chosen.is-featured')
+    await expect(card).not.toHaveAttribute('style', /.+/)
+    const framed = await boxOf(card)
+    const cover = await boxOf(card.locator('.spotify-featured-cover > *'))
+    const name = await boxOf(card.locator('.track-copy'))
+    expect(cover.y).toBeGreaterThanOrEqual(framed.y)
+    expect(name.y + name.height).toBeLessThanOrEqual(framed.y + framed.height)
+  })
+
   test('a note too long for its panel stops at the panel and scrolls', async ({ page }) => {
     await openApp(page)
     const notes = await panelOfType(page, 'notes')
