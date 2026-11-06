@@ -340,17 +340,24 @@ test.describe('Moment view', () => {
     const notes = await panelOfType(page, 'notes')
     await expectCanvasSaved(page)
     const { board } = await describeCanvas(page)
-    const before = (await readStorage(page, board!.id)).camera
+    // Only where the view is. A save during this view writes those three numbers
+    // and an ordinary save the camera's whole record, and which came last depends
+    // on timing, not on whether the view was kept.
+    const savedView = async () => {
+      const { x, y, z } = (await readStorage(page, board!.id)).camera!
+      return { x, y, z }
+    }
+    const before = await savedView()
     const noteShape = await shapeOf(page, notes.panelId)
 
     await prepareForScreenshot(page)
     await dragLocator(page, noteShape, { dx: 90, dy: 60 })
     await page.waitForTimeout(600) // Past the delay before a change is saved.
-    expect((await readStorage(page, board!.id)).camera).toEqual(before)
+    expect(await savedView()).toEqual(before)
 
     await page.reload()
     await waitForCanvas(page)
-    expect((await readStorage(page, board!.id)).camera).toEqual(before)
+    expect(await savedView()).toEqual(before)
   })
 
   test('a running slideshow holds its picture, and carries on afterwards', async ({ page }) => {

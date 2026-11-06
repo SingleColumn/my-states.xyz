@@ -52,7 +52,13 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: baseURL,
-    env: { PORT: String(port) },
+    env: {
+      PORT: String(port),
+      // The bundled sample collections, whatever a developer's .env says. The
+      // curated library only answers the app's own addresses, not this port,
+      // and a test run should not depend on another server being up.
+      VITE_IMAGE_COLLECTIONS_BASE_URL: '',
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
