@@ -197,6 +197,13 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   text-align: left;
 }
 
+/* A long label wraps to a second row instead of widening the whole menu. */
+.board-actions-menu-wrapped-label {
+  max-width: 20ch;
+  padding-block: var(--space-detail-2);
+  line-height: 1.25;
+}
+
 .board-actions-menu-divider {
   height: var(--border-width-hairline);
   margin: var(--space-detail-2) var(--space-menu-item-padding-x);

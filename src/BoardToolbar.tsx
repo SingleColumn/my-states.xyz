@@ -7,7 +7,18 @@ import { BoardSaveStatus } from './BoardSaveStatus'
 import { importNameSuggestion } from './utils'
 
 export function BoardToolbar() {
-  const { boards } = useAppState()
+  const { boards, panels, slideshow } = useAppState()
+  // Only a board with an image collection has anything to choose between: an online one, or one
+  // that came in with an imported board (stored pictures, every one credited to its creator).
+  // The slideshow's own pictures are the ones loaded for it; a viewer's folder has no credit.
+  const usesOnlineCollections = panels.all.some((panel) => {
+    if (panel.type !== 'slideshow') return false
+    const { imageSource } = panel.config
+    if (imageSource.type === 'curated') return true
+    if (imageSource.type !== 'session-assets') return false
+    const images = slideshow.imagesFor(panel.id)
+    return images.length > 0 && images.every((image) => image.attribution?.creator)
+  })
   // The theme select itself sits beside the Settings button (BoardThemeSelect);
   // the compact toolbar repeats the choice in the … menu.
   const theme = useBoardThemeOptions()
@@ -160,9 +171,14 @@ export function BoardToolbar() {
               <Copy size={16} aria-hidden="true" /><span>Duplicate board</span>
             </button>
             <div className="board-actions-menu-divider" role="separator" />
-            <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => void run(boards.exportActive))}>
+            <button type="button" role="menuitem" disabled={!boards.activeBoard} title={usesOnlineCollections ? 'Image panels keep the one picture they are showing now.' : undefined} onClick={() => runMenuAction(() => void run(() => boards.exportActive()))}>
               <Download size={17} aria-hidden="true" /><span>Export board</span>
             </button>
+            {usesOnlineCollections ? (
+              <button type="button" role="menuitem" disabled={!boards.activeBoard} title="Includes every picture in the image collections this board uses, so slideshows keep playing after import. The file is larger." onClick={() => runMenuAction(() => void run(() => boards.exportActive({ wholeCollections: true })))}>
+                <Download size={17} aria-hidden="true" /><span className="board-actions-menu-wrapped-label">Export with complete image collection</span>
+              </button>
+            ) : null}
             <button type="button" role="menuitem" onClick={() => runMenuAction(() => inputRef.current?.click())}>
               <FolderUp size={17} aria-hidden="true" /><span>Import board</span>
             </button>

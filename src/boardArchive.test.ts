@@ -302,6 +302,237 @@ describe('portable board archives', () => {
     }
   })
 
+  describe('downloading curated images', () => {
+    const baseUrl = 'https://cdn.example/export'
+
+    async function curatedBoard(imageCount: number, currentIndex = 0) {
+      const panels = createDefaultPanels().map((panel): Panel => panel.type === 'slideshow'
+        ? { ...panel, config: { ...panel.config, folderName: 'Autumn', currentIndex, imageSource: { type: 'curated', collectionSlug: 'autumn' } } }
+        : panel)
+      const board = await storeBoard('Curated downloads', panels)
+      const items = Array.from({ length: imageCount }, (_, position) => ({
+        position, id: `img-${position}`, file: `images/ab/img-${position}.jpg`, thumb: `thumbs/ab/img-${position}.webp`,
+        width: 100, height: 100, source: 'rbnks', source_url: 'https://www.instagram.com/p/example/',
+      }))
+      // Wraps `imageResponse` with the catalog files the exporter reads first.
+      const fetcherFor = (imageResponse: (url: string, init?: RequestInit) => Promise<Response>) => vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input)
+        if (url === `${baseUrl}/collections/index.json`) return Response.json({
+          manifest_version: 1, generated_at: '2026-10-02T08:01:00Z',
+          collections: [{ slug: 'autumn', title: 'Autumn', kind: 'creator', creator: 'rbnks', version: 1, published_at: '2026-10-02T08:00:00Z', count: imageCount, manifest: 'collections/autumn/latest.json' }],
+        })
+        if (url === `${baseUrl}/collections/autumn/latest.json`) return Response.json({
+          manifest_version: 1, slug: 'autumn', title: 'Autumn', kind: 'creator', creator: 'rbnks', version: 1,
+          published_at: '2026-10-02T08:00:00Z', count: imageCount, items,
+        })
+        return imageResponse(url, init)
+      }) as unknown as typeof fetch
+      return { board, fetcherFor }
+    }
+
+    const jpeg = () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+
+    it('asks the network again when the browser blocks a stored copy of an image', async () => {
+      const { board, fetcherFor } = await curatedBoard(1)
+      const fetcher = fetcherFor(async (_url, init) => {
+        // Mimics the browser rejecting a cached copy that lacks the cross-site permission header.
+        if (init?.cache !== 'reload') throw new TypeError('Failed to fetch')
+        return jpeg()
+      })
+      const entries = await archiveEntries(await exportBoardArchive(board.id, { fetcher, curatedBaseUrl: baseUrl }))
+      expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toHaveLength(1)
+    })
+
+    it('explains which image failed and why, in plain language', async () => {
+      const blocked = await curatedBoard(1)
+      await expect(exportBoardArchive(blocked.board.id, {
+        fetcher: blocked.fetcherFor(async () => { throw new TypeError('Failed to fetch') }),
+        curatedBaseUrl: baseUrl,
+      })).rejects.toThrow('An image from "rbnks" could not be downloaded for the export. Check your internet connection')
+
+      const missing = await curatedBoard(1)
+      await expect(exportBoardArchive(missing.board.id, {
+        fetcher: missing.fetcherFor(async () => new Response('', { status: 404 })),
+        curatedBaseUrl: baseUrl,
+      })).rejects.toThrow('error 404')
+    })
+
+    it('downloads only a few images at a time', async () => {
+      const { board, fetcherFor } = await curatedBoard(10)
+      let active = 0
+      let peak = 0
+      const fetcher = fetcherFor(async () => {
+        active++
+        peak = Math.max(peak, active)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        active--
+        return jpeg()
+      })
+      const entries = await archiveEntries(await exportBoardArchive(board.id, { fetcher, curatedBaseUrl: baseUrl, curated: { scope: 'all' } }))
+      expect(Object.keys(entries).filter((path) => path.startsWith('images/'))).toHaveLength(10)
+      expect(peak).toBeLessThanOrEqual(4)
+      expect(peak).toBeGreaterThan(1)
+    })
+
+    function downloadedImages(fetcher: typeof fetch) {
+      return (fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls
+        .map(([input]) => String(input))
+        .filter((url) => url.includes('/images/'))
+    }
+
+    it('takes only the picture each panel is showing, using the live position the screen reports', async () => {
+      const { board, fetcherFor } = await curatedBoard(5)
+      const shownPanelId = slideshowIn(panelsOf(await getBoard(board.id))).id
+      const fetcher = fetcherFor(async () => jpeg())
+      const archive = await exportBoardArchive(board.id, {
+        fetcher,
+        curatedBaseUrl: baseUrl,
+        curated: { scope: 'visible', visibleItemIds: { [shownPanelId]: 'img-3' } },
+      })
+      expect(downloadedImages(fetcher)).toEqual([`${baseUrl}/images/ab/img-3.jpg`])
+      const exported = manifest(await archiveEntries(archive))
+      expect(exported.images).toHaveLength(1)
+      expect(slideshowIn(exported.panels).config).toMatchObject({ imageSource: { type: 'session-assets' }, currentIndex: 0 })
+    })
+
+    it('falls back to the position saved on the panel, then to the first picture', async () => {
+      const saved = await curatedBoard(5, 2)
+      const savedFetcher = saved.fetcherFor(async () => jpeg())
+      await exportBoardArchive(saved.board.id, { fetcher: savedFetcher, curatedBaseUrl: baseUrl })
+      expect(downloadedImages(savedFetcher)).toEqual([`${baseUrl}/images/ab/img-2.jpg`])
+
+      const pastTheEnd = await curatedBoard(3, 9)
+      const endFetcher = pastTheEnd.fetcherFor(async () => jpeg())
+      await exportBoardArchive(pastTheEnd.board.id, { fetcher: endFetcher, curatedBaseUrl: baseUrl })
+      expect(downloadedImages(endFetcher)).toEqual([`${baseUrl}/images/ab/img-0.jpg`])
+    })
+
+    it('takes the whole collection when asked, and the imported slideshow still has every picture', async () => {
+      const { board, fetcherFor } = await curatedBoard(4)
+      const fetcher = fetcherFor(async () => jpeg())
+      const archive = await exportBoardArchive(board.id, { fetcher, curatedBaseUrl: baseUrl, curated: { scope: 'all' } })
+      expect(downloadedImages(fetcher)).toHaveLength(4)
+      const { board: imported } = await importBoardArchive(asFile(archive))
+      expect(await getBoardAssets(imported.id)).toHaveLength(4)
+    })
+
+    it('does not download any picture when duplicating a board, which keeps pointing at the online collection', async () => {
+      const { board, fetcherFor } = await curatedBoard(3)
+      const fetcher = fetcherFor(async () => jpeg())
+      const original = globalThis.fetch
+      globalThis.fetch = fetcher
+      try {
+        const copy = await duplicateBoard(board.id, 'Copy')
+        expect(slideshowIn(panelsOf(await getBoard(copy.id))).config.imageSource).toEqual({ type: 'curated', collectionSlug: 'autumn' })
+      } finally {
+        globalThis.fetch = original
+      }
+      expect(downloadedImages(fetcher)).toEqual([])
+    })
+  })
+
+  describe('stored pictures that came from an imported collection', () => {
+    const credit = { creator: 'rbnks' }
+
+    /** A board with `slideshows` Images panels holding stored pictures, in the state an imported collection leaves them. */
+    async function storedBoard(slideshows: number, currentIndex = 0) {
+      const base = createDefaultPanels()
+      const first = slideshowIn(base)
+      const extra = Array.from({ length: slideshows - 1 }, (_, index): Panel => ({ ...first, id: `extra_slideshow_${index}`, config: { ...first.config } }))
+      const panels = [...base, ...extra].map((panel): Panel => panel.type === 'slideshow'
+        ? { ...panel, config: { ...panel.config, currentIndex, imageSource: { type: 'session-assets' } } }
+        : panel)
+      const board = await storeBoard('Imported collection', panels)
+      const slideshowIds = panelsOf(await getBoard(board.id)).filter((panel) => panel.type === 'slideshow').map((panel) => panel.id)
+      return { board, slideshowIds }
+    }
+
+    const picture = (id: string, name: string, panelIds: string[], attribution: { creator: string } | null = credit) =>
+      ({ ...makeAsset(id, name, new Uint8Array([1, 2, 3])), panelIds, ...(attribution ? { attribution } : {}) })
+
+    const exportedPictureCount = async (boardId: string, curated?: Parameters<typeof exportBoardArchive>[1] extends infer O ? O extends { curated?: infer C } ? C : never : never) =>
+      manifest(await archiveEntries(await exportBoardArchive(boardId, { curated }))).images.length
+
+    it('exports only the picture on screen, by the live position the screen reports', async () => {
+      const { board, slideshowIds } = await storedBoard(1)
+      await saveBoardAssets(board.id, ['a', 'b', 'c'].map((letter) => picture(`img_${letter}`, `${letter}.png`, slideshowIds)))
+      const archive = await exportBoardArchive(board.id, { curated: { scope: 'visible', visibleItemIds: { [slideshowIds[0]]: 'img_c' } } })
+      const exported = manifest(await archiveEntries(archive))
+      expect(exported.images).toHaveLength(1)
+      expect(exported.images[0]).toMatchObject({ attribution: credit })
+      expect(slideshowIn(exported.panels).config.currentIndex).toBe(0)
+      const { board: imported } = await importBoardArchive(asFile(archive))
+      expect((await getBoardAssets(imported.id)).map((asset) => asset.filename)).toEqual(['c.png'])
+    })
+
+    it('falls back to the saved position, counted in the order the slideshow lists the pictures', async () => {
+      const { board, slideshowIds } = await storedBoard(1, 1)
+      // Stored out of order on purpose: the slideshow sorts by name, so position 1 is "b.png".
+      await saveBoardAssets(board.id, ['c', 'a', 'b'].map((letter) => picture(`img_${letter}`, `${letter}.png`, slideshowIds)))
+      const { board: imported } = await importBoardArchive(asFile(await exportBoardArchive(board.id)))
+      expect((await getBoardAssets(imported.id)).map((asset) => asset.filename)).toEqual(['b.png'])
+    })
+
+    it('keeps every picture when the complete collection is asked for', async () => {
+      const { board, slideshowIds } = await storedBoard(1)
+      await saveBoardAssets(board.id, ['a', 'b', 'c'].map((letter) => picture(`img_${letter}`, `${letter}.png`, slideshowIds)))
+      expect(await exportedPictureCount(board.id, { scope: 'all' })).toBe(3)
+    })
+
+    it("never trims a viewer's own pictures, which have no credit and exist nowhere else", async () => {
+      const { board, slideshowIds } = await storedBoard(1)
+      await saveBoardAssets(board.id, ['a', 'b', 'c'].map((letter) => picture(`own_${letter}`, `${letter}.png`, slideshowIds, null)))
+      expect(await exportedPictureCount(board.id)).toBe(3)
+    })
+
+    it('leaves a panel alone when only some of its pictures are credited', async () => {
+      const { board, slideshowIds } = await storedBoard(1)
+      await saveBoardAssets(board.id, [
+        picture('img_a', 'a.png', slideshowIds),
+        picture('own_b', 'b.png', slideshowIds, null),
+      ])
+      expect(await exportedPictureCount(board.id)).toBe(2)
+    })
+
+    it('keeps a shared picture for every panel that still shows it, and drops the rest', async () => {
+      const { board, slideshowIds } = await storedBoard(2)
+      const [first, second] = slideshowIds
+      await saveBoardAssets(board.id, [
+        picture('img_a', 'a.png', [first, second]),
+        picture('img_b', 'b.png', [first, second]),
+        picture('img_c', 'c.png', [first, second]),
+      ])
+      // Both panels show "b"; the first one's own position would have been "a".
+      const archive = await exportBoardArchive(board.id, { curated: { scope: 'visible', visibleItemIds: { [first]: 'img_b', [second]: 'img_b' } } })
+      const exported = manifest(await archiveEntries(archive))
+      expect(exported.images).toHaveLength(1)
+      expect(exported.images[0].panelIds).toHaveLength(2)
+
+      const { board: imported } = await importBoardArchive(asFile(archive))
+      for (const panel of panelsOf(await getBoard(imported.id)).filter((candidate) => candidate.type === 'slideshow')) {
+        expect((await getBoardAssets(imported.id, panel.id)).map((asset) => asset.filename)).toEqual(['b.png'])
+      }
+    })
+
+    it('gives each panel its own shown picture when they show different ones', async () => {
+      const { board, slideshowIds } = await storedBoard(2)
+      const [first, second] = slideshowIds
+      await saveBoardAssets(board.id, ['a', 'b', 'c'].map((letter) => picture(`img_${letter}`, `${letter}.png`, [first, second])))
+      const archive = await exportBoardArchive(board.id, { curated: { scope: 'visible', visibleItemIds: { [first]: 'img_a', [second]: 'img_c' } } })
+      const { board: imported } = await importBoardArchive(asFile(archive))
+      const importedPanels = panelsOf(await getBoard(imported.id)).filter((panel) => panel.type === 'slideshow')
+      const shown = await Promise.all(importedPanels.map(async (panel) => (await getBoardAssets(imported.id, panel.id)).map((asset) => asset.filename)))
+      expect(shown.sort()).toEqual([['a.png'], ['c.png']])
+    })
+
+    it('still duplicates a board with every picture', async () => {
+      const { board, slideshowIds } = await storedBoard(1)
+      await saveBoardAssets(board.id, ['a', 'b', 'c'].map((letter) => picture(`img_${letter}`, `${letter}.png`, slideshowIds)))
+      const copy = await duplicateBoard(board.id, 'Copy')
+      expect(await getBoardAssets(copy.id)).toHaveLength(3)
+    })
+  })
+
   it('imports an unavailable bundled collection reference without crashing or substituting it', async () => {
     const source = await createBoard('Unavailable sample')
     const entries = await archiveEntries(await exportBoardArchive(source.id))
