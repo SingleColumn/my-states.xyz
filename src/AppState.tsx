@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useMemo, useState } from 'react'
+import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react'
 import { useValue, type Editor, type TLStoreSnapshot } from 'tldraw'
 import type {
   CanvasCamera,
@@ -45,7 +45,12 @@ interface BoardsState {
   remove(boardId: string): Promise<void>
   /** A copy of the active board, named "<name> (copy)" or the next free number, opened once made. Never asks: the name is chosen to already be free. */
   duplicate(): Promise<void>
-  exportActive(): Promise<void>
+  /**
+   * Saves the open board as a file. An Images panel showing an online
+   * collection takes along the one picture it is showing, unless
+   * `wholeCollections` asks for every picture in it.
+   */
+  exportActive(options?: { wholeCollections?: boolean }): Promise<void>
   /**
    * Resolves to a notice worth showing (a theme that came with the archive
    * was renamed), or null. `name`, when given, overrides the archive's own
@@ -104,6 +109,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const slideshow = useSlideshowState(boardCore.activeBoard, panels)
   const spotify = useSpotifyState(boardCore.activeBoard, panels)
   const appearance = useAppearanceState(boardCore.activeBoard)
+  // Read when an export starts, not when the menu is built, so it sees the
+  // picture showing at that moment without rebuilding `boards` on every slide.
+  const slideshowRef = useRef(slideshow)
+  slideshowRef.current = slideshow
+  const panelsRef = useRef(panels)
+  panelsRef.current = panels
 
   const boards = useMemo<BoardsState>(
     () => ({
@@ -139,11 +150,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         await boardCore.refreshSummaries()
         await boardCore.open(duplicated.id)
       }),
-      exportActive: () => boardCore.operation.run(async () => {
+      exportActive: (options) => boardCore.operation.run(async () => {
         await notes.flush()
         if (!boardCore.activeBoard) throw new Error('No board is open.')
         await boardCore.flush()
-        const blob = await exportBoardArchive(boardCore.activeBoard.id)
+        const blob = await exportBoardArchive(boardCore.activeBoard.id, {
+          curated: options?.wholeCollections
+            ? { scope: 'all' }
+            : { scope: 'visible', visibleItemIds: shownCuratedItemIds(slideshowRef.current, panelsRef.current.all) },
+        })
         downloadBoardArchive(blob, boardCore.activeBoard.name)
       }),
       importFile: (file, name) => boardCore.operation.run(async () => {
@@ -192,6 +207,28 @@ export function useAppState() {
   const value = useContext(AppStateContext)
   if (!value) throw new Error('useAppState must be used inside AppStateProvider')
   return value
+}
+
+/**
+ * The online-collection image each Images panel is showing right now, by panel
+ * id (online collections, and stored pictures that may come from an imported
+ * collection). The slideshow's live position is read, because while a show
+ * plays it is not saved to the panel. A panel whose pictures are not loaded is
+ * left out and the export falls back to the position saved on the panel.
+ */
+function shownCuratedItemIds(slideshow: SlideshowState, panels: Panel[]): Record<string, string> {
+  const shown: Record<string, string> = {}
+  for (const panel of panels) {
+    if (panel.type !== 'slideshow') continue
+    const { imageSource } = panel.config
+    if (imageSource.type !== 'curated' && imageSource.type !== 'session-assets') continue
+    const image = slideshow.imagesFor(panel.id)[slideshow.currentIndexFor(panel.id)]
+    if (!image) continue
+    // Online pictures are listed as `curated-<id>` (see createImageItemsFromCuratedCollection);
+    // stored pictures keep their own id.
+    shown[panel.id] = imageSource.type === 'curated' ? image.id.replace(/^curated-/, '') : image.id
+  }
+  return shown
 }
 
 function usePanelsState(activeBoardId: string | null): PanelsState {

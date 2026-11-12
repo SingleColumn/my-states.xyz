@@ -106,6 +106,7 @@ async function buildBoardContent(
   snapshotCurated = false,
   fetcher: typeof fetch = fetch,
   curatedBaseUrl: string | null = configuredImageCollectionsBaseUrl,
+  curatedExport: CuratedExportChoice = { scope: 'visible' },
 ): Promise<{ board: Board; content: ImportedBoardContent }> {
   const [board, notes, assets] = await Promise.all([getBoard(boardId), getNotes(boardId), getBoardAssets(boardId)])
   if (!board) throw new Error('The selected board no longer exists.')
@@ -123,8 +124,14 @@ async function buildBoardContent(
     : panel)
   // Bundled files already ship with the app; inactive local assets are not duplicated.
   let exportedAssets: ImportedBoardContent['assets'] = panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'session-assets') ? assets : []
-  if (snapshotCurated && panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'curated')) {
-    const snapshot = await snapshotCuratedCollections(panels, fetcher, curatedBaseUrl)
+  // Only an export trims; duplicating a board keeps every stored picture.
+  if (snapshotCurated && curatedExport.scope === 'visible') {
+    const trimmed = keepOnlyShownCollectionImages(panels, exportedAssets, curatedExport)
+    panels = trimmed.panels
+    exportedAssets = trimmed.assets
+  }
+  if (snapshotCurated &&panels.some((panel) => panel.type === 'slideshow' && panel.config.imageSource.type === 'curated')) {
+    const snapshot = await snapshotCuratedCollections(panels, fetcher, curatedBaseUrl, curatedExport)
     panels = snapshot.panels
     exportedAssets = [...exportedAssets, ...snapshot.assets]
   }
@@ -141,7 +148,70 @@ async function buildBoardContent(
   return { board, content }
 }
 
-async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch, curatedBaseUrl: string | null) {
+/**
+ * A board imported from an export with complete collections holds its pictures
+ * itself, so its panels no longer point at an online collection. A panel whose
+ * pictures all carry a creator credit is still a collection, and is treated like
+ * one: its export takes only the picture on screen. Pictures from the viewer's
+ * own folder have no credit and always travel whole, since nothing else holds
+ * them. This rests on credit being what tells the two apart; if the app ever
+ * credits a viewer's own pictures, those would be trimmed too.
+ */
+function keepOnlyShownCollectionImages(
+  panels: Panel[],
+  assets: ImportedBoardContent['assets'],
+  choice: CuratedExportChoice,
+): { panels: Panel[]; assets: ImportedBoardContent['assets'] } {
+  // Same rule storage uses to say which panels a stored picture belongs to.
+  const belongsTo = (asset: ImportedBoardContent['assets'][number], panelId: string) =>
+    asset.panelIds?.includes(panelId) || (!asset.panelIds?.length && (!asset.panelId || asset.panelId === panelId))
+  const keptBy = new Map<string, Set<string>>() // picture id -> trimmed panels that still show it
+  const trimmedPanels = new Set<string>()
+  const nextPanels = panels.map((panel): Panel => {
+    if (panel.type !== 'slideshow' || panel.config.imageSource.type !== 'session-assets') return panel
+    const own = assets.filter((asset) => belongsTo(asset, panel.id))
+    if (!own.length || !own.every((asset) => asset.attribution?.creator)) return panel
+    // The slideshow lists its pictures by name, so the saved position counts in that order.
+    const byName = [...own].sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
+    const shown = own.find((asset) => asset.id === choice.visibleItemIds?.[panel.id]) ?? byName[panel.config.currentIndex] ?? byName[0]
+    trimmedPanels.add(panel.id)
+    keptBy.set(shown.id, (keptBy.get(shown.id) ?? new Set()).add(panel.id))
+    return { ...panel, config: { ...panel.config, currentIndex: 0 } }
+  })
+  if (!trimmedPanels.size) return { panels, assets }
+
+  const nextAssets = assets.flatMap((asset) => {
+    const owners = nextPanels.filter((panel) => panel.type === 'slideshow' && belongsTo(asset, panel.id)).map((panel) => panel.id)
+    const trimmedOwners = owners.filter((panelId) => trimmedPanels.has(panelId))
+    // Not part of any trimmed panel (a viewer's own pictures): travels as it was.
+    if (!trimmedOwners.length) return [asset]
+    const stillShownBy = keptBy.get(asset.id)
+    // A shared picture still belongs to every untrimmed panel that used it.
+    const panelIds = [...owners.filter((panelId) => !trimmedPanels.has(panelId)), ...(stillShownBy ?? [])]
+    if (!panelIds.length) return []
+    const { panelId: _single, ...rest } = asset
+    return [{ ...rest, panelIds }]
+  })
+  return { panels: nextPanels, assets: nextAssets }
+}
+
+/**
+ * What an exported Images panel takes along from an online collection.
+ * `visible` is the one picture the panel is showing; `all` is the whole
+ * collection, so the slideshow keeps playing after the board is imported.
+ */
+export interface CuratedExportChoice {
+  scope: 'visible' | 'all'
+  /**
+   * The online-collection image each panel is showing right now, by panel id.
+   * The live position is not always saved to the panel while a show is
+   * playing, so the screen supplies it; a panel missing here falls back to
+   * its saved position.
+   */
+  visibleItemIds?: Record<string, string>
+}
+
+async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch, curatedBaseUrl: string | null, choice: CuratedExportChoice) {
   if (!curatedBaseUrl) {
     throw new Error('This board uses online image collections, but their source is not configured. The export was not created.')
   }
@@ -158,7 +228,7 @@ async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch
     if (!collection) {
       throw new Error(`The image collection "${panel.config.folderName ?? panel.config.imageSource.collectionSlug}" is no longer available, so this board cannot be exported yet.`)
     }
-    for (const item of collection.items) {
+    for (const item of itemsToExport(panel, collection.items, choice)) {
       const existing = portable.get(item.id)
       if (existing) {
         if (!existing.panelIds.includes(panel.id)) existing.panelIds.push(panel.id)
@@ -172,18 +242,14 @@ async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch
         ...panel.config,
         folderName: collection.title,
         imageSource: { type: 'session-assets' },
+        // A single exported picture is position 0; the saved position pointed into the full collection.
+        ...(choice.scope === 'visible' ? { currentIndex: 0 } : {}),
       },
     }
   })
 
-  const assets = await Promise.all([...portable.values()].map(async ({ item, panelIds }) => {
-    let response: Response
-    try {
-      response = await fetcher(item.fileUrl)
-    } catch {
-      throw new Error(`An image from "${item.attribution.creator}" could not be included in the export.`)
-    }
-    if (!response.ok) throw new Error(`An image from "${item.attribution.creator}" could not be included in the export.`)
+  const assets = await mapWithConcurrency([...portable.values()], CURATED_DOWNLOAD_CONCURRENCY, async ({ item, panelIds }) => {
+    const response = await fetchCuratedImage(item, fetcher)
     const bytes = await response.arrayBuffer()
     const blob = new Blob([bytes], { type: item.mimeType })
     return {
@@ -199,20 +265,76 @@ async function snapshotCuratedCollections(panels: Panel[], fetcher: typeof fetch
       attribution: item.attribution,
       blob,
     }
-  }))
+  })
 
   return { panels: snapshotPanels, assets }
 }
 
+function itemsToExport(panel: Panel<'slideshow'>, items: CuratedCollectionItem[], choice: CuratedExportChoice): CuratedCollectionItem[] {
+  if (choice.scope === 'all') return items
+  const shownId = choice.visibleItemIds?.[panel.id]
+  // The saved position can be stale, or point past the end if the collection shrank; the first picture is the last resort.
+  const shown = items.find((item) => item.id === shownId) ?? items[panel.config.currentIndex] ?? items[0]
+  return shown ? [shown] : []
+}
+
+// A handful at a time: a collection can hold dozens of full-size photos, and starting
+// them all at once makes slow connections time out for no benefit.
+const CURATED_DOWNLOAD_CONCURRENCY = 4
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  // Each worker keeps taking the next unstarted item; the first failure rejects the whole
+  // export, and the other workers stop picking up new items because `next` is exhausted.
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await work(items[index])
+    }
+  }
+  try {
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  } catch (error) {
+    next = items.length
+    throw error
+  }
+  return results
+}
+
+// Why a plain download can fail even though the image site is set up correctly: the slideshow
+// shows images through an <img> tag, which sends no Origin header, so the browser keeps a copy
+// of the file without the cross-site permission header, for up to a year. A later download from
+// the app then reuses that stored copy and the browser blocks it. Asking the network again
+// (`cache: 'reload'`) gets a fresh copy that carries the header, and refreshes the stored one.
+async function fetchCuratedImage(item: CuratedCollectionItem, fetcher: typeof fetch): Promise<Response> {
+  const creator = item.attribution.creator
+  let response: Response
+  try {
+    try {
+      response = await fetcher(item.fileUrl)
+    } catch {
+      response = await fetcher(item.fileUrl, { cache: 'reload' })
+    }
+  } catch {
+    throw new Error(`An image from "${creator}" could not be downloaded for the export. Check your internet connection and try again. If it keeps happening, an ad blocker or browser extension may be blocking the image site.`)
+  }
+  if (!response.ok) {
+    throw new Error(`An image from "${creator}" could not be downloaded for the export (the image site answered with error ${response.status}). Try again later.`)
+  }
+  return response
+}
+
 export async function exportBoardArchive(
   boardId: string,
-  options: { fetcher?: typeof fetch; curatedBaseUrl?: string | null } = {},
+  options: { fetcher?: typeof fetch; curatedBaseUrl?: string | null; curated?: CuratedExportChoice } = {},
 ) {
   const { board, content } = await buildBoardContent(
     boardId,
     true,
     options.fetcher ?? fetch,
     options.curatedBaseUrl === undefined ? configuredImageCollectionsBaseUrl : options.curatedBaseUrl,
+    options.curated,
   )
   const theme = board.themeId ? await themeForArchive(board.themeId) : undefined
 
