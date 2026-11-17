@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square, Trash2 } from 'lucide-react'
+import { ChevronsDownUp, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
@@ -7,10 +7,11 @@ import { DEFAULT_SLIDESHOW_ZOOM } from '../storage'
 import { useFeaturedImageCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
+import { usePanelSessionState } from '../panelSessionState'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
 import { panelContentProps, panelFrameActionProps } from '../panelSurface'
-import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
+import { notePictureOf, PICTURE_DRAG_TYPE } from './notePicture'
 import { CollectionBrowser, shuffleCollectionOrder } from './CollectionBrowser'
 import { selectImageCollection } from './collectionSelection'
 
@@ -49,15 +50,17 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   const firstImage = panelImages[0]
   const currentImage = panelImages[currentIndex]
   const folderInputRef = useRef<HTMLInputElement | null>(null)
-  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false)
+  // Kept per panel rather than in this copy of it, so they survive a switch
+  // between the canvas and Editor mode (see panelSessionState).
+  const [isImagePickerOpen, setIsImagePickerOpen] = usePanelSessionState(panelId, 'image-picker-open', false)
   const [isViewerOpen, setIsViewerOpen] = useState(false)
-  const [panelView, setPanelView] = useState<'slideshow' | 'browse-collections'>(() => (
+  const [panelView, setPanelView] = usePanelSessionState<'slideshow' | 'browse-collections'>(panelId, 'view', () => (
     panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
   ))
-  const [collectionBrowserMode, setCollectionBrowserMode] = useState<'carousel' | 'grid'>(() => (
+  const [collectionBrowserMode, setCollectionBrowserMode] = usePanelSessionState<'carousel' | 'grid'>(panelId, 'collection-browser-mode', () => (
     panelSettings.imageSource.type === 'none' ? 'grid' : 'carousel'
   ))
-  const [gridCollectionIds, setGridCollectionIds] = useState<string[]>([])
+  const [gridCollectionIds, setGridCollectionIds] = usePanelSessionState<string[]>(panelId, 'grid-order', [])
   const sourceKey = panelSettings.imageSource.type === 'bundled'
     ? `bundled:${panelSettings.imageSource.collectionId}`
     : panelSettings.imageSource.type === 'curated'
@@ -231,44 +234,63 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
         panelId={panelId}
         panelType="slideshow"
         title="Images"
-        menuItems={[
-          {
-            id: 'loaded-images',
-            label: `${isImagePickerOpen ? 'Hide' : 'Show'} loaded images`,
-            icon: <Images size={17} aria-hidden="true" />,
-            checked: isImagePickerOpen,
-            onSelect: () => setIsImagePickerOpen((current) => !current),
-          },
+        // SPIKE: grouped like the Writing menu -- where the pictures come
+        // from, how they are shown, then the panel (focus view joins the
+        // Panel group, beside the other sizes) -- with the remove last in its group.
+        menuSections={[{ heading: 'Pictures', items: [
           { id: 'choose-folder', label: 'Choose a local folder', icon: <FolderOpen size={17} aria-hidden="true" />, onSelect: () => void chooseFolder() },
-          {
-            id: 'collection-view',
-            label: isBrowsingCollections && collectionBrowserMode === 'grid' ? 'Show collection carousel' : 'Show collection grid',
-            icon: <LayoutGrid size={17} aria-hidden="true" />,
-            onSelect: () => {
-              if (isBrowsingCollections && collectionBrowserMode === 'grid') {
-                setIsImagePickerOpen(false)
-                setCollectionBrowserMode('carousel')
-                setPanelView('browse-collections')
-                return
-              }
-              showCollectionGrid()
-            },
-          },
           // Only a local folder has anything stored to remove. Clearing an online
           // collection would just forget it, which browsing the collections already does.
           ...(panelSettings.imageSource.type === 'session-assets'
             ? [{ id: 'clear', label: 'Remove local images', icon: <Trash2 size={17} aria-hidden="true" />, destructive: true, onSelect: () => void slideshow.resetFolder(panelId) }]
             : []),
+        ] }, { heading: 'View', items: [
+          {
+            id: 'loaded-images',
+            label: 'Show loaded images',
+            icon: <Images size={17} aria-hidden="true" />,
+            checked: isImagePickerOpen,
+            onSelect: () => setIsImagePickerOpen((current) => !current),
+          },
+          {
+            id: 'collection-view',
+            kind: 'choices',
+            label: 'Browse collections as',
+            icon: <LayoutGrid size={17} aria-hidden="true" />,
+            // Either one opens the collections, so it closes the menu to show them.
+            closeOnSelect: true,
+            options: [
+              {
+                id: 'carousel',
+                label: 'Show collection carousel',
+                content: 'Carousel',
+                checked: isBrowsingCollections && collectionBrowserMode === 'carousel',
+                onSelect: () => {
+                  setIsImagePickerOpen(false)
+                  setCollectionBrowserMode('carousel')
+                  setPanelView('browse-collections')
+                },
+              },
+              {
+                id: 'grid',
+                label: 'Show collection grid',
+                content: 'Grid',
+                checked: isBrowsingCollections && collectionBrowserMode === 'grid',
+                onSelect: () => showCollectionGrid(),
+              },
+            ],
+          },
           {
             id: 'focus-view',
-            label: focusView ? 'Expand panel to full view' : 'Adjust panel to focus view',
-            icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
+            label: 'Focus view',
+            icon: <ChevronsDownUp size={17} aria-hidden="true" />,
+            checked: focusView,
             // Focus view is the picture on its own; with the collection browser open there is no picture,
             // and the header that holds the way back is hidden, so it is not offered.
             disabled: isBrowsingCollections && !focusView,
             onSelect: () => commands.togglePanelFocusView(panelId),
           },
-        ]}
+        ] }]}
       >
         {isImagePickerOpen ? (
           <section className="slideshow-image-picker" id="loaded-images-picker" aria-label="Loaded images" {...panelContentProps}>
@@ -301,6 +323,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
               ? panelSettings.imageSource.collectionId
               : panelSettings.imageSource.type === 'curated' ? panelSettings.imageSource.collectionSlug : undefined}
             viewMode={collectionBrowserMode}
+            stateScope={panelId}
             onSelectCollection={(collectionId) => void chooseCollection(collectionId)}
             onRetry={collectionSource.retry}
           />
@@ -344,22 +367,25 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             <button className="card-icon-button" type="button" title="Next image" aria-label="Next image" onClick={() => slideshow.next(panelId)}><SkipForward size={18} /></button>
             <button className="card-icon-button" type="button" title="Stop" aria-label="Stop slideshow" onClick={() => slideshow.stop(panelId)}><Square size={16} /></button>
             <button className={`card-icon-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={18} /></button>
-            {/* The handle a note takes this panel by. The picture itself is
+            {/* The handle a note takes this picture by. The picture itself is
                 not draggable (see CrossfadeImage), and the controls box above
-                cancels native drags, so the handle stops the event there. */}
+                cancels native drags, so the handle stops the event there. The
+                note keeps the picture, not a link back to this panel (see
+                notePicture.ts). */}
             {currentImage && panel ? (
               <span
                 className="card-icon-button slideshow-drag-handle"
                 role="img"
                 draggable
-                title="Drag into a note to embed this image"
-                aria-label="Drag into a note to embed this image"
+                title="Drag into a note to place this picture there"
+                aria-label="Drag into a note to place this picture there"
                 onDragStart={(event) => {
                   event.stopPropagation()
                   event.dataTransfer.effectAllowed = 'copy'
-                  event.dataTransfer.setData(PANEL_DRAG_TYPE, JSON.stringify({ panelId, imageId: currentImage.id, title: embedTitleFor(panel, currentImage.name) }))
-                  // Plain text too, so a drop anywhere else gets the title.
-                  event.dataTransfer.setData('text/plain', embedTitleFor(panel, currentImage.name))
+                  const picture = notePictureOf(currentImage)
+                  event.dataTransfer.setData(PICTURE_DRAG_TYPE, JSON.stringify(picture))
+                  // Plain text too, so a drop anywhere else gets the picture's name.
+                  event.dataTransfer.setData('text/plain', picture.alt)
                 }}
               >
                 <GripVertical size={18} />

@@ -351,6 +351,70 @@
   color: var(--accent);
 }
 
+/* SPIKE: a group's name, quieter than the actions under it, so it reads as
+   a label for them and not as one more thing to click. */
+.card-header-menu-heading {
+  padding: var(--space-detail-1) var(--space-menu-item-padding-x) 0;
+  color: var(--color-text-soft);
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* SPIKE: one setting and its values. The name sits on its own line, laid
+   out like a menu line so the icon and name line up with the actions above,
+   and the values are a row of buttons under it, sharing the width. */
+.card-header-menu-choices {
+  display: grid;
+  gap: var(--space-detail-1);
+  padding: var(--space-detail-1) var(--space-menu-item-padding-x) var(--space-detail-2);
+}
+
+.card-header-menu-choices-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: calc(var(--size-menu-item-height) - 8px);
+}
+
+.card-header-menu-options {
+  display: flex;
+  gap: var(--space-detail-2);
+}
+
+/* Each value has an edge of its own, well clear of the faint divider colour:
+   a menu line has no edge, so a button in one has to show that it is one.
+   The chosen value is told apart by a full-strength edge, a filled
+   background and bold type, not by colour alone (the theme's accent is the
+   same pale colour as its text). */
+.card-header-menu .card-header-menu-options button {
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 44px;
+  min-height: calc(var(--size-menu-item-height) - 6px);
+  padding: 0 var(--space-detail-2);
+  border: 1px solid color-mix(in srgb, var(--color-control-border-hover) 55%, transparent);
+  background: transparent;
+  text-align: center;
+}
+
+.card-header-menu .card-header-menu-options button:hover:not(:disabled) {
+  border-color: var(--color-control-border-hover);
+  background: var(--card-button-bg-hover);
+}
+
+.card-header-menu .card-header-menu-options button.is-checked {
+  border-color: var(--color-control-border-hover);
+  background: color-mix(in srgb, var(--color-control-border-hover) 22%, transparent);
+  font-weight: 700;
+}
+
+.card-header-menu .card-header-menu-options button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
 .app-chrome-panel-add-control {
   width: 112px;
   padding-right: var(--space-detail-2);
@@ -631,4 +695,13 @@ input[type="range"]:focus-visible {
 .app-chrome svg,
 .help-about-dialog svg {
   stroke-width: var(--icon-stroke-width);
+}
+
+/* SPIKE: where panel menus on the canvas are drawn, above every panel, so
+   no panel's frame cuts one off. Only the menus take presses. */
+.canvas-menu-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
 }

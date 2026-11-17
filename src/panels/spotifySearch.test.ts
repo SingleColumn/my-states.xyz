@@ -159,7 +159,7 @@ function mountAnonymousPanel(overrides: Record<string, unknown> = {}, options: {
 /** What the search looks for is a setting in the panel's ··· menu, not a control in the body. */
 function chooseSearchType(type: 'playlists' | 'tracks') {
   fireEvent.click(screen.getByLabelText('Music panel actions'))
-  fireEvent.click(screen.getByText(type === 'tracks' ? 'Search for songs' : 'Search for playlists'))
+  fireEvent.click(screen.getByRole('menuitemradio', { name: type === 'tracks' ? 'Search for songs' : 'Search for playlists' }))
 }
 
 function typeSearch(text: string) {
@@ -694,8 +694,8 @@ describe('Music panel before Spotify is connected', () => {
     expect(document.querySelector('.panel-body select')).toBeNull()
 
     fireEvent.click(screen.getByLabelText('Music panel actions'))
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Search for playlists' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('menuitemradio', { name: 'Search for playlists' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('menuitemradio', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('false')
   })
 
   it('switches what the field searches for from the menu, and says so in the field', () => {
@@ -707,7 +707,7 @@ describe('Music panel before Spotify is connected', () => {
     expect(screen.queryByLabelText('Search playlists')).toBeNull()
 
     fireEvent.click(screen.getByLabelText('Music panel actions'))
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('menuitemradio', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('true')
   })
 
   // The glow follows a click, not a state. A playlist saved in the board days

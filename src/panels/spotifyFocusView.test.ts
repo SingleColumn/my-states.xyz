@@ -145,15 +145,16 @@ describe('Music panel focus view', () => {
     expect(full.indexOf('Search playlists')).toBeGreaterThan(full.indexOf('panel-body'))
   })
 
-  it('offers the focus view toggle from the panel header, before the hide button', () => {
+  it('offers focus view in the panel group, right after Hide panel, with the same name on or off', () => {
     const markup = renderMusicPanel(false)
-    expect(markup.indexOf('Reduce panel to focus view')).toBeLessThan(markup.indexOf('Hide panel'))
-    expect(renderMusicPanel(true)).toContain('Expand panel to full view')
+    expect(markup.indexOf('>Hide panel<')).toBeLessThan(markup.indexOf('>Focus view<'))
+    expect(markup.indexOf('>Focus view<')).toBeLessThan(markup.indexOf('>Expand panel to full screen<'))
+    expect(renderMusicPanel(true)).toContain('>Focus view<')
   })
 
   it('puts Log out last in the header menu, after every shared panel control', () => {
     const markup = renderMusicPanel(false)
-    expect(markup.indexOf('>Reduce panel to focus view<')).toBeLessThan(markup.indexOf('>Log out<'))
+    expect(markup.indexOf('>Focus view<')).toBeLessThan(markup.indexOf('>Log out<'))
     expect(markup.indexOf('>Hide panel<')).toBeLessThan(markup.indexOf('>Log out<'))
     expect(markup.indexOf('>Expand panel to full screen<')).toBeLessThan(markup.indexOf('>Log out<'))
     expect(markup.indexOf('>Restore panel to default size<')).toBeLessThan(markup.indexOf('>Log out<'))

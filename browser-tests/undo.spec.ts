@@ -165,7 +165,7 @@ test.describe('focus view and undo', () => {
     const moved = geometryOf(await panelById(page, images.panelId))
     expect(moved).not.toEqual(geometryOf(images))
 
-    await choosePanelMenuItem(await shapeOf(page, images.panelId), 'Adjust panel to focus view')
+    await choosePanelMenuItem(await shapeOf(page, images.panelId), 'Focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
 
     // No click on the canvas first: tldraw counts clearing a selection as a step

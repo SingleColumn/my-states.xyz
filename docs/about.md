@@ -47,7 +47,7 @@ Select **New note** in the header, or **Create new note** in the **Choose a note
 
 There is no formatting toolbar: the page stays quiet. Right-click in the note for a small bar with bold, italic, code and link, which acts on whatever is selected. It is asked for rather than offered, so selecting a phrase to re-read it never puts buttons over the words. Cut, copy and paste keep their usual keys: Ctrl+X, Ctrl+C and Ctrl+V. Type `/` at the start of a line (or after a space) for a menu of things to add: headings, a quote, lists, a divider, or the picture the Images panel is showing; keep typing to narrow the list, use the arrow keys and Enter to choose, or Esc to dismiss it. Markdown shortcuts work too: `#` for a heading, `-` for a list, `>` for a quote, `**bold**` and `*italic*`. To open a link in a note, hold **Ctrl** or **Shift** and select it: the pointer changes shape while you hold the key, to show which words will open. A plain click puts the cursor in the link instead, so you can change its words. The header menu offers four text sizes, from **Small** to **Extra large**; the choice is remembered.
 
-A note can also hold a live view of another panel. Drag the grip at the right of the Images panel's playback controls into a note and an embed appears there showing what that panel is showing, and following it as it changes. It starts as a poster; select **Show** to see it. If the panel is later removed, the embed says so. In the note's Markdown the embed is a single link line, so it travels with an exported board.
+A note can also hold pictures from the Images panel. Drag the grip at the right of the Images panel's playback controls into a note, and the picture showing appears there. The note keeps the picture itself, so it stays when the Images panel moves on to another collection or is removed. A picture from an online or sample collection is kept by its web address; a picture from your own folder is copied into the note, and made smaller first if it is very large. In the note's Markdown it is an ordinary picture, so it travels with an exported board and other Markdown tools can show it.
 
 **Expand panel to full screen** turns the Writing panel into a writing page: the form controls step aside, the title sits above the text, and the footer counts words instead of characters. **Restore previous panel size** brings the panel view back.
 
@@ -57,25 +57,25 @@ Use **Save markdown file** to download the current note as a `.md` file, and **D
 
 An empty Images panel browses the available image collections one cover at a time. Use the arrows to browse, or wait for the cover to change, then select the cover or **Use this collection**. To load supported images from your computer instead, open the panel menu (**···**) and select **Choose a local folder**. Where the browser cannot open a folder directly, the file picker is used instead.
 
-The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and, when the images come from a local folder, **Remove local images**, which removes them from the panel. **Show collection grid** displays six collections at a time so you can choose one directly, with page controls when more are available, and **Show collection carousel** shows them one at a time. Opening either leaves the current images in place until you make a new choice.
+The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and, when the images come from a local folder, **Remove local images**, which removes them from the panel. In the **Browse collections as** row, **Grid** displays six collections at a time so you can choose one directly, with page controls when more are available, and **Carousel** shows them one at a time. Opening either leaves the current images in place until you make a new choice.
 
 Below the picture, use **Previous image**, **Start slideshow** (which becomes **Pause slideshow**), **Next image**, **Stop slideshow** and **Shuffle images** to control the slideshow. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
 
 Every picture in a collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.
 
-To look at the pictures on their own, select **Adjust panel to focus view** in the header. The panel keeps its size and shows only the picture, with every control hidden, including the header. Click the picture to pause or resume the slideshow, and press **Esc** to bring the controls back; the panel reminds you of both whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
+To look at the pictures on their own, select **Focus view** in the panel menu. The panel keeps its size and shows only the picture, with every control hidden, including the header. Click the picture to pause or resume the slideshow, and press **Esc** to bring the controls back; the panel reminds you of both whenever the pointer is over it. While in focus view, drag the picture itself to move the panel.
 
 ## Music panel
 
 Search Spotify for playlists or songs straight away: no Spotify account is needed to look, and the panel also suggests a few playlists to start from. Select a result or a suggestion to choose it. Playing it is the step that needs Spotify, so select **Connect Spotify** and you are brought back to what you chose. Once connected you can also paste a Spotify playlist URL or URI and load it, and use the previous, play/pause, next, seek, and volume controls while a track is playing. **Reset fields** clears the search and URL fields. Spotify playback requires an eligible Spotify Premium account. Select **Log out** to disconnect.
 
-The panel shows the playlist that is loaded, with its cover. To keep only the playlist, the current track, and the playback controls while you work elsewhere, select **Reduce panel to focus view** in the panel header; the panel becomes smaller and stays that way until you select **Expand panel to full view** in the same place.
+The panel shows the playlist that is loaded, with its cover. To keep only the playlist, the current track, and the playback controls while you work elsewhere, select **Focus view** in the panel menu; the panel becomes smaller and stays that way until you select **Focus view** again.
 
 ## Video panel
 
 Add a Video panel and use **Choose video** to select from the public Instagram posts and Reels curated by the application owner. The list is part of the deployed application; it does not accept pasted links or arbitrary web addresses. Each Video panel remembers its own selection, so several Video panels can show different catalogue entries.
 
-Instagram supplies the player and its controls. Selecting a video loads Instagram's official embed and therefore makes a request to Instagram. Public posts can still fail to appear when they have been deleted, made private, age-restricted, or had embedding disabled. When the embed cannot load, use **Open on Instagram** if it is available. **Adjust panel to focus view** hides the selector while retaining the selected video.
+Instagram supplies the player and its controls. Selecting a video loads Instagram's official embed and therefore makes a request to Instagram. Public posts can still fail to appear when they have been deleted, made private, age-restricted, or had embedding disabled. When the embed cannot load, use **Open on Instagram** if it is available. **Focus view** hides the selector while retaining the selected video.
 
 ## Themes
 

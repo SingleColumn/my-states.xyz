@@ -2,14 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import {
   ChevronsDownUp,
-  ChevronsUpDown,
   Disc3,
   ExternalLink,
   Link2,
-  ListMusic,
   LogIn,
   LogOut,
-  Music,
   Pause,
   Play,
   RotateCcw,
@@ -31,6 +28,7 @@ import { getSessionSuggestions, shuffleSessionSuggestions } from '../spotifySugg
 import { forgetReturnContext, rememberReturnContext, takeReturnContext, type SpotifyReturnContext } from '../spotifyReturnContext'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
+import { usePanelSessionState } from '../panelSessionState'
 import { musicPanelView, type MusicSearchState } from './musicPanelView'
 import { panelContentProps } from '../panelSurface'
 
@@ -59,17 +57,20 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // needs: searching and choosing happen either way, and this flag marks the
   // boundary between the two rather than the door into the panel.
   const connected = Boolean(spotify.tokens)
-  const [query, setQuery] = useState('')
+  // The choices below are kept per panel rather than in this copy of it, so
+  // they survive a switch between the canvas and Editor mode (see
+  // panelSessionState).
+  const [query, setQuery] = usePanelSessionState(panelId, 'query', '')
   // A playlist is what this panel is for: it plays behind the images for as
   // long as someone is looking at them, where a single song stops after three
   // minutes. Songs stay available, but finding a playlist is the default step.
-  const [searchType, setSearchType] = useState<SpotifySearchType>('playlists')
-  const [playlistUrl, setPlaylistUrl] = useState(panelPlaylist.url ?? '')
-  const [isLinkFieldOpen, setIsLinkFieldOpen] = useState(false)
+  const [searchType, setSearchType] = usePanelSessionState<SpotifySearchType>(panelId, 'search-type', 'playlists')
+  const [playlistUrl, setPlaylistUrl] = usePanelSessionState(panelId, 'playlist-url', panelPlaylist.url ?? '')
+  const [isLinkFieldOpen, setIsLinkFieldOpen] = usePanelSessionState(panelId, 'link-field-open', false)
   // Putting the search away is what brings the artwork out: the panel shows
   // one or the other, never both, and the choice is the person's to make.
-  const [searchCollapsed, setSearchCollapsed] = useState(false)
-  const [volume, setVolume] = useState(70)
+  const [searchCollapsed, setSearchCollapsed] = usePanelSessionState(panelId, 'search-collapsed', false)
+  const [volume, setVolume] = usePanelSessionState(panelId, 'volume', 70)
   const [busy, setBusy] = useState(false)
   // Distinct from `busy`, which any action sets: this one says a search is
   // owed an answer, so the list can wait instead of reporting no matches.
@@ -546,36 +547,29 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         panelId={panelId}
         panelType="spotify"
         title="Music"
-        menuItems={[
-          // Pasting a link is how someone plays a playlist they already have
-          // in hand, which is a rarer thing to arrive wanting than searching
-          // for one. It waits here so the body holds a single way in.
+        // SPIKE: grouped like the Writing menu -- finding music, how the panel
+        // looks, the panel itself (focus view joins it, beside the other
+        // sizes), and the Spotify account last.
+        menuSections={[{ heading: 'Find music', items: [
           // What the search looks for is a setting, not something to decide on
           // every visit, so it lives here and the field gets the whole row. The
           // field's own placeholder says which is on.
-          ...(!searchHidden ? [
-            {
-              id: 'search-playlists',
-              label: 'Search for playlists',
-              icon: <ListMusic size={17} aria-hidden="true" />,
-              checked: searchType === 'playlists',
-              onSelect: () => setSearchType('playlists'),
-            },
-            {
-              id: 'search-songs',
-              label: 'Search for songs',
-              icon: <Music size={17} aria-hidden="true" />,
-              checked: searchType === 'tracks',
-              onSelect: () => setSearchType('tracks'),
-            },
-          ] : []),
-          ...(connected && !focusView ? [{
-            id: 'search-visibility',
-            label: searchCollapsed ? 'Show the search' : 'Hide the search and show the artwork',
-            icon: searchCollapsed ? <Search size={17} aria-hidden="true" /> : <Disc3 size={17} aria-hidden="true" />,
-            checked: searchCollapsed,
-            onSelect: () => setSearchCollapsed((current) => !current),
+          ...(!searchHidden ? [{
+            id: 'search-type',
+            kind: 'choices' as const,
+            label: 'Search for',
+            icon: <Search size={17} aria-hidden="true" />,
+            // The field below says what it now searches, so there is nothing
+            // to compare with the menu open.
+            closeOnSelect: true,
+            options: [
+              { id: 'playlists', label: 'Search for playlists', content: 'Playlists', checked: searchType === 'playlists', onSelect: () => setSearchType('playlists') },
+              { id: 'songs', label: 'Search for songs', content: 'Songs', checked: searchType === 'tracks', onSelect: () => setSearchType('tracks') },
+            ],
           }] : []),
+          // Pasting a link is how someone plays a playlist they already have
+          // in hand, which is a rarer thing to arrive wanting than searching
+          // for one. It waits here so the body holds a single way in.
           ...(connected && !focusView ? [{
             id: 'playlist-link',
             label: 'Play from a Spotify link',
@@ -583,13 +577,25 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             checked: linkFieldOpen,
             onSelect: () => setIsLinkFieldOpen((current) => !current),
           }] : []),
+        ] }, { heading: 'View', items: [
+          // One name whether on or off, with a tick for on, so it is in the
+          // same place under the same words every time it is looked for.
+          ...(connected && !focusView ? [{
+            id: 'search-visibility',
+            label: 'Show the search',
+            icon: <Disc3 size={17} aria-hidden="true" />,
+            checked: !searchCollapsed,
+            onSelect: () => setSearchCollapsed((current) => !current),
+          }] : []),
           {
             id: 'focus-view',
-            label: focusView ? 'Expand panel to full view' : 'Reduce panel to focus view',
-            icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
+            label: 'Focus view',
+            icon: <ChevronsDownUp size={17} aria-hidden="true" />,
+            checked: focusView,
             onSelect: () => commands.togglePanelFocusView(panelId),
           },
-        ]}
+        ] }]}
+        trailingMenuHeading="Spotify"
         trailingMenuItems={connected ? [
           { id: 'log-out', label: 'Log out', icon: <LogOut size={17} aria-hidden="true" />, onSelect: () => spotify.logout() },
         ] : undefined}

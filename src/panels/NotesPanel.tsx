@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
-import { CopyPlus, Download, FilePlus2, FileUp, Minus, Plus, Ruler, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Minus, PenLine, Plus, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { markdownNamedAsCopy } from '../noteTitle'
@@ -17,6 +17,29 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // chrome and becomes a page. The default panel size is deliberately left
   // untouched so the two treatments can be compared side by side.
   const isWritingMode = commands.isPanelFullScreen(panelId)
+  // Editor mode draws this panel's header as a page, and has no panel size to
+  // work its sizes out from. So the header, while it is drawn on the canvas,
+  // leaves its own sizes on the page for Editor mode to reuse (spike.css).
+  useEffect(() => {
+    const header = sectionRef.current?.querySelector<HTMLElement>('.card-header')
+    if (isWritingMode || !header) return
+    const publish = () => {
+      const title = header.querySelector<HTMLElement>('.card-title')
+      const button = header.querySelector<HTMLElement>('.card-icon-button')
+      if (!title || !button) return
+      const root = document.documentElement.style
+      root.setProperty('--spike-header-title-size', getComputedStyle(title).fontSize)
+      root.setProperty('--spike-header-padding', getComputedStyle(header).paddingTop)
+      root.setProperty('--spike-header-button-size', `${button.offsetWidth}px`)
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(header)
+    // A change of text size or theme resizes the title before the header.
+    const title = header.querySelector('.card-title')
+    if (title) observer.observe(title)
+    return () => observer.disconnect()
+  }, [isWritingMode])
   const [fontSize, setFontSize] = useState(() => readEditorFontSize())
   const [paperWidth, setPaperWidth] = useState(() => readPaperWidth())
   const [showTools, setShowTools] = useState(() => readShowTools())
@@ -29,6 +52,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
   const toolbarHostRef = useRef<HTMLDivElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const writingMilestonesRef = useRef({ noteId: null as string | null, started: false, fiftyWords: false, twoHundredWords: false })
   const wasInWritingModeRef = useRef(isWritingMode)
 
@@ -149,26 +173,15 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   ) : null
 
   return (
-    <section className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}${momentView && !activeNote ? ' is-moment-empty' : ''}`}>
+    <section ref={sectionRef} className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}${momentView && !activeNote ? ' is-moment-empty' : ''}`}>
       <PanelHeader
         panelId={panelId}
         panelType="notes"
         title="Writing"
-        menuItems={[
-          {
-            id: 'formatting-tools',
-            label: 'Show formatting tools',
-            icon: <Type size={17} aria-hidden="true" />,
-            checked: showTools,
-            onSelect: () => {
-              setShowTools(!showTools)
-              try {
-                window.localStorage.setItem(showToolsStorageKey, String(!showTools))
-              } catch {
-                // The choice still holds for this session.
-              }
-            },
-          },
+        // SPIKE: grouped by what each action is about -- the note, how it
+        // looks, then the panel -- and each group's delete is its last line,
+        // so the two deletes are never next to each other.
+        menuSections={[{ heading: 'Note', items: [
           { id: 'new-note', label: 'New note', icon: <FilePlus2 size={17} aria-hidden="true" />, onSelect: () => { void notes.createNote(panelId).catch(() => {}) } },
           {
             id: 'open-markdown',
@@ -201,29 +214,56 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               if (confirmed) void notes.deleteNote(activeNote.id, panelId).catch(() => {})
             },
           },
-        ]}
-        trailingMenuItems={[
-          ...Object.entries(editorFontSizes).map(([size, { label }]) => ({
-            id: `text-size-${size}`,
-            label,
+        ] }, { heading: 'View', items: [
+          {
+            id: 'formatting-tools',
+            label: 'Show formatting tools',
+            icon: <PenLine size={17} aria-hidden="true" />,
+            checked: showTools,
+            onSelect: () => {
+              setShowTools(!showTools)
+              try {
+                window.localStorage.setItem(showToolsStorageKey, String(!showTools))
+              } catch {
+                // The choice still holds for this session.
+              }
+            },
+          },
+          {
+            id: 'text-size',
+            kind: 'choices',
+            label: 'Text size',
             icon: <Type size={17} aria-hidden="true" />,
-            checked: size === fontSize,
-            onSelect: () => {
-              setFontSize(size as EditorFontSize)
-              window.localStorage.setItem(editorFontSizeStorageKey, size)
-            },
-          })),
-          ...Object.entries(paperWidths).map(([width, { label }]) => ({
-            id: `paper-width-${width}`,
-            label: `Paper: ${label}`,
+            // Each value is shown as a letter at that size, which says what
+            // the setting does without a word for each size.
+            options: Object.entries(editorFontSizes).map(([size, { label, fontSize: px }]) => ({
+              id: `text-size-${size}`,
+              label,
+              content: <span style={{ fontSize: `${parseFloat(px) / parseFloat(editorFontSizes.medium.fontSize)}em`, lineHeight: 1 }}>A</span>,
+              checked: size === fontSize,
+              onSelect: () => {
+                setFontSize(size as EditorFontSize)
+                window.localStorage.setItem(editorFontSizeStorageKey, size)
+              },
+            })),
+          },
+          {
+            id: 'paper-width',
+            kind: 'choices',
+            label: 'Paper',
             icon: <Ruler size={17} aria-hidden="true" />,
-            checked: width === paperWidth,
-            onSelect: () => {
-              setPaperWidth(width as PaperWidth)
-              window.localStorage.setItem(paperWidthStorageKey, width)
-            },
-          })),
-        ]}
+            options: Object.entries(paperWidths).map(([width, { label }]) => ({
+              id: `paper-width-${width}`,
+              label: `Paper: ${label}`,
+              content: label,
+              checked: width === paperWidth,
+              onSelect: () => {
+                setPaperWidth(width as PaperWidth)
+                window.localStorage.setItem(paperWidthStorageKey, width)
+              },
+            })),
+          },
+        ] }]}
       >
         {isWritingMode ? (
           <div className="notes-zoom-control" role="group" aria-label="Zoom">

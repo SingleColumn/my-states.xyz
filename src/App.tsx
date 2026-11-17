@@ -26,6 +26,12 @@ import { WelcomeCard } from './WelcomeCard'
 import { isWelcomeHidden, setWelcomeHidden } from './welcomePreference'
 import { AppSettings } from './AppSettings'
 import { WordGraphProvider } from './wordGraph/WordGraphController'
+import { SpikeEditorLayer } from './spike/SpikeEditorLayer'
+import { isSpikeS1On, spikeState } from './spike/spikeFlag'
+import './spike/spike.css'
+
+// SPIKE: hides the canvas layer while Editor mode is on at load; spikeState.set keeps it in step afterwards.
+if (isSpikeS1On) document.documentElement.setAttribute('data-spike-s1', '')
 import { ThemeCredit } from './ThemeCredit'
 import type { Board, PanelLayout, PanelType } from './types'
 
@@ -54,6 +60,8 @@ export default function App() {
 }
 
 function AppContent() {
+  // SPIKE: where panel menus on the canvas are drawn (see the layer below).
+  const [canvasMenuLayer, setCanvasMenuLayer] = useState<HTMLDivElement | null>(null)
   const posthog = usePostHog()
   const appState = useAppState()
   const { spotify, boards, panels, appearance } = appState
@@ -326,6 +334,8 @@ function AppContent() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Delete' && event.key !== 'Backspace') return
       if (isTextInputTarget(event.target)) return
+      // SPIKE S2: with the canvas hidden, a key must not delete panels the user cannot see.
+      if (spikeState.get().editorMode && spikeState.get().guards) return
       const selectedShapeIds = editor.getSelectedShapeIds()
       if (!selectedShapeIds.length) return
       event.preventDefault()
@@ -775,6 +785,8 @@ function AppContent() {
       MenuPanel: AppChromeMenuPanel,
       TopPanel: null,
       ContextMenu: CanvasContextMenu,
+      // SPIKE S1
+      InFrontOfTheCanvas: SpikeEditorLayer,
     }),
     [],
   )
@@ -790,7 +802,7 @@ function AppContent() {
       data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
       style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
     >
-      <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId }}>
+      <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId, menuLayer: canvasMenuLayer }}>
         <AppChromePropsProvider value={appChromeProps}>
           <MomentViewProvider value={momentView.isOn}>
             <WordGraphProvider boardId={boards.activeBoard.id}>
@@ -806,6 +818,11 @@ function AppContent() {
           </MomentViewProvider>
         </AppChromePropsProvider>
       </PanelCommandsProvider>
+      {/* SPIKE: panel menus on the canvas are drawn here, over the canvas,
+          not inside their panel: every panel's frame clips what is in it,
+          so a menu longer than a short panel (Music on a new board) lost
+          its last lines. Editor mode does the same with a layer of its own. */}
+      <div ref={setCanvasMenuLayer} className="canvas-menu-layer" />
       {momentView.isOn ? <p className="moment-view-hint" role="status">Take your screenshot, then press <kbd>Esc</kbd> to go back</p> : null}
       <ThemeCredit url={appearance.effective.definition.inspiredBy} fullScreen={Boolean(fullScreenPanelId)} />
       {displayedArchitectureReport ? <PanelArchitectureReportView report={displayedArchitectureReport} onClose={() => setArchitectureReport(null)} /> : null}

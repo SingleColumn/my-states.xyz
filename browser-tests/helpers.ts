@@ -181,14 +181,14 @@ export async function selectPanel(page: Page, panelId: string) {
  * keeps exactly one button whose accessible name ends "panel actions", so
  * the caller does not need the panel's own title to find it.
  *
- * An item is `menuitem` or `menuitemcheckbox` depending on whether
+ * An item is `menuitem`, `menuitemcheckbox` or, in a row of choices, `menuitemradio`, depending on whether
  * PanelHeader was given a `checked` value for it (see PanelHeader.tsx), and
  * a caller of this helper has no reason to know which -- so both are tried.
  */
 export async function choosePanelMenuItem(shape: Locator, itemName: string | RegExp) {
   await shape.getByRole('button', { name: /panel actions$/ }).click()
   const page = shape.page()
-  await page.getByRole('menuitem', { name: itemName }).or(page.getByRole('menuitemcheckbox', { name: itemName })).click()
+  await page.getByRole('menuitem', { name: itemName }).or(page.getByRole('menuitemcheckbox', { name: itemName })).or(page.getByRole('menuitemradio', { name: itemName })).click()
 }
 
 /** The editable body of a Notes panel (MDXEditor renders a same-classed placeholder beside it). */

@@ -20,6 +20,7 @@ import { markPointerEventHandled } from '../panelSurface'
 import type { ImageItem } from '../types'
 import { useNotesEditorActions } from './notesEditorActions'
 import { noteEmoji } from './notesEmoji'
+import { notePictureOf, settleNotePicture } from './notePicture'
 
 /**
  * The insert menu: type `/` at the start of a line or after a space and a
@@ -354,11 +355,17 @@ function buildItems(image: ImageItem | null, browsingEmoji: MutableRefObject<boo
       label: 'Picture from the Images panel',
       keywords: 'image photo picture',
       icon: <ImageIcon size={16} />,
-      // A folder picture is an object URL that dies with the page; until
-      // notes can hold a stable reference to a local image, only pictures
-      // with a lasting address (the sample collections) can be placed.
-      disabled: !image ? 'No picture is showing' : image.urlKind !== 'static' ? 'Sample collections only, for now' : undefined,
-      run: (ctx) => { if (image) ctx.get(commandsCtx).call(insertImageCommand.key, { src: image.url, alt: image.name, title: '' }) },
+      // The note keeps the picture itself, as a drag from the panel does: a
+      // picture with a lasting address keeps it, and one from the writer's
+      // own folder is copied in (see notePicture.ts).
+      disabled: !image ? 'No picture is showing' : undefined,
+      run: (ctx) => {
+        if (!image) return
+        void settleNotePicture(notePictureOf(image)).then(
+          (picture) => ctx.get(commandsCtx).call(insertImageCommand.key, picture),
+          (error: unknown) => window.alert(error instanceof Error ? error.message : 'The picture could not be placed in the note.'),
+        )
+      },
     },
   ]
 }

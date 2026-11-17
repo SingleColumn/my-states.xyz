@@ -34,6 +34,27 @@ test.describe('the writing tools', () => {
     await expect(page.getByRole('toolbar', { name: 'Writing tools' })).toBeHidden()
   })
 
+  test('the panel menu is grouped by what each action is about, and the two deletes are in different groups', async ({ page }) => {
+    await openApp(page)
+    const shape = await shapeOf(page, (await panelOfType(page, 'notes')).panelId)
+    await shape.getByRole('button', { name: 'Writing panel actions' }).click()
+    const menu = page.getByRole('menu', { name: 'Writing panel actions' })
+    const groups = menu.locator('.card-header-menu-section')
+    await expect(groups).toHaveCount(3)
+    await expect(groups.nth(0)).toHaveAttribute('aria-label', 'Note')
+    await expect(groups.nth(1)).toHaveAttribute('aria-label', 'View')
+    await expect(groups.nth(2)).toHaveAttribute('aria-label', 'Panel')
+    await expect(groups.nth(0).getByRole('menuitem').last()).toHaveText('Delete note')
+    await expect(groups.nth(2).getByRole('menuitem').last()).toHaveText('Delete panel')
+
+    // Text size and paper are one line each, not one line per value.
+    await expect(groups.nth(1).getByRole('group', { name: 'Text size' }).getByRole('menuitemradio')).toHaveCount(4)
+    await expect(groups.nth(1).getByRole('group', { name: 'Paper' }).getByRole('menuitemradio')).toHaveCount(3)
+    await groups.nth(1).getByRole('menuitemradio', { name: 'Paper: Wide' }).click()
+    await expect(menu).toBeVisible()
+    await expect(groups.nth(1).getByRole('menuitemradio', { name: 'Paper: Wide' })).toHaveAttribute('aria-checked', 'true')
+  })
+
   test('say what the line is, and give a way back out of a list', async ({ page }) => {
     const { body, bar } = await openWithTools(page)
     const style = bar.getByRole('combobox', { name: 'Style of this line' })
@@ -138,18 +159,23 @@ test.describe('the writing tools', () => {
     const { board } = await describeCanvas(page)
     await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('![dot](data:image/png')
 
-    const grip = (await body.locator('.notes-image-handle').boundingBox())!
+    // A picture with a paragraph to itself sits in the middle of the page,
+    // with a handle on each side.
+    await expect(body.locator('p.notes-picture-alone .notes-image')).toHaveCount(1)
+    await picture.hover()
+    await expect(body.locator('.notes-image-handle.is-left')).toBeVisible()
+
+    const grip = (await body.locator('.notes-image-handle.is-right').boundingBox())!
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
     await page.mouse.down()
     await page.mouse.move(grip.x + 200, grip.y + grip.height / 2, { steps: 8 })
     await page.mouse.up()
 
     // Wider than it was, and now carried as the one form that can hold a
-    // size. The width is in the panel's own pixels, which the canvas scales
-    // on the way to the screen, so the screen width is the smaller number.
+    // size -- as a share of the page, so it follows the paper's width.
     await expect.poll(async () => Math.round((await picture.boundingBox())!.width)).toBeGreaterThan(120)
     await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
-      .toMatch(/<img src="data:image\/png[^"]*" alt="dot" width="\d+" \/>/)
+      .toMatch(/<img src="data:image\/png[^"]*" alt="dot" width="\d+%" \/>/)
 
     // And it comes back that size, which is the whole point of the tag.
     const pulled = Math.round((await picture.boundingBox())!.width)
@@ -157,6 +183,66 @@ test.describe('the writing tools', () => {
     await waitForCanvas(page)
     const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
     await expect.poll(async () => Math.round((await again.locator('.notes-image img').boundingBox())!.width)).toBe(pulled)
+  })
+
+  test('a click on the width handle that does not move leaves the picture as it was, and a drag follows the pointer, at any canvas zoom', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    await body.click()
+    const chooser = page.waitForEvent('filechooser')
+    await bar.getByRole('button', { name: 'Picture' }).click()
+    await (await chooser).setFiles(PNG_FIXTURE)
+    const picture = body.locator('.notes-image img:not(.ProseMirror-separator)')
+    await expect(picture).toHaveCount(1)
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('![dot](data:image/png')
+
+    // The canvas draws the panel smaller than its own size. Measuring the
+    // picture as drawn once made a plain click save that smaller width.
+    const own = await picture.evaluate((image) => (image as HTMLImageElement).offsetWidth)
+    const drawn = (await picture.boundingBox())!.width
+    expect(drawn).toBeLessThan(own)
+
+    const grip = body.locator('.notes-image-handle.is-right')
+    await picture.hover()
+    await grip.click()
+    await grip.click()
+    await expect(picture).not.toHaveAttribute('width')
+    expect(await picture.evaluate((image) => (image as HTMLImageElement).offsetWidth)).toBe(own)
+    expect((await readStorage(page, board!.id)).notes[0]?.content).not.toContain('<img')
+
+    // A drag keeps the edge under the pointer, whatever the zoom. The
+    // picture is centred, so both edges move; the width is kept in whole
+    // percentages of the column, so the edge lands within one of them.
+    const column = await picture.evaluate((image) => image.closest('p')!.getBoundingClientRect().width)
+    const box = (await grip.boundingBox())!
+    const before = (await picture.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 6 })
+    await page.mouse.up()
+    await expect.poll(async () => {
+      const after = (await picture.boundingBox())!
+      return Math.abs(after.x + after.width - (before.x + before.width) - 60)
+    }).toBeLessThanOrEqual(column / 100)
+    await expect.poll(async () => {
+      const after = (await picture.boundingBox())!
+      return Math.abs(before.x - after.x - 60)
+    }).toBeLessThanOrEqual(column / 100)
+  })
+
+  test('a picture in a line of words stays in the line, with a handle on its right only', async ({ page }) => {
+    const { body, bar } = await openWithTools(page)
+    await body.click()
+    await page.keyboard.type('Before ')
+    const chooser = page.waitForEvent('filechooser')
+    await bar.getByRole('button', { name: 'Picture' }).click()
+    await (await chooser).setFiles(PNG_FIXTURE)
+    const picture = body.locator('.notes-image img:not(.ProseMirror-separator)')
+    await expect(picture).toHaveCount(1)
+    await expect(body.locator('p.notes-picture-alone')).toHaveCount(0)
+    await picture.hover()
+    await expect(body.locator('.notes-image-handle.is-right')).toBeVisible()
+    await expect(body.locator('.notes-image-handle.is-left')).toBeHidden()
   })
 
   test('a picture belongs to the note, not to the canvas underneath it', async ({ page }) => {
@@ -176,7 +262,7 @@ test.describe('the writing tools', () => {
     await page.mouse.click(middle.x, middle.y)
     await expect(body.locator('.notes-image.is-selected')).toHaveCount(1)
     await page.mouse.move(20, 20)
-    await expect(body.locator('.notes-image-handle')).toHaveCSS('opacity', '1')
+    await expect(body.locator('.notes-image-handle.is-right')).toHaveCSS('opacity', '1')
 
     // Right-clicking it asks the note, not the canvas. A picture is drawn by
     // the editor with `contenteditable="false"`, so the test for "this is
@@ -377,8 +463,12 @@ async function measured<T>(page: Page, read: () => Promise<T>): Promise<T> {
 }
 
 async function setTextSize(page: Page, shape: Locator, label: string) {
-  await shape.getByRole('button', { name: 'Writing panel actions' }).click()
-  await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click()
+  const menuButton = shape.getByRole('button', { name: 'Writing panel actions' })
+  await menuButton.click()
+  await page.getByRole('menuitemradio', { name: label, exact: true }).click()
+  // A size leaves the menu open, so it can be compared with the next one.
+  await menuButton.click()
+  await expect(page.getByRole('menu', { name: 'Writing panel actions' })).toHaveCount(0)
 }
 
 function look(page: Page) {

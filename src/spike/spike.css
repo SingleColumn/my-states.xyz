@@ -1,0 +1,168 @@
+/* SPIKE S1, throwaway. Only applies while the spike flag is on. */
+
+html[data-spike-s1] .tl-canvas {
+  visibility: hidden;
+}
+
+/* Canvas | Editor, beside the logo: two toolbar buttons joined into one
+   control, so they read as one choice with two answers. */
+.spike-mode-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.spike-mode-switch .app-chrome-control {
+  white-space: nowrap;
+}
+.spike-mode-switch .app-chrome-control:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.spike-mode-switch .app-chrome-control:last-child {
+  margin-left: calc(-1 * var(--border-width-hairline));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+/* The pressed half's border is drawn over its neighbour's. */
+.spike-mode-switch .app-chrome-control[aria-pressed="true"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* The top bar floats exactly as it does on the canvas, so nothing in it
+   moves when the mode changes. The page starts below it: the bar's height
+   plus its inset above and the same again as a gap below. (The bar is not
+   made flush here: that shifted every control by the inset on each switch.) */
+.spike-editor-layer {
+  position: absolute;
+  inset: calc(var(--app-chrome-height, 0px) + 2 * var(--space-top-toolbar-edge, 0px)) 0 0 0;
+  /* Only tldraw defines this; the full-screen header rule multiplies by it. */
+  --tl-scale: 1;
+  pointer-events: none;
+}
+
+.spike-page {
+  position: absolute;
+  /* `right` is set inline from the windows docked on the right edge. */
+  inset: 0;
+}
+
+/* Everything below the Writing page's header bar; `top` is set inline from
+   the header's height. Presses fall through it to the page. */
+.spike-window-area {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Header menus are drawn here, above the page and every window, so no
+   frame can cut them off or cover them. Only the menus take presses. */
+.spike-menu-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.spike-window {
+  pointer-events: auto;
+  border-radius: var(--radius-panel);
+}
+
+/* The same outline the canvas draws around a selected panel. */
+.spike-window.is-selected {
+  outline: max(var(--selection-stroke-width), 1.5px) solid var(--color-selection-stroke);
+  outline-offset: 0;
+}
+
+/* Minimised: only the header shows, at the window's width. The panel stays
+   mounted underneath, so music keeps playing and nothing is reloaded. */
+.spike-window.is-minimised > .canvas-panel-shell {
+  position: relative !important;
+  inset: auto !important;
+  height: auto !important;
+  /* The shell contains its size, which makes an auto height zero. Width
+     containment is enough for the header's own width-based layout. */
+  contain: layout style !important;
+  container-type: inline-size !important;
+}
+.spike-window.is-minimised .canvas-panel-wheel-scope,
+.spike-window.is-minimised .canvas-panel-wheel-scope > * {
+  height: auto !important;
+  min-height: 0 !important;
+}
+.spike-window.is-minimised .card-header ~ * {
+  display: none !important;
+}
+.spike-window.is-minimised .card-header {
+  cursor: pointer;
+}
+
+/* The header is where a window is picked up, as on the canvas. */
+.spike-window .card-header {
+  cursor: grab;
+}
+
+html[data-spike-gesture="move"],
+html[data-spike-gesture="move"] * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* Invisible strips just inside each edge and corner. They sit above the
+   panel so a resize can start anywhere along the edge. */
+.spike-edge {
+  position: absolute;
+  z-index: 2;
+}
+.spike-edge-n, .spike-edge-s { left: 16px; right: 16px; height: 12px; }
+.spike-edge-e, .spike-edge-w { top: 16px; bottom: 16px; width: 12px; }
+.spike-edge-n { top: -6px; cursor: ns-resize; }
+.spike-edge-s { bottom: -6px; cursor: ns-resize; }
+.spike-edge-e { right: -6px; cursor: ew-resize; }
+.spike-edge-w { left: -6px; cursor: ew-resize; }
+.spike-edge-ne, .spike-edge-nw, .spike-edge-se, .spike-edge-sw { width: 20px; height: 20px; z-index: 3; }
+.spike-edge-ne { top: -10px; right: -10px; cursor: nesw-resize; }
+.spike-edge-sw { bottom: -10px; left: -10px; cursor: nesw-resize; }
+.spike-edge-nw { top: -10px; left: -10px; cursor: nwse-resize; }
+.spike-edge-se { bottom: -10px; right: -10px; cursor: nwse-resize; }
+
+/* A selected window shows square corner handles, as tldraw does on the
+   canvas, so it is clear the window can be resized and where to grab. */
+.spike-window.is-selected .spike-edge-ne::after,
+.spike-window.is-selected .spike-edge-nw::after,
+.spike-window.is-selected .spike-edge-se::after,
+.spike-window.is-selected .spike-edge-sw::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  background: var(--color-background, #fff);
+  border: 1.5px solid var(--color-selection-stroke);
+  border-radius: 2px;
+}
+
+html[data-spike-gesture$="-resize"],
+html[data-spike-gesture$="-resize"] * {
+  user-select: none !important;
+}
+
+/* The shell hands every press to tldraw on the canvas; here there is no
+   canvas to hand it to, so the frame takes the pointer itself. */
+.spike-editor-layer .canvas-panel-shell {
+  pointer-events: auto !important;
+}
+
+/* The Writing page's header is drawn like the canvas panel's, not like the
+   slim strip of the full-screen view, so the two modes read as one app. The
+   sizes are measured from the canvas panel (SpikeEditorLayer), since there
+   they follow the panel's size and the theme. Until measured, the
+   full-screen view's own sizes stay. (The left edge still lines up with the
+   board name above, set by the full-screen rule.) */
+.spike-page .panel-notes-surface.is-writing-mode {
+  --card-header-button-size: var(--spike-header-button-size, 30px);
+}
+.spike-page .panel-notes-surface.is-writing-mode .card-header {
+  padding-block: var(--spike-header-padding, calc(var(--card-padding) / 3));
+}
+.spike-page .panel-notes-surface.is-writing-mode .card-title {
+  font-size: var(--spike-header-title-size, var(--type-md));
+}
