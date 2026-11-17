@@ -244,9 +244,9 @@
 }
 
 /*
- * A picture in a note, with a handle on its right edge to pull. The handle
- * shows on hover and while the picture is selected, so an unpicked picture
- * is only a picture; it is a little wider than it looks, because a 4px
+ * A picture in a note, with a handle on each edge to pull. The handles
+ * show on hover and while the picture is selected, so an unpicked picture
+ * is only a picture; each is a little wider than it looks, because a 4px
  * target is a target nobody hits.
  */
 .notes-image {
@@ -262,15 +262,41 @@
   border-radius: var(--radius-small);
 }
 
+/* Sized as a share of the column: the frame takes the share (a percentage
+   on it is of the paragraph, the nearest block) and the picture fills the
+   frame. */
+.notes-image.has-share img {
+  width: 100%;
+}
+
+/* A picture with a paragraph to itself sits in the middle of the page. */
+.notes-editor-content p.notes-picture-alone {
+  text-align: center;
+}
+
 .notes-image-handle {
   position: absolute;
   top: 0;
-  right: 0;
   width: var(--size-image-handle-target);
   height: 100%;
   cursor: ew-resize;
   opacity: 0;
   touch-action: none;
+}
+
+.notes-image-handle.is-right {
+  right: 0;
+}
+
+.notes-image-handle.is-left {
+  left: 0;
+}
+
+/* A picture in a line of text grows to the right only, so the left handle
+   would move nothing under the pointer; it is offered only to a centred
+   picture, which grows from its middle. */
+.notes-editor-content p:not(.notes-picture-alone) .notes-image-handle.is-left {
+  display: none;
 }
 
 /* A grip, not a hairline. The first version was a 2px rule the colour of
@@ -281,7 +307,6 @@
   content: "";
   position: absolute;
   top: 50%;
-  right: 0;
   width: var(--size-image-handle-grip-width);
   height: var(--size-image-handle-grip);
   transform: translateY(-50%);
@@ -289,6 +314,14 @@
   border-radius: var(--size-image-handle-grip-width);
   background: var(--accent-notes, var(--color-focus-ring));
   box-shadow: var(--shadow-app-badge);
+}
+
+.notes-image-handle.is-right::after {
+  right: 0;
+}
+
+.notes-image-handle.is-left::after {
+  left: 0;
 }
 
 /* Shown whenever the picture is the thing being dealt with -- pointed at,
@@ -881,90 +914,6 @@
 
 .slideshow-drag-handle:active {
   cursor: grabbing;
-}
-
-/*
- * A panel embedded in a note (see notesEmbed.tsx). One figure, three
- * faces: a poster naming the source, the live frame once asked for, or a
- * note that the source is gone. It keeps the writing measure and the
- * note's own rhythm rather than bringing a panel's chrome into the page.
- */
-.notes-embed {
-  margin: 0 auto var(--space-rich-content-block);
-  border: var(--border-width-hairline) solid var(--color-panel-divider);
-  border-radius: var(--radius-control);
-  overflow: hidden;
-  background: var(--color-code-block-bg);
-}
-
-.notes-embed.is-selected {
-  outline: 2px solid var(--color-focus-ring);
-}
-
-.notes-embed-poster {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-detail-2);
-  width: 100%;
-  min-height: 120px;
-  padding: var(--space-detail-6);
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.notes-embed-poster.is-missing {
-  cursor: default;
-  color: var(--color-text-muted);
-}
-
-.notes-embed-title {
-  font-weight: var(--font-weight-medium);
-}
-
-.notes-embed-note {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-detail-1);
-  font-size: var(--type-sm);
-  color: var(--color-text-muted);
-}
-
-.notes-embed-frame {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  border: 0;
-  background: transparent;
-}
-
-.notes-embed-picture {
-  display: block;
-  width: 100%;
-  max-height: 480px;
-  object-fit: contain;
-}
-
-.notes-embed:has(.notes-embed-picture) {
-  position: relative;
-}
-
-/* The corner a picture is resized by; shown only while it is selected. */
-.notes-embed-resize {
-  position: absolute;
-  right: var(--space-detail-2);
-  bottom: var(--space-detail-2);
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-focus-ring);
-  border-radius: 4px;
-  background: var(--color-code-block-bg);
-  cursor: nwse-resize;
-  touch-action: none;
 }
 
 /* ProseMirror's drop cursor between blocks, in the theme's accent. */

@@ -10,7 +10,7 @@ import { useMomentView } from '../momentView'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
 import { panelContentProps, panelFrameActionProps } from '../panelSurface'
-import { embedTitleFor, PANEL_DRAG_TYPE } from './notesEmbed'
+import { notePictureOf, PICTURE_DRAG_TYPE } from './notePicture'
 import { CollectionBrowser, shuffleCollectionOrder } from './CollectionBrowser'
 import { selectImageCollection } from './collectionSelection'
 
@@ -344,22 +344,25 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             <button className="card-icon-button" type="button" title="Next image" aria-label="Next image" onClick={() => slideshow.next(panelId)}><SkipForward size={18} /></button>
             <button className="card-icon-button" type="button" title="Stop" aria-label="Stop slideshow" onClick={() => slideshow.stop(panelId)}><Square size={16} /></button>
             <button className={`card-icon-button ${panelSettings.shuffle ? 'is-active' : ''}`} type="button" title="Shuffle" aria-label="Shuffle images" aria-pressed={panelSettings.shuffle} onClick={() => slideshow.updateSettings({ shuffle: !panelSettings.shuffle }, panelId)}><Shuffle size={18} /></button>
-            {/* The handle a note takes this panel by. The picture itself is
+            {/* The handle a note takes this picture by. The picture itself is
                 not draggable (see CrossfadeImage), and the controls box above
-                cancels native drags, so the handle stops the event there. */}
+                cancels native drags, so the handle stops the event there. The
+                note keeps the picture, not a link back to this panel (see
+                notePicture.ts). */}
             {currentImage && panel ? (
               <span
                 className="card-icon-button slideshow-drag-handle"
                 role="img"
                 draggable
-                title="Drag into a note to embed this image"
-                aria-label="Drag into a note to embed this image"
+                title="Drag into a note to place this picture there"
+                aria-label="Drag into a note to place this picture there"
                 onDragStart={(event) => {
                   event.stopPropagation()
                   event.dataTransfer.effectAllowed = 'copy'
-                  event.dataTransfer.setData(PANEL_DRAG_TYPE, JSON.stringify({ panelId, imageId: currentImage.id, title: embedTitleFor(panel, currentImage.name) }))
-                  // Plain text too, so a drop anywhere else gets the title.
-                  event.dataTransfer.setData('text/plain', embedTitleFor(panel, currentImage.name))
+                  const picture = notePictureOf(currentImage)
+                  event.dataTransfer.setData(PICTURE_DRAG_TYPE, JSON.stringify(picture))
+                  // Plain text too, so a drop anywhere else gets the picture's name.
+                  event.dataTransfer.setData('text/plain', picture.alt)
                 }}
               >
                 <GripVertical size={18} />

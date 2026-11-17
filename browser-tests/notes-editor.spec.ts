@@ -327,133 +327,105 @@ test.describe('insert menu', () => {
 })
 
 
-test.describe('panel embeds', () => {
-  /** Loads pictures, then drags the Images panel's grip onto the note. */
-  async function embedImagesPanel(page: Page) {
+test.describe('pictures dragged into a note', () => {
+  /**
+   * Drags the Images panel's grip onto the note. The note keeps the picture
+   * itself as an ordinary Markdown picture, never a link back to the panel.
+   */
+  async function dragPictureIntoNote(page: Page, load: (imagesPanelId: string) => Promise<void> = (panelId) => loadSampleImages(page, panelId)) {
     const images = await panelOfType(page, 'slideshow')
     const notes = await panelOfType(page, 'notes')
-    await loadSampleImages(page, images.panelId)
-    // A sample collection starts playing; hold it so the picture the embed
-    // names stays put until the test moves it on purpose.
+    await load(images.panelId)
+    // A sample collection starts playing; hold it so the picture dragged
+    // stays put until the test moves it on purpose.
     await dispatch(page, { kind: 'images.pause', panelId: images.panelId })
     const body = noteBodyOf(await shapeOf(page, notes.panelId))
     await body.click()
-    await page.keyboard.type('Before the embed.')
-    const grip = (await shapeOf(page, images.panelId)).getByLabel('Drag into a note to embed this image')
+    await page.keyboard.type('Before the picture.')
+    const grip = (await shapeOf(page, images.panelId)).getByLabel('Drag into a note to place this picture there')
     await grip.dragTo(body, { targetPosition: { x: 40, y: 40 } })
-    return { images, notes, body, embed: body.locator('.notes-embed') }
+    // ProseMirror places a zero-size img.ProseMirror-separator beside an
+    // inline image for caret placement; the document's own picture is the other one.
+    return { images, notes, body, picture: body.locator('.notes-image img:not(.ProseMirror-separator)') }
   }
 
-  test('an image dragged from the Images panel becomes an embed fixed to that image and survives a reload', async ({ page }) => {
+  test('a picture with a web address keeps it, and stays when the panel moves on, is removed, and after a reload', async ({ page }) => {
     await openApp(page)
-    const { images, notes, embed } = await embedImagesPanel(page)
-    await expect(embed).toHaveCount(1)
-
-    // Shown at once: a plain picture runs nothing, so there is no poster or frame.
-    const picture = embed.locator('img.notes-embed-picture')
+    const { images, notes, picture } = await dragPictureIntoNote(page)
+    await expect(picture).toHaveCount(1)
     await expect(picture).toBeVisible()
-    await expect(embed.locator('iframe')).toHaveCount(0)
+    const src = (await picture.getAttribute('src'))!
     const name = (await picture.getAttribute('alt'))!
+    // A sample collection's own address, not a copy and not a panel reference.
+    expect(src).toMatch(/^\/sample-images\//)
 
-    // Fixed, not followed: moving the slideshow on leaves the embed alone.
+    // Ordinary Markdown: the picture and its address, nothing about the panel.
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain(`](${src}`)
+    const content = (await readStorage(page, board!.id)).notes[0]!.content
+    expect(content).not.toContain('my-states://')
+    expect(content).not.toContain(images.panelId)
+
+    // The note no longer depends on the panel in any way.
     await dispatch(page, { kind: 'images.next', panelId: images.panelId })
-    await expect(picture).toHaveAttribute('alt', name)
-
-    // Stored twice over: the exact document, and Markdown with the link line.
-    // The drop was on the paragraph's text, so the embed sits beside it --
-    // on whichever side was nearer -- never inside it.
-    const { board } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content)
-      .toMatch(new RegExp(`my-states://panel/${escapeRegExp(images.panelId)}\\?image=`))
-    const stored = (await readStorage(page, board!.id)).notes[0]!
-    expect(stored.document?.schemaVersion).toBe(1)
-    // The editor may keep an empty line after a trailing block, so count only the embed.
-    expect(stored.document?.doc.content?.filter((block) => block.type === 'panelEmbed')).toHaveLength(1)
-
-    await page.reload()
-    await waitForCanvas(page)
-    const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
-    await expect(again).toHaveCount(1)
-    await expect(again.locator('img.notes-embed-picture')).toHaveAttribute('alt', name)
-  })
-
-  test('a picture embed is resized by its corner handle and the width is kept', async ({ page }) => {
-    await openApp(page)
-    const { notes, body, embed } = await embedImagesPanel(page)
-    const picture = embed.locator('img.notes-embed-picture')
-    await expect(picture).toBeVisible()
-    const full = (await embed.boundingBox())!.width
-
-    await picture.click()
-    const handle = embed.getByRole('slider', { name: 'Picture width' })
-    await expect(handle).toBeVisible()
-    const box = (await handle.boundingBox())!
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.down()
-    // A centred picture changes on both sides, so moving the right handle by
-    // a quarter of the full width makes the whole picture about half-width.
-    await page.mouse.move(box.x - full / 4, box.y + box.height / 2, { steps: 5 })
-    await page.mouse.up()
-    const half = (await embed.boundingBox())!.width
-    expect(half).toBeLessThan(full * 0.65)
-    expect(half).toBeGreaterThan(full * 0.35)
-    const editorBox = (await body.boundingBox())!
-    const resizedBox = (await embed.boundingBox())!
-    expect(Math.abs((resizedBox.x + resizedBox.width / 2) - (editorBox.x + editorBox.width / 2))).toBeLessThan(2)
-
-    const { board } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toMatch(/&width=\d+/)
-    await page.reload()
-    await waitForCanvas(page)
-    const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-embed')
-    expect((await again.boundingBox())!.width).toBeLessThan(full * 0.65)
-    const reloadedEditor = (await again.locator('xpath=..').boundingBox())!
-    const reloadedEmbed = (await again.boundingBox())!
-    expect(Math.abs((reloadedEmbed.x + reloadedEmbed.width / 2) - (reloadedEditor.x + reloadedEditor.width / 2))).toBeLessThan(2)
-    void body
-  })
-
-  test('says so when the panel it came from is gone, and undo removes only the embed', async ({ page }) => {
-    await openApp(page)
-    const { images, embed } = await embedImagesPanel(page)
-    await expect(embed).toHaveCount(1)
-    const before = (await describeCanvas(page)).panels.length
-
     await dispatch(page, { kind: 'panel.remove', panelId: images.panelId })
-    await expect(embed.locator('.notes-embed-note')).toHaveText('This panel is no longer on the canvas.')
-    expect((await describeCanvas(page)).panels.length).toBe(before - 1)
+    await expect(picture).toHaveAttribute('src', src)
+    await expect(picture).toBeVisible()
+
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, notes.panelId)).locator('.notes-image img:not(.ProseMirror-separator)')
+    await expect(again).toHaveAttribute('src', src)
+    await expect(again).toHaveAttribute('alt', name)
   })
 
-  test('Ctrl+Z after a drop takes back the embed, not the canvas', async ({ page }) => {
+  test('a picture from the writer\'s own folder is copied into the note', async ({ page }) => {
     await openApp(page)
-    const { body, embed } = await embedImagesPanel(page)
-    await expect(embed).toHaveCount(1)
+    const { images, picture } = await dragPictureIntoNote(page, async (panelId) => {
+      await (await shapeOf(page, panelId)).locator('input.visually-hidden-file-input').setInputFiles(PICTURE_FOLDER_FIXTURE)
+      await expect((await shapeOf(page, panelId)).getByLabel('Drag into a note to place this picture there')).toBeVisible()
+    })
+    // The folder's address ends with the page, so the note holds the picture's own data.
+    await expect(picture).toHaveAttribute('src', /^data:image\/png;base64,/)
+    await expect(picture).toHaveAttribute('alt', 'dot')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('](data:image/png;base64,')
+    await dispatch(page, { kind: 'panel.remove', panelId: images.panelId })
+    await expect(picture).toHaveAttribute('src', /^data:image\/png;base64,/)
+  })
+
+  test('a copy too big to keep in a note is scaled down to fit', async ({ page }) => {
+    await openApp(page)
+    // Noise does not compress, so this picture is several megabytes as a PNG.
+    const result = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 2400
+      canvas.height = 1600
+      const context = canvas.getContext('2d')!
+      const pixels = context.createImageData(canvas.width, canvas.height)
+      for (let index = 0; index < pixels.data.length; index += 1) pixels.data[index] = index % 4 === 3 ? 255 : Math.floor(Math.random() * 256)
+      context.putImageData(pixels, 0, 0)
+      const big = await new Promise<Blob>((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'))
+      const { blobToNoteDataUrl, NOTE_PICTURE_LIMIT_BYTES } = await import('/src/panels/notePicture.ts' as string) as typeof import('../src/panels/notePicture')
+      const dataUrl = await blobToNoteDataUrl(big)
+      const stored = atob(dataUrl.slice(dataUrl.indexOf(',') + 1)).length
+      return { original: big.size, stored, limit: NOTE_PICTURE_LIMIT_BYTES, type: dataUrl.slice(5, dataUrl.indexOf(';')) }
+    })
+    expect(result.original).toBeGreaterThan(result.limit)
+    expect(result.stored).toBeLessThanOrEqual(result.limit)
+    expect(result.type).toBe('image/webp')
+  })
+
+  test('Ctrl+Z after a drop takes back the picture, not the canvas', async ({ page }) => {
+    await openApp(page)
+    const { body, picture } = await dragPictureIntoNote(page)
+    await expect(picture).toHaveCount(1)
     const panelsBefore = (await describeCanvas(page)).panels.map((panel) => panel.panelId)
     await body.click({ position: { x: 20, y: 10 } })
     await undo(page)
-    await expect(embed).toHaveCount(0)
-    await expect(body).toContainText('Before the embed.')
+    await expect(picture).toHaveCount(0)
+    await expect(body).toContainText('Before the picture.')
     expect((await describeCanvas(page)).panels.map((panel) => panel.panelId)).toEqual(panelsBefore)
-  })
-
-  test('the Markdown line alone brings an embed back', async ({ page }) => {
-    await openApp(page)
-    const images = await panelOfType(page, 'slideshow')
-    const notes = await panelOfType(page, 'notes')
-    await loadSampleImages(page, images.panelId)
-    // Written through the command surface, which speaks Markdown. The editor
-    // may also persist its structured representation; the reload assertion
-    // below is the compatibility behavior this test is concerned with.
-    await dispatch(page, { kind: 'note.setContent', panelId: notes.panelId, content: `Text first.\n\n[Images: whatever](my-states://panel/${images.panelId})\n\nText after.\n` })
-    const { board } = await describeCanvas(page)
-    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('my-states://panel/')
-    await page.reload()
-    await waitForCanvas(page)
-    const body = noteBodyOf(await shapeOf(page, notes.panelId))
-    await expect(body.locator('.notes-embed')).toHaveCount(1)
-    await expect(body.locator('.notes-embed-title')).toHaveText(/^Images: /)
-    await expect(body.locator('p').first()).toHaveText('Text first.')
-    await expect(body.locator('p').last()).toHaveText('Text after.')
   })
 })
 
@@ -1719,6 +1691,58 @@ test.describe('a note from before the structured document existed', () => {
     await expect(again.locator('hr')).toHaveCount(1)
     await expect(again.locator('p').last()).toHaveText('The last paragraph.')
   })
+
+  /**
+   * A stored document holding an element the editor no longer has (here the
+   * removed picture-from-a-panel embed) cannot be read. The note must still
+   * open, from its Markdown. This once left the panel empty: Milkdown waits
+   * for a failed creation to finish before destroying it, so the fallback
+   * never ran.
+   */
+  test('opens from its Markdown when its stored document holds an element the editor no longer has', async ({ page }) => {
+    await openApp(page)
+    const notes = await panelOfType(page, 'notes')
+    const body = noteBodyOf(await shapeOf(page, notes.panelId))
+    await body.click()
+    await page.keyboard.type('placeholder')
+    const { board } = await describeCanvas(page)
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toBe('placeholder\n')
+
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('my-states')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const all = await new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
+        const request = db.transaction('notes').objectStore('notes').getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const note = all[0]
+      note.content = 'Kept words.\n\n[Images: a picture](my-states://panel/panel-gone?image=img-1)\n'
+      note.document = { schemaVersion: 1, doc: { type: 'doc', content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Kept words.' }] },
+        { type: 'panelEmbed', attrs: { panelId: 'panel-gone', title: 'Images: a picture', imageId: 'img-1', width: 100 } },
+      ] } }
+      await new Promise<void>((resolve, reject) => {
+        const request = db.transaction('notes', 'readwrite').objectStore('notes').put(note)
+        request.onsuccess = () => resolve()
+        request.onerror = () => reject(request.error)
+      })
+      db.close()
+    })
+
+    await page.reload()
+    await waitForCanvas(page)
+    const again = noteBodyOf(await shapeOf(page, (await panelOfType(page, 'notes')).panelId))
+    await expect(again.locator('p').first()).toHaveText('Kept words.')
+    // And it can be written in: the next save replaces the unreadable document.
+    await again.locator('p').first().click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' More.')
+    await expect.poll(async () => (await readStorage(page, board!.id)).notes[0]?.content).toContain('Kept words. More.')
+  })
 })
 
 const LEGACY_MARKDOWN = [
@@ -1745,7 +1769,5 @@ const LEGACY_MARKDOWN = [
 /** Read from disk: built in memory it would need a Buffer, and node's types are not in this project. */
 const MARKDOWN_FIXTURE = 'browser-tests/fixtures/Kept from elsewhere.md'
 const EQUALS_FIXTURE = 'browser-tests/fixtures/equals.md'
+const PICTURE_FOLDER_FIXTURE = 'browser-tests/fixtures/picture-folder'
 
-function escapeRegExp(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
