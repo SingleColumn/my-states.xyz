@@ -919,3 +919,24 @@
 .card-footer-status .error-text {
   margin: 0;
 }
+
+/* SPIKE. The row that opens the sliders in Editor mode: quiet, full width,
+   and clearly something to press. */
+.slideshow-settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--image-panel-label-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slideshow-settings-toggle:hover,
+.slideshow-settings-toggle:focus-visible {
+  color: var(--color-text);
+}

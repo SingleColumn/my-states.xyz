@@ -1,5 +1,5 @@
-import { ChevronsDownUp, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square, Trash2 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronRight, ChevronsDownUp, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square, Trash2 } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
@@ -8,6 +8,7 @@ import { useFeaturedImageCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
 import { usePanelSessionState } from '../panelSessionState'
+import { getSpikeSnapshot, spikeState } from '../spike/spikeFlag'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
 import { panelContentProps, panelFrameActionProps } from '../panelSurface'
@@ -54,6 +55,11 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // between the canvas and Editor mode (see panelSessionState).
   const [isImagePickerOpen, setIsImagePickerOpen] = usePanelSessionState(panelId, 'image-picker-open', false)
   const [isViewerOpen, setIsViewerOpen] = useState(false)
+  // SPIKE. In Editor mode the panel is a narrow window and the three sliders
+  // take about 40% of its height, so they sit behind one row until asked for.
+  // The buttons stay out. On the canvas nothing changes.
+  const collapseSliders = useSyncExternalStore(spikeState.subscribe, getSpikeSnapshot, getSpikeSnapshot).editorMode
+  const [slidersOpen, setSlidersOpen] = useState(false)
   const [panelView, setPanelView] = usePanelSessionState<'slideshow' | 'browse-collections'>(panelId, 'view', () => (
     panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
   ))
@@ -392,6 +398,14 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
               </span>
             ) : null}
           </div>
+          {collapseSliders ? (
+            <button className="slideshow-settings-toggle" type="button" aria-expanded={slidersOpen} onClick={() => setSlidersOpen((open) => !open)}>
+              {slidersOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+              Speed, fade and zoom
+            </button>
+          ) : null}
+          {collapseSliders && !slidersOpen ? null : (
+          <>
           <div className="range-grid">
             <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={minSlideshowInterval} max={maxSlideshowInterval} step={250} value={panelSettings.intervalMs} onChange={(event) => slideshow.updateSettings({ intervalMs: Number(event.target.value) }, panelId)} /></label>
             <label><span>Fade <output className="slideshow-control-value">{panelSettings.transitionMs} ms</output></span><input type="range" min={0} max={4000} step={50} value={panelSettings.transitionMs} onChange={(event) => slideshow.updateSettings({ transitionMs: Number(event.target.value) }, panelId)} /></label>
@@ -401,6 +415,8 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             <span className="zoom-readout">{Math.round(panelSettings.zoom * 100)}%</span>
             <button className="card-icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: DEFAULT_SLIDESHOW_ZOOM }, panelId)}><RotateCcw size={17} /></button>
           </div>
+          </>
+          )}
         </div>
 
         <footer className="card-footer" {...panelContentProps}>

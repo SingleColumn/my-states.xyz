@@ -52,3 +52,32 @@ test('the Writing header is drawn the same size in both modes', async ({ page })
   expect(editor.title).toBeCloseTo(canvas.title, 0)
   expect(Math.abs(editor.height - canvas.height)).toBeLessThan(3)
 })
+
+for (const [width, height] of [[1280, 720], [1920, 1080]]) {
+  test(`on the first switch to Editor mode the windows sit one on each side, clear of each other, at ${width}x${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    await openApp(page)
+    await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Editor' }).click()
+    const layer = page.locator('[data-testid="spike-editor-layer"]')
+    await expect(layer).toBeVisible()
+    const windows = layer.locator('.spike-window')
+    await expect(windows).toHaveCount(2)
+    const area = (await layer.locator('.spike-window-area').boundingBox())!
+    const boxes = [(await windows.nth(0).boundingBox())!, (await windows.nth(1).boundingBox())!].sort((a, b) => a.x - b.x)
+    const [left, right] = boxes
+    const footer = (await layer.locator('.spike-page .card-footer').boundingBox())!
+    // One on each side, with the page's middle left open between them.
+    expect(left.x + left.width).toBeLessThan(right.x)
+    expect(left.x + left.width / 2).toBeLessThan(width / 2)
+    expect(right.x + right.width / 2).toBeGreaterThan(width / 2)
+    expect(right.x - (left.x + left.width)).toBeGreaterThan(width * 0.4)
+    // Narrow, and inside the area with a margin all round.
+    for (const box of boxes) {
+      expect(box.width).toBeLessThanOrEqual(380)
+      expect(box.y).toBeGreaterThan(area.y + 8)
+      expect(box.y + box.height).toBeLessThan(area.y + area.height - 8)
+      // Clear of the page's footer (the word count) as well.
+      expect(box.y + box.height).toBeLessThanOrEqual(footer.y)
+    }
+  })
+}

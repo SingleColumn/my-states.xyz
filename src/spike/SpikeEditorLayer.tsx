@@ -46,7 +46,11 @@ const WINDOWS_KEY = 'mic:spike-windows'
 const MIN_W = 260
 const MIN_H = 180
 const GAP = 16
-const COLUMN_W = 420
+// New windows are narrow so the page keeps the middle of the screen: a
+// share of the width, held between these.
+const COLUMN_W_MIN = 300
+const COLUMN_W_MAX = 380
+const COLUMN_W_SHARE = 0.22
 // A press on a minimised header that moves less than this is a click, which
 // opens the window again; more is a drag.
 const CLICK_SLOP = 4
@@ -133,6 +137,9 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
   // All window positions and screen limits are measured in this area.
   const areaRef = useRef<HTMLDivElement>(null)
   const [pageHeaderHeight, setPageHeaderHeight] = useState(0)
+  // The page's footer (word count) is kept clear too: windows float between
+  // the header and the footer, not over either.
+  const [pageFooterHeight, setPageFooterHeight] = useState(0)
   const [rects, setRects] = useState<Record<string, Rect>>(readSavedRects)
   const [order, setOrder] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -153,13 +160,21 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
 
   useLayoutEffect(() => {
     const header = layerRef.current?.querySelector<HTMLElement>('.spike-page .card-header')
+    const footer = layerRef.current?.querySelector<HTMLElement>('.spike-page .card-footer')
     if (!header) {
       setPageHeaderHeight(0)
+      setPageFooterHeight(0)
       return
     }
-    setPageHeaderHeight(header.offsetHeight)
-    const observer = new ResizeObserver(() => setPageHeaderHeight(header.offsetHeight))
+    // Drawn height, so the page's zoom is counted.
+    const measure = () => {
+      setPageHeaderHeight(header.getBoundingClientRect().height)
+      setPageFooterHeight(footer?.getBoundingClientRect().height ?? 0)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
     observer.observe(header)
+    if (footer) observer.observe(footer)
     return () => observer.disconnect()
   }, [hostId])
 
@@ -167,7 +182,7 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
   // rather than waiting for the observer, which a hidden tab may not run.
   useLayoutEffect(() => {
     if (areaRef.current) setLayer(layerSize(areaRef.current))
-  }, [pageHeaderHeight])
+  }, [pageHeaderHeight, pageFooterHeight])
 
   // Header menus are drawn into this layer, above the page and every window
   // (see `menuLayer` in PanelHeader). State, not a ref, so the menus get it
@@ -186,22 +201,46 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
     if (changed) setHeaderHeights((current) => ({ ...current, ...measured }))
   })
 
-  // A window with no saved place goes into a column on the right, sharing
-  // the height with the other new ones.
+  // A window with no saved place goes into a column down one side, the first
+  // on the left, the next on the right, and so on, so each side has one and
+  // the page stays clear between them. A side with more than one shares its
+  // height between them.
   const windowIds = windows.map((window) => window.id).join(',')
   useLayoutEffect(() => {
     const missing = windows.filter((window) => !rectsRef.current[window.id])
     if (missing.length === 0) return
+    // The area below the page's header is smaller once that header is
+    // measured; placing before then would size the windows for a taller area.
+    if (hostId && pageHeaderHeight === 0) return
     const { width, height } = layerSize(areaRef.current)
-    const h = Math.max(MIN_H, (height - GAP * (missing.length + 1)) / missing.length)
+    const columnW = Math.round(Math.min(COLUMN_W_MAX, Math.max(COLUMN_W_MIN, width * COLUMN_W_SHARE)))
+    // Windows already placed count towards a side, so a window added later
+    // goes where there is room rather than on top of one.
+    const sides: Record<'left' | 'right', string[]> = { left: [], right: [] }
+    windows.forEach((window) => {
+      const rect = rectsRef.current[window.id]
+      if (rect) sides[rect.x + rect.w / 2 < width / 2 ? 'left' : 'right'].push(window.id)
+    })
+    const added: Record<string, 'left' | 'right'> = {}
+    missing.forEach((window) => {
+      const side = sides.left.length <= sides.right.length ? 'left' : 'right'
+      sides[side].push(window.id)
+      added[window.id] = side
+    })
     updateRects((current) => {
       const next = { ...current }
-      missing.forEach((window, index) => {
-        next[window.id] = { x: width - GAP - COLUMN_W, y: GAP + index * (h + GAP), w: COLUMN_W, h }
-      })
+      for (const side of ['left', 'right'] as const) {
+        const count = sides[side].length
+        const h = Math.max(MIN_H, (height - GAP * (count + 1)) / count)
+        sides[side].forEach((id, index) => {
+          // Only the new ones are placed; the others keep their own place.
+          if (!added[id]) return
+          next[id] = { x: side === 'left' ? GAP : width - GAP - columnW, y: GAP + index * (h + GAP), w: columnW, h }
+        })
+      }
       return next
     })
-  }, [windowIds]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [windowIds, pageHeaderHeight]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Escape, or a press outside any window, clears the selection, as on the canvas.
   useEffect(() => {
@@ -320,7 +359,7 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
             <Frame type="notes" panelId={hostId} fullScreen zoom={zoom} style={{ position: 'absolute', inset: 0 }} />
           </div>
         ) : null}
-        <div ref={areaRef} className="spike-window-area" style={{ top: pageHeaderHeight }}>
+        <div ref={areaRef} className="spike-window-area" style={{ top: pageHeaderHeight, bottom: pageFooterHeight }}>
         {windows.map((window) => {
           const saved = rects[window.id]
           if (!saved) return null
