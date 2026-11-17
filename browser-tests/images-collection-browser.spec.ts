@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { cameraZoom, choosePanelMenuItem, openApp, panelById, panelOfType, shapeOf } from './helpers'
+import { cameraZoom, choosePanelMenuItem, loadSampleImages, openApp, panelById, panelOfType, shapeOf } from './helpers'
 
 test.describe('Images collection browser', () => {
   test('switches between the collection carousel and grid from the panel menu', async ({ page }) => {
@@ -195,5 +195,32 @@ test.describe('a panel menu and the canvas zoom', () => {
     // The wheel really did move the zoom, and to both sides of the range.
     expect(reached[0]).toBeLessThan(0.7)
     expect(reached[1]).toBeGreaterThan(1.25)
+  })
+})
+
+test.describe('the slideshow settings row', () => {
+  test('keeps the sliders out of sight until asked, and says what they are set to', async ({ page }) => {
+    await openApp(page)
+    const images = await panelOfType(page, 'slideshow')
+    await loadSampleImages(page, images.panelId)
+    const shape = await shapeOf(page, images.panelId)
+    const row = shape.locator('.slideshow-settings-toggle')
+    await expect(row).toHaveText(/Change every .+ s · .*(Fade|No fade).* · Zoom \d+%/)
+    await expect(shape.locator('.range-grid')).toHaveCount(0)
+    // The buttons are not behind it.
+    await expect(shape.getByRole('button', { name: 'Next image' })).toBeVisible()
+
+    await row.click()
+    await expect(shape.locator('.range-grid')).toBeVisible()
+    await expect(row).toHaveAttribute('aria-expanded', 'true')
+
+    // Moving a slider is reflected in the row once it is closed again.
+    const speed = shape.locator('.range-grid label', { hasText: 'Speed' }).locator('input[type="range"]')
+    await speed.focus()
+    await page.keyboard.press('ArrowRight')
+    const text = await row.innerText()
+    await row.click()
+    await expect(shape.locator('.range-grid')).toHaveCount(0)
+    await expect(row).toHaveText(text)
   })
 })

@@ -100,6 +100,7 @@ test.describe('content: the widget owns it', () => {
     const images = await panelOfType(page, 'slideshow')
     await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
+    await shape.locator('.slideshow-settings-toggle').click()
     const speed = shape.locator('.range-grid label', { hasText: 'Speed' }).locator('input[type="range"]')
     const box = await speed.boundingBox()
     if (!box) throw new Error('The speed slider is not on screen')

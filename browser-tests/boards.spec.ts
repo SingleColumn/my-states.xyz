@@ -84,6 +84,7 @@ test('panels, hiding, settings and stacking order survive a reload', async ({ pa
   // Change slideshow settings through the panel's controls.
   const imagesShape = await shapeOf(page, images.panelId)
   await imagesShape.getByRole('button', { name: 'Shuffle images' }).click()
+  await imagesShape.locator('.slideshow-settings-toggle').click()
   const speed = imagesShape.locator('.range-grid label', { hasText: 'Speed' }).locator('input[type="range"]')
   await speed.focus()
   await page.keyboard.press('ArrowRight')

@@ -145,9 +145,10 @@ describe('Images panel focus view', () => {
     expect(full).toContain('slideshow-controls')
     expect(full).toContain('aria-label="Next image"')
     expect(full).toContain('aria-label="Stop slideshow"')
-    expect(full).toContain('>Speed ')
-    expect(full).toContain('>Fade ')
-    expect(full).toContain('>Zoom ')
+    // The sliders sit behind one row that says what they are set to.
+    expect(full).toContain('slideshow-settings-toggle')
+    expect(full).toContain('aria-expanded="false"')
+    expect(full).not.toContain('>Speed ')
     expect(full).toContain('card-footer')
     expect(full).toContain('>Choose a local folder<')
     expect(full).toContain('>Remove local images<')

@@ -59,7 +59,7 @@ An empty Images panel browses the available image collections one cover at a tim
 
 The panel menu also has **Show loaded images**, which opens a list of thumbnails you can pick from, and, when the images come from a local folder, **Remove local images**, which removes them from the panel. In the **Browse collections as** row, **Grid** displays six collections at a time so you can choose one directly, with page controls when more are available, and **Carousel** shows them one at a time. Opening either leaves the current images in place until you make a new choice.
 
-Below the picture, use **Previous image**, **Start slideshow** (which becomes **Pause slideshow**), **Next image**, **Stop slideshow** and **Shuffle images** to control the slideshow. Adjust **Speed**, **Fade**, and **Zoom** with their sliders; **Reset zoom** returns the zoom to its default value.
+Below the picture, use **Previous image**, **Start slideshow** (which becomes **Pause slideshow**), **Next image**, **Stop slideshow** and **Shuffle images** to control the slideshow. The line beneath them shows the current speed, fade and zoom; select it to open the **Speed**, **Fade** and **Zoom** sliders. **Reset zoom** returns the zoom to its default value.
 
 Every picture in a collection carries a credit. Move the pointer over the picture to see who made it and to follow a link to the original post.
 

@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, ChevronsDownUp, FolderOpen, GripVertical, Images, LayoutGrid, Maximize2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, Square, Trash2 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useAppState } from '../AppState'
 import type { ImageItem, Panel } from '../types'
@@ -8,7 +8,6 @@ import { useFeaturedImageCollections } from '../collectionSource'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
 import { usePanelSessionState } from '../panelSessionState'
-import { getSpikeSnapshot, spikeState } from '../spike/spikeFlag'
 import { ImageAttributionOverlay } from './imageAttribution'
 import { ImageViewer } from './ImageViewer'
 import { panelContentProps, panelFrameActionProps } from '../panelSurface'
@@ -55,11 +54,11 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
   // between the canvas and Editor mode (see panelSessionState).
   const [isImagePickerOpen, setIsImagePickerOpen] = usePanelSessionState(panelId, 'image-picker-open', false)
   const [isViewerOpen, setIsViewerOpen] = useState(false)
-  // SPIKE. In Editor mode the panel is a narrow window and the three sliders
-  // take about 40% of its height, so they sit behind one row until asked for.
-  // The buttons stay out. On the canvas nothing changes.
-  const collapseSliders = useSyncExternalStore(spikeState.subscribe, getSpikeSnapshot, getSpikeSnapshot).editorMode
-  const [slidersOpen, setSlidersOpen] = useState(false)
+  // The three sliders are rarely touched once set, and they compete with the
+  // picture, so they sit behind one row that also says what they are set to.
+  // The buttons stay out. Kept per panel for the visit, so the canvas and
+  // Editor mode agree on whether it is open.
+  const [slidersOpen, setSlidersOpen] = usePanelSessionState(panelId, 'sliders-open', false)
   const [panelView, setPanelView] = usePanelSessionState<'slideshow' | 'browse-collections'>(panelId, 'view', () => (
     panelSettings.imageSource.type === 'none' ? 'browse-collections' : 'slideshow'
   ))
@@ -398,13 +397,17 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
               </span>
             ) : null}
           </div>
-          {collapseSliders ? (
-            <button className="slideshow-settings-toggle" type="button" aria-expanded={slidersOpen} onClick={() => setSlidersOpen((open) => !open)}>
-              {slidersOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
-              Speed, fade and zoom
-            </button>
-          ) : null}
-          {collapseSliders && !slidersOpen ? null : (
+          <button
+            className="slideshow-settings-toggle"
+            type="button"
+            aria-expanded={slidersOpen}
+            title="Show or hide the speed, fade and zoom sliders"
+            onClick={() => setSlidersOpen((open) => !open)}
+          >
+            {slidersOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+            <span className="slideshow-settings-summary">{settingsSummary(panelSettings)}</span>
+          </button>
+          {slidersOpen ? (
           <>
           <div className="range-grid">
             <label><span>Speed <output className="slideshow-control-value">{panelSettings.intervalMs} ms</output></span><input type="range" min={minSlideshowInterval} max={maxSlideshowInterval} step={250} value={panelSettings.intervalMs} onChange={(event) => slideshow.updateSettings({ intervalMs: Number(event.target.value) }, panelId)} /></label>
@@ -416,7 +419,7 @@ export function SlideshowPanel({ panelId }: { panelId: string }) {
             <button className="card-icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" onClick={() => slideshow.updateSettings({ zoom: DEFAULT_SLIDESHOW_ZOOM }, panelId)}><RotateCcw size={17} /></button>
           </div>
           </>
-          )}
+          ) : null}
         </div>
 
         <footer className="card-footer" {...panelContentProps}>
@@ -579,4 +582,11 @@ function CrossfadeImage({
       />
     </>
   )
+}
+
+/** What the sliders are set to, in a line: "Change every 4 s · Fade 0.5 s · Zoom 110%". */
+function settingsSummary(settings: { intervalMs: number; transitionMs: number; zoom: number }) {
+  const seconds = (ms: number) => `${Math.round(ms / 100) / 10} s`
+  const fade = settings.transitionMs > 0 ? `Fade ${seconds(settings.transitionMs)}` : 'No fade'
+  return `Change every ${seconds(settings.intervalMs)} · ${fade} · Zoom ${Math.round(settings.zoom * 100)}%`
 }
