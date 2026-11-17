@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
+import { ChevronsDownUp } from 'lucide-react'
 import { useAppState } from '../AppState'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { panelContentProps } from '../panelSurface'
@@ -26,12 +26,15 @@ export function VideoPanel({ panelId }: { panelId: string }) {
         panelId={panelId}
         panelType="video"
         title="Video"
-        menuItems={[{
+        // SPIKE: headed like the other panels; focus view is its only action
+        // of its own, and it is drawn in the Panel group.
+        menuSections={[{ items: [{
           id: 'focus-view',
-          label: focusView ? 'Expand panel to full view' : 'Adjust panel to focus view',
-          icon: focusView ? <ChevronsUpDown size={17} aria-hidden="true" /> : <ChevronsDownUp size={17} aria-hidden="true" />,
+          label: 'Focus view',
+          icon: <ChevronsDownUp size={17} aria-hidden="true" />,
+          checked: focusView,
           onSelect: () => commands.togglePanelFocusView(panelId),
-        }]}
+        }] }]}
       />
 
       <div className="video-panel-body" {...panelContentProps}>

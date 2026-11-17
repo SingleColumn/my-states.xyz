@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Images } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent } from 'react'
 import type { CollectionSummary } from '../imageCollections'
+import { usePanelSessionState } from '../panelSessionState'
 
 export const collectionRotationIntervalMs = 3000
 // Automatic browsing can be ambient and unhurried. An explicit arrow press
@@ -75,6 +76,8 @@ export interface CollectionBrowserProps {
   error: string | null
   initialCollectionId?: string
   viewMode: 'carousel' | 'grid'
+  /** The panel showing it: the collection in view and the grid page are kept under it, so they survive the panel being drawn again elsewhere. */
+  stateScope?: string
   onSelectCollection(collectionId: string): void
   onRetry?: () => void
 }
@@ -90,18 +93,19 @@ export function CollectionBrowser({
   error,
   initialCollectionId,
   viewMode,
+  stateScope,
   onSelectCollection,
   onRetry,
 }: CollectionBrowserProps) {
   // Sample once for this browser instance. Async source completion and ordinary
   // rerenders reuse the same value rather than reshuffling what is featured.
   const [initialRandomValue] = useState(Math.random)
-  const [currentId, setCurrentId] = useState<string | null>(() => initialId(collections, initialCollectionId, initialRandomValue))
+  const [currentId, setCurrentId] = usePanelSessionState<string | null>(stateScope, 'browser-current', () => initialId(collections, initialCollectionId, initialRandomValue))
   const [isHovered, setIsHovered] = useState(false)
   const [hasFocusWithin, setHasFocusWithin] = useState(false)
   const [outgoingCollection, setOutgoingCollection] = useState<CollectionSummary | null>(null)
   const [captionCollectionId, setCaptionCollectionId] = useState<string | null>(currentId)
-  const [gridPage, setGridPage] = useState(() => gridPageForCollection(collections, initialCollectionId))
+  const [gridPage, setGridPage] = usePanelSessionState(stateScope, 'browser-grid-page', () => gridPageForCollection(collections, initialCollectionId))
   const previousCollectionIdRef = useRef<string | null>(currentId)
   const hasLocatedInitialGridPageRef = useRef(collections.length > 0)
   const transitionDurationRef = useRef(collectionCoverTransitionMs)

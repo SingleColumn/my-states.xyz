@@ -67,7 +67,7 @@ test.describe('content: the widget owns it', () => {
     // as an ordinary click at every step rather than the start of a drag.
     const trigger = shape.getByRole('button', { name: /panel actions$/ })
     await dragLocator(page, trigger, { dx: 3, dy: 2 })
-    const item = page.getByRole('menuitem', { name: 'Show collection grid' })
+    const item = page.getByRole('menuitemradio', { name: 'Show collection grid' })
     await expect(item).toBeVisible()
     expect(geometryOf(await panelById(page, images.panelId))).toEqual(geometryOf(images))
 
@@ -100,6 +100,7 @@ test.describe('content: the widget owns it', () => {
     const images = await panelOfType(page, 'slideshow')
     await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
+    await shape.locator('.slideshow-settings-toggle').click()
     const speed = shape.locator('.range-grid label', { hasText: 'Speed' }).locator('input[type="range"]')
     const box = await speed.boundingBox()
     if (!box) throw new Error('The speed slider is not on screen')
@@ -176,7 +177,7 @@ test.describe('Images focus view', () => {
     await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
 
-    await choosePanelMenuItem(shape, 'Adjust panel to focus view')
+    await choosePanelMenuItem(shape, 'Focus view')
     const pause = shape.getByRole('button', { name: 'Pause slideshow' })
     await expect(pause).toBeVisible()
     await pause.click()
@@ -192,7 +193,7 @@ test.describe('Images focus view', () => {
     await loadSampleImages(page, images.panelId)
     const shape = await shapeOf(page, images.panelId)
 
-    await choosePanelMenuItem(shape, 'Adjust panel to focus view')
+    await choosePanelMenuItem(shape, 'Focus view')
     await expect.poll(async () => (await panelById(page, images.panelId)).focusView).toBe(true)
     const before = geometryOf(await panelById(page, images.panelId))
     const picture = shape.locator('img.slideshow-image-layer')

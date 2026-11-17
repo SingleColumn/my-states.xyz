@@ -919,3 +919,35 @@
 .card-footer-status .error-text {
   margin: 0;
 }
+
+/* The row that opens the sliders: quiet, full width, and clearly something
+   to press. Its text is the current settings, cut short in a narrow panel. */
+.slideshow-settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--image-panel-label-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slideshow-settings-toggle:hover,
+.slideshow-settings-toggle:focus-visible {
+  color: var(--color-text);
+}
+
+.slideshow-settings-toggle svg {
+  flex: none;
+}
+
+.slideshow-settings-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

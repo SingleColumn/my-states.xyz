@@ -14,13 +14,13 @@ import { NotesEditorActionsContext, type NotesEditorActions } from './notesEdito
 import { formattingTooltip, NotesFormattingTooltip } from './NotesFormattingTooltip'
 import { linkEditorTooltip, NotesLinkEditor, removeLinkCommand } from './NotesLinkEditor'
 import { insertMenu, NotesInsertMenu } from './NotesInsertMenu'
-import { panelEmbed, panelEmbedDrop, panelEmbedDropCursor, panelEmbedRemark, PanelEmbedView } from './notesEmbed'
 import { configureUnderlineStringify, toggleUnderlineCommand, underlineKeymap, underlineRemark, underlineSchema } from './notesUnderline'
 import { configureHighlightStringify, highlightInputRule, highlightKeymap, highlightRemark, highlightSchema, toggleHighlightCommand } from './notesHighlight'
 import { configureTextStyleStringify, textStyleRemark, textStyleSchema } from './notesTextStyle'
 import { pastePlainText } from './notesClipboard'
 import { NotesWritingToolbar } from './NotesWritingToolbar'
-import { configureImageSize, imageSizeRemark, NotesImageView } from './notesImage'
+import { configureImageSize, imageSizeRemark, lonePictureCentring, NotesImageView } from './notesImage'
+import { notesDropCursor, notesPictureDrop } from './notesPictureDrop'
 import '@milkdown/prose/view/style/prosemirror.css'
 
 /**
@@ -245,6 +245,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, readO
       .use(clipboard)
       .use(underlineRemark)
       .use(imageSizeRemark)
+      .use(lonePictureCentring)
       .use($view(imageSchema.node, () => nodeViewFactory({ component: NotesImageView, as: 'span' })))
       .use(underlineSchema)
       .use(toggleUnderlineCommand)
@@ -266,11 +267,8 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, readO
       .use(formattingTooltip)
       .use(linkEditorTooltip)
       .use(insertMenu)
-      .use(panelEmbedRemark)
-      .use(panelEmbed)
-      .use($view(panelEmbed, () => nodeViewFactory({ component: PanelEmbedView, as: 'div', contentAs: 'div' })))
-      .use(panelEmbedDrop)
-      .use(panelEmbedDropCursor)
+      .use(notesPictureDrop)
+      .use(notesDropCursor)
 
     const offerHandle = () => {
       const ready = editorRef.current
@@ -347,7 +345,12 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, readO
       // that and the next edit writes a fresh document.
       if (!storedDocument) throw error
       console.warn('The stored note document could not be read; opening it from its Markdown instead.', error)
-      await editor.destroy()
+      // The failed editor is not destroyed: Milkdown's destroy waits for a
+      // creation still under way to finish, and this one never will, so it
+      // would wait forever and the note would never open. It drew nothing
+      // (the document is read before the view is made); the mount is
+      // cleared anyway, so the Markdown editor starts on an empty one.
+      mount.replaceChildren()
       editor = make(false)
       editorRef.current = editor
       await editor.create()

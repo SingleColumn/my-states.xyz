@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentType, type CSSProperties } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react'
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
@@ -18,6 +18,7 @@ import { createPanelProps, panelFromShape } from './panelStore'
 import { isInsidePanelContent, isTextInputTarget, markPointerEventHandled, panelScrollSelector } from './panelSurface'
 import { usePanelCommands } from './PanelHeader'
 import { useMomentView } from './momentView'
+import { getSpikeSnapshot, spikeState } from './spike/spikeFlag'
 
 export { PANEL_SHAPE_TYPE } from './panelShapeTypes'
 export type { PanelShape } from './panelShapeSchema'
@@ -28,7 +29,7 @@ export type { PanelShape } from './panelShapeSchema'
  * panelRegistry.ts. Typed as a record over PanelType so that a type added to
  * the registry without a renderer is a compile error here.
  */
-const panelComponents: { readonly [K in PanelType]: ComponentType<{ panelId: string }> } = {
+export const panelComponents: { readonly [K in PanelType]: ComponentType<{ panelId: string }> } = {
   spotify: SpotifyPanel,
   slideshow: SlideshowPanel,
   notes: NotesPanel,
@@ -84,7 +85,10 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
     // they are visible again the board the canvas is panned.
     const commands = usePanelCommands()
     const momentView = useMomentView()
+    // SPIKE: in Editor mode the panels are drawn by the front-of-canvas layer instead.
+    const spike = useSyncExternalStore(spikeState.subscribe, getSpikeSnapshot)
     if (!shape.props.visible) return null
+    if (spike.editorMode) return null
 
     return (
       <HTMLContainer

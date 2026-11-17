@@ -5,6 +5,7 @@ import { CanvasViewControls } from './CanvasViewControls'
 import { BoardToolbar } from './BoardToolbar'
 import { BoardThemeSelect } from './BoardThemeSelect'
 import type { PanelType } from './types'
+import { SpikeModeSwitch } from './spike/SpikeModeSwitch'
 
 export interface AppChromeRect {
   top: number
@@ -112,6 +113,7 @@ export function AppChrome({
           <img className="app-chrome-brand-logo" src="/favicon.svg" alt="" width={26} height={26} />
           <span className="app-chrome-brand-name">{HELP_ABOUT_LABEL}</span>
         </button>
+        <SpikeModeSwitch />
         <BoardToolbar />
       </div>
 

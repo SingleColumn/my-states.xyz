@@ -320,14 +320,14 @@ test.describe('the Music panel, before Spotify is connected', () => {
     await expect(shape.locator('.card-footer')).toBeVisible()
     await expect(shape.getByLabel('Search playlists')).toBeVisible()
 
-    await choosePanelMenuItem(shape, 'Reduce panel to focus view')
+    await choosePanelMenuItem(shape, 'Focus view')
     await expect(shape.locator('.spotify-focus-connect').getByText('Not connected')).toBeVisible()
     await expect(shape.getByRole('button', { name: 'Connect Spotify', exact: true })).toBeVisible()
     // The focus view is too small for six cards or for a search field.
     await expect(shape.locator('.suggestion-card')).toHaveCount(0)
     await expect(shape.getByLabel('Search playlists')).toHaveCount(0)
 
-    await choosePanelMenuItem(shape, 'Expand panel to full view')
+    await choosePanelMenuItem(shape, 'Focus view')
     await expect(shape.getByLabel('Search playlists')).toBeVisible()
   })
 })

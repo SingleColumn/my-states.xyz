@@ -1,4 +1,10 @@
 import 'fake-indexeddb/auto'
+import { beforeEach } from 'vitest'
+import { clearPanelSessionState } from '../panelSessionState'
+
+// Panels remember their passing view choices per panel for the whole page
+// visit, and tests reuse panel names, so each test starts with none.
+beforeEach(() => clearPanelSessionState())
 
 class MemoryStorage implements Storage {
   #values = new Map<string, string>()

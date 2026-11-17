@@ -145,17 +145,19 @@ describe('Images panel focus view', () => {
     expect(full).toContain('slideshow-controls')
     expect(full).toContain('aria-label="Next image"')
     expect(full).toContain('aria-label="Stop slideshow"')
-    expect(full).toContain('>Speed ')
-    expect(full).toContain('>Fade ')
-    expect(full).toContain('>Zoom ')
+    // The sliders sit behind one row that says what they are set to.
+    expect(full).toContain('slideshow-settings-toggle')
+    expect(full).toContain('aria-expanded="false"')
+    expect(full).not.toContain('>Speed ')
     expect(full).toContain('card-footer')
     expect(full).toContain('>Choose a local folder<')
     expect(full).toContain('>Remove local images<')
   })
 
-  it('offers the focus view toggle from the panel header, before the hide button', () => {
+  it('offers focus view in the panel group, right after Hide panel and before the other sizes', () => {
     const markup = renderImagesPanel(false)
-    expect(markup.indexOf('Adjust panel to focus view')).toBeLessThan(markup.indexOf('Hide panel'))
+    expect(markup.indexOf('>Hide panel<')).toBeLessThan(markup.indexOf('>Focus view<'))
+    expect(markup.indexOf('>Focus view<')).toBeLessThan(markup.indexOf('>Expand panel to full screen<'))
   })
 
   it('keeps the source actions in the panel header menu', () => {
