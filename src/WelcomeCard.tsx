@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { MoreHorizontal, X } from 'lucide-react'
 
+/** Which control closed the card, so the ways out can be compared. */
+export type WelcomeCloseMethod = 'close_button' | 'got_it' | 'outside_click' | 'escape_key' | 'how_it_works'
+
 interface WelcomeCardProps {
   /** `dontShowAgain` is the checkbox as it stood when the card was closed. */
-  onClose(dontShowAgain: boolean): void
+  onClose(dontShowAgain: boolean, method: WelcomeCloseMethod): void
   onOpenHelp(dontShowAgain: boolean): void
 }
 
@@ -20,7 +23,7 @@ export function WelcomeCard({ onClose, onOpenHelp }: WelcomeCardProps) {
   return (
     // The glass layer keeps the panels visible but quiet behind the card.
     // A press on it closes the card for this visit, as it does for the help dialog.
-    <div className="welcome-frost" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(dontShowAgain) }}>
+    <div className="welcome-frost" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(dontShowAgain, 'outside_click') }}>
     <section
       className="welcome-card"
       aria-label="Welcome to my-states.xyz"
@@ -29,12 +32,12 @@ export function WelcomeCard({ onClose, onOpenHelp }: WelcomeCardProps) {
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return
         event.stopPropagation()
-        onClose(dontShowAgain)
+        onClose(dontShowAgain, 'escape_key')
       }}
     >
       <header className="welcome-card-header">
         <h2>Welcome to my-states.xyz</h2>
-        <button className="welcome-card-close" type="button" aria-label="Close welcome message" title="Close" onClick={() => onClose(dontShowAgain)}>
+        <button className="welcome-card-close" type="button" aria-label="Close welcome message" title="Close" onClick={() => onClose(dontShowAgain, 'close_button')}>
           <X size={16} aria-hidden="true" />
         </button>
       </header>
@@ -51,7 +54,7 @@ export function WelcomeCard({ onClose, onOpenHelp }: WelcomeCardProps) {
           <span>Don't show this again</span>
         </label>
         <div className="welcome-card-actions">
-          <button className="welcome-card-primary" type="button" onClick={() => onClose(dontShowAgain)}>Got it</button>
+          <button className="welcome-card-primary" type="button" onClick={() => onClose(dontShowAgain, 'got_it')}>Got it</button>
           <button className="welcome-card-secondary" type="button" onClick={() => onOpenHelp(dontShowAgain)}>How it works</button>
         </div>
       </div>

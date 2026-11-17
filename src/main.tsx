@@ -54,12 +54,24 @@ if (localOrigin) {
     )
   } else {
     // Imported lazily so the mobile branch above never pays for it.
-    import('./App').then(({ default: App }) => {
+    Promise.all([import('./App'), import('./spike/spikeFlag')]).then(([{ default: App }, { spikeState }]) => {
+      // Every event says which view the visitor was in, so writing and the
+      // rest can be compared between Canvas and Editor. Set here, before the
+      // first pageview is sent, and again whenever the view changes.
+      const desktopPosthogOptions = {
+        ...posthogOptions,
+        loaded: (posthog: PostHogInterface) => {
+          posthogOptions.loaded(posthog)
+          const registerLayoutMode = () => posthog.register({ layout_mode: spikeState.get().editorMode ? 'editor' : 'canvas' })
+          registerLayoutMode()
+          spikeState.subscribe(registerLayoutMode)
+        },
+      }
       root.render(
         <React.StrictMode>
           <PostHogProvider
             apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
-            options={posthogOptions}
+            options={desktopPosthogOptions}
           >
             <App />
             <Analytics />

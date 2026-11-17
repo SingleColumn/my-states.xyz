@@ -22,7 +22,7 @@ import { diffChangesBoard, registerHiddenCanvasPersistence, saveActivity } from 
 import { buildPanelArchitectureReport, type PanelArchitectureReport, type PanelRuntimeSnapshot } from './panelArchitectureReport'
 import { PanelArchitectureReportView } from './PanelArchitectureReportView'
 import { HelpAbout } from './HelpAbout'
-import { WelcomeCard } from './WelcomeCard'
+import { WelcomeCard, type WelcomeCloseMethod } from './WelcomeCard'
 import { isWelcomeHidden, setWelcomeHidden } from './welcomePreference'
 import { AppSettings } from './AppSettings'
 import { WordGraphProvider } from './wordGraph/WordGraphController'
@@ -668,13 +668,14 @@ function AppContent() {
 
   const closeHelpAbout = useCallback(() => setIsHelpAboutOpen(false), [])
 
-  const closeWelcome = useCallback((dontShowAgain: boolean) => {
+  const closeWelcome = useCallback((dontShowAgain: boolean, method: WelcomeCloseMethod) => {
     if (dontShowAgain) setWelcomeHidden(true)
     setIsWelcomeVisible(false)
-  }, [])
+    posthog.capture('welcome_closed', { method, dont_show_again: dontShowAgain })
+  }, [posthog])
 
   const openHelpFromWelcome = useCallback((dontShowAgain: boolean) => {
-    closeWelcome(dontShowAgain)
+    closeWelcome(dontShowAgain, 'how_it_works')
     openHelpAbout()
   }, [closeWelcome, openHelpAbout])
 

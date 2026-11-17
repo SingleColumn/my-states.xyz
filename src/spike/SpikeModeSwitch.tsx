@@ -1,5 +1,6 @@
 import { FileText, LayoutDashboard } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
+import { usePostHog } from '@posthog/react'
 import { getSpikeSnapshot, spikeState } from './spikeFlag'
 
 /**
@@ -12,6 +13,18 @@ import { getSpikeSnapshot, spikeState } from './spikeFlag'
  */
 export function SpikeModeSwitch() {
   const { editorMode } = useSyncExternalStore(spikeState.subscribe, getSpikeSnapshot)
+  const posthog = usePostHog()
+
+  function choose(nextEditorMode: boolean) {
+    // Pressing the view already in use changes nothing, so it is not a switch.
+    if (nextEditorMode === editorMode) return
+    spikeState.set({ editorMode: nextEditorMode })
+    posthog.capture('layout_mode_switched', {
+      from: editorMode ? 'editor' : 'canvas',
+      to: nextEditorMode ? 'editor' : 'canvas',
+    })
+  }
+
   return (
     <div className="spike-mode-switch" role="group" aria-label="View">
       <button
@@ -19,7 +32,7 @@ export function SpikeModeSwitch() {
         type="button"
         aria-pressed={!editorMode}
         title="Canvas: arrange your panels freely"
-        onClick={() => spikeState.set({ editorMode: false })}
+        onClick={() => choose(false)}
       >
         <LayoutDashboard size={16} aria-hidden="true" />
         <span>Canvas</span>
@@ -29,7 +42,7 @@ export function SpikeModeSwitch() {
         type="button"
         aria-pressed={editorMode}
         title="Editor: write on a full page, with the other panels as windows"
-        onClick={() => spikeState.set({ editorMode: true })}
+        onClick={() => choose(true)}
       >
         <FileText size={16} aria-hidden="true" />
         <span>Editor</span>
