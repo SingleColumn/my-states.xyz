@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { cameraZoom, openApp, panelOfType, selectPanel } from './helpers'
+import { expect, test, type Locator } from '@playwright/test'
+import { cameraZoom, loadSampleImages, openApp, panelOfType, selectPanel } from './helpers'
 
 /**
  * SPIKE. Editor mode draws its panels at the zoom the canvas was left at,
@@ -103,4 +103,111 @@ test('in Editor mode, canvas shortcuts do not reach the hidden canvas, with no s
     await page.keyboard.press(key)
     expect(await read(), `after ${key}`).toEqual({ tool: 'select', panels: panelsBefore })
   }
+})
+
+test('in Editor mode, the toolbar leaves out controls that act on the hidden canvas', async ({ page }) => {
+  await openApp(page)
+  const view = page.getByRole('group', { name: 'View' })
+  const pan = page.getByRole('button', { name: 'Pan canvas' })
+  const layoutMenu = page.getByRole('button', { name: 'Open panel view and layout actions' })
+  const canvasActions = page.getByTestId('actions-menu.button')
+  const hiddenMenu = page.getByRole('button', { name: 'Open hidden panels' })
+  await expect(pan).toBeVisible()
+  await expect(layoutMenu).toBeVisible()
+  await expect(canvasActions).toBeVisible()
+
+  await view.getByRole('button', { name: 'Editor' }).click()
+  await expect(page.locator('[data-testid="spike-editor-layer"]')).toBeVisible()
+  await expect(pan).toHaveCount(0)
+  await expect(layoutMenu).toHaveCount(0)
+  await expect(canvasActions).toHaveCount(0)
+  await expect(hiddenMenu).toHaveCount(0)
+  // Still useful in Editor mode: adding panels, and undo for panel changes.
+  await expect(page.getByRole('combobox', { name: 'Add panel' })).toBeVisible()
+  await expect(page.getByTestId('quick-actions.undo')).toBeVisible()
+
+  // A hidden panel can be brought back from the toolbar, as a window.
+  const images = page.locator('.spike-window').filter({ has: page.locator('[data-panel="slideshow"]') })
+  await images.getByRole('button', { name: 'Images panel actions' }).click()
+  await page.getByRole('menuitem', { name: 'Hide panel' }).click()
+  await expect(images).toHaveCount(0)
+  await hiddenMenu.click()
+  await expect(page.getByRole('menuitem')).toHaveText(['Restore Images 1'])
+  await page.getByRole('menuitem', { name: 'Restore Images 1' }).click()
+  await expect(images).toHaveCount(1)
+  await expect(hiddenMenu).toHaveCount(0)
+
+  // Back on the canvas, everything returns.
+  await view.getByRole('button', { name: 'Canvas' }).click()
+  await expect(pan).toBeVisible()
+  await expect(layoutMenu).toBeVisible()
+  await expect(canvasActions).toBeVisible()
+})
+
+test('in Editor mode, the Notes choice is left out while the page is showing', async ({ page }) => {
+  await openApp(page)
+  const writingCount = () => page.evaluate(() => window.myStates!.describe().panels.filter((panel) => panel.type === 'notes').length)
+  const add = page.getByRole('combobox', { name: 'Add panel' })
+  await expect(add.locator('option', { hasText: 'Notes' })).toHaveCount(1)
+
+  await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Editor' }).click()
+  await expect(page.locator('[data-testid="spike-editor-layer"]')).toBeVisible()
+  // Left out, rather than adding a panel that Editor mode would never draw.
+  await expect(add.locator('option', { hasText: 'Notes' })).toHaveCount(0)
+  await expect(add.locator('option', { hasText: 'Images' })).toHaveCount(1)
+  expect(await writingCount()).toBe(1)
+
+  // Other panels are still added, and drawn as windows.
+  await add.selectOption('slideshow')
+  await expect(page.locator('.spike-window')).toHaveCount(3)
+
+  // Back on the canvas the choice works again.
+  await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Canvas' }).click()
+  await expect(add.locator('option', { hasText: 'Notes' })).toHaveCount(1)
+})
+
+test('in Editor mode, Music and Images windows offer focus view in their ⋯ menu', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await openApp(page)
+  // Setup on the canvas, where the collection browser is: Images needs a
+  // picture before it offers focus view.
+  await loadSampleImages(page, (await panelOfType(page, 'slideshow')).panelId)
+  const zoom = await cameraZoom(page)
+  await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Editor' }).click()
+  const layer = page.locator('[data-testid="spike-editor-layer"]')
+  await expect(layer).toBeVisible()
+  const size = async (window: Locator) => { const box = (await window.boundingBox())!; return { w: Math.round(box.width), h: Math.round(box.height) } }
+  const focusViewItem = page.getByRole('menuitemcheckbox', { name: 'Focus view' })
+
+  // Music: a compact player, drawn at the size the canvas gives it (380 x 260
+  // canvas units), scaled by the zoom the panels are drawn at.
+  const music = layer.locator('.spike-window').filter({ has: page.locator('[data-panel="spotify"]') })
+  const before = await size(music)
+  await music.getByRole('button', { name: 'Music panel actions' }).click()
+  await expect(focusViewItem).toHaveAttribute('aria-checked', 'false')
+  await focusViewItem.click()
+  const scale = Math.min(1.25, Math.max(0.7, zoom))
+  await expect.poll(() => size(music)).toEqual({ w: Math.round(380 * scale), h: Math.round(260 * scale) })
+  await expect(music.locator('.panel-spotify-surface')).toHaveClass(/is-focus-view/)
+  // Its saved size is not edited, so there is nothing to drag.
+  await expect(music.locator('[data-spike-edge]')).toHaveCount(0)
+  await music.getByRole('button', { name: 'Music panel actions' }).click()
+  await expect(focusViewItem).toHaveAttribute('aria-checked', 'true')
+  await focusViewItem.click()
+  await expect.poll(() => size(music)).toEqual(before)
+  await expect(music.locator('[data-spike-edge]')).toHaveCount(8)
+
+  // Images: keeps its size; the controls give way to the picture.
+  const images = layer.locator('.spike-window').filter({ has: page.locator('[data-panel="slideshow"]') })
+  const imagesBefore = await size(images)
+  await images.getByRole('button', { name: 'Images panel actions' }).click()
+  await focusViewItem.click()
+  await expect(images.locator('.panel-slideshow-surface')).toHaveClass(/is-focus-view/)
+  expect(await size(images)).toEqual(imagesBefore)
+
+  // The state is shared: the canvas shows both in focus view.
+  await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Canvas' }).click()
+  const state = await page.evaluate(() => window.myStates!.describe().panels.filter((panel) => panel.type !== 'notes').map((panel) => [panel.type, panel.focusView]))
+  expect(state).toContainEqual(['slideshow', true])
+  expect(state).toContainEqual(['spotify', false])
 })

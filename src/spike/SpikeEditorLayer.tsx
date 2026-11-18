@@ -6,6 +6,7 @@ import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds } from '../canv
 import { PanelCommandsProvider, usePanelCommands, type PanelCommands, type PanelMenuItem } from '../PanelHeader'
 import { panelComponents } from '../PanelShape'
 import { isTextInputTarget } from '../panelSurface'
+import { getPanelFocusViewSize } from '../panelLayout'
 import type { PanelType } from '../types'
 import { getSpikeSnapshot, spikeState } from './spikeFlag'
 
@@ -127,10 +128,10 @@ export function SpikeEditorLayer() {
   const host = visible.find((panel) => panel.type === 'notes')
   const others = visible.filter((panel) => panel.type === 'slideshow' || panel.type === 'spotify')
 
-  return <Windows outer={outer} zoom={zoom} hostId={host?.id} windows={others.map((panel) => ({ id: panel.id, type: panel.type }))} />
+  return <Windows outer={outer} zoom={zoom} hostId={host?.id} windows={others.map((panel) => ({ id: panel.id, type: panel.type, focusView: panel.focusView }))} />
 }
 
-function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom: number; hostId?: string; windows: Array<{ id: string; type: PanelType }> }) {
+function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom: number; hostId?: string; windows: Array<{ id: string; type: PanelType; focusView: boolean }> }) {
   const layerRef = useRef<HTMLDivElement>(null)
   // Windows live in an area below the Writing page's header bar, so they can
   // never cover its buttons (its ⋯ menu sits right where a new window goes).
@@ -366,7 +367,12 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
           // Drawn inside the screen as it is now, so a window placed on a
           // larger screen, or before the browser was made smaller, is still
           // wholly visible. The saved place is left alone.
-          const rect = shown(saved, layer, headerHeights[window.id])
+          // In focus view a panel with a size of its own (Music) is drawn at
+          // that size, as on the canvas, where it is a size in canvas units and
+          // so scales with the zoom. The saved size is left alone and comes
+          // back when focus view is left.
+          const focusSize = window.focusView ? getPanelFocusViewSize(window.type) : null
+          const rect = shown(focusSize ? { ...saved, w: focusSize.w * zoom, h: focusSize.h * zoom } : saved, layer, headerHeights[window.id])
           const isSelected = selected === window.id
           const style: CSSProperties = {
             position: 'absolute',
@@ -385,7 +391,8 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
               onPointerDownCapture={(event) => onWindowPointerDown(event, window.id)}
             >
               <Frame type={window.type} panelId={window.id} zoom={zoom} style={{ position: 'absolute', inset: 0 }} />
-              {(rect.minimised ? MINIMISED_EDGES : EDGES).map((edge) => <div key={edge} className={`spike-edge spike-edge-${edge}`} data-spike-edge={edge} />)}
+              {/* No edges in a fixed-size focus view: dragging one would change a size that is not shown. */}
+              {(focusSize ? [] : rect.minimised ? MINIMISED_EDGES : EDGES).map((edge) => <div key={edge} className={`spike-edge spike-edge-${edge}`} data-spike-edge={edge} />)}
             </div>
           )
         })}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiMenuActionItem, TldrawUiToolbar, useCanRedo, useCanUndo } from 'tldraw'
 import { Hand, Settings } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
@@ -6,6 +6,7 @@ import { BoardToolbar } from './BoardToolbar'
 import { BoardThemeSelect } from './BoardThemeSelect'
 import type { PanelType } from './types'
 import { SpikeModeSwitch } from './spike/SpikeModeSwitch'
+import { getSpikeSnapshot, spikeState } from './spike/spikeFlag'
 
 export interface AppChromeRect {
   top: number
@@ -76,6 +77,10 @@ export function AppChrome({
   onAddPanel,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
+  // SPIKE: in Editor mode the canvas is hidden, so the controls that move or
+  // arrange it would act on something nobody can see. They are left out
+  // rather than greyed, because there is nothing for them to do there.
+  const { editorMode } = useSyncExternalStore(spikeState.subscribe, getSpikeSnapshot)
   useLayoutEffect(() => {
     const element = rootRef.current
     if (!element) return
@@ -117,8 +122,8 @@ export function AppChrome({
         <BoardToolbar />
       </div>
 
-      <section className="app-chrome-canvas" aria-label="Canvas view controls">
-        <button
+      <section className="app-chrome-canvas" aria-label={editorMode ? 'Panel controls' : 'Canvas view controls'}>
+        {editorMode ? null : <button
           className="app-chrome-control app-chrome-pan-control"
           type="button"
           aria-label={isPanMode ? 'Exit pan mode' : 'Pan canvas'}
@@ -129,7 +134,7 @@ export function AppChrome({
           <Hand size={16} aria-hidden="true" />
           <span className="canvas-control-label-long">{isPanMode ? 'Exit pan mode' : 'Pan canvas'}</span>
           <span className="canvas-control-label-short">{isPanMode ? 'Exit' : 'Pan'}</span>
-        </button>
+        </button>}
         <CanvasViewControls
           isReady={isCanvasReady}
           onAddPanel={onAddPanel}
@@ -143,6 +148,7 @@ export function AppChrome({
           onHideSelectedPanel={onHideSelectedPanel}
           onRestorePanel={onRestorePanel}
           onEnterMomentView={onEnterMomentView}
+          editorMode={editorMode}
         />
       </section>
 
@@ -153,9 +159,13 @@ export function AppChrome({
           <DefaultQuickActions>
             <UndoRedoQuickActions />
           </DefaultQuickActions>
-          <DefaultActionsMenu>
-            <DefaultActionsMenuContent />
-          </DefaultActionsMenu>
+          {/* Align, group, zoom and the like: canvas only. Undo and redo
+              stay, since they also undo panel changes made in Editor mode. */}
+          {editorMode ? null : (
+            <DefaultActionsMenu>
+              <DefaultActionsMenuContent />
+            </DefaultActionsMenu>
+          )}
         </TldrawUiToolbar>
         <button
           className="app-chrome-control settings-launcher"

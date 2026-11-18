@@ -2,6 +2,7 @@ import { Camera, EyeOff, Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelT
 import { useEffect, useRef, useState } from 'react'
 import type { PanelType } from './types'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
+import { useAppState } from './AppState'
 
 interface CanvasViewControlsProps {
   isReady: boolean
@@ -16,6 +17,12 @@ interface CanvasViewControlsProps {
   onHideSelectedPanel(): void
   onRestorePanel(panelId: string): void
   onEnterMomentView(): void
+  /**
+   * SPIKE: in Editor mode only the menu's "Hidden panels" section is kept,
+   * since a restored panel opens as a window. Fitting, resetting and hiding
+   * act on the hidden canvas, and the screenshot view shows the canvas.
+   */
+  editorMode?: boolean
 }
 
 export function CanvasViewControls({
@@ -31,7 +38,14 @@ export function CanvasViewControls({
   onHideSelectedPanel,
   onRestorePanel,
   onEnterMomentView,
+  editorMode = false,
 }: CanvasViewControlsProps) {
+  const { panels } = useAppState()
+  // SPIKE: Editor mode draws one Writing panel, the page. A second one would
+  // be added to the board and never shown, so the choice is left out while
+  // the page is showing. With no visible Writing panel it is offered: the
+  // new one becomes the page.
+  const writingIsThePage = editorMode && panels.all.some((panel) => panel.type === 'notes' && panel.visible)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [panelTypeToAdd, setPanelTypeToAdd] = useState<PanelType | ''>('')
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -57,6 +71,8 @@ export function CanvasViewControls({
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isMenuOpen])
+
+  const menuLabel = editorMode ? 'Hidden panels' : 'Panel view and layout actions'
 
   function runMenuAction(action: () => void) {
     setIsMenuOpen(false)
@@ -88,25 +104,26 @@ export function CanvasViewControls({
         onChange={handleAddPanel}
       >
         <option value="">Add panel</option>
-        {PANEL_TYPES.filter((type) => type !== 'video').map((type) => (
+        {PANEL_TYPES.filter((type) => type !== 'video' && !(type === 'notes' && writingIsThePage)).map((type) => (
           <option value={type} key={type}>{getPanelDefinition(type).label}</option>
         ))}
       </select>
-      <button
+      {editorMode && !hiddenPanels.length ? null : <button
         ref={triggerRef}
         className="app-chrome-control app-chrome-menu-trigger"
         type="button"
-        title="Panel view and layout actions"
-        aria-label="Open panel view and layout actions"
+        title={menuLabel}
+        aria-label={`Open ${menuLabel.toLowerCase()}`}
         aria-haspopup="menu"
         aria-expanded={isMenuOpen}
         disabled={!isReady}
         onClick={() => setIsMenuOpen((open) => !open)}
       >
         <MoreHorizontal size={16} aria-hidden="true" />
-      </button>
-      {isMenuOpen ? (
-        <div className="canvas-view-menu" role="menu" aria-label="Panel view and layout actions">
+      </button>}
+      {isMenuOpen && (!editorMode || hiddenPanels.length) ? (
+        <div className="canvas-view-menu" role="menu" aria-label={menuLabel}>
+          {editorMode ? null : <>
           <button type="button" role="menuitem" title="Fit all panels into view" onClick={() => runMenuAction(onFitPanels)}>
             <Focus size={16} aria-hidden="true" />
             <span>Fit all panels</span>
@@ -154,6 +171,7 @@ export function CanvasViewControls({
             <Camera size={16} aria-hidden="true" />
             <span>Prepare board for screenshot</span>
           </button>
+          </>}
           {hiddenPanels.length ? (
             <div className="canvas-view-menu-section" role="group" aria-label="Hidden panels">
               <span className="canvas-view-menu-heading">Hidden panels</span>

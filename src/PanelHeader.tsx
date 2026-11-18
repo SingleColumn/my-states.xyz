@@ -128,11 +128,17 @@ export function PanelHeader({ panelId, panelType, title, menuItems, menuSections
   const headed = menuSections !== undefined
   // SPIKE: in a headed menu the focus view is a size of the panel, like full
   // screen, so it is drawn in the Panel group, right after Hide panel,
-  // whichever group the panel listed it in.
-  const focusViewItem = headed && !windowItems
+  // whichever group the panel listed it in. A window in Editor mode keeps it
+  // too, after Hide panel.
+  const focusViewItem = headed
     ? menuSections.flatMap((section) => section.items).find((item): item is PanelMenuItem => item.id === 'focus-view' && !isChoices(item))
     : undefined
-  const panelItems: PanelMenuItem[] = windowItems ?? [
+  const withFocusView = (items: PanelMenuItem[]) => {
+    if (!focusViewItem || items.length === 0) return items
+    const afterHide = items.findIndex((item) => item.id === 'hide') + 1
+    return [...items.slice(0, afterHide), focusViewItem, ...items.slice(afterHide)]
+  }
+  const panelItems: PanelMenuItem[] = windowItems ? withFocusView(windowItems) : [
     { id: 'hide', label: 'Hide panel', icon: <EyeOff size={17} aria-hidden="true" />, onSelect: () => commands.hidePanel(panelId) },
     ...(focusViewItem ? [focusViewItem] : []),
     {
