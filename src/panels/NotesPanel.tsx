@@ -50,6 +50,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
   const [animationPreview, setAnimationPreview] = useState(false)
+  const [animationOptionsOpen, setAnimationOptionsOpen] = useState(false)
   const [animationManagerOpen, setAnimationManagerOpen] = useState(false)
   const [animationDocument, setAnimationDocument] = useState<NoteDocument | null>(null)
   const animationDocumentRef = useRef<NoteDocument | null>(null)
@@ -110,9 +111,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   useEffect(() => {
     animationDocumentRef.current = null
     setAnimationDocument(null)
+    setAnimationOptionsOpen(false)
     setAnimationManagerOpen(false)
   }, [activeNote?.id])
-  useEffect(() => { if (momentView) setAnimationManagerOpen(false) }, [momentView])
+  useEffect(() => { if (momentView) { setAnimationOptionsOpen(false); setAnimationManagerOpen(false) } }, [momentView])
 
   function captureWritingProgress(words: number) {
     const noteId = activeNote?.id
@@ -224,7 +226,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ] }, { heading: 'View', items: [
-          { id: 'animations', label: 'Animations', icon: <Play size={17} aria-hidden="true" />, disabled: !activeNote || momentView, onSelect: openAnimationManager },
+          { id: 'animations', label: 'Animations', icon: <Play size={17} aria-hidden="true" />, checked: animationOptionsOpen, disabled: !activeNote || momentView, onSelect: () => setAnimationOptionsOpen(value => !value) },
           {
             id: 'formatting-tools',
             label: 'Show formatting tools',
@@ -232,6 +234,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             checked: showTools,
             onSelect: () => {
               setShowTools(!showTools)
+              setAnimationOptionsOpen(false)
               try {
                 window.localStorage.setItem(showToolsStorageKey, String(!showTools))
               } catch {
@@ -321,17 +324,17 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         )}
 
+        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} toolbarHost={isWritingMode ? animationToolbarHostRef.current : null} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen && !animationPreview} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
+
         {/* Always rendered, hidden when the writer has not asked for it:
             the editor draws the tools into this element as it starts, and a
             host that came and went would leave the drawing with nowhere to
             go. */}
         <div
-          className={`notes-writing-toolbar-host${showTools && activeNote && !animationPreview ? '' : ' is-hidden'}`}
+          className={`notes-writing-toolbar-host${showTools && activeNote && !animationPreview && !animationOptionsOpen ? '' : ' is-hidden'}`}
           ref={toolbarHostRef}
           {...panelContentProps}
         />
-
-        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} toolbarHost={isWritingMode ? animationToolbarHostRef.current : null} writingMode={isWritingMode} document={animationDocument} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
 
         {activeNote ? (
           <div

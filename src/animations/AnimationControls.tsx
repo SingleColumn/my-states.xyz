@@ -10,12 +10,14 @@ import { validateAnimationCss } from './css'
 import './animations.css'
 
 /** Panel-local playback and authoring state; definitions alone are persisted. */
-export function AnimationControls({ panelId, sourceElement, toolbarHost, writingMode, document, managerOpen, onManagerOpen, onManagerClose, onPreviewChange }: {
+export function AnimationControls({ panelId, sourceElement, toolbarHost, writingMode, document, optionsOpen, onOptionsClose, managerOpen, onManagerOpen, onManagerClose, onPreviewChange }: {
   panelId: string
   sourceElement: HTMLElement | null
   toolbarHost: HTMLElement | null
   writingMode: boolean
   document: NoteDocument | null
+  optionsOpen: boolean
+  onOptionsClose(): void
   managerOpen: boolean
   onManagerOpen(): void
   onManagerClose(): void
@@ -103,6 +105,18 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
   </div> : null
 
   return <>
+    {optionsOpen && <div className="animation-options-host" {...panelContentProps}>
+      <div className="animation-options-strip" role="toolbar" aria-label="Animation options">
+        <select className="app-dropdown" aria-label="Animation" value={selected.id} onChange={event => select(event.target.value)}>
+          <optgroup label="Built-in animations">{definitions.filter(definition => !definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>
+          {definitions.some(definition => definition.id.startsWith('custom-')) && <optgroup label="Custom animations">{definitions.filter(definition => definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>}
+        </select>
+        <button type="button" className="app-chrome-control animation-options-preview" onClick={preview}>Preview</button>
+        <button type="button" className="card-icon-button" aria-label="Animation settings" title="Animation settings" onClick={onManagerOpen}><Settings2 size={16} /></button>
+        <button type="button" className="card-icon-button" aria-label="Close animation options" title="Close animation options" onClick={onOptionsClose}><X size={16} /></button>
+      </div>
+      {status && <p className="animation-options-status" role="status">{status}</p>}
+    </div>}
     {playbackDefinition && <div className="animation-playback" {...panelContentProps}>
       {toolbarHost ? createPortal(playbackToolbar, toolbarHost) : playbackToolbar}
       <AnimationPreview key={`${playbackDefinition.id}:${run}`} document={document} definition={playbackDefinition} playing={playing} run={run} writingMode={writingMode} onFinish={() => { setPlaying(false); setFinished(true) }} />

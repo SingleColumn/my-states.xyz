@@ -2,10 +2,51 @@ import { test, expect, type Locator } from '@playwright/test'
 import { addPanelFromToolbar, cameraZoom, createBoardFromToolbar, describeCanvas, dispatch, dragLocator, noteBodyOf, openApp, panelOfType, shapeOf, waitForCanvas } from './helpers'
 
 async function openAnimations(panel: Locator) {
-  await panel.getByRole('button', { name: 'Writing panel actions' }).click()
-  await panel.page().getByRole('menuitem', { name: 'Animations' }).click()
+  const strip = panel.getByRole('toolbar', { name: 'Animation options' })
+  if (!await strip.isVisible()) {
+    await panel.getByRole('button', { name: 'Writing panel actions' }).click()
+    await panel.page().getByRole('menuitemcheckbox', { name: 'Animations' }).click()
+  }
+  await expect(strip).toBeVisible()
+  await strip.getByRole('button', { name: 'Animation settings' }).click()
   return panel.page().getByRole('dialog', { name: 'Animation management' })
 }
+
+test('the Animations action opens basic options below the header', async ({ page }) => {
+  await openApp(page)
+  const note = await panelOfType(page, 'notes')
+  const panel = await shapeOf(page, note.panelId)
+  const editor = noteBodyOf(panel)
+  await editor.fill('A short document for preview')
+  await expect(panel.getByRole('toolbar', { name: 'Animation options' })).toHaveCount(0)
+  await panel.getByRole('button', { name: 'Writing panel actions' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Animations' }).click()
+  const strip = panel.getByRole('toolbar', { name: 'Animation options' })
+  await expect(strip).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Animation management' })).toHaveCount(0)
+  await strip.getByRole('combobox', { name: 'Animation' }).selectOption('random-illumination')
+  await panel.screenshot({ path: 'test-results/animations-basic-options.png' })
+  for (const width of [320, 390, 600, 900]) {
+    await dispatch(page, { kind: 'panel.resize', panelId: note.panelId, w: width, h: 650 })
+    const positions = await strip.evaluate(element => {
+      const outer = element.getBoundingClientRect()
+      return [...element.querySelectorAll('button, select')].map(control => {
+        const box = control.getBoundingClientRect()
+        return { left: box.left, right: box.right, outerLeft: outer.left, outerRight: outer.right }
+      })
+    })
+    expect(positions.every(item => item.left >= item.outerLeft && item.right <= item.outerRight)).toBe(true)
+  }
+  await dispatch(page, { kind: 'panel.resize', panelId: note.panelId, w: 440, h: 650 })
+  await strip.getByRole('button', { name: 'Preview' }).click()
+  await expect(panel.locator('.animation-preview-host')).toContainText('A short document for preview')
+  await expect(strip).toHaveCount(0)
+  await panel.getByRole('button', { name: 'Exit animation' }).click()
+  await expect(strip).toBeVisible()
+  await expect(editor).toBeVisible()
+  await strip.getByRole('button', { name: 'Close animation options' }).click()
+  await expect(strip).toHaveCount(0)
+})
 
 test('writing stays clear; playback and authoring are separate', async ({ page }) => {
   const { pageErrors } = await openApp(page)

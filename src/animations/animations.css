@@ -1,3 +1,9 @@
+.animation-options-host { flex: 0 0 auto; min-width: 0; width: 100%; padding-block: var(--space-detail-5) var(--space-detail-2); }
+.animation-options-strip { box-sizing: border-box; display: flex; align-items: center; gap: var(--space-detail-1); width: min(100%, 480px); margin-inline: auto; padding: var(--space-detail-1); border: var(--border-width-hairline) solid var(--color-panel-border); border-radius: var(--radius-control); }
+.animation-options-strip select { flex: 1 1 auto; min-width: 0; width: 0; height: var(--card-header-button-size); }
+.animation-options-strip button { flex: 0 0 auto; }
+.animation-options-status { margin: 5px auto 0; max-width: 480px; color: var(--color-text-soft); font-size: var(--type-xs); }
+.canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode .animation-options-host { width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2))); margin-inline: auto; }
 .notes-body > .animation-playback { flex: 1 1 auto; min-height: 0; }
 .animation-playback { display: flex; flex-direction: column; min-width: 0; container-type: inline-size; }
 .animation-playback-toolbar { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 3px var(--card-padding); }
