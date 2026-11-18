@@ -152,10 +152,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     await notes.selectNote(documentId, panelId)
   }
 
-  // A single note - even the blank one a fresh board opens with - is not a
-  // choice yet, so a dropdown offering nothing but itself and "Create new
-  // note" is a control for a choice that doesn't exist.
-  const hasNotes = notes.notes.length > 1
+  // A note open in another panel cannot be selected here. Count only choices
+  // this panel can use, or the picker appears for an unavailable blank note.
+  const availableNotes = notes.notes.filter(note => notes.noteOpenElsewhere(note.id, panelId) === null)
+  const hasNotes = activeNote ? availableNotes.length > 1 : availableNotes.length > 0
   const noteSelect = hasNotes ? (
     <select
       className="app-dropdown note-select"
@@ -171,17 +171,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           Select existing note
         </option>
       )}
-      {notes.notes.map((note) => {
-        // Shown but not choosable: a note missing from the list is one the
-        // writer goes looking for, where one that says where it is answers
-        // the question instead.
-        const elsewhere = notes.noteOpenElsewhere(note.id, panelId) !== null
-        return (
-          <option key={note.id} value={note.id} disabled={elsewhere}>
-            {getDisplayNoteTitle(note)}{elsewhere ? ' — open in another Writing panel' : ''}
-          </option>
-        )
-      })}
+      {availableNotes.map((note) => <option key={note.id} value={note.id}>{getDisplayNoteTitle(note)}</option>)}
     </select>
   ) : null
 
