@@ -15,6 +15,7 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
   const [shadow, setShadow] = useState<ShadowRoot | null>(null)
   const progress = useRef(0)
   const lastLit = useRef<number[]>([])
+  const finished = useRef(false)
   const remainingDelay = useRef(Math.max(0, parameterNumber(definition, 'startDelay', 0)) * 1000)
   useEffect(() => {
     if (host.current && !host.current.shadowRoot) setShadow(host.current.attachShadow({ mode: 'open' }))
@@ -25,6 +26,7 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
   useEffect(() => {
     progress.current = 0
     lastLit.current = []
+    finished.current = false
     remainingDelay.current = Math.max(0, parameterNumber(definition, 'startDelay', 0)) * 1000
     // A new document or replay is a fresh presentation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -32,18 +34,25 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
   useEffect(() => {
     const words = shadow?.querySelectorAll<HTMLElement>('.word')
     if (!words) return
+    // Authored CSS animations run on their own clock, so the transport has to
+    // hold them while stopped or waiting out the start delay. A finished
+    // sequence is left running so its last words can complete their effect.
+    const paper = shadow?.querySelector<HTMLElement>('.animation-paper')
+    const setPaused = (paused: boolean) => { if (paper) paper.dataset.paused = String(paused && !finished.current) }
+    const finish = () => { finished.current = true; setPaused(false); onFinish() }
     if (!playing) {
+      setPaused(true)
       if (definition.playback.kind === 'random') {
         lastLit.current.forEach(index => { if (words[index]) words[index].dataset.illuminated = 'false' })
         lastLit.current = []
       }
       return
     }
-    if (!count) { onFinish(); return }
+    if (!count) { finish(); return }
     const advance = () => {
       if (definition.playback.kind === 'sequential') {
         if (progress.current < words.length) words[progress.current++].dataset.revealed = 'true'
-        if (progress.current >= words.length) onFinish()
+        if (progress.current >= words.length) finish()
       } else {
         lastLit.current.forEach(index => { if (words[index]) words[index].dataset.illuminated = 'false' })
         const lit = illuminatedIndices(definition, progress.current++, words.length)
@@ -55,17 +64,21 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
     let delayTimer: number | undefined
     let delayStartedAt: number | null = null
     if (remainingDelay.current > 0) {
+      setPaused(true)
       delayStartedAt = performance.now()
       delayTimer = window.setTimeout(() => {
         remainingDelay.current = 0
         delayStartedAt = null
+        setPaused(false)
         advance()
         timer = window.setInterval(advance, 1000 / speed)
       }, remainingDelay.current)
     } else {
+      setPaused(false)
       timer = window.setInterval(advance, 1000 / speed)
     }
     return () => {
+      setPaused(true)
       if (delayStartedAt !== null) remainingDelay.current = Math.max(0, remainingDelay.current - (performance.now() - delayStartedAt))
       window.clearTimeout(delayTimer)
       window.clearInterval(timer)
@@ -81,7 +94,7 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
     {shadow && createPortal(<>
       <style>{baseCss}</style>
       <style>{css}</style>
-      <div className="animation-paper" style={{ '--animation-color': /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffd166' } as React.CSSProperties}>
+      <div className="animation-paper" data-paused="true" style={{ '--animation-color': /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffd166' } as React.CSSProperties}>
         {content}
       </div>
     </>, shadow)}
@@ -122,7 +135,9 @@ function renderNode(node: Node | undefined, cursor: { index: number; count: numb
   if (node.type === 'image') {
     const src = String(node.attrs?.src ?? '')
     const width = String(node.attrs?.width ?? '')
-    return /^(https?:|data:image\/(?:png|jpeg|gif|webp|avif);base64,)/i.test(src)
+    // Matches the types the note editor's picture picker accepts. SVG is safe
+    // here because an <img> never runs scripts inside the picture.
+    return /^(https?:|data:image\/(?:png|jpeg|gif|webp|avif|svg\+xml);base64,)/i.test(src)
       ? <img key={key} src={src} alt={String(node.attrs?.alt ?? '')} style={/^\d+(?:\.\d+)?(?:px|%)?$/.test(width) ? { width: /^\d+$/.test(width) ? `${width}px` : width } : undefined} /> : null
   }
   const children = (node.content ?? []).map((child, index) => renderNode(child, cursor, `${key}-${index}`))
@@ -150,4 +165,5 @@ const baseCss = `
 .mark-span[data-size="small"] { font-size: .8em; }.mark-span[data-size="large"] { font-size: 1.25em; }.mark-span[data-size="x-large"] { font-size: 1.6em; }
 .mark-span[data-color="muted"] { color: var(--color-text-muted); }.mark-span[data-color="amber"] { color: #d98a00; }.mark-span[data-color="red"] { color: #dc3f35; }.mark-span[data-color="blue"] { color: #2f85dc; }.mark-span[data-color="green"] { color: #2f9e55; }
 .animation-paper img { max-width: 100%; }.word { display: inline; }
+.animation-paper[data-paused="true"] .word { animation-play-state: paused !important; }
 `

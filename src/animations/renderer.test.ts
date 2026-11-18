@@ -26,6 +26,12 @@ describe('animation document rendering', () => {
     expect(JSON.stringify(document)).toBe(original)
   })
 
+  it('keeps SVG pictures added from a file', () => {
+    const src = 'data:image/svg+xml;base64,PHN2Zy8+'
+    const markup = renderToStaticMarkup(renderDocumentNodes(snapshot({ type: 'doc', content: [{ type: 'image', attrs: { src, alt: 'logo' } }] })))
+    expect(markup).toContain(`src="${src}"`)
+  })
+
   it('renders an empty document and a long document', () => {
     expect(renderToStaticMarkup(renderDocumentNodes(snapshot({ type: 'doc', content: [] })))).toBe('')
     const text = Array(2001).join('word ')
