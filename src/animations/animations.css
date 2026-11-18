@@ -38,9 +38,13 @@
 .animation-color-trigger { display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; height: 34px; padding: 3px 8px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-input-bg); color: var(--color-input-text); cursor: pointer; font-family: var(--font-family-code); }
 .animation-color-chip { flex: 0 0 25px; height: 25px; border: 1px solid var(--color-control-border); border-radius: 4px; }
 .animation-color-popover { box-sizing: border-box; width: 100%; margin-top: 6px; padding: 12px; border: 1px solid var(--color-panel-border); border-radius: var(--radius-control); background: var(--panel-content-background); }
-.animation-color-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.animation-color-swatch { width: 100%; height: 32px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); cursor: pointer; }
-.animation-color-hex { display: grid; gap: 6px; margin-top: 12px; color: var(--color-text-soft); font-size: var(--type-xs); }
+.animation-color-plane { position: relative; height: 120px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); cursor: crosshair; touch-action: none; }
+.animation-color-plane:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus-ring); outline-offset: var(--focus-ring-offset); }
+.animation-color-plane-cursor { position: absolute; width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #222; transform: translate(-50%, -50%); pointer-events: none; }
+.animation-hue-field, .animation-color-hex { display: grid; gap: 6px; margin-top: 10px; color: var(--color-text-soft); font-size: var(--type-xs); }
+.animation-hue-field input { appearance: none; height: 12px; margin: 3px 0; border: 1px solid var(--color-control-border); border-radius: 999px; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); cursor: pointer; }
+.animation-hue-field input::-webkit-slider-thumb { appearance: none; width: 17px; height: 17px; border: 2px solid #fff; border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px #222; }
+.animation-hue-field input::-moz-range-thumb { width: 13px; height: 13px; border: 2px solid #fff; border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px #222; }
 .animation-color-hex input { box-sizing: border-box; width: 100%; height: 32px; padding-inline: 8px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-input-bg); color: var(--color-input-text); font-family: var(--font-family-code); }
 .animation-color-hex input[aria-invalid='true'] { border-color: var(--color-danger); }
 .animation-window-hint { margin: 0; color: var(--color-text-muted); font-size: var(--type-xs); }

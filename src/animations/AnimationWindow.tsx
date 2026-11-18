@@ -3,14 +3,9 @@ import { createPortal } from 'react-dom'
 import { Play, X } from 'lucide-react'
 import { markPointerEventHandled } from '../panelSurface'
 import type { AnimationDefinition } from './definitions'
+import { hexToHsv, hsvToHex, type HsvColour } from './colour'
 
 interface Rect { x: number; y: number; width: number; height: number }
-const illuminationColours = [
-  { name: 'Amber', value: '#ffd166' }, { name: 'Coral', value: '#ff6b6b' },
-  { name: 'Pink', value: '#f783ac' }, { name: 'Violet', value: '#b197fc' },
-  { name: 'Blue', value: '#74c0fc' }, { name: 'Teal', value: '#63e6be' },
-  { name: 'Lime', value: '#a9e34b' }, { name: 'White', value: '#ffffff' },
-]
 const isHexColour = (value: string) => /^#[0-9a-f]{6}$/i.test(value)
 let topAnimationLayer = 8
 function viewport(): Rect {
@@ -61,13 +56,30 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
   const [rect, setRect] = useState(() => initialRect(sourceElement))
   const [openColour, setOpenColour] = useState<string | null>(null)
   const [colourText, setColourText] = useState('')
-  const colourPopover = useRef<HTMLDivElement>(null)
+  const [pickerHsv, setPickerHsv] = useState<HsvColour>(() => hexToHsv('#ffd166'))
+  const pickerHsvRef = useRef(pickerHsv)
+  const colourHexInput = useRef<HTMLInputElement>(null)
+  const planePointer = useRef<number | null>(null)
   const colourOpenRef = useRef(false)
   colourOpenRef.current = openColour !== null
   const gesture = useRef<{ pointer: number; element: HTMLElement; mode: 'move' | 'resize'; x: number; y: number; rect: Rect } | null>(null)
 
   useEffect(() => setOpenColour(null), [selected.id])
-  useEffect(() => { if (openColour) colourPopover.current?.scrollIntoView({ block: 'nearest' }) }, [openColour])
+  useEffect(() => { if (openColour) colourHexInput.current?.scrollIntoView({ block: 'nearest' }) }, [openColour])
+
+  function applyColour(id: string, hsv: HsvColour) {
+    pickerHsvRef.current = hsv
+    setPickerHsv(hsv)
+    const hex = hsvToHex(hsv)
+    setColourText(hex)
+    onParameterChange(id, hex)
+  }
+  function moveColourPointer(event: PointerEvent<HTMLDivElement>, id: string) {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const saturation = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width))
+    const value = Math.min(1, Math.max(0, 1 - (event.clientY - bounds.top) / bounds.height))
+    applyColour(id, { ...pickerHsvRef.current, saturation, value })
+  }
 
   useEffect(() => {
     root.current?.focus({ preventScroll: true })
@@ -155,19 +167,48 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
           <span>{parameter.label}</span>
           {parameter.type === 'color' ? <div className="animation-color-control">
             <button type="button" className="animation-color-trigger" aria-label={`Choose ${parameter.label.toLowerCase()}`} aria-expanded={openColour === parameter.id} onClick={() => {
-              setColourText(String(parameter.value))
+              const current = isHexColour(String(parameter.value)) ? String(parameter.value) : '#ffd166'
+              const hsv = hexToHsv(current)
+              pickerHsvRef.current = hsv
+              setPickerHsv(hsv)
+              setColourText(current)
               setOpenColour(openColour === parameter.id ? null : parameter.id)
             }}><span className="animation-color-chip" style={{ backgroundColor: String(parameter.value) }} /><span>{parameter.value}</span></button>
-            {openColour === parameter.id && <div ref={colourPopover} className="animation-color-popover" role="group" aria-label={`${parameter.label} picker`}>
-              <div className="animation-color-swatches">{illuminationColours.map(colour => <button key={colour.value} type="button" aria-label={colour.name} title={colour.name} className="animation-color-swatch" style={{ backgroundColor: colour.value }} onClick={() => {
-                setColourText(colour.value)
-                onParameterChange(parameter.id, colour.value)
-              }} />)}</div>
+            {openColour === parameter.id && <div className="animation-color-popover" role="group" aria-label={`${parameter.label} picker`}>
+              <div className="animation-color-plane" role="slider" tabIndex={0} aria-label="Colour shade" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pickerHsv.saturation * 100)} aria-valuetext={colourText} style={{ backgroundColor: hsvToHex({ hue: pickerHsv.hue, saturation: 1, value: 1 }) }}
+                onPointerDown={event => {
+                  if (event.button !== 0) return
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  planePointer.current = event.pointerId
+                  moveColourPointer(event, parameter.id)
+                }}
+                onPointerMove={event => { if (planePointer.current === event.pointerId) moveColourPointer(event, parameter.id) }}
+                onPointerUp={event => { if (planePointer.current === event.pointerId) { planePointer.current = null; event.currentTarget.releasePointerCapture(event.pointerId) } }}
+                onPointerCancel={event => { if (planePointer.current === event.pointerId) planePointer.current = null }}
+                onKeyDown={event => {
+                  const step = 0.02
+                  const next = { ...pickerHsvRef.current }
+                  if (event.key === 'ArrowLeft') next.saturation = Math.max(0, next.saturation - step)
+                  else if (event.key === 'ArrowRight') next.saturation = Math.min(1, next.saturation + step)
+                  else if (event.key === 'ArrowUp') next.value = Math.min(1, next.value + step)
+                  else if (event.key === 'ArrowDown') next.value = Math.max(0, next.value - step)
+                  else return
+                  event.preventDefault()
+                  applyColour(parameter.id, next)
+                }}><span className="animation-color-plane-cursor" style={{ left: `${pickerHsv.saturation * 100}%`, top: `${(1 - pickerHsv.value) * 100}%` }} /></div>
+              <label className="animation-hue-field">Hue
+                <input type="range" aria-label="Hue" min={0} max={360} step={1} value={Math.round(pickerHsv.hue)} onChange={event => applyColour(parameter.id, { ...pickerHsvRef.current, hue: Number(event.target.value) })} />
+              </label>
               <label className="animation-color-hex">Hex colour
-                <input aria-label="Hex colour" value={colourText} maxLength={7} spellCheck={false} aria-invalid={!isHexColour(colourText)} onChange={event => {
+                <input ref={colourHexInput} aria-label="Hex colour" value={colourText} maxLength={7} spellCheck={false} aria-invalid={!isHexColour(colourText)} onChange={event => {
                   const value = event.target.value
                   setColourText(value)
-                  if (isHexColour(value)) onParameterChange(parameter.id, value)
+                  if (isHexColour(value)) {
+                    const hsv = hexToHsv(value)
+                    pickerHsvRef.current = hsv
+                    setPickerHsv(hsv)
+                    onParameterChange(parameter.id, value)
+                  }
                 }} />
               </label>
             </div>}

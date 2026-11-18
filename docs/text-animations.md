@@ -34,7 +34,7 @@ Open the Writing panel's **···** menu and choose **Animations**. A compact st
 
 Built-in definitions are immutable. Their parameter adjustments are temporary preview settings. Press **Duplicate** to make an editable copy, or **New animation** to start from a simple word rule. A custom animation shows **Unsaved changes** until saved. **Edit CSS** opens its name and CSS fields; built-ins offer **View CSS** as read-only. **Save animation** persists the definition in this browser's `localStorage` under `mic:text-animations:v1`, separate from notes and boards. **Delete** is available only for custom animations and asks for confirmation; deleting the animation currently playing also returns the panel to writing. Closing and reopening the window keeps unsaved edits for the current panel session. Changing the active note, hiding or deleting the source panel, or switching boards closes its window and playback; saved definitions remain available locally.
 
-Random Illumination's **Light colour** opens an in-window palette. Choose a swatch or enter any six-digit hex colour. Clicking elsewhere in Settings or pressing Escape closes the palette; a valid colour updates the current preview immediately.
+Random Illumination's **Light colour** opens an in-window colour area and hue slider. Drag in the area to choose the shade, move the slider to change hue, or enter any six-digit hex colour. Clicking elsewhere in Settings or pressing Escape closes the picker; a valid colour updates the current preview immediately. The built-in animation changes the word colour without a blurred text shadow.
 
 The CSS interface is `.word`, with zero-based `data-index`, total `data-word-count`, and `data-revealed` and `data-illuminated` values of `true` or `false`. For example:
 

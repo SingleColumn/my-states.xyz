@@ -20,7 +20,7 @@ export const builtInAnimations: AnimationDefinition[] = [
   },
   {
     formatVersion: 1, id: 'random-illumination', name: 'Random Illumination',
-    css: '.word[data-illuminated="true"] { color: var(--animation-color); text-shadow: 0 0 0.65em var(--animation-color); }',
+    css: '.word[data-illuminated="true"] { color: var(--animation-color); }',
     parameters: [
       startDelayParameter,
       { id: 'color', label: 'Light colour', type: 'color', value: '#ffd166' },
