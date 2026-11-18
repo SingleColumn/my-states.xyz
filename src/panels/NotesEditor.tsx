@@ -103,6 +103,8 @@ interface NotesEditorProps {
 export interface NotesEditorHandle {
   /** The note as Markdown, derived now. */
   getMarkdown(): string
+  /** A read-only snapshot for the separate animation renderer. */
+  getDocument(): NoteDocument
   /** Puts the caret at the start of the document -- where the title leads. */
   focusStart(): void
   /**
@@ -278,6 +280,7 @@ function NotesEditorInner({ markdown, document: noteDocument, placeholder, readO
           const doc = ctx.get(editorViewCtx).state.doc
           return withoutSyntheticNamingLine(getMarkdown()(ctx), doc)
         }),
+        getDocument: () => ready.action((ctx) => ({ schemaVersion: NOTE_DOCUMENT_SCHEMA_VERSION, doc: ctx.get(editorViewCtx).state.doc.toJSON() as Record<string, unknown> })),
         focusStart: () => ready.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)).scrollIntoView())

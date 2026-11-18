@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
 import { CopyPlus, Download, FilePlus2, FileUp, Minus, PenLine, Plus, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
@@ -8,6 +8,8 @@ import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
 import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
+import { AnimationControls } from '../animations/AnimationControls'
+import type { NoteDocument } from '../types'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const posthog = usePostHog()
@@ -47,7 +49,14 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
+  const [animationPreview, setAnimationPreview] = useState(false)
+  const [animationDocument, setAnimationDocument] = useState<NoteDocument | null>(null)
+  const animationDocumentRef = useRef<NoteDocument | null>(null)
   const editorHandle = useRef<NotesEditorHandle | null>(null)
+  const handleAnimationPreviewChange = useCallback((preview: boolean) => {
+    if (preview) setAnimationDocument(animationDocumentRef.current ?? editorHandle.current?.getDocument() ?? null)
+    setAnimationPreview(preview)
+  }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
@@ -94,6 +103,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   const heldBy = activeNoteId ? notes.noteOpenElsewhere(activeNoteId, panelId) : null
   const namedNote = notes.notes.find(note => note.id === activeNoteId) ?? null
   const activeNote = heldBy === null ? namedNote : null
+  useEffect(() => {
+    animationDocumentRef.current = null
+    setAnimationDocument(null)
+  }, [activeNote?.id])
 
   function captureWritingProgress(words: number) {
     const noteId = activeNote?.id
@@ -320,9 +333,12 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           {...panelContentProps}
         />
 
+        {activeNote && !momentView && <AnimationControls key={activeNote.id} document={animationDocument} onPreviewChange={handleAnimationPreviewChange} />}
+
         {activeNote ? (
           <div
             className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
+            style={animationPreview ? { display: 'none' } : undefined}
             {...panelContentProps}
             // What the wheel scrolls when it lands somewhere with nothing
             // scrollable above it -- the note's title, which sits beside the
@@ -331,12 +347,14 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           >
             <NotesEditor
               key={activeNote.id}
-              readOnly={momentView}
+              readOnly={momentView || animationPreview}
               toolbarHost={toolbarHostRef}
               markdown={activeNote.content}
               document={activeNote.document}
               placeholder={editorPlaceholder}
               onChange={(document, next, title) => {
+                animationDocumentRef.current = document
+                if (animationPreview) setAnimationDocument(document)
                 notes.setActiveNoteDocument(document, panelId, activeNote.id)
                 // Only when the first line's words actually change. The
                 // document is kept out of React state on purpose (see
@@ -349,6 +367,11 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle
+                if (!handle) animationDocumentRef.current = null
+                if (handle) {
+                  animationDocumentRef.current = handle.getDocument()
+                  if (animationPreview) setAnimationDocument(animationDocumentRef.current)
+                }
                 notes.registerEditor(panelId, handle, activeNote.id)
               }}
             />
