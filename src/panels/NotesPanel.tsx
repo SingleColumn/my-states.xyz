@@ -65,7 +65,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
   const toolbarHostRef = useRef<HTMLDivElement>(null)
-  const animationToolbarHostRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const writingMilestonesRef = useRef({ noteId: null as string | null, started: false, fiftyWords: false, twoHundredWords: false })
   const wasInWritingModeRef = useRef(isWritingMode)
@@ -278,7 +277,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           },
         ] }]}
       >
-        {isWritingMode ? <div className="animation-header-toolbar" ref={animationToolbarHostRef} /> : null}
         {isWritingMode && !animationPreview ? (
           <div className="notes-zoom-control" role="group" aria-label="Zoom">
             <button className="card-icon-button" type="button" title="Zoom out" aria-label="Zoom out" disabled={zoom <= minZoom} onClick={() => setZoom(zoom - zoomStep)}>
@@ -324,7 +322,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         )}
 
-        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} toolbarHost={isWritingMode ? animationToolbarHostRef.current : null} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
+        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
 
         {/* Always rendered, hidden when the writer has not asked for it:
             the editor draws the tools into this element as it starts, and a

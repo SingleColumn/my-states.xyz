@@ -1,27 +1,15 @@
 .animation-options-host { flex: 0 0 auto; min-width: 0; width: 100%; padding-block: var(--space-detail-5) var(--space-detail-2); container-type: inline-size; }
 .animation-options-strip { box-sizing: border-box; display: flex; align-items: center; gap: var(--space-detail-1); width: min(100%, 480px); margin-inline: auto; padding: var(--space-detail-1); border: var(--border-width-hairline) solid var(--color-panel-border); border-radius: var(--radius-control); }
-.animation-options-strip.is-collapsed { width: max-content; max-width: 100%; }
 .animation-options-strip select { flex: 1 1 auto; min-width: 0; width: 0; height: var(--card-header-button-size); }
 .animation-options-strip button { flex: 0 0 auto; }
-.animation-options-strip .animation-options-play { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 76px; }
-.animation-options-reveal { display: inline-flex; align-items: center; gap: 6px; }
+.animation-options-strip .animation-options-play, .animation-options-strip .animation-options-stop { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 76px; }
+.animation-options-strip .animation-options-stop { width: 64px; }
 .animation-options-status { margin: 5px auto 0; max-width: 480px; color: var(--color-text-soft); font-size: var(--type-xs); }
 .canvas-panel-shell.is-full-screen .panel-notes-surface.is-writing-mode .animation-options-host { width: min(var(--writing-paper-width), calc(100% - (var(--card-padding) * 2))); margin-inline: auto; }
-@container (max-width: 350px) { .animation-options-strip .animation-options-play { width: var(--card-header-button-size); }.animation-options-action-label { display: none; } }
+@container (max-width: 350px) { .animation-options-strip .animation-options-play, .animation-options-strip .animation-options-stop { width: var(--card-header-button-size); }.animation-options-action-label { display: none; } }
 .notes-body > .animation-playback { flex: 1 1 auto; min-height: 0; }
 .animation-playback { display: flex; flex-direction: column; min-width: 0; container-type: inline-size; }
-.animation-playback-toolbar { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 3px var(--card-padding); }
-.animation-playback-toolbar .card-icon-button { flex: 0 0 auto; }
-.animation-playback-name { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--color-text-soft); font-size: var(--font-size-notes-control-label); }
-.animation-header-toolbar { min-width: 0; }
-.animation-header-toolbar:empty { display: none; }
-.animation-header-toolbar .animation-playback-toolbar { padding: 0; }
-.animation-header-toolbar .animation-playback-name { flex: 0 1 150px; }
 .animation-preview-host { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--color-editor-bg); color: var(--color-input-text); border-radius: var(--radius-editor); }
-@container (max-width: 350px) {
-  .animation-playback-toolbar { flex-wrap: wrap; }
-  .animation-playback-name { order: -1; flex-basis: 100%; }
-}
 
 .animation-window { position: fixed; z-index: 8; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; background: var(--panel-content-background); color: var(--text-primary); border: var(--card-border); border-radius: var(--radius-large); box-shadow: var(--shadow-panel); font-family: var(--font-family-ui); font-size: var(--type-sm); --accent: var(--accent-notes); --bg: var(--bg-notes); }
 .animation-window:focus { outline: none; }
