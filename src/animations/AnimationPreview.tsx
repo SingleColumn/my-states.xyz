@@ -8,8 +8,8 @@ import { illuminatedIndices, wordIndices } from './playback'
 
 type Node = { type?: string; text?: string; attrs?: Record<string, unknown>; marks?: Array<{ type: string; attrs?: Record<string, unknown> }>; content?: Node[] }
 
-export function AnimationPreview({ document, definition, playing, run, onFinish }: {
-  document: NoteDocument | null; definition: AnimationDefinition; playing: boolean; run: number; onFinish: () => void
+export function AnimationPreview({ document, definition, playing, run, writingMode, onFinish }: {
+  document: NoteDocument | null; definition: AnimationDefinition; playing: boolean; run: number; writingMode: boolean; onFinish: () => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const [shadow, setShadow] = useState<ShadowRoot | null>(null)
@@ -53,7 +53,7 @@ export function AnimationPreview({ document, definition, playing, run, onFinish 
     try { return validateAnimationCss(definition.css) } catch { return '' }
   }, [definition.css])
   const color = String(definition.parameters.find(parameter => parameter.id === 'color')?.value ?? '#ffd166')
-  return <div ref={host} className="animation-preview-host" aria-label="Animated note preview">
+  return <div ref={host} className={`animation-preview-host${writingMode ? ' is-writing-preview' : ''}`} aria-label="Animated note preview">
     {shadow && createPortal(<>
       <style>{baseCss}</style>
       <style>{css}</style>
@@ -113,6 +113,8 @@ function safeChoice(value: unknown, choices: string[]) { return typeof value ===
 const baseCss = `
 :host { display: block; color: var(--color-input-text); font-family: var(--font-family-ui); }
 .animation-paper { box-sizing: border-box; min-height: 100%; padding: var(--card-padding); font-size: var(--notes-editor-font-size); line-height: var(--notes-editor-line-height); overflow-wrap: anywhere; }
+:host(.is-writing-preview) .animation-paper { zoom: var(--notes-zoom, 1); width: min(var(--notes-paper-width, 794px), calc((100% - (var(--card-padding) * 2)) / var(--notes-zoom, 1))); min-height: var(--writing-paper-height); margin-inline: auto; padding-block: calc(var(--card-padding) + var(--space-detail-2)) var(--space-writing-bottom); border: var(--border-width-hairline) solid color-mix(in srgb, var(--color-editor-border) 72%, transparent); border-radius: var(--radius-editor); }
+:host(.is-writing-preview) .animation-paper > .animation-block { max-width: var(--writing-measure); margin-inline: auto; }
 .animation-block { margin: 0 0 var(--space-rich-content-block); }
 .animation-paper > .animation-block:first-child { color: var(--color-note-title); font-family: var(--font-family-display); font-size: 1.5em; font-weight: var(--font-weight-note-title); line-height: var(--line-height-tight); }
 .animation-h1 { font-size: 1.4em; font-weight: 700; }.animation-h2 { font-size: 1.25em; font-weight: 700; }.animation-h3 { font-size: 1.1em; font-weight: 700; }

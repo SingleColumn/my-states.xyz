@@ -1,0 +1,44 @@
+.notes-body > .animation-playback { flex: 1 1 auto; min-height: 0; }
+.animation-playback { display: flex; flex-direction: column; min-width: 0; container-type: inline-size; }
+.animation-playback-toolbar { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 3px var(--card-padding); }
+.animation-playback-toolbar .card-icon-button { flex: 0 0 auto; }
+.animation-playback-name { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--color-text-soft); font-size: var(--font-size-notes-control-label); }
+.animation-header-toolbar { min-width: 0; }
+.animation-header-toolbar:empty { display: none; }
+.animation-header-toolbar .animation-playback-toolbar { padding: 0; }
+.animation-header-toolbar .animation-playback-name { flex: 0 1 150px; }
+.animation-preview-host { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--color-editor-bg); color: var(--color-input-text); border-radius: var(--radius-editor); }
+@container (max-width: 350px) {
+  .animation-playback-toolbar { flex-wrap: wrap; }
+  .animation-playback-name { order: -1; flex-basis: 100%; }
+}
+
+.animation-window { position: fixed; z-index: 8; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; background: var(--panel-content-background); color: var(--text-primary); border: var(--card-border); border-radius: var(--radius-large); box-shadow: var(--shadow-panel); font-family: var(--font-family-ui); font-size: var(--type-sm); --accent: var(--accent-notes); --bg: var(--bg-notes); }
+.animation-window:focus { outline: none; }
+.animation-window-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--color-panel-divider); }
+.animation-window-drag { flex: 1; min-width: 0; cursor: move; touch-action: none; user-select: none; }
+.animation-window-content { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; gap: 18px; padding: 18px 22px 24px; }
+.animation-window-field { display: grid; gap: 7px; min-width: 0; color: var(--color-text-soft); font-weight: var(--font-weight-semibold); }
+.animation-window-field select, .animation-window-field input, .animation-window-field textarea { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; }
+.animation-window-field input, .animation-window-field textarea { color: var(--color-input-text); background: var(--color-input-bg); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); padding: 8px 10px; }
+.animation-window-selection { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; min-width: 0; }
+.animation-window-selection h2 { margin: 0 0 4px; font-size: var(--type-md); }
+.animation-window-selection span { color: var(--color-text-muted); font-size: var(--type-xs); }
+.animation-window-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.animation-window-section { display: grid; gap: 12px; min-width: 0; padding-top: 16px; border-top: 1px solid var(--color-panel-divider); }
+.animation-window-section h3 { margin: 0; font-size: var(--type-sm); }
+.animation-window-section > .app-chrome-control { justify-self: start; }
+.animation-parameter { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(100px, 1.3fr) minmax(44px, auto); align-items: center; gap: 10px; min-width: 0; }
+.animation-parameter input { min-width: 0; width: 100%; accent-color: var(--accent-notes); }
+.animation-parameter input[type='color'] { width: 48px; height: 34px; }
+.animation-parameter output { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
+.animation-window-hint { margin: 0; color: var(--color-text-muted); font-size: var(--type-xs); }
+.animation-css-fields { display: grid; gap: 12px; min-width: 0; }
+.animation-css-fields textarea { min-height: 190px; max-height: 420px; resize: vertical; overflow: auto; font-family: var(--font-family-code); line-height: 1.45; tab-size: 2; }
+.animation-css-fields > .app-chrome-control { justify-self: start; }
+.animation-window-status { margin: 0; color: var(--color-text-soft); }
+.animation-window-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 11px 22px; border-top: 1px solid var(--color-panel-divider); }
+.animation-window-primary { background: var(--card-primary-bg); border-color: var(--card-primary-border); color: var(--card-primary-icon); font-weight: var(--font-weight-control); }
+.animation-window-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; }
+.animation-window-resize::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 9px; height: 9px; border-right: 2px solid var(--color-text-muted); border-bottom: 2px solid var(--color-text-muted); }
+@media (max-width: 520px) { .animation-window-content { padding-inline: 14px; }.animation-window-footer { padding-inline: 14px; } }

@@ -1,78 +1,119 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Play, Pause, RotateCcw, Settings2, X } from 'lucide-react'
 import type { NoteDocument } from '../types'
 import { panelContentProps } from '../panelSurface'
 import { AnimationPreview } from './AnimationPreview'
+import { AnimationWindow } from './AnimationWindow'
 import { builtInAnimations, duplicateAnimation, loadCustomAnimations, saveCustomAnimations, type AnimationDefinition } from './definitions'
 import { validateAnimationCss } from './css'
+import './animations.css'
 
-export function AnimationControls({ document, onPreviewChange }: { document: NoteDocument | null; onPreviewChange: (preview: boolean) => void }) {
-  const [open, setOpen] = useState(false)
-  const [preview, setPreview] = useState(false)
-  const [playing, setPlaying] = useState(false)
-  const [run, setRun] = useState(0)
+/** Panel-local playback and authoring state; definitions alone are persisted. */
+export function AnimationControls({ panelId, sourceElement, toolbarHost, writingMode, document, managerOpen, onManagerOpen, onManagerClose, onPreviewChange }: {
+  panelId: string
+  sourceElement: HTMLElement | null
+  toolbarHost: HTMLElement | null
+  writingMode: boolean
+  document: NoteDocument | null
+  managerOpen: boolean
+  onManagerOpen(): void
+  onManagerClose(): void
+  onPreviewChange(preview: boolean): void
+}) {
   const [custom, setCustom] = useState(loadCustomAnimations)
+  const [drafts, setDrafts] = useState<Record<string, AnimationDefinition>>({})
   const [selectedId, setSelectedId] = useState(builtInAnimations[0].id)
-  const [error, setError] = useState('')
-  const definitions = [...builtInAnimations, ...custom]
-  const selected = definitions.find(definition => definition.id === selectedId) ?? definitions[0]
-  const isCustom = selected.id.startsWith('custom-')
-  useEffect(() => { onPreviewChange(preview) }, [preview, onPreviewChange])
-  useEffect(() => () => onPreviewChange(false), [onPreviewChange])
-  useEffect(() => { setPlaying(false); setRun(value => value + 1) }, [selectedId])
+  const [editCss, setEditCss] = useState(false)
+  const [status, setStatus] = useState('')
+  const [playbackDefinition, setPlaybackDefinition] = useState<AnimationDefinition | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [finished, setFinished] = useState(false)
+  const [run, setRun] = useState(0)
 
-  function update(next: AnimationDefinition) {
-    setCustom(current => current.map(definition => definition.id === next.id ? next : definition))
+  useEffect(() => () => onPreviewChange(false), [onPreviewChange])
+  useEffect(() => { if (managerOpen) setCustom(loadCustomAnimations()) }, [managerOpen])
+
+  const savedDefinitions = [...builtInAnimations, ...custom]
+  const unsavedDefinitions = Object.values(drafts).filter(draft => !savedDefinitions.some(saved => saved.id === draft.id))
+  const definitions = [...savedDefinitions, ...unsavedDefinitions]
+  const source = savedDefinitions.find(definition => definition.id === selectedId)
+  const selected = drafts[selectedId] ?? source ?? definitions[0]
+  const isCustom = selected.id.startsWith('custom-')
+  const dirty = isCustom && (!source || JSON.stringify(selected) !== JSON.stringify(source))
+
+  function updateDraft(next: AnimationDefinition, updatePlayback = false) {
+    setDrafts(current => ({ ...current, [next.id]: next }))
+    setStatus('')
+    if (updatePlayback && playbackDefinition?.id === next.id) setPlaybackDefinition(next)
   }
-  function save() {
-    try {
-      validateAnimationCss(selected.css)
-      saveCustomAnimations(custom)
-      setError('Saved on this device.')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not save this animation.') }
-  }
+  function select(id: string) { setSelectedId(id); setEditCss(false); setStatus('') }
   function duplicate() {
     const next = duplicateAnimation(selected)
-    setCustom(current => [...current, next])
+    updateDraft(next)
     setSelectedId(next.id)
-    setOpen(true)
-    setError('Edit the copy, then save it.')
+    setEditCss(true)
   }
   function createNew() {
     const next = duplicateAnimation(builtInAnimations[0])
     next.name = 'New animation'
     next.css = '.word { opacity: 1; }'
-    setCustom(current => [...current, next])
+    updateDraft(next)
     setSelectedId(next.id)
-    setError('Write CSS for the words, then save it.')
+    setEditCss(true)
   }
-  return <div className={`animation-area${preview && open ? ' is-preview' : ''}`} {...panelContentProps}>
-    <button type="button" className="card-icon-button animation-toggle" onClick={() => { setOpen(value => !value); if (open) { setPreview(false); setPlaying(false) } }} aria-expanded={open}>Text animation</button>
-    {open && <div className="animation-controls">
-      <label>Animation <select className="app-dropdown" value={selected.id} onChange={event => { setSelectedId(event.target.value); setError('') }}>
-        {definitions.map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}
-      </select></label>
-      <div className="animation-actions">
-        <button type="button" className="card-icon-button" onClick={() => { setPreview(true); setRun(value => value + 1); setPlaying(true) }}>Preview / replay</button>
-        <button type="button" className="card-icon-button" disabled={!preview} onClick={() => setPlaying(false)}>Stop</button>
-        <button type="button" className="card-icon-button" disabled={!preview} onClick={() => { setPreview(false); setPlaying(false) }}>Edit note</button>
-        <button type="button" className="card-icon-button" onClick={duplicate}>Duplicate</button>
-        <button type="button" className="card-icon-button" onClick={createNew}>New animation</button>
-      </div>
-      {selected.parameters.map(parameter => <label key={parameter.id}>{parameter.label}
-        <input type={parameter.type === 'range' ? 'range' : parameter.type === 'color' ? 'color' : 'number'}
-          min={parameter.min} max={parameter.max} step={parameter.step} value={parameter.value}
-          onChange={event => {
-            const value = parameter.type === 'color' ? event.target.value : Number(event.target.value)
-            const next = { ...selected, parameters: selected.parameters.map(item => item.id === parameter.id ? { ...item, value } : item) }
-            if (isCustom) update(next)
-            else { const copy = duplicateAnimation(next); setCustom(current => [...current, copy]); setSelectedId(copy.id); setError('This adjustable copy can be saved.') }
-          }} /> <span>{parameter.value}</span>
-      </label>)}
-      {isCustom && <label>Name <input value={selected.name} onChange={event => update({ ...selected, name: event.target.value })} /></label>}
-      <label>CSS <textarea aria-label="Animation CSS" spellCheck={false} readOnly={!isCustom} value={selected.css} onChange={event => update({ ...selected, css: event.target.value })} rows={6} /></label>
-      {isCustom && <button type="button" className="card-icon-button" onClick={save}>Save animation</button>}
-      {error && <span role="status">{error}</span>}
+  function save() {
+    try {
+      if (!selected.name.trim()) throw new Error('Give the animation a name.')
+      validateAnimationCss(selected.css)
+      // Merge with storage so a save in another Writing panel is not erased.
+      const stored = loadCustomAnimations()
+      const next = [...stored.filter(definition => definition.id !== selected.id), selected]
+      saveCustomAnimations(next)
+      setCustom(next)
+      setDrafts(current => { const updated = { ...current }; delete updated[selected.id]; return updated })
+      setStatus('Saved on this device.')
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save this animation.') }
+  }
+  function preview() {
+    try {
+      validateAnimationCss(selected.css)
+      setPlaybackDefinition(selected)
+      setRun(value => value + 1)
+      setPlaying(true)
+      setFinished(false)
+      onPreviewChange(true)
+      setStatus('')
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'This CSS cannot be previewed.') }
+  }
+  function replay() { setRun(value => value + 1); setPlaying(true); setFinished(false) }
+  function togglePlayback() {
+    if (playing) setPlaying(false)
+    else if (finished) replay()
+    else setPlaying(true)
+  }
+  function exit() { setPlaying(false); setPlaybackDefinition(null); onPreviewChange(false) }
+
+  const playbackToolbar = playbackDefinition ? <div className="animation-playback-toolbar" role="toolbar" aria-label="Animation playback">
+    <button type="button" className="card-icon-button" aria-label={playing ? 'Pause animation' : 'Play animation'} title={playing ? 'Pause' : 'Play'} onClick={togglePlayback}>{playing ? <Pause size={16} /> : <Play size={16} />}</button>
+    <button type="button" className="card-icon-button" aria-label="Replay animation" title="Replay" onClick={replay}><RotateCcw size={16} /></button>
+    <strong className="animation-playback-name" title={playbackDefinition.name}>{playbackDefinition.name}</strong>
+    <button type="button" className="card-icon-button" aria-label="Animation settings" title="Animation settings" onClick={onManagerOpen}><Settings2 size={16} /></button>
+    <button type="button" className="card-icon-button" aria-label="Exit animation" title="Exit animation" onClick={exit}><X size={16} /></button>
+  </div> : null
+
+  return <>
+    {playbackDefinition && <div className="animation-playback" {...panelContentProps}>
+      {toolbarHost ? createPortal(playbackToolbar, toolbarHost) : playbackToolbar}
+      <AnimationPreview key={`${playbackDefinition.id}:${run}`} document={document} definition={playbackDefinition} playing={playing} run={run} writingMode={writingMode} onFinish={() => { setPlaying(false); setFinished(true) }} />
     </div>}
-    {preview && open && <AnimationPreview key={`${selected.id}:${run}`} document={document} definition={selected} playing={playing} run={run} onFinish={() => setPlaying(false)} />}
-  </div>
+    {managerOpen && <AnimationWindow
+      panelId={panelId} sourceElement={sourceElement} definitions={definitions} selected={selected} isCustom={isCustom} dirty={dirty}
+      editCss={editCss} status={status} onClose={onManagerClose} onSelect={select}
+      onParameterChange={(id, value) => updateDraft({ ...selected, parameters: selected.parameters.map(parameter => parameter.id === id ? { ...parameter, value } : parameter) }, true)}
+      onNameChange={name => updateDraft({ ...selected, name })}
+      onCssChange={css => updateDraft({ ...selected, css })}
+      onEditCss={() => setEditCss(value => !value)} onDuplicate={duplicate} onNew={createNew} onSave={save} onPreview={preview}
+    />}
+  </>
 }

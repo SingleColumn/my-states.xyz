@@ -51,16 +51,6 @@
   min-height: 0;
 }
 
-.animation-area { min-width: 0; display: flex; flex-direction: column; gap: var(--space-notes-gap); }
-.notes-body > .animation-area.is-preview { flex: 1 1 auto; min-height: 0; }
-.animation-toggle { align-self: flex-start; }
-.animation-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; max-height: 180px; overflow: auto; font-size: var(--font-size-notes-control-label); }
-.animation-controls label { display: inline-flex; align-items: center; gap: 6px; }
-.animation-controls .animation-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.animation-controls textarea { min-width: min(320px, 70vw); font-family: var(--font-family-code); }
-.animation-controls input[type='range'] { width: 90px; }
-.animation-preview-host { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--color-editor-bg); color: var(--color-input-text); border-radius: var(--radius-editor); }
-
 /* One column: the note's name moved into its first line, so the choice of
    note is the only control left standing here. */
 .notes-document-controls {

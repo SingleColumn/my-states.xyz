@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
-import { CopyPlus, Download, FilePlus2, FileUp, Minus, PenLine, Plus, Ruler, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Minus, PenLine, Play, Plus, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { markdownNamedAsCopy } from '../noteTitle'
@@ -50,6 +50,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
   const [animationPreview, setAnimationPreview] = useState(false)
+  const [animationManagerOpen, setAnimationManagerOpen] = useState(false)
   const [animationDocument, setAnimationDocument] = useState<NoteDocument | null>(null)
   const animationDocumentRef = useRef<NoteDocument | null>(null)
   const editorHandle = useRef<NotesEditorHandle | null>(null)
@@ -57,10 +58,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     if (preview) setAnimationDocument(animationDocumentRef.current ?? editorHandle.current?.getDocument() ?? null)
     setAnimationPreview(preview)
   }, [])
+  const openAnimationManager = useCallback(() => setAnimationManagerOpen(true), [])
+  const closeAnimationManager = useCallback(() => setAnimationManagerOpen(false), [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
   const toolbarHostRef = useRef<HTMLDivElement>(null)
+  const animationToolbarHostRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const writingMilestonesRef = useRef({ noteId: null as string | null, started: false, fiftyWords: false, twoHundredWords: false })
   const wasInWritingModeRef = useRef(isWritingMode)
@@ -106,7 +110,9 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   useEffect(() => {
     animationDocumentRef.current = null
     setAnimationDocument(null)
+    setAnimationManagerOpen(false)
   }, [activeNote?.id])
+  useEffect(() => { if (momentView) setAnimationManagerOpen(false) }, [momentView])
 
   function captureWritingProgress(words: number) {
     const noteId = activeNote?.id
@@ -218,6 +224,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ] }, { heading: 'View', items: [
+          { id: 'animations', label: 'Animations', icon: <Play size={17} aria-hidden="true" />, disabled: !activeNote || momentView, onSelect: openAnimationManager },
           {
             id: 'formatting-tools',
             label: 'Show formatting tools',
@@ -268,7 +275,8 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           },
         ] }]}
       >
-        {isWritingMode ? (
+        {isWritingMode ? <div className="animation-header-toolbar" ref={animationToolbarHostRef} /> : null}
+        {isWritingMode && !animationPreview ? (
           <div className="notes-zoom-control" role="group" aria-label="Zoom">
             <button className="card-icon-button" type="button" title="Zoom out" aria-label="Zoom out" disabled={zoom <= minZoom} onClick={() => setZoom(zoom - zoomStep)}>
               <Minus size={16} aria-hidden="true" />
@@ -281,7 +289,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             </button>
           </div>
         ) : null}
-        {isWritingMode && hasNotes ? (
+        {isWritingMode && hasNotes && !animationPreview ? (
           <label className="writing-note-picker">
             <span className="sr-only">Choose a note</span>
             {noteSelect}
@@ -304,7 +312,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         {/* No title field in either treatment: the note is named by its
             first line, so the name is written where it is read. What is
             left here is the choice of note, and only when there is one. */}
-        {isWritingMode || !hasNotes ? null : (
+        {isWritingMode || !hasNotes || animationPreview ? null : (
           <div className="notes-document-controls" {...panelContentProps}>
             <label className="note-control-field">
               <span>Choose a note</span>
@@ -318,12 +326,12 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             host that came and went would leave the drawing with nowhere to
             go. */}
         <div
-          className={`notes-writing-toolbar-host${showTools && activeNote ? '' : ' is-hidden'}`}
+          className={`notes-writing-toolbar-host${showTools && activeNote && !animationPreview ? '' : ' is-hidden'}`}
           ref={toolbarHostRef}
           {...panelContentProps}
         />
 
-        {activeNote && !momentView && <AnimationControls key={activeNote.id} document={animationDocument} onPreviewChange={handleAnimationPreviewChange} />}
+        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} toolbarHost={isWritingMode ? animationToolbarHostRef.current : null} writingMode={isWritingMode} document={animationDocument} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
 
         {activeNote ? (
           <div
