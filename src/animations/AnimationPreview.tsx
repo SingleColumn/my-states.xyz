@@ -15,13 +15,20 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
   const [shadow, setShadow] = useState<ShadowRoot | null>(null)
   const progress = useRef(0)
   const lastLit = useRef<number[]>([])
+  const remainingDelay = useRef(Math.max(0, parameterNumber(definition, 'startDelay', 0)) * 1000)
   useEffect(() => {
     if (host.current && !host.current.shadowRoot) setShadow(host.current.attachShadow({ mode: 'open' }))
   }, [])
   const count = useMemo(() => countWords(document?.doc as Node | undefined), [document])
   const speed = Math.max(1, parameterNumber(definition, definition.playback.kind === 'sequential' ? 'speed' : 'frequency', 3))
   const content = useMemo(() => renderDocumentNodes(document), [document])
-  useEffect(() => { progress.current = 0; lastLit.current = [] }, [document])
+  useEffect(() => {
+    progress.current = 0
+    lastLit.current = []
+    remainingDelay.current = Math.max(0, parameterNumber(definition, 'startDelay', 0)) * 1000
+    // A new document or replay is a fresh presentation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document, run])
   useEffect(() => {
     const words = shadow?.querySelectorAll<HTMLElement>('.word')
     if (!words) return
@@ -44,8 +51,25 @@ export function AnimationPreview({ document, definition, playing, run, writingMo
         lastLit.current = lit
       }
     }
-    const timer = window.setInterval(advance, 1000 / speed)
-    return () => window.clearInterval(timer)
+    let timer: number | undefined
+    let delayTimer: number | undefined
+    let delayStartedAt: number | null = null
+    if (remainingDelay.current > 0) {
+      delayStartedAt = performance.now()
+      delayTimer = window.setTimeout(() => {
+        remainingDelay.current = 0
+        delayStartedAt = null
+        advance()
+        timer = window.setInterval(advance, 1000 / speed)
+      }, remainingDelay.current)
+    } else {
+      timer = window.setInterval(advance, 1000 / speed)
+    }
+    return () => {
+      if (delayStartedAt !== null) remainingDelay.current = Math.max(0, remainingDelay.current - (performance.now() - delayStartedAt))
+      window.clearTimeout(delayTimer)
+      window.clearInterval(timer)
+    }
     // The run key remounts this component for replay; stopping retains revealed words.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, shadow, count, speed, definition, run])

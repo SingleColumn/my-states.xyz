@@ -9,17 +9,20 @@ export interface AnimationDefinition {
   playback: { kind: PlaybackKind; continuous: boolean }
 }
 
+const startDelayParameter = { id: 'startDelay', label: 'Start delay (seconds)', type: 'range' as const, value: 0, min: 0, max: 10, step: 0.5 }
+
 export const builtInAnimations: AnimationDefinition[] = [
   {
     formatVersion: 1, id: 'sequential-reveal', name: 'Sequential Reveal',
     css: '.word { visibility: hidden; }\n.word[data-revealed="true"] { visibility: visible; }',
-    parameters: [{ id: 'speed', label: 'Words per second', type: 'range', value: 4, min: 1, max: 20, step: 1 }],
+    parameters: [startDelayParameter, { id: 'speed', label: 'Words per second', type: 'range', value: 4, min: 1, max: 20, step: 1 }],
     playback: { kind: 'sequential', continuous: false },
   },
   {
     formatVersion: 1, id: 'random-illumination', name: 'Random Illumination',
     css: '.word[data-illuminated="true"] { color: var(--animation-color); text-shadow: 0 0 0.65em var(--animation-color); }',
     parameters: [
+      startDelayParameter,
       { id: 'color', label: 'Light colour', type: 'color', value: '#ffd166' },
       { id: 'intensity', label: 'Words lit at once', type: 'range', value: 3, min: 1, max: 12, step: 1 },
       { id: 'frequency', label: 'Changes per second', type: 'range', value: 3, min: 1, max: 12, step: 1 },
@@ -47,6 +50,9 @@ export function loadCustomAnimations(): AnimationDefinition[] {
       item?.formatVersion === 1 && typeof item.id === 'string' && item.id.startsWith('custom-') &&
       typeof item.name === 'string' && typeof item.css === 'string' && Array.isArray(item.parameters) &&
       (item.playback?.kind === 'sequential' || item.playback?.kind === 'random'))
+      .map(definition => definition.parameters.some(parameter => parameter.id === 'startDelay')
+        ? definition
+        : { ...definition, parameters: [{ ...startDelayParameter }, ...definition.parameters] })
   } catch { return [] }
 }
 export function saveCustomAnimations(definitions: AnimationDefinition[]) {

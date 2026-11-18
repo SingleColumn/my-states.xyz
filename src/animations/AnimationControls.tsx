@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, RotateCcw, Settings2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Play, Pause, RotateCcw, Settings2, X } from 'lucide-react'
 import type { NoteDocument } from '../types'
 import { panelContentProps } from '../panelSurface'
 import { AnimationPreview } from './AnimationPreview'
@@ -28,6 +28,7 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
   const [selectedId, setSelectedId] = useState(builtInAnimations[0].id)
   const [editCss, setEditCss] = useState(false)
   const [status, setStatus] = useState('')
+  const [optionsCollapsed, setOptionsCollapsed] = useState(false)
   const [playbackDefinition, setPlaybackDefinition] = useState<AnimationDefinition | null>(null)
   const [playing, setPlaying] = useState(false)
   const [finished, setFinished] = useState(false)
@@ -35,6 +36,7 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
 
   useEffect(() => () => onPreviewChange(false), [onPreviewChange])
   useEffect(() => { if (managerOpen) setCustom(loadCustomAnimations()) }, [managerOpen])
+  useEffect(() => { if (!optionsOpen) setOptionsCollapsed(false) }, [optionsOpen])
 
   const savedDefinitions = [...builtInAnimations, ...custom]
   const unsavedDefinitions = Object.values(drafts).filter(draft => !savedDefinitions.some(saved => saved.id === draft.id))
@@ -49,7 +51,12 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
     setStatus('')
     if (updatePlayback && playbackDefinition?.id === next.id) setPlaybackDefinition(next)
   }
-  function select(id: string) { setSelectedId(id); setEditCss(false); setStatus('') }
+  function select(id: string) {
+    if (id !== selectedId && playbackDefinition) exit()
+    setSelectedId(id)
+    setEditCss(false)
+    setStatus('')
+  }
   function duplicate() {
     const next = duplicateAnimation(selected)
     updateDraft(next)
@@ -86,7 +93,7 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
       setFinished(false)
       onPreviewChange(true)
       setStatus('')
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'This CSS cannot be previewed.') }
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'This CSS cannot be played.') }
   }
   function replay() { setRun(value => value + 1); setPlaying(true); setFinished(false) }
   function togglePlayback() {
@@ -95,6 +102,7 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
     else setPlaying(true)
   }
   function exit() { setPlaying(false); setPlaybackDefinition(null); onPreviewChange(false) }
+  function playOrPause() { if (playbackDefinition) togglePlayback(); else preview() }
 
   const playbackToolbar = playbackDefinition ? <div className="animation-playback-toolbar" role="toolbar" aria-label="Animation playback">
     <button type="button" className="card-icon-button" aria-label={playing ? 'Pause animation' : 'Play animation'} title={playing ? 'Pause' : 'Play'} onClick={togglePlayback}>{playing ? <Pause size={16} /> : <Play size={16} />}</button>
@@ -106,19 +114,23 @@ export function AnimationControls({ panelId, sourceElement, toolbarHost, writing
 
   return <>
     {optionsOpen && <div className="animation-options-host" {...panelContentProps}>
-      <div className="animation-options-strip" role="toolbar" aria-label="Animation options">
+      <div className={`animation-options-strip${optionsCollapsed ? ' is-collapsed' : ''}`} role="toolbar" aria-label="Animation options">
+        {optionsCollapsed ? <button type="button" className="app-chrome-control animation-options-reveal" aria-label="Show animation options" title="Show animation options" onClick={() => setOptionsCollapsed(false)}>Animations <ChevronDown size={16} /></button> : <>
         <select className="app-dropdown" aria-label="Animation" value={selected.id} onChange={event => select(event.target.value)}>
           <optgroup label="Built-in animations">{definitions.filter(definition => !definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>
           {definitions.some(definition => definition.id.startsWith('custom-')) && <optgroup label="Custom animations">{definitions.filter(definition => definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>}
         </select>
-        <button type="button" className="app-chrome-control animation-options-preview" onClick={preview}>Preview</button>
+        <button type="button" className="app-chrome-control animation-options-play" aria-label={playing ? 'Pause animation' : 'Play animation'} title={playing ? 'Pause animation' : 'Play animation'} onClick={playOrPause}>{playing ? <Pause size={16} /> : <Play size={16} />}<span className="animation-options-action-label">{playing ? 'Pause' : 'Play'}</span></button>
+        <button type="button" className="card-icon-button" aria-label="Replay animation" title="Replay animation" disabled={!playbackDefinition} onClick={replay}><RotateCcw size={16} /></button>
         <button type="button" className="card-icon-button" aria-label="Animation settings" title="Animation settings" onClick={onManagerOpen}><Settings2 size={16} /></button>
-        <button type="button" className="card-icon-button" aria-label="Close animation options" title="Close animation options" onClick={onOptionsClose}><X size={16} /></button>
+        <button type="button" className="card-icon-button" aria-label={playbackDefinition ? 'Exit animation' : 'Close animation options'} title={playbackDefinition ? 'Exit animation' : 'Close animation options'} onClick={playbackDefinition ? exit : onOptionsClose}><X size={16} /></button>
+        <button type="button" className="card-icon-button" aria-label="Hide animation options" title="Hide animation options" onClick={() => setOptionsCollapsed(true)}><ChevronUp size={16} /></button>
+        </>}
       </div>
-      {status && <p className="animation-options-status" role="status">{status}</p>}
+      {status && !optionsCollapsed && <p className="animation-options-status" role="status">{status}</p>}
     </div>}
     {playbackDefinition && <div className="animation-playback" {...panelContentProps}>
-      {toolbarHost ? createPortal(playbackToolbar, toolbarHost) : playbackToolbar}
+      {!optionsOpen && (toolbarHost ? createPortal(playbackToolbar, toolbarHost) : playbackToolbar)}
       <AnimationPreview key={`${playbackDefinition.id}:${run}`} document={document} definition={playbackDefinition} playing={playing} run={run} writingMode={writingMode} onFinish={() => { setPlaying(false); setFinished(true) }} />
     </div>}
     {managerOpen && <AnimationWindow

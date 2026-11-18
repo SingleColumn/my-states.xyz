@@ -19,17 +19,18 @@ An animation definition is versioned independently from notes and playback insta
   "name": "Gentle reveal",
   "css": ".word { visibility: hidden; }\n.word[data-revealed=\"true\"] { visibility: visible; }",
   "parameters": [
+    { "id": "startDelay", "label": "Start delay (seconds)", "type": "range", "value": 0, "min": 0, "max": 10, "step": 0.5 },
     { "id": "speed", "label": "Words per second", "type": "range", "value": 4, "min": 1, "max": 20, "step": 1 }
   ],
   "playback": { "kind": "sequential", "continuous": false }
 }
 ```
 
-The two built-ins have the same format and execute through the same preview renderer. `sequential` changes `data-revealed` in document order. `random` changes `data-illuminated` using a seeded generator, with a configurable number of words and changes per second. Stop clears illumination; replay starts a new run. Parameters are copied into custom definitions. A playback instance is currently panel-local UI state; it is not part of the note.
+The two built-ins have the same format and execute through the same preview renderer. `sequential` changes `data-revealed` in document order. `random` changes `data-illuminated` using a seeded generator, with a configurable number of words and changes per second. Start delay counts down before the first word changes; pausing preserves the time left, and replay restarts the delay. Older saved custom animations receive a default delay of zero seconds. Stop clears illumination; replay starts a new run. Parameters are copied into custom definitions. A playback instance is currently panel-local UI state; it is not part of the note.
 
 ## Creating an animation
 
-Open the Writing panel's **···** menu and choose **Animations**. A compact strip below the Writing header lets you choose an animation and press **Preview**. Its settings button opens the movable, resizable window for parameters, duplication, and CSS editing. The playback toolbar offers play/pause, replay, settings, and exit. Closing the window leaves playback running; exiting playback returns to the mounted editor without changing its content or undo history. The basic strip reappears after exit until closed.
+Open the Writing panel's **···** menu and choose **Animations**. A compact strip below the Writing header lets you choose an animation and press **Play**. The selector stays in place during playback; the same strip offers pause, replay, settings, and exit. The chevron hides the controls and leaves a **Show animation options** button. Settings opens the movable, resizable window for parameters, duplication, and CSS editing. Closing the window leaves playback running; exiting playback returns to the mounted editor without changing its content or undo history.
 
 Built-in definitions are immutable. Their parameter adjustments are temporary preview settings. Press **Duplicate** to make an editable copy, or **New animation** to start from a simple word rule. A custom animation shows **Unsaved changes** until saved. **Edit CSS** opens its name and CSS fields; built-ins offer **View CSS** as read-only. **Save animation** persists the definition in this browser's `localStorage` under `mic:text-animations:v1`, separate from notes and boards. Closing and reopening the window keeps unsaved edits for the current panel session. Changing the active note, hiding or deleting the source panel, or switching boards closes its window and playback; saved definitions remain available locally.
 

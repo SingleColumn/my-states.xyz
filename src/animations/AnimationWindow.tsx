@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { Play, X } from 'lucide-react'
 import { markPointerEventHandled } from '../panelSurface'
 import type { AnimationDefinition } from './definitions'
 
@@ -132,7 +132,7 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
           <input aria-label={parameter.label} type={parameter.type === 'range' ? 'range' : parameter.type === 'color' ? 'color' : 'number'}
             min={parameter.min} max={parameter.max} step={parameter.step} value={parameter.value}
             onChange={event => onParameterChange(parameter.id, parameter.type === 'color' ? event.target.value : Number(event.target.value))} />
-          <output>{parameter.value}</output>
+          <output>{parameter.id === 'startDelay' ? `${parameter.value} s` : parameter.value}</output>
         </label>)}
         {!isCustom && <p className="animation-window-hint">These settings apply to this preview. Duplicate to save your own version.</p>}
       </section>
@@ -147,7 +147,7 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
     </div>
     <footer className="animation-window-footer">
       {isCustom && <button type="button" className="app-chrome-control" disabled={!dirty} onClick={onSave}>Save animation</button>}
-      <button type="button" className="app-chrome-control animation-window-primary" onClick={onPreview}>Preview in Writing Panel</button>
+      <button type="button" className="app-chrome-control animation-window-primary" onClick={onPreview}><Play size={16} aria-hidden="true" /> Play in Writing Panel</button>
     </footer>
     <div role="separator" aria-label="Resize animation window" title="Drag to resize" className="animation-window-resize" onPointerDown={event => begin(event, 'resize')} />
   </section>, document.body)

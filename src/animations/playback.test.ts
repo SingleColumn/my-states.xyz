@@ -35,4 +35,11 @@ describe('local animation definitions', () => {
     expect(loadCustomAnimations()).toEqual([copy])
     expect(builtInAnimations[0].css).not.toBe(copy.css)
   })
+
+  it('adds a zero-second start delay to older saved definitions', () => {
+    const copy = duplicateAnimation(builtInAnimations[0])
+    copy.parameters = copy.parameters.filter(parameter => parameter.id !== 'startDelay')
+    saveCustomAnimations([copy])
+    expect(loadCustomAnimations()[0].parameters[0]).toMatchObject({ id: 'startDelay', value: 0, min: 0, max: 10 })
+  })
 })

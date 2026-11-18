@@ -324,7 +324,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         )}
 
-        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} toolbarHost={isWritingMode ? animationToolbarHostRef.current : null} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen && !animationPreview} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
+        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} toolbarHost={isWritingMode ? animationToolbarHostRef.current : null} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
 
         {/* Always rendered, hidden when the writer has not asked for it:
             the editor draws the tools into this element as it starts, and a
