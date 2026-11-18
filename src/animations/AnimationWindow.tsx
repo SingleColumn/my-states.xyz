@@ -28,7 +28,7 @@ function initialRect(sourceElement: HTMLElement | null): Rect {
   return clamp({ x, y: 110, width, height })
 }
 
-export function AnimationWindow({ panelId, sourceElement, definitions, selected, isCustom, dirty, editCss, status, onClose, onSelect, onParameterChange, onNameChange, onCssChange, onEditCss, onDuplicate, onNew, onSave, onPreview }: {
+export function AnimationWindow({ panelId, sourceElement, definitions, selected, isCustom, dirty, editCss, status, onClose, onSelect, onParameterChange, onNameChange, onCssChange, onEditCss, onDuplicate, onNew, onDelete, onSave, onPreview }: {
   panelId: string
   sourceElement: HTMLElement | null
   definitions: AnimationDefinition[]
@@ -45,6 +45,7 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
   onEditCss(): void
   onDuplicate(): void
   onNew(): void
+  onDelete(): void
   onSave(): void
   onPreview(): void
 }) {
@@ -113,16 +114,19 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
     </header>
     <div className="animation-window-content">
       <label className="animation-window-field">Animation
-        <select className="app-dropdown" aria-label="Animation" value={selected.id} onChange={event => onSelect(event.target.value)}>
-          <optgroup label="Built-in animations">{definitions.filter(definition => !definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>
-          {definitions.some(definition => definition.id.startsWith('custom-')) && <optgroup label="Custom animations">{definitions.filter(definition => definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>}
-        </select>
+        <span className="animation-window-picker">
+          <select className="app-dropdown" aria-label="Animation" value={selected.id} onChange={event => onSelect(event.target.value)}>
+            <optgroup label="Built-in animations">{definitions.filter(definition => !definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>
+            {definitions.some(definition => definition.id.startsWith('custom-')) && <optgroup label="Custom animations">{definitions.filter(definition => definition.id.startsWith('custom-')).map(definition => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</optgroup>}
+          </select>
+        </span>
       </label>
       <div className="animation-window-selection">
         <div><h2>{selected.name}</h2><span>{isCustom ? dirty ? 'Custom · Unsaved changes' : 'Custom · Saved' : 'Built-in animation'}</span></div>
         <div className="animation-window-actions">
           <button type="button" className="app-chrome-control" onClick={onDuplicate}>Duplicate</button>
           <button type="button" className="app-chrome-control" onClick={onNew}>New animation</button>
+          {isCustom && <button type="button" className="app-chrome-control animation-window-delete" onClick={onDelete}>Delete</button>}
         </div>
       </div>
       <section className="animation-window-section" aria-label="Animation parameters">

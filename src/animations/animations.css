@@ -18,11 +18,14 @@
 .animation-window-content { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; gap: 18px; padding: 18px 22px 24px; }
 .animation-window-field { display: grid; gap: 7px; min-width: 0; color: var(--color-text-soft); font-weight: var(--font-weight-semibold); }
 .animation-window-field select, .animation-window-field input, .animation-window-field textarea { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; }
+.animation-window-picker { display: block; min-width: 0; padding: var(--space-detail-1); border: var(--border-width-hairline) solid var(--color-panel-border); border-radius: var(--radius-control); }
+.animation-window-picker select { height: var(--card-header-button-size); padding-inline: 10px; }
 .animation-window-field input, .animation-window-field textarea { color: var(--color-input-text); background: var(--color-input-bg); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); padding: 8px 10px; }
 .animation-window-selection { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; min-width: 0; }
 .animation-window-selection h2 { margin: 0 0 4px; font-size: var(--type-md); }
 .animation-window-selection span { color: var(--color-text-muted); font-size: var(--type-xs); }
 .animation-window-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.animation-window-delete:hover, .animation-window-delete:focus-visible { color: var(--color-danger); }
 .animation-window-section { display: grid; gap: 12px; min-width: 0; padding-top: 16px; border-top: 1px solid var(--color-panel-divider); }
 .animation-window-section h3 { margin: 0; font-size: var(--type-sm); }
 .animation-window-section > .app-chrome-control { justify-self: start; }

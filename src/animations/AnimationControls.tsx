@@ -80,6 +80,22 @@ export function AnimationControls({ panelId, sourceElement, writingMode, documen
       setStatus('Saved on this device.')
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save this animation.') }
   }
+  function remove() {
+    if (!isCustom) return
+    const stored = loadCustomAnimations()
+    const saved = stored.some(definition => definition.id === selected.id)
+    if (!window.confirm(saved ? `Delete "${selected.name}" from this device?` : `Discard "${selected.name}"?`)) return
+    try {
+      const next = stored.filter(definition => definition.id !== selected.id)
+      if (saved) saveCustomAnimations(next)
+      setCustom(next)
+      setDrafts(current => { const updated = { ...current }; delete updated[selected.id]; return updated })
+      if (playbackDefinition?.id === selected.id) exit()
+      setSelectedId(builtInAnimations[0].id)
+      setEditCss(false)
+      setStatus(saved ? 'Animation deleted from this device.' : 'Unsaved animation discarded.')
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not delete this animation.') }
+  }
   function preview() {
     try {
       validateAnimationCss(selected.css)
@@ -124,7 +140,7 @@ export function AnimationControls({ panelId, sourceElement, writingMode, documen
       onParameterChange={(id, value) => updateDraft({ ...selected, parameters: selected.parameters.map(parameter => parameter.id === id ? { ...parameter, value } : parameter) }, true)}
       onNameChange={name => updateDraft({ ...selected, name })}
       onCssChange={css => updateDraft({ ...selected, css })}
-      onEditCss={() => setEditCss(value => !value)} onDuplicate={duplicate} onNew={createNew} onSave={save} onPreview={preview}
+      onEditCss={() => setEditCss(value => !value)} onDuplicate={duplicate} onNew={createNew} onDelete={remove} onSave={save} onPreview={preview}
     />}
   </>
 }
