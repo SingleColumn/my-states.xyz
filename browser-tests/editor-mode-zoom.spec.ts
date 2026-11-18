@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { cameraZoom, openApp } from './helpers'
+import { cameraZoom, openApp, panelOfType, selectPanel } from './helpers'
 
 /**
  * SPIKE. Editor mode draws its panels at the zoom the canvas was left at,
@@ -81,3 +81,26 @@ for (const [width, height] of [[1280, 720], [1920, 1080]]) {
     }
   })
 }
+
+test('in Editor mode, canvas shortcuts do not reach the hidden canvas, with no setting needed', async ({ page }) => {
+  await openApp(page)
+  const panelsBefore = (await page.evaluate(() => window.myStates!.describe().panels.map((panel) => panel.panelId))).sort()
+  // The case that leaked in spike S2: a panel selected on the canvas, so the
+  // canvas has the keyboard, then the switch.
+  await selectPanel(page, (await panelOfType(page, 'notes')).panelId)
+  await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Editor' }).click()
+  await expect(page.locator('[data-testid="spike-editor-layer"]')).toBeVisible()
+
+  // Straight after the switch, with focus still on its button: without the
+  // guards `h` changed the hidden tool here and Delete removed the Writing panel.
+  // Checked after every key, because the keys can undo each other's leaks:
+  // Ctrl+A goes back to the select tool, and Delete removes what Ctrl+D added.
+  const read = () => page.evaluate(() => ({
+    tool: (window as unknown as { __spike: { editor: { getCurrentToolId(): string } } }).__spike.editor.getCurrentToolId(),
+    panels: window.myStates!.describe().panels.map((panel) => panel.panelId).sort(),
+  }))
+  for (const key of ['h', 'Control+d', 'Delete', 'Backspace', 'Control+a', 'Delete']) {
+    await page.keyboard.press(key)
+    expect(await read(), `after ${key}`).toEqual({ tool: 'select', panels: panelsBefore })
+  }
+})

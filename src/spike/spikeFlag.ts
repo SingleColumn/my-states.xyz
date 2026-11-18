@@ -4,21 +4,25 @@
  *
  * Starts from localStorage `mic:spike-s1` = `1` (start in Editor mode; kept
  * up to date by the mode switch, so the last mode used is remembered) and
- * `mic:spike-guards` = `1` (guards on). Both can be changed at runtime from
- * the console through `window.__spike`, so a switch can be tested as well as
- * a start.
+ * the hidden-canvas guards, which are on unless `mic:spike-guards` = `0`
+ * (kept only to show what leaks without them). Both can be changed at
+ * runtime from the console through `window.__spike`, so a switch can be
+ * tested as well as a start.
  */
-function read(key: string) {
+function read(key: string, fallback = false) {
   try {
-    return window.localStorage.getItem(key) === '1'
+    const value = window.localStorage.getItem(key)
+    return value === null ? fallback : value === '1'
   } catch {
-    return false
+    // Without storage the guards must still hold: a key that reaches the
+    // hidden canvas can delete a panel nobody can see.
+    return fallback
   }
 }
 
 type Listener = () => void
 const listeners = new Set<Listener>()
-const state = { editorMode: read('mic:spike-s1'), guards: read('mic:spike-guards') }
+const state = { editorMode: read('mic:spike-s1'), guards: read('mic:spike-guards', true) }
 
 export const spikeState = {
   get: () => state,
