@@ -544,13 +544,16 @@ test.describe('two Notes panels', () => {
     const { panel: second, shape: secondShape } = await addSecondNotesPanel(page)
     await expect(dispatch(page, { kind: 'note.select', panelId: second.panelId, noteId })).rejects.toThrow(/another Writing panel/)
 
-    // And the picker says so rather than hiding it.
-    const heldOption = secondShape.getByRole('combobox', { name: 'Choose a note' })
-      .locator('option', { hasText: 'open in another Writing panel' })
-    await expect(heldOption).toHaveCount(1)
-    // The property rather than toBeDisabled(), which does not read an
-    // <option> the way it reads the controls around it.
-    await expect(heldOption).toHaveJSProperty('disabled', true)
+    // There is only one usable note in this panel, so a picker with a locked
+    // option would suggest a choice that cannot be made.
+    await expect(secondShape.getByRole('combobox', { name: 'Choose a note' })).toHaveCount(0)
+
+    // With another available note, the picker returns and lists usable notes.
+    await secondShape.getByRole('button', { name: 'Writing panel actions' }).click()
+    await page.getByRole('menuitem', { name: 'New note' }).click()
+    const picker = secondShape.getByRole('combobox', { name: 'Choose a note' })
+    await expect(picker).toBeVisible()
+    await expect(picker.locator('option', { hasText: 'open in another Writing panel' })).toHaveCount(0)
 
     // And the first panel's note is untouched by any of it. Read from
     // storage rather than typed into again: by now the second panel sits

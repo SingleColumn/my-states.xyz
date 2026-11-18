@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePostHog } from '@posthog/react'
-import { CopyPlus, Download, FilePlus2, FileUp, Minus, PenLine, Plus, Ruler, Trash2, Type } from 'lucide-react'
+import { CopyPlus, Download, FilePlus2, FileUp, Minus, PenLine, Play, Plus, Ruler, Trash2, Type } from 'lucide-react'
 import { useAppState } from '../AppState'
 import type { Note, Panel } from '../types'
 import { markdownNamedAsCopy } from '../noteTitle'
@@ -8,6 +8,8 @@ import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
 import { panelContentProps, panelScrollProps } from '../panelSurface'
 import { NotesEditor, type NoteStats, type NotesEditorHandle } from './NotesEditor'
+import { AnimationControls } from '../animations/AnimationControls'
+import type { NoteDocument } from '../types'
 
 export function NotesPanel({ panelId }: { panelId: string }) {
   const posthog = usePostHog()
@@ -47,7 +49,18 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   // What the footer reports. It comes from the editor rather than from the
   // note's Markdown, which is no longer derived on every keystroke.
   const [stats, setStats] = useState<NoteStats | null>(null)
+  const [animationPreview, setAnimationPreview] = useState(false)
+  const [animationOptionsOpen, setAnimationOptionsOpen] = useState(false)
+  const [animationManagerOpen, setAnimationManagerOpen] = useState(false)
+  const [animationDocument, setAnimationDocument] = useState<NoteDocument | null>(null)
+  const animationDocumentRef = useRef<NoteDocument | null>(null)
   const editorHandle = useRef<NotesEditorHandle | null>(null)
+  const handleAnimationPreviewChange = useCallback((preview: boolean) => {
+    if (preview) setAnimationDocument(animationDocumentRef.current ?? editorHandle.current?.getDocument() ?? null)
+    setAnimationPreview(preview)
+  }, [])
+  const openAnimationManager = useCallback(() => setAnimationManagerOpen(true), [])
+  const closeAnimationManager = useCallback(() => setAnimationManagerOpen(false), [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   // The writing tools are drawn into this by the editor, which is what lets
   // them read the caret; the panel only decides where they sit.
@@ -94,6 +107,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   const heldBy = activeNoteId ? notes.noteOpenElsewhere(activeNoteId, panelId) : null
   const namedNote = notes.notes.find(note => note.id === activeNoteId) ?? null
   const activeNote = heldBy === null ? namedNote : null
+  useEffect(() => {
+    animationDocumentRef.current = null
+    setAnimationDocument(null)
+    setAnimationOptionsOpen(false)
+    setAnimationManagerOpen(false)
+  }, [activeNote?.id])
+  useEffect(() => { if (momentView) { setAnimationOptionsOpen(false); setAnimationManagerOpen(false) } }, [momentView])
 
   function captureWritingProgress(words: number) {
     const noteId = activeNote?.id
@@ -139,10 +159,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
     await notes.selectNote(documentId, panelId)
   }
 
-  // A single note - even the blank one a fresh board opens with - is not a
-  // choice yet, so a dropdown offering nothing but itself and "Create new
-  // note" is a control for a choice that doesn't exist.
-  const hasNotes = notes.notes.length > 1
+  // A note open in another panel cannot be selected here. Count only choices
+  // this panel can use, or the picker appears for an unavailable blank note.
+  const availableNotes = notes.notes.filter(note => notes.noteOpenElsewhere(note.id, panelId) === null)
+  const hasNotes = activeNote ? availableNotes.length > 1 : availableNotes.length > 0
   const noteSelect = hasNotes ? (
     <select
       className="app-dropdown note-select"
@@ -158,17 +178,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           Select existing note
         </option>
       )}
-      {notes.notes.map((note) => {
-        // Shown but not choosable: a note missing from the list is one the
-        // writer goes looking for, where one that says where it is answers
-        // the question instead.
-        const elsewhere = notes.noteOpenElsewhere(note.id, panelId) !== null
-        return (
-          <option key={note.id} value={note.id} disabled={elsewhere}>
-            {getDisplayNoteTitle(note)}{elsewhere ? ' — open in another Writing panel' : ''}
-          </option>
-        )
-      })}
+      {availableNotes.map((note) => <option key={note.id} value={note.id}>{getDisplayNoteTitle(note)}</option>)}
     </select>
   ) : null
 
@@ -215,6 +225,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             },
           },
         ] }, { heading: 'View', items: [
+          { id: 'animations', label: 'Animations', icon: <Play size={17} aria-hidden="true" />, checked: animationOptionsOpen, disabled: !activeNote || momentView, onSelect: () => setAnimationOptionsOpen(value => !value) },
           {
             id: 'formatting-tools',
             label: 'Show formatting tools',
@@ -222,6 +233,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             checked: showTools,
             onSelect: () => {
               setShowTools(!showTools)
+              setAnimationOptionsOpen(false)
               try {
                 window.localStorage.setItem(showToolsStorageKey, String(!showTools))
               } catch {
@@ -265,7 +277,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           },
         ] }]}
       >
-        {isWritingMode ? (
+        {isWritingMode && !animationPreview ? (
           <div className="notes-zoom-control" role="group" aria-label="Zoom">
             <button className="card-icon-button" type="button" title="Zoom out" aria-label="Zoom out" disabled={zoom <= minZoom} onClick={() => setZoom(zoom - zoomStep)}>
               <Minus size={16} aria-hidden="true" />
@@ -278,7 +290,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
             </button>
           </div>
         ) : null}
-        {isWritingMode && hasNotes ? (
+        {isWritingMode && hasNotes && !animationPreview ? (
           <label className="writing-note-picker">
             <span className="sr-only">Choose a note</span>
             {noteSelect}
@@ -301,7 +313,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         {/* No title field in either treatment: the note is named by its
             first line, so the name is written where it is read. What is
             left here is the choice of note, and only when there is one. */}
-        {isWritingMode || !hasNotes ? null : (
+        {isWritingMode || !hasNotes || animationPreview ? null : (
           <div className="notes-document-controls" {...panelContentProps}>
             <label className="note-control-field">
               <span>Choose a note</span>
@@ -310,12 +322,14 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         )}
 
+        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
+
         {/* Always rendered, hidden when the writer has not asked for it:
             the editor draws the tools into this element as it starts, and a
             host that came and went would leave the drawing with nowhere to
             go. */}
         <div
-          className={`notes-writing-toolbar-host${showTools && activeNote ? '' : ' is-hidden'}`}
+          className={`notes-writing-toolbar-host${showTools && activeNote && !animationPreview && !animationOptionsOpen ? '' : ' is-hidden'}`}
           ref={toolbarHostRef}
           {...panelContentProps}
         />
@@ -323,6 +337,7 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         {activeNote ? (
           <div
             className={['notes-editor', 'card-content', isWritingMode ? 'is-writing' : ''].filter(Boolean).join(' ')}
+            style={animationPreview ? { display: 'none' } : undefined}
             {...panelContentProps}
             // What the wheel scrolls when it lands somewhere with nothing
             // scrollable above it -- the note's title, which sits beside the
@@ -331,12 +346,14 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           >
             <NotesEditor
               key={activeNote.id}
-              readOnly={momentView}
+              readOnly={momentView || animationPreview}
               toolbarHost={toolbarHostRef}
               markdown={activeNote.content}
               document={activeNote.document}
               placeholder={editorPlaceholder}
               onChange={(document, next, title) => {
+                animationDocumentRef.current = document
+                if (animationPreview) setAnimationDocument(document)
                 notes.setActiveNoteDocument(document, panelId, activeNote.id)
                 // Only when the first line's words actually change. The
                 // document is kept out of React state on purpose (see
@@ -349,6 +366,11 @@ export function NotesPanel({ panelId }: { panelId: string }) {
               }}
               onHandle={(handle) => {
                 editorHandle.current = handle
+                if (!handle) animationDocumentRef.current = null
+                if (handle) {
+                  animationDocumentRef.current = handle.getDocument()
+                  if (animationPreview) setAnimationDocument(animationDocumentRef.current)
+                }
                 notes.registerEditor(panelId, handle, activeNote.id)
               }}
             />
