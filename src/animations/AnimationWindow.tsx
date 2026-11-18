@@ -5,6 +5,13 @@ import { markPointerEventHandled } from '../panelSurface'
 import type { AnimationDefinition } from './definitions'
 
 interface Rect { x: number; y: number; width: number; height: number }
+const illuminationColours = [
+  { name: 'Amber', value: '#ffd166' }, { name: 'Coral', value: '#ff6b6b' },
+  { name: 'Pink', value: '#f783ac' }, { name: 'Violet', value: '#b197fc' },
+  { name: 'Blue', value: '#74c0fc' }, { name: 'Teal', value: '#63e6be' },
+  { name: 'Lime', value: '#a9e34b' }, { name: 'White', value: '#ffffff' },
+]
+const isHexColour = (value: string) => /^#[0-9a-f]{6}$/i.test(value)
 let topAnimationLayer = 8
 function viewport(): Rect {
   const chrome = document.querySelector('.app-chrome')?.getBoundingClientRect()
@@ -52,15 +59,27 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
   const root = useRef<HTMLElement>(null)
   const [layer, setLayer] = useState(() => ++topAnimationLayer)
   const [rect, setRect] = useState(() => initialRect(sourceElement))
+  const [openColour, setOpenColour] = useState<string | null>(null)
+  const [colourText, setColourText] = useState('')
+  const colourPopover = useRef<HTMLDivElement>(null)
+  const colourOpenRef = useRef(false)
+  colourOpenRef.current = openColour !== null
   const gesture = useRef<{ pointer: number; element: HTMLElement; mode: 'move' | 'resize'; x: number; y: number; rect: Rect } | null>(null)
+
+  useEffect(() => setOpenColour(null), [selected.id])
+  useEffect(() => { if (openColour) colourPopover.current?.scrollIntoView({ block: 'nearest' }) }, [openColour])
 
   useEffect(() => {
     root.current?.focus({ preventScroll: true })
     const resize = () => setRect(current => clamp(current))
     const key = (event: KeyboardEvent) => {
       event.stopPropagation()
-      if (event.key === 'Escape') { event.preventDefault(); onClose() }
-      if (!(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) && (event.key === 'Delete' || event.key === 'Backspace')) event.preventDefault()
+      if (event.type === 'keydown' && event.key === 'Escape') {
+        event.preventDefault()
+        if (colourOpenRef.current) setOpenColour(null)
+        else onClose()
+      }
+      if (event.type === 'keydown' && !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) && (event.key === 'Delete' || event.key === 'Backspace')) event.preventDefault()
     }
     const element = root.current!
     element.addEventListener('keydown', key)
@@ -103,6 +122,7 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
     onPointerDownCapture={event => {
       markPointerEventHandled(event)
       if (layer < topAnimationLayer) setLayer(++topAnimationLayer)
+      if (openColour && !(event.target instanceof Element && event.target.closest('.animation-color-control'))) setOpenColour(null)
       if (!(event.target instanceof Element && event.target.closest('button, input, textarea, select'))) root.current?.focus({ preventScroll: true })
     }}
     onPointerDown={event => event.stopPropagation()} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
@@ -131,13 +151,31 @@ export function AnimationWindow({ panelId, sourceElement, definitions, selected,
       </div>
       <section className="animation-window-section" aria-label="Animation parameters">
         <h3>Settings</h3>
-        {selected.parameters.map(parameter => <label className="animation-parameter" key={parameter.id}>
+        {selected.parameters.map(parameter => <div className={`animation-parameter${parameter.type === 'color' ? ' is-color' : ''}`} key={parameter.id}>
           <span>{parameter.label}</span>
-          <input aria-label={parameter.label} type={parameter.type === 'range' ? 'range' : parameter.type === 'color' ? 'color' : 'number'}
+          {parameter.type === 'color' ? <div className="animation-color-control">
+            <button type="button" className="animation-color-trigger" aria-label={`Choose ${parameter.label.toLowerCase()}`} aria-expanded={openColour === parameter.id} onClick={() => {
+              setColourText(String(parameter.value))
+              setOpenColour(openColour === parameter.id ? null : parameter.id)
+            }}><span className="animation-color-chip" style={{ backgroundColor: String(parameter.value) }} /><span>{parameter.value}</span></button>
+            {openColour === parameter.id && <div ref={colourPopover} className="animation-color-popover" role="group" aria-label={`${parameter.label} picker`}>
+              <div className="animation-color-swatches">{illuminationColours.map(colour => <button key={colour.value} type="button" aria-label={colour.name} title={colour.name} className="animation-color-swatch" style={{ backgroundColor: colour.value }} onClick={() => {
+                setColourText(colour.value)
+                onParameterChange(parameter.id, colour.value)
+              }} />)}</div>
+              <label className="animation-color-hex">Hex colour
+                <input aria-label="Hex colour" value={colourText} maxLength={7} spellCheck={false} aria-invalid={!isHexColour(colourText)} onChange={event => {
+                  const value = event.target.value
+                  setColourText(value)
+                  if (isHexColour(value)) onParameterChange(parameter.id, value)
+                }} />
+              </label>
+            </div>}
+          </div> : <input aria-label={parameter.label} type={parameter.type === 'range' ? 'range' : 'number'}
             min={parameter.min} max={parameter.max} step={parameter.step} value={parameter.value}
-            onChange={event => onParameterChange(parameter.id, parameter.type === 'color' ? event.target.value : Number(event.target.value))} />
-          <output>{parameter.id === 'startDelay' ? `${parameter.value} s` : parameter.value}</output>
-        </label>)}
+            onChange={event => onParameterChange(parameter.id, Number(event.target.value))} />}
+          {parameter.type !== 'color' && <output>{parameter.id === 'startDelay' ? `${parameter.value} s` : parameter.value}</output>}
+        </div>)}
         {!isCustom && <p className="animation-window-hint">These settings apply to this preview. Duplicate to save your own version.</p>}
       </section>
       <section className="animation-window-section" aria-label="Animation editing">

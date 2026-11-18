@@ -12,6 +12,17 @@ async function openAnimations(panel: Locator) {
   return panel.page().getByRole('dialog', { name: 'Animation management' })
 }
 
+async function setLightColour(manager: Locator, value: string) {
+  const trigger = manager.getByRole('button', { name: 'Choose light colour' })
+  await trigger.click()
+  const picker = manager.getByRole('group', { name: 'Light colour picker' })
+  await expect(picker).toBeVisible()
+  await picker.getByRole('textbox', { name: 'Hex colour' }).fill(value)
+  await expect(trigger).toContainText(value)
+  await manager.getByText('Words lit at once', { exact: true }).click()
+  await expect(picker).toHaveCount(0)
+}
+
 test('the Animations action opens basic options below the header', async ({ page }) => {
   await openApp(page)
   const note = await panelOfType(page, 'notes')
@@ -101,6 +112,33 @@ test('start delay waits before playback and keeps its remaining time when paused
   await expect(editor).toContainText('One two three four')
 })
 
+test('illumination colour picker closes on settings clicks and Escape', async ({ page }) => {
+  await openApp(page)
+  const note = await panelOfType(page, 'notes')
+  const manager = await openAnimations(await shapeOf(page, note.panelId))
+  await manager.getByRole('combobox', { name: 'Animation' }).selectOption('random-illumination')
+  const trigger = manager.getByRole('button', { name: 'Choose light colour' })
+  await trigger.click()
+  const picker = manager.getByRole('group', { name: 'Light colour picker' })
+  await expect(picker).toBeVisible()
+  await manager.screenshot({ path: 'test-results/animations-colour-picker.png' })
+  await picker.getByRole('button', { name: 'Coral' }).click()
+  await expect(trigger).toContainText('#ff6b6b')
+  await manager.getByText('Words lit at once', { exact: true }).click()
+  await expect(picker).toHaveCount(0)
+  await trigger.click()
+  await picker.getByRole('textbox', { name: 'Hex colour' }).fill('#12ab34')
+  await page.keyboard.press('Escape')
+  await expect(picker).toHaveCount(0)
+  await expect(manager).toBeVisible()
+  await expect(trigger).toContainText('#12ab34')
+  await dragLocator(page, manager.getByRole('separator', { name: 'Resize animation window' }), { dx: -220, dy: -200 })
+  await trigger.click()
+  await expect(picker.getByRole('textbox', { name: 'Hex colour' })).toBeInViewport()
+  await manager.getByText('Words lit at once', { exact: true }).click()
+  await expect(picker).toHaveCount(0)
+})
+
 test('only custom animations can be deleted, without removing other saved animations', async ({ page }) => {
   await openApp(page)
   const note = await panelOfType(page, 'notes')
@@ -167,14 +205,14 @@ test('writing stays clear; playback and authoring are separate', async ({ page }
   await manager.getByRole('combobox', { name: 'Animation' }).selectOption('random-illumination')
   await expect(manager.getByRole('slider', { name: 'Changes per second' })).toBeVisible()
   await expect(manager.getByRole('slider', { name: 'Words lit at once' })).toBeVisible()
-  await manager.locator('input[type="color"]').fill('#00ff00')
+  await setLightColour(manager, '#00ff00')
   await manager.getByRole('button', { name: 'Play in Writing Panel' }).click()
   await expect(panel.locator('.animation-preview-host .word')).toHaveCount(4)
   await expect(editor).toBeHidden()
   await expect(manager).toBeVisible()
   await expect.poll(() => panel.locator('.word[data-illuminated="true"]').count()).toBeGreaterThan(0)
   await expect.poll(async () => panel.locator('.word[data-illuminated="true"]').first().evaluate(element => getComputedStyle(element).color)).toBe('rgb(0, 255, 0)')
-  await manager.locator('input[type="color"]').fill('#0000ff')
+  await setLightColour(manager, '#0000ff')
   await expect.poll(async () => panel.locator('.word[data-illuminated="true"]').first().evaluate(element => getComputedStyle(element).color)).toBe('rgb(0, 0, 255)')
   await manager.getByRole('button', { name: 'Close animation window' }).click()
   const strip = panel.getByRole('toolbar', { name: 'Animation options' })

@@ -30,9 +30,19 @@
 .animation-window-section h3 { margin: 0; font-size: var(--type-sm); }
 .animation-window-section > .app-chrome-control { justify-self: start; }
 .animation-parameter { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(100px, 1.3fr) minmax(44px, auto); align-items: center; gap: 10px; min-width: 0; }
+.animation-parameter.is-color { align-items: start; }
+.animation-parameter.is-color > span { padding-top: 9px; }
 .animation-parameter input { min-width: 0; width: 100%; accent-color: var(--accent-notes); }
-.animation-parameter input[type='color'] { width: 48px; height: 34px; }
 .animation-parameter output { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
+.animation-color-control { position: relative; grid-column: 2 / -1; min-width: 0; }
+.animation-color-trigger { display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; height: 34px; padding: 3px 8px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-input-bg); color: var(--color-input-text); cursor: pointer; font-family: var(--font-family-code); }
+.animation-color-chip { flex: 0 0 25px; height: 25px; border: 1px solid var(--color-control-border); border-radius: 4px; }
+.animation-color-popover { box-sizing: border-box; width: 100%; margin-top: 6px; padding: 12px; border: 1px solid var(--color-panel-border); border-radius: var(--radius-control); background: var(--panel-content-background); }
+.animation-color-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.animation-color-swatch { width: 100%; height: 32px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); cursor: pointer; }
+.animation-color-hex { display: grid; gap: 6px; margin-top: 12px; color: var(--color-text-soft); font-size: var(--type-xs); }
+.animation-color-hex input { box-sizing: border-box; width: 100%; height: 32px; padding-inline: 8px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-input-bg); color: var(--color-input-text); font-family: var(--font-family-code); }
+.animation-color-hex input[aria-invalid='true'] { border-color: var(--color-danger); }
 .animation-window-hint { margin: 0; color: var(--color-text-muted); font-size: var(--type-xs); }
 .animation-css-fields { display: grid; gap: 12px; min-width: 0; }
 .animation-css-fields textarea { min-height: 190px; max-height: 420px; resize: vertical; overflow: auto; font-family: var(--font-family-code); line-height: 1.45; tab-size: 2; }
