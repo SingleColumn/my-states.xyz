@@ -140,7 +140,10 @@ export function useMomentViewMode(editorRef: MutableRefObject<Editor | null>, sl
  */
 function rememberNoteHeights() {
   for (const surface of document.querySelectorAll<HTMLElement>('.panel-notes-surface')) {
-    const writingArea = surface.querySelector<HTMLElement>('.notes-editor')
+    // While an animation plays the editor is hidden and the playback takes its
+    // place, so the one with a height is the one on screen.
+    const writingArea = [...surface.querySelectorAll<HTMLElement>('.notes-editor, .animation-playback')]
+      .find((area) => area.offsetHeight > 0)
     if (writingArea) surface.style.setProperty('--moment-note-height', `${writingArea.offsetHeight}px`)
   }
 }
