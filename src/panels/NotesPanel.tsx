@@ -322,7 +322,10 @@ export function NotesPanel({ panelId }: { panelId: string }) {
           </div>
         )}
 
-        {activeNote && !momentView && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
+        {/* Kept mounted in screenshot view: it holds the playback, and
+            removing it would stop an animation the writer wants captured.
+            Its controls are closed on entering (see the effect above). */}
+        {activeNote && <AnimationControls key={activeNote.id} panelId={panelId} sourceElement={sectionRef.current} writingMode={isWritingMode} document={animationDocument} optionsOpen={animationOptionsOpen} onOptionsClose={() => setAnimationOptionsOpen(false)} managerOpen={animationManagerOpen} onManagerOpen={openAnimationManager} onManagerClose={closeAnimationManager} onPreviewChange={handleAnimationPreviewChange} />}
 
         {/* Always rendered, hidden when the writer has not asked for it:
             the editor draws the tools into this element as it starts, and a
