@@ -8,7 +8,6 @@ import type {
   Note,
   Panel,
   PanelType,
-  SpotifyTokens,
 } from './types'
 import { createId } from './utils'
 import { getPanelDefinition } from './panelRegistry'
@@ -40,13 +39,16 @@ const DB_VERSION = 2
 const ACTIVE_BOARD_KEY = 'active-board-id'
 const GLOBAL_THEME_KEY = 'global-theme-id'
 const THEME_MODE_KEY = 'theme-mode-preference'
-// Named before the app was. Kept so a Spotify login survives this build.
-const SPOTIFY_TOKENS_KEY = 'mic:spotify-tokens'
-
 /** What earlier builds left in the browser, removed once by this one. */
 const previousGeneration = {
   database: 'music-images-canvas',
-  localStorageKeys: ['mic:canvas', 'mic:slideshow', 'mic:spotify-playlist', 'mic:last-note-id'],
+  localStorageKeys: [
+    'mic:canvas', 'mic:slideshow', 'mic:spotify-playlist', 'mic:last-note-id',
+    // A Spotify sign-in from when the Music panel could connect an account
+    // (see docs/spotify-sdk-approach.md). The tokens are no longer used, and a
+    // token nothing uses should not sit in the browser.
+    'mic:spotify-tokens', 'mic:spotify-code-verifier', 'mic:spotify-state',
+  ],
 }
 
 export const boardLimits = {
@@ -182,16 +184,6 @@ void dbPromise.then(() => reportStorageStatus(null), (error: unknown) => {
 function discardPreviousGeneration() {
   for (const key of previousGeneration.localStorageKeys) window.localStorage.removeItem(key)
   void deleteDB(previousGeneration.database).catch(() => {})
-}
-
-function readJson<T>(key: string, fallback: T): T {
-  const raw = window.localStorage.getItem(key)
-  if (!raw) return fallback
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return fallback
-  }
 }
 
 /**
@@ -581,18 +573,6 @@ function writeGlobalThemeId(preferences: { put(value: PreferenceRecord): Promise
 export async function setThemeModePreference(preference: ThemeModePreference) {
   const db = await dbPromise
   await db.put('preferences', { key: THEME_MODE_KEY, value: preference })
-}
-
-export function loadSpotifyTokens() {
-  return readJson<SpotifyTokens | null>(SPOTIFY_TOKENS_KEY, null)
-}
-
-export function saveSpotifyTokens(tokens: SpotifyTokens | null) {
-  if (!tokens) {
-    window.localStorage.removeItem(SPOTIFY_TOKENS_KEY)
-    return
-  }
-  window.localStorage.setItem(SPOTIFY_TOKENS_KEY, JSON.stringify(tokens))
 }
 
 function validateAssets(assets: Array<Omit<BoardImage, 'boardId'> & { blob: Blob }>) {

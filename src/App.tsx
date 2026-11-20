@@ -64,9 +64,8 @@ function AppContent() {
   const [canvasMenuLayer, setCanvasMenuLayer] = useState<HTMLDivElement | null>(null)
   const posthog = usePostHog()
   const appState = useAppState()
-  const { spotify, boards, panels, appearance } = appState
+  const { boards, panels, appearance } = appState
   const [callbackStatus, setCallbackStatus] = useState<string | null>(null)
-  const callbackHandledRef = useRef(false)
   const [isPanMode, setIsPanMode] = useState(false)
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
   const [isCanvasReady, setIsCanvasReady] = useState(false)
@@ -128,45 +127,6 @@ function AppContent() {
     if (!missing) return
     setCallbackStatus(`This board was saved with the theme "${missing}", which is not installed. Your current theme is being used instead.`)
   }, [boards.activeBoard?.id, appearance.effective.missingThemeId])
-
-  useEffect(() => {
-    if (window.location.pathname !== '/callback' || callbackHandledRef.current) return
-    // The Spotify authorization code is single-use. Mark this callback as
-    // handled before starting the exchange because updating Spotify state can
-    // re-run this effect while the request is still in flight.
-    callbackHandledRef.current = true
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const state = params.get('state')
-    const error = params.get('error')
-
-    if (error) {
-      spotify.reportSignInFailure()
-      setCallbackStatus(`Spotify login failed: ${error}`)
-      window.history.replaceState({}, '', '/')
-      return
-    }
-    if (!code) {
-      spotify.reportSignInFailure()
-      setCallbackStatus('Spotify did not return an authorization code.')
-      window.history.replaceState({}, '', '/')
-      return
-    }
-
-    setCallbackStatus('Finishing Spotify login...')
-    // Remove the one-time code before awaiting the exchange. This also keeps
-    // a later render from attempting to process the same authorization code.
-    window.history.replaceState({}, '', '/')
-    spotify
-      .handleCallback(code, state)
-      .then(() => {
-        setCallbackStatus(null)
-        posthog.capture('spotify_login_completed')
-      })
-      .catch((caught) => {
-        setCallbackStatus(caught instanceof Error ? caught.message : 'Spotify callback failed.')
-      })
-  }, [posthog, spotify])
 
   /**
    * Puts a board on the canvas. Every board has its document from

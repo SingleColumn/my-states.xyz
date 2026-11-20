@@ -131,12 +131,6 @@ export interface NoteDocument {
   doc: Record<string, unknown>
 }
 
-export interface SpotifyTokens {
-  accessToken: string
-  refreshToken: string | null
-  expiresAt: number
-}
-
 export interface SpotifyPlaylistReference {
   id: string | null
   uri: string | null
@@ -208,13 +202,3 @@ export interface BoardSummary {
   themeId?: string
 }
 
-export interface SpotifyTrackState {
-  title: string
-  artist: string
-  album: string
-  albumArt: string | null
-  url: string | null
-  durationMs: number
-  positionMs: number
-  paused: boolean
-}

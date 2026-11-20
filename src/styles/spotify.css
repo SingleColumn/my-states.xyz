@@ -59,40 +59,6 @@
   text-align: left;
 }
 
-.track-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-control-inner-gap);
-  min-width: 0;
-}
-
-.track-title-row .track-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.current-playback-link {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: var(--card-footer-button-size);
-  height: var(--card-footer-button-size);
-  border: var(--border-width-hairline) solid var(--card-button-border);
-  border-radius: var(--button-radius);
-  color: var(--card-button-icon-color);
-}
-
-.current-playback-link:hover {
-  color: var(--card-button-active-icon);
-  background: var(--card-button-bg-hover);
-}
-
-.current-playback-link svg {
-  width: var(--size-control-icon);
-  height: var(--size-control-icon);
-}
-
 .track-title {
   margin: 0 0 var(--space-track-title-bottom);
   overflow-wrap: anywhere;
@@ -112,7 +78,6 @@
   -webkit-line-clamp: 2;
 }
 
-.progress-row,
 .transport-row,
 .input-row {
   display: flex;
@@ -121,28 +86,8 @@
   min-width: 0;
 }
 
-.progress-row {
-  margin-bottom: var(--space-row-bottom);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-progress);
-}
-
-.progress-row input,
-.volume-control input {
-  flex: 1;
-}
-
 .transport-row {
   margin-bottom: var(--space-row-bottom);
-}
-
-.volume-control {
-  display: flex;
-  align-items: center;
-  gap: var(--space-control-inner-gap);
-  min-width: var(--size-volume-min);
-  flex: 1;
-  color: var(--color-text-muted);
 }
 
 .input-row {
@@ -241,56 +186,6 @@
 .spotify-show-search:focus-visible {
   background: var(--card-button-bg-hover);
   color: var(--color-text);
-}
-
-/* Connecting Spotify sits in the same row as Reset fields, which is styled
-   down to the field's weight so the search leads. This one is the offer that
-   row exists to carry, so it keeps the primary fill and the control weight
-   the rest of the panel's primary actions have. */
-.spotify-search-actions .spotify-connect {
-  background: var(--card-primary-bg);
-  border-color: var(--card-primary-border);
-  color: var(--card-primary-icon);
-  font-weight: var(--font-weight-control);
-}
-
-/* Someone has just clicked a playlist and only connecting Spotify can play it,
-   so the button that does that draws the eye. It is the same slow halo as the
-   About button's — three pulses over twenty seconds, each rising over ~1.4s,
-   holding ~1.6s and fading over ~2s — in the same theme colour, so the two
-   read as one family of "look here". Unlike the About button it rests in this
-   button's own primary colours rather than the neutral ones. */
-.spotify-connect.is-inviting {
-  animation: spotify-connect-invite 20s ease-in-out 1;
-}
-
-@keyframes spotify-connect-invite {
-  0%,
-  5%,
-  30%,
-  38%,
-  63%,
-  71%,
-  96%,
-  100% {
-    border-color: var(--card-primary-border);
-    background: var(--card-primary-bg);
-    box-shadow:
-      0 0 0 0 transparent,
-      0 0 0 0 transparent;
-  }
-  12%,
-  20%,
-  45%,
-  53%,
-  78%,
-  86% {
-    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-primary-border));
-    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-primary-bg));
-    box-shadow:
-      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
-      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
-  }
 }
 
 /* No movement was asked for, but the invitation is still worth making: the
@@ -519,10 +414,6 @@
 .spotify-chosen.is-featured .spotify-chosen-note {
   margin: 0;
   text-align: center;
-}
-
-.spotify-chosen.is-featured .track-title-row {
-  justify-content: center;
 }
 
 /* What to do next is not part of the song's description, so it stands

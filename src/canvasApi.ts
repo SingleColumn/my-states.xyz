@@ -15,7 +15,7 @@ import { isSelectableVideoId } from './videoCatalog'
  * Geometry commands go straight to tldraw. Configuration commands go through
  * panelStore, so tldraw validates them and they undo like any edit. The
  * verbs that are not property writes (creating a note, loading a sample
- * collection, logging in to Spotify) are the app's own and are dispatched to
+ * collection, loading a Spotify playlist) are the app's own and are dispatched to
  * the same state the panels use.
  */
 
@@ -65,9 +65,7 @@ export type CanvasCommand =
   | { kind: 'images.pause'; panelId: string }
   | { kind: 'images.next'; panelId: string }
   | { kind: 'images.previous'; panelId: string }
-  | { kind: 'spotify.login' }
   | { kind: 'spotify.loadPlaylistUrl'; panelId: string; url: string }
-  | { kind: 'spotify.togglePlay'; panelId: string }
   | { kind: 'appearance.setGlobalTheme'; themeId: string }
   | { kind: 'appearance.setBoardTheme'; themeId: string | null }
   /** A theme definition (the contents of a .theme.json file) as data; validated like a file import. */
@@ -235,16 +233,9 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
           requirePanel(command.panelId)
           state.slideshow.previous(command.panelId)
           return
-        case 'spotify.login':
-          await state.spotify.login()
-          return
         case 'spotify.loadPlaylistUrl':
           requirePanel(command.panelId)
           await state.spotify.loadPlaylistFromUrl(command.url, command.panelId)
-          return
-        case 'spotify.togglePlay':
-          requirePanel(command.panelId)
-          await state.spotify.togglePlay(command.panelId)
           return
         case 'appearance.setGlobalTheme':
           await state.appearance.setGlobalTheme(command.themeId)

@@ -52,14 +52,6 @@
 }
 
 @container panel-shell (max-width: 520px) {
-  .panel-spotify-surface .transport-row {
-    flex-wrap: wrap;
-  }
-
-  .panel-spotify-surface .volume-control {
-    flex-basis: 100%;
-  }
-
   /* One scroller, not two. The body stays clipped (as it is at every wider
      size) and the results take the space left over, so the list scrolls and
      nothing scrolls behind it. */

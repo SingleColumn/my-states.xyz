@@ -13,7 +13,6 @@ import {
   getBoardSummaries,
   importBoardContent,
   saveBoardAssets,
-  saveSpotifyTokens,
   boardLimits,
   BOARD_SCHEMA_VERSION,
   getStoredTheme,
@@ -164,7 +163,8 @@ describe('portable board archives', () => {
   })
 
   it('exports and imports notes, embedded images, canvas state, and a playlist reference without Spotify tokens', async () => {
-    saveSpotifyTokens({ accessToken: 'access-secret', refreshToken: 'refresh-secret', expiresAt: Date.now() + 60_000 })
+    // Tokens a build that could sign in to Spotify may have left behind.
+    window.localStorage.setItem('mic:spotify-tokens', JSON.stringify({ accessToken: 'access-secret', refreshToken: 'refresh-secret', expiresAt: Date.now() + 60_000 }))
     const archive = await createCompleteArchive()
     const entries = await archiveEntries(archive)
     const exportedManifest = manifest(entries)

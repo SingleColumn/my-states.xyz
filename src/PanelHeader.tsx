@@ -111,7 +111,7 @@ export function PanelHeader({ panelId, panelType, title, menuItems, menuSections
    * "Panel", so the whole menu reads as headed groups.
    */
   menuSections?: PanelMenuSection[]
-  /** Kept as the last block of the menu — e.g. Music's Log out. */
+  /** Kept as the last block of the menu. */
   trailingMenuItems?: PanelMenuItem[]
   /** SPIKE: the heading over `trailingMenuItems` in a headed menu. */
   trailingMenuHeading?: string

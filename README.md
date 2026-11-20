@@ -1,17 +1,16 @@
 # my-states.xyz
 
-my-states.xyz is a desktop-oriented creative workspace, hosted at [www.my-states.xyz](https://www.my-states.xyz). It places a Spotify playlist player, image slideshow, and Markdown editor on a persistent infinite canvas, so you can arrange music, visual references, and writing in one place.
+my-states.xyz is a desktop-oriented creative workspace, hosted at [www.my-states.xyz](https://www.my-states.xyz). It places a Spotify music player, image slideshow, and Markdown editor on a persistent infinite canvas, so you can arrange music, visual references, and writing in one place.
 
-The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other than Spotify authentication). Its only server-side component is a pair of small read-only endpoints that let the Music panel search Spotify's public catalog before anyone has connected a Spotify account; everything else runs in the browser.
+The app is a single-user MVP: it has no accounts, cloud sync, or sharing. Its only server-side component is a pair of small read-only endpoints that let the Music panel search Spotify's public catalog; everything else runs in the browser.
 
 ## What it does
 
 - Pan and zoom an infinite canvas; drag and resize the three built-in panels.
 - Create named boards; each retains its own canvas camera, panel layout, images, notes, slideshow settings, and Spotify playlist reference.
-- Import and export complete portable boards as `.board.zip` files. Exports include the board's image bytes and Markdown notes, but never Spotify credentials.
-- Search Spotify playlists and songs, and browse a rotating set of curated suggestions, without connecting a Spotify account.
-- Connect Spotify with OAuth PKCE when you want playback, and control it in the panel.
-- Load a playlist from a Spotify playlist URL or URI.
+- Import and export complete portable boards as `.board.zip` files. Exports include the board's image bytes and Markdown notes.
+- Search Spotify playlists and songs, and browse a rotating set of curated suggestions.
+- Play what you choose in Spotify's own embedded player: 30-second previews without a Spotify login, whole songs when you are logged in to Spotify in the same browser.
 - Browse live curated image collections when their public export is configured (or bundled samples in local fallback mode), or select a local folder from the Images panel menu, then play the images as a slideshow with previous/next, play/pause, stop, shuffle, speed, fade, and zoom controls.
 - Import a directory through the browser's file picker when direct folder access is unavailable.
 - Create, select, rename, edit, autosave, delete, and download Markdown notes.
@@ -21,7 +20,7 @@ The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other 
 
 - Vite, React, and TypeScript
 - [tldraw](https://www.tldraw.com/) for the canvas
-- Spotify Web Playback SDK and Web API
+- Spotify's embedded player (iFrame API) and, on the server, the Spotify Web API
 - [Milkdown](https://milkdown.dev/) (ProseMirror + remark) for the writing editor
 - `localStorage` and IndexedDB for local persistence
 
@@ -29,33 +28,20 @@ The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other 
 
 - Node.js and npm
 - A current desktop Chromium browser (Chrome or Edge recommended)
-- A Spotify Premium account for browser playback
-- A Spotify Developer application with a Client ID, and its Client Secret if you want catalog search and suggestions to work before a visitor connects Spotify
+- A Spotify Developer application with a Client ID and Client Secret, for catalog search and suggestions
 
 ## Set up Spotify
 
 1. Create an application in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Add this redirect URI to that application:
-
-   ```text
-   http://127.0.0.1:5173/callback
-   ```
-
-3. Copy the example environment file and add your Client ID:
+2. Copy the example environment file:
 
    ```bash
    cp .env.example .env
    ```
 
-   ```dotenv
-   VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
-   ```
-
-   If you serve the app at a different origin or port, update the redirect URI in Spotify and set the optional `VITE_SPOTIFY_REDIRECT_URI` value in `.env` to the same callback URL.
-
    Optionally set `VITE_TLDRAW_LICENSE_KEY` in `.env` to your tldraw license key to remove the watermark. The app runs fine without it.
 
-4. Add the server-only credentials, which power catalog search and the curated suggestions for visitors who have not connected Spotify:
+3. Add the server-only credentials, which power catalog search and the curated suggestions:
 
    ```dotenv
    SPOTIFY_CLIENT_ID=your_spotify_client_id
@@ -64,17 +50,17 @@ The app is a single-user MVP: it has no accounts, cloud sync, or sharing (other 
 
    These are read only by the endpoints in `api/` and, in local development, by the dev server. They are never compiled into the browser bundle. `npm run dev` serves `/api/spotify/*` from the same handler Vercel runs, so the local workflow is unchanged: `npm run dev` and nothing else.
 
-   Without them the app still runs. Search works once a visitor connects Spotify, and before that the panel says discovery is unavailable while keeping its search field and Connect Spotify.
+   Without them the app still runs, but the Music panel says discovery is unavailable and cannot search.
 
-> Keep `.env` private. It is intentionally excluded from version control. The Spotify Client ID is public browser configuration; the Client Secret is not. Never place a Spotify client secret in a `VITE_*` variable -- anything with that prefix is compiled into the JavaScript the browser downloads. There is deliberately no `VITE_SPOTIFY_CLIENT_SECRET`, and the token minted from the secret never leaves the server.
+> Keep `.env` private. It is intentionally excluded from version control. The Spotify Client ID is not a secret; the Client Secret is. Never place a Spotify client secret in a `VITE_*` variable -- anything with that prefix is compiled into the JavaScript the browser downloads. There is deliberately no `VITE_SPOTIFY_CLIENT_SECRET`, and the token minted from the secret never leaves the server.
 
 ## How Spotify is reached
 
-The app talks to Spotify in two separate ways, and keeps them apart on purpose.
+**Search, through this app.** The endpoints in `api/spotify/` use Spotify's Client Credentials flow with `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to search playlists and songs and to read the curated suggestions' details. This authenticates the application, not the visitor, so it reaches public catalog data only and no Spotify login screen appears. The browser can ask these endpoints two questions -- a search, and the details of a list of playlist ids -- and nothing else: it cannot name a Spotify URL or path, and the application's token is never sent to it.
 
-**Application-level, for the public catalog.** The endpoints in `api/spotify/` use Spotify's Client Credentials flow with `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to search playlists and songs and to read the curated suggestions' details. This authenticates the application, not the visitor, so it reaches public catalog data only and no Spotify login screen appears. The browser can ask these endpoints two questions -- a search, and the details of a list of playlist ids -- and nothing else: it cannot name a Spotify URL or path, and the application's token is never sent to it.
+**Playback, in Spotify's own player.** What a visitor chooses is loaded into Spotify's embedded player (`src/spotifyEmbed.ts`, `src/panels/SpotifyEmbedStrip.tsx`). The app never sees a visitor's Spotify login: without one Spotify plays 30-second previews, and with one in the same browser it plays whole songs. If Spotify sends the visitor to its own site to log in, the panel welcomes them back and rebuilds the player when they return.
 
-**User-level, for playback.** Connecting Spotify uses the browser-side Authorization Code + PKCE flow, exactly as before, and the resulting token stays in `localStorage`, separate from boards. Playback, the Web Playback SDK, and anything else tied to a Spotify account use that token and only that token. Browsing the catalog can never start playback, and application credentials are never used for anything belonging to a visitor.
+The panel used to let a visitor connect their own Spotify account (Authorization Code + PKCE, and the Web Playback SDK). Spotify's development mode limits that to a few allowlisted accounts, so it was removed; the code is kept in [docs/spotify-sdk-approach.md](docs/spotify-sdk-approach.md).
 
 ## Curated playlist suggestions
 
@@ -98,7 +84,7 @@ export const curatedSpotifyPlaylists: CuratedSpotifyPlaylist[] = [
 - **Categories** are free text and never shown. Their only job is to keep a set of suggestions varied: the selection takes one per category before it takes a second from any.
 - **How many.** A pool of thirty to a hundred or more works well, and there is no upper bound; about six are shown. Each page load picks a different subset where the pool allows one, and Shuffle suggestions picks another without reloading.
 - **Invalid entries are skipped** rather than emptying the suggestion area. Note that Spotify's Web API stopped serving its own algorithmic and editorial playlists -- the ones whose id begins `37i9dQZF1D` -- to applications in development mode in November 2024, so those ids will not resolve. Use playlists made by people, or by your own Spotify account.
-- **An empty list is fine.** It ships empty, so that no invented Spotify id is ever shipped. With an empty pool the suggestion area simply does not appear, and search and Connect Spotify are unaffected.
+- **An empty list is fine.** It ships empty, so that no invented Spotify id is ever shipped. With an empty pool the suggestion area simply does not appear, and search is unaffected.
 
 ## Run locally
 
@@ -165,35 +151,31 @@ leaves a screenshot and a trace under `test-results/`; open a trace with
 
 ## Deploy to Vercel
 
-This repository includes `vercel.json`, which rewrites every route except `/api/*` to `index.html`, so Spotify can return users to `/callback` in this Vite SPA while the functions in `api/` keep receiving their own requests. The exclusion is asserted by a test (`api/_lib/vercelRewrites.test.ts`), because a rewrite that swallowed `/api/spotify/*` would answer with a page of HTML and a 200 rather than with an error -- a failure that looks like success.
+This repository includes `vercel.json`, which rewrites every route except `/api/*` to `index.html`, so any address opens this Vite SPA while the functions in `api/` keep receiving their own requests. The exclusion is asserted by a test (`api/_lib/vercelRewrites.test.ts`), because a rewrite that swallowed `/api/spotify/*` would answer with a page of HTML and a 200 rather than with an error -- a failure that looks like success.
 
-Before production deployment, set these Vercel Production environment variables and register the exact HTTPS callback URL in the Spotify Developer Dashboard:
+Before production deployment, set these Vercel Production environment variables:
 
 ```dotenv
-VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
-VITE_SPOTIFY_REDIRECT_URI=https://your-domain.example/callback
 VITE_IMAGE_COLLECTIONS_BASE_URL=https://your-public-storage.example/curated-export
 SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 ```
 
-The first two are browser configuration and are compiled into the bundle. The last two are server-only, are read by the functions in `api/`, and must never be given a `VITE_` prefix.
+The first is browser configuration and is compiled into the bundle. The last two are server-only, are read by the functions in `api/`, and must never be given a `VITE_` prefix.
 
 In the Vercel dashboard, choose the variable type like this (Vercel's **Config** values stay readable after saving; **Secret** values cannot be viewed again once saved):
 
 | Variable | Type | Why |
 | --- | --- | --- |
 | `SPOTIFY_CLIENT_SECRET` | **Secret** | The only real credential. Nobody needs to read it back. |
-| `SPOTIFY_CLIENT_ID` | Config | Already public: the browser sends it to Spotify in the login link. |
-| `VITE_SPOTIFY_CLIENT_ID` | Config | Every `VITE_` variable is compiled into the JavaScript visitors download. |
-| `VITE_SPOTIFY_REDIRECT_URI` | Config | Same, and it is only a URL. |
+| `SPOTIFY_CLIENT_ID` | Config | An identifier, not a credential. |
 | `VITE_IMAGE_COLLECTIONS_BASE_URL` | Config | Public root URL for the read-only curated image export. |
 
 The same applies to the other `VITE_` variables (the tldraw licence key and the PostHog values): they are already public in the bundle, so marking them Secret would add nothing.
 
 The Secret type controls who on your team can read a value back. It does not decide whether the browser can see it: that is settled by the missing `VITE_` prefix, which keeps the client secret out of the bundle. Keep the client secret somewhere you can find it again, because Vercel will not show it after you save it. Set the server-only variables for **Production**, and for **Preview** as well if you use preview deployments, or discovery will be unavailable there. Local development reads your `.env` file rather than Vercel's Development environment. Redeploy after changing any variable so the new value takes effect.
 
-Use [VERCEL_DEPLOYMENT_CHECKLIST.md](VERCEL_DEPLOYMENT_CHECKLIST.md) for the complete DNS, OAuth, deployment, and hosted-browser verification steps.
+Use [VERCEL_DEPLOYMENT_CHECKLIST.md](VERCEL_DEPLOYMENT_CHECKLIST.md) for the complete DNS, deployment, and hosted-browser verification steps.
 
 ## Using the workspace
 
@@ -201,7 +183,7 @@ On first launch, the app creates a board with its three panels. Use the board co
 
 | Panel | How to use it |
 | --- | --- |
-| Music | Search Spotify, or pick one of the suggested playlists, straight away -- no Spotify account is needed to look. Connect Spotify to play what you have chosen, or to paste a Spotify playlist URL/URI. Playback requires Spotify Premium. |
+| Music | Search Spotify, or pick one of the suggested playlists. What you choose plays in Spotify's own player: 30-second previews without a Spotify login, whole songs when you are logged in to Spotify in the same browser. |
 | Images | Browse and select a live curated collection when configured (otherwise a bundled sample), or choose a local folder from the panel menu. Local JPEG, PNG, WebP, GIF, AVIF, BMP, and SVG files are copied into the active board. |
 | Markdown Text Editor | Create a document, give it a name, and write with the toolbar. Notes autosave; use the download button to export the active note as `.md`. |
 
@@ -229,7 +211,7 @@ For a responsive app, prefer WebP or AVIF where appropriate, avoid unnecessarily
 
 ## Portable boards
 
-Export downloads a complete `.board.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. Curated selections are copied into the archive with their attribution and restore as local session images, so the archive does not depend on the live feed remaining unchanged. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Spotify login tokens, playback device data, current-track data, search results, and the session's suggestions are not included.
+Export downloads a complete `.board.zip` archive that can be imported into another browser profile or device. It includes the canvas layout, slideshow settings, playlist reference, Markdown notes, and active local image assets. Curated selections are copied into the archive with their attribution and restore as local session images, so the archive does not depend on the live feed remaining unchanged. A bundled sample selection exports only its stable collection reference because those files already ship with the app. Search results and the session's suggestions are not included.
 
 Version 1 supports up to 200 images, 25 MB per image, and 250 MB of image data in a board. Import validates the archive structure and rejects unsupported or oversized content. Before a board is switched, created, deleted, imported, or exported, pending note and canvas saves are flushed so the archive and stored board include the most recent changes.
 
@@ -240,13 +222,13 @@ Archives are written in format version 3, which can associate one embedded curat
 All workspace data stays in the browser:
 
 - IndexedDB holds boards, their canvas/layout and slideshow state, Markdown notes, embedded image blobs and metadata, and—where the browser permits it—a selected folder handle for convenience.
-- `localStorage` holds Spotify authentication data only; the active board is a preference inside IndexedDB.
-- `sessionStorage` holds two throwaway notes, per browser tab: which suggestions the previous page load showed, so the next one can differ, and what someone was about to play when they left to connect Spotify. Neither holds a token, and neither reaches a board.
+- `localStorage` holds a few small preferences (for example, not showing the card about Spotify previews again); the active board is a preference inside IndexedDB.
+- `sessionStorage` holds one throwaway note, per browser tab: which suggestions the previous page load showed, so the next one can differ.
 - Images are read locally when selected and copied into the active board; they are not uploaded by this app.
 
 The File System Access API allows Chromium browsers to remember a selected folder, but the browser may ask you to grant permission again after a restart. If direct folder selection is not supported, the Images panel falls back to directory file selection; this fallback does not retain an access handle. A selected folder is a convenience only: exported boards use their embedded image copies.
 
-Clearing this site's browser data removes the stored boards, notes, images, settings, and Spotify session. Use board export or the note download button for backups.
+Clearing this site's browser data removes the stored boards, notes, images, and settings. Use board export or the note download button for backups.
 
 ## Limitations
 

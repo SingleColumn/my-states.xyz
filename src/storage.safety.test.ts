@@ -22,7 +22,7 @@ beforeAll(async () => {
   await old.put('sessions', earlier.board)
   old.close()
   for (const key of earlier.localStorageKeys) window.localStorage.setItem(key, '{}')
-  window.localStorage.setItem('mic:spotify-tokens', JSON.stringify({ accessToken: 'keep', refreshToken: null, expiresAt: 1 }))
+  window.localStorage.setItem('mic:spotify-tokens', JSON.stringify({ accessToken: 'old', refreshToken: null, expiresAt: 1 }))
   await storage.initializeBoards()
 })
 
@@ -38,7 +38,7 @@ describe('the fresh database', () => {
     db.close()
   })
 
-  it('removes the earlier database and workspace keys, and keeps the Spotify login', async () => {
+  it('removes the earlier database and workspace keys, and an old Spotify sign-in', async () => {
     // deleteDB is fire-and-forget; give it a turn. Opening with no version
     // afterwards creates an empty database, so no stores means it was gone.
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -46,7 +46,8 @@ describe('the fresh database', () => {
     expect(old.objectStoreNames.length).toBe(0)
     old.close()
     for (const key of earlier.localStorageKeys) expect(window.localStorage.getItem(key)).toBeNull()
-    expect(storage.loadSpotifyTokens()).toMatchObject({ accessToken: 'keep' })
+    // The Music panel no longer signs in to Spotify, so its tokens are not kept.
+    expect(window.localStorage.getItem('mic:spotify-tokens')).toBeNull()
   })
 
   it('creates every panel visible and out of focus view, from a normalised draft built straight into a document', async () => {

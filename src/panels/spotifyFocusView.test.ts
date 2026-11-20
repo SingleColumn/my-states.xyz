@@ -5,7 +5,7 @@ import type { PanelCommands } from '../PanelHeader'
 import { PanelCommandsProvider } from '../PanelHeader'
 import { SpotifyPanel } from './SpotifyPanel'
 
-const panel = vi.hoisted(() => ({ focusView: false, connected: true }))
+const panel = vi.hoisted(() => ({ focusView: false }))
 
 // The header's menu is closed until clicked, and a static render cannot
 // click, so the real header is rendered with its menu open.
@@ -20,32 +20,18 @@ vi.mock('../PanelHeader', async (importOriginal) => {
 vi.mock('../AppState', () => ({
   useAppState: () => ({
     spotify: {
-      tokens: panel.connected ? { accessToken: 'test-token', refreshToken: null, expiresAt: Date.now() + 600_000 } : null,
-      track: panel.connected ? { title: 'Weightless', artist: 'Marconi Union', album: 'Distance', albumArt: null, url: null, durationMs: 8000, positionMs: 1000, paused: false } : null,
       tracks: [],
       playlists: [],
       selectedTrack: null,
-      deviceId: 'device',
-      isReady: true,
-      status: 'Ready',
+      playlistsHaveMore: false,
       error: null,
-      login: async () => {},
-      logout: () => {},
       clearSearchResults: () => {},
-      handleCallback: async () => {},
       searchPlaylists: async () => {},
       searchTracks: async () => {},
+      loadMorePlaylists: async () => {},
       loadPlaylistFromUrl: async () => {},
       selectPlaylist: () => {},
       selectTrack: () => {},
-      lookupTrack: async () => {},
-      playPlaylist: async () => {},
-      playTrack: async () => {},
-      togglePlay: async () => {},
-      nextTrack: async () => {},
-      previousTrack: async () => {},
-      seek: async () => {},
-      setVolume: async () => {},
     },
     boards: { activeBoard: { id: 'board_focus' } },
     panels: {
@@ -70,55 +56,43 @@ const commands: PanelCommands = {
   expandPanelFromStartingHeight: () => {},
 }
 
-function renderMusicPanel(focusView: boolean, connected = true) {
+function renderMusicPanel(focusView: boolean) {
   panel.focusView = focusView
-  panel.connected = connected
   return renderToStaticMarkup(createElement(PanelCommandsProvider, {
     commands,
     children: createElement(SpotifyPanel, { panelId: 'panel_music' }),
   }))
 }
 
+// The focus view is the panel a few centimetres tall: Spotify's smallest
+// player, and the music's name in the footer.
 describe('Music panel focus view', () => {
   it('names the loaded playlist in both views, so it survives Reset fields', () => {
     for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
       expect(markup).toContain('Deep Focus')
+      expect(markup).not.toContain('No playlist loaded')
     }
   })
 
-  // The row names the playlist and nothing more, the same in every view, so
-  // that putting the search away does not move the words that say what is
-  // playing. Its cover is what made it a card the size of a result row.
-  it('names the loaded playlist without its cover, in every view', () => {
-    for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
-      expect(markup).toContain('Deep Focus')
-      expect(markup).not.toContain('https://example.test/deep-focus.jpg')
-    }
-  })
-
-  it('keeps the playlist, track, and playback controls in the focus view', () => {
+  it("holds Spotify's smallest player", () => {
     const markup = renderMusicPanel(true)
     expect(markup).toContain('is-focus-view')
-    expect(markup).toContain('Weightless')
-    expect(markup).toContain('Marconi Union - Distance')
-    expect(markup).toContain('aria-label="Seek"')
-    expect(markup).toContain('title="Play or pause"')
-    expect(markup).toContain('aria-label="Volume"')
+    expect(markup).toContain('spotify-embed-strip')
+    expect(markup).toContain('Previews without a login')
   })
 
-  it('drops the search, the results, and the link option from the focus view', () => {
+  it('drops the search, the results and the suggestions from the focus view', () => {
     const focused = renderMusicPanel(true)
-    expect(focused).not.toContain('Play from a Spotify link')
     expect(focused).not.toContain('Search playlists')
     expect(focused).not.toContain('Reset fields')
     expect(focused).not.toContain('Playlist search results')
+    expect(focused).not.toContain('Suggested for this session')
 
     const full = renderMusicPanel(false)
     expect(full).not.toContain('is-focus-view')
-    expect(full).toContain('Play from a Spotify link')
     expect(full).toContain('Search playlists')
     expect(full).toContain('Reset fields')
-    // No search typed: what is playing fills the room the results would take.
+    // No search typed: the chosen music fills the room the results would take.
     expect(full).toContain('is-featured')
   })
 
@@ -136,15 +110,6 @@ describe('Music panel focus view', () => {
     expect(focused).not.toContain('Search for songs')
   })
 
-  // The body offers one way in. The link field is a step someone opens from
-  // the panel menu, so it is absent until they ask for it.
-  it('keeps the playlist link field out of the body until it is opened', () => {
-    const full = renderMusicPanel(false)
-    expect(full).toContain('Play from a Spotify link')
-    expect(full).not.toContain('Spotify playlist URL')
-    expect(full.indexOf('Search playlists')).toBeGreaterThan(full.indexOf('panel-body'))
-  })
-
   it('offers focus view in the panel group, right after Hide panel, with the same name on or off', () => {
     const markup = renderMusicPanel(false)
     expect(markup.indexOf('>Hide panel<')).toBeLessThan(markup.indexOf('>Focus view<'))
@@ -152,56 +117,13 @@ describe('Music panel focus view', () => {
     expect(renderMusicPanel(true)).toContain('>Focus view<')
   })
 
-  it('puts Log out last in the header menu, after every shared panel control', () => {
-    const markup = renderMusicPanel(false)
-    expect(markup.indexOf('>Focus view<')).toBeLessThan(markup.indexOf('>Log out<'))
-    expect(markup.indexOf('>Hide panel<')).toBeLessThan(markup.indexOf('>Log out<'))
-    expect(markup.indexOf('>Expand panel to full screen<')).toBeLessThan(markup.indexOf('>Log out<'))
-    expect(markup.indexOf('>Restore panel to default size<')).toBeLessThan(markup.indexOf('>Log out<'))
-  })
-})
-
-// The focus view is the panel a few centimetres tall. With no Spotify
-// session there is no player to show in it, and six suggestion cards are not
-// what belongs there either: what it can usefully say is that it is not
-// connected, and how to connect.
-describe('Music panel focus view, before Spotify is connected', () => {
-  it("holds Spotify's smallest player, and keeps connecting an account in the menu", () => {
-    const markup = renderMusicPanel(true, false)
-    expect(markup).toContain('is-focus-view')
-    expect(markup).toContain('spotify-embed-strip')
-    expect(markup).toContain('Previews without a login')
-    // Only in the menu: the app's own Spotify login works for allowlisted
-    // accounts alone while the app is in Spotify's development mode.
-    expect(markup).toContain('Connect Spotify account')
-    expect(markup).not.toContain('spotify-connect')
-  })
-
-  // The board's music is part of the board, connected or not; the focus view
-  // names it once, in the footer.
-  it('names the playlist the board was saved with', () => {
-    const markup = renderMusicPanel(true, false)
-    expect(markup).toContain('Deep Focus')
-    expect(markup).not.toContain('No playlist loaded')
-  })
-
-  it('leaves out the search, the suggestions and the playback controls', () => {
-    const markup = renderMusicPanel(true, false)
-    expect(markup).not.toContain('Search playlists')
-    expect(markup).not.toContain('Playlist search results')
-    expect(markup).not.toContain('Suggested for this session')
-    expect(markup).not.toContain('aria-label="Seek"')
-    expect(markup).not.toContain('title="Play or pause"')
-    expect(markup).not.toContain('Play from a Spotify link')
-  })
-
-  // The full view is where searching and connecting belong, and neither of
-  // them waits on the other.
-  it('gives the search and the offer to connect back in the full view', () => {
-    const markup = renderMusicPanel(false, false)
-    expect(markup).not.toContain('is-focus-view')
-    expect(markup).toContain('Search playlists')
-    expect(markup).toContain('Connect Spotify')
-    expect(markup).toContain('Reset fields')
+  // Signing in to a Spotify account went with the Web Playback SDK approach
+  // (docs/spotify-sdk-approach.md).
+  it('offers no Spotify account in any view', () => {
+    for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
+      expect(markup).not.toContain('Connect Spotify')
+      expect(markup).not.toContain('>Log out<')
+      expect(markup).not.toContain('Play from a Spotify link')
+    }
   })
 })
