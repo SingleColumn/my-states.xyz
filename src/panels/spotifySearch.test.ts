@@ -832,7 +832,7 @@ describe('Music panel before Spotify is connected', () => {
 
       expect(card()?.textContent).toContain('30-second previews')
       expect(card()?.textContent).toContain('come back to this my-states tab')
-      expect(card()?.textContent).toContain('private (incognito) window')
+      expect(card()?.textContent).toContain('Private (incognito) windows may not recognise')
     })
 
     it('opens for a chosen song as well', () => {
