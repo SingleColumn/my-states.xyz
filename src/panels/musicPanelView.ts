@@ -48,11 +48,24 @@ export interface MusicPanelInputs {
   playerReady: boolean
   /** The Spotify session ended on its own (expired), not by logging out. */
   sessionEnded: boolean
+  /** Spotify's own player (not connected only): could it load? */
+  embedFailed?: boolean
+  /**
+   * The visitor used Spotify's player, left this tab, and came back with
+   * nothing playing: most likely a trip to Spotify's site to log in.
+   */
+  backFromSpotify?: boolean
+}
+
+/** Spotify's own player, shown to a visitor who has not connected Spotify. */
+export interface MusicEmbedView {
+  /** Spotify's documented compact heights, in screen pixels. */
+  height: 152 | 80
+  /** Kept playing but not drawn (the screenshot view shows the cover). */
+  hidden: boolean
 }
 
 export interface MusicPanelView {
-  /** Not connected and in the focus view: only the offer to connect. */
-  connectOnly: boolean
   /** The search field and the buttons under it. */
   showSearch: boolean
   /**
@@ -74,6 +87,13 @@ export interface MusicPanelView {
   nextStep: string | null
   /** The playback controls: connected, in every view. */
   showPlayer: boolean
+  /**
+   * Spotify's own player: not connected, with something chosen. Present in
+   * every view, so a change of view never stops the music it is playing.
+   */
+  embed: MusicEmbedView | null
+  /** Offer a reload: the one way left to pick up a Spotify login made elsewhere. */
+  offerReload: boolean
 }
 
 /**
@@ -100,12 +120,18 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
     ? { kind: 'track', id: playing.url ?? playing.title, title: playing.title, meta: `${playing.artist} - ${playing.album}`, image: playing.albumArt, url: playing.url }
     : chosen
 
+  // Spotify's player belongs to whoever has not connected, whenever there is
+  // something to play. It is never taken away by a change of view, only hidden
+  // or made smaller, because taking it away is what stops the music.
+  const embedFor = (height: MusicEmbedView['height'], hidden = false): MusicEmbedView | null =>
+    !connected && chosen && !inputs.embedFailed ? { height, hidden } : null
+  const offerReload = !connected && Boolean(inputs.backFromSpotify) && chosen !== null
+
   // A moment shows which song it is, whatever the panel was doing: a search
   // left open or a panel in its focus view gives way to the cover, and no
   // connecting step or player belongs in a picture of the board.
   if (inputs.momentView) {
     return {
-      connectOnly: false,
       showSearch: false,
       middle: music ? 'cover' : 'none',
       music,
@@ -113,22 +139,33 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
       namer: music ? 'cover' : null,
       nextStep: null,
       showPlayer: false,
+      embed: embedFor(focusView ? 80 : 152, true),
+      offerReload: false,
     }
   }
 
   // The focus view is the panel at its smallest: no search and no cover.
-  // Not connected, all it can usefully offer is the way to connect; the
-  // footer names the music.
+  // Not connected, Spotify's smallest player is the whole of it; the footer
+  // names the music. Only coming back from Spotify earns a line of text.
   if (focusView) {
     return {
-      connectOnly: !connected,
       showSearch: false,
       middle: 'none',
       music,
       chosen,
       namer: connected && music ? 'player' : null,
-      nextStep: null,
+      // One short line, beside its button: the focus view has room for
+      // Spotify's player and very little else, and the player matters more.
+      nextStep: connected || !chosen
+        ? null
+        : inputs.embedFailed
+          ? 'Spotify’s player could not load here.'
+          : inputs.backFromSpotify
+            ? 'Welcome back. Press play again.'
+            : null,
       showPlayer: connected,
+      embed: embedFor(80),
+      offerReload,
     }
   }
 
@@ -154,7 +191,6 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
         : 'row'
 
   return {
-    connectOnly: false,
     showSearch: !searchHidden,
     middle,
     music,
@@ -162,6 +198,8 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
     namer,
     nextStep: nextStep(inputs, chosen),
     showPlayer: connected,
+    embed: embedFor(152),
+    offerReload,
   }
 }
 
@@ -176,9 +214,14 @@ function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null): string | 
     return 'Your Spotify connection has ended. Connect Spotify again to keep listening.'
   }
   if (!inputs.connected) {
-    return chosen
-      ? `Connect Spotify to play this ${chosen.kind === 'track' ? 'song' : 'playlist'} here. You will come straight back to this page.`
-      : null
+    if (!chosen) return null
+    if (inputs.embedFailed) return 'Spotify’s player could not load here. You can still listen on Spotify.'
+    if (inputs.backFromSpotify) {
+      return 'Welcome back to my-states. If you logged in to Spotify, press play again. Still only short previews? Reload this page.'
+    }
+    // Said before anything happens, because once Spotify's player sends the
+    // visitor away, this page cannot say anything until they come back.
+    return 'Without a Spotify login, Spotify plays 30-second previews. If Spotify takes you to its site to log in, come back to this my-states tab afterwards.'
   }
   if (inputs.cameBackToPlay && !inputs.playing && chosen) {
     return inputs.playerReady

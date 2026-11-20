@@ -37,30 +37,47 @@ describe('musicPanelView', () => {
       expect(view({})).toMatchObject({ middle: 'empty', namer: null, nextStep: null })
     })
 
-    it('a board with a song: the song large, and the step left to play it', () => {
+    it("a board with a song: the song large, Spotify's player under it, and what to expect", () => {
       const result = view({ boardTrack: song, suggestionCount: 6 })
-      expect(result).toMatchObject({ middle: 'cover', namer: 'cover', music: { title: 'Both Sides Now', meta: 'Frank Sinatra - Cycles', image: song.image } })
-      expect(result.nextStep).toContain('Connect Spotify to play this song here')
+      expect(result).toMatchObject({ middle: 'cover', namer: 'cover', music: { title: 'Both Sides Now', meta: 'Frank Sinatra - Cycles', image: song.image }, embed: { height: 152, hidden: false } })
+      expect(result.nextStep).toContain('30-second previews')
+      expect(result.nextStep).toContain('come back to this my-states tab')
     })
 
     it('a board with a playlist: the playlist large, with its own cover', () => {
       const result = view({ boardPlaylist: playlist })
       expect(result).toMatchObject({ middle: 'cover', namer: 'cover', music: { title: 'A Moveable Feast', meta: 'Playlist', image: playlist.image } })
-      expect(result.nextStep).toContain('Connect Spotify to play this playlist here')
+      expect(result.embed).toEqual({ height: 152, hidden: false })
     })
 
-    it('searching on a board with music: the results, and the music in a row beside the step', () => {
+    it("searching on a board with music: the results, the music in a row, and Spotify's player kept", () => {
       const result = view({ boardTrack: song, searchState: 'results' })
-      expect(result).toMatchObject({ middle: 'results', namer: 'row' })
-      expect(result.nextStep).toContain('Connect Spotify')
+      expect(result).toMatchObject({ middle: 'results', namer: 'row', embed: { height: 152 } })
+      expect(result.nextStep).toContain('30-second previews')
     })
 
-    it('searching on a board without music: the results alone', () => {
-      expect(view({ searchState: 'results' })).toMatchObject({ middle: 'results', namer: null, nextStep: null })
+    it('searching on a board without music: the results alone, and no player', () => {
+      expect(view({ searchState: 'results' })).toMatchObject({ middle: 'results', namer: null, nextStep: null, embed: null })
     })
 
-    it('the focus view: only the offer to connect; the footer names the music', () => {
-      expect(view({ focusView: true, boardTrack: song })).toMatchObject({ connectOnly: true, showSearch: false, middle: 'none', namer: null, nextStep: null, showPlayer: false })
+    it("the focus view: Spotify's smallest player alone; the footer names the music", () => {
+      expect(view({ focusView: true, boardTrack: song })).toMatchObject({ showSearch: false, middle: 'none', namer: null, nextStep: null, showPlayer: false, embed: { height: 80, hidden: false } })
+    })
+
+    it('back from Spotify with nothing playing: welcomed back, told to press play, offered a reload', () => {
+      const result = view({ boardPlaylist: playlist, backFromSpotify: true })
+      expect(result.nextStep).toContain('Welcome back to my-states')
+      expect(result).toMatchObject({ offerReload: true, embed: { height: 152 } })
+    })
+
+    it('back from Spotify in the focus view: the same, in one short line', () => {
+      expect(view({ focusView: true, boardPlaylist: playlist, backFromSpotify: true })).toMatchObject({ nextStep: 'Welcome back. Press play again.', offerReload: true, embed: { height: 80 } })
+    })
+
+    it("Spotify's player could not load: no player, and a line saying so", () => {
+      const result = view({ boardPlaylist: playlist, embedFailed: true })
+      expect(result.embed).toBeNull()
+      expect(result.nextStep).toContain('could not load')
     })
 
     it('a session that ended on its own says so, ahead of anything else', () => {
@@ -135,7 +152,13 @@ describe('musicPanelView', () => {
     })
 
     it('the focus view: the player names the music; no cover, no search', () => {
-      expect(view({ ...on, focusView: true, playing })).toMatchObject({ connectOnly: false, showSearch: false, middle: 'none', namer: 'player', showPlayer: true })
+      expect(view({ ...on, focusView: true, playing })).toMatchObject({ showSearch: false, middle: 'none', namer: 'player', showPlayer: true })
+    })
+
+    it("never has Spotify's own player: the connected player replaces it", () => {
+      expect(view({ ...on, boardPlaylist: playlist }).embed).toBeNull()
+      expect(view({ ...on, focusView: true, boardPlaylist: playlist }).embed).toBeNull()
+      expect(view({ ...on, boardPlaylist: playlist, backFromSpotify: true }).offerReload).toBe(false)
     })
   })
 
@@ -172,8 +195,10 @@ describe('musicPanelView in a moment', () => {
   it('shows the music on its own, whatever the panel was doing', () => {
     for (const connected of [false, true]) for (const focusView of [false, true]) for (const searchState of ['waiting', 'results'] as const) {
       const result = view({ momentView: true, connected, focusView, searchState, boardTrack: song, cameBackToPlay: true })
-      expect(result).toMatchObject({ connectOnly: false, showSearch: false, middle: 'cover', namer: 'cover', nextStep: null, showPlayer: false })
+      expect(result).toMatchObject({ showSearch: false, middle: 'cover', namer: 'cover', nextStep: null, showPlayer: false })
       expect(result.music?.title).toBe('Both Sides Now')
+      // Kept but hidden: taking the player away would stop the music.
+      expect(result.embed).toEqual(connected ? null : { height: focusView ? 80 : 152, hidden: true })
     }
   })
 

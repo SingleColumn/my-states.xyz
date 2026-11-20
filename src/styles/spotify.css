@@ -620,3 +620,77 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-playlist-meta);
 }
+
+/* Spotify's own player, for a visitor who has not connected Spotify. Its look
+   is Spotify's, so it gets a fixed, compact strip at the bottom of the panel
+   and nothing more: the rest of the panel stays in the app's own style. */
+.spotify-embed-strip {
+  position: relative;
+  flex: 0 0 auto;
+  margin-top: var(--space-control-inner-gap);
+}
+
+/* Rounded to Spotify's own 12px card, in screen pixels (the frame is drawn
+   at screen size), so no corner of the iframe's white page shows round it. */
+.spotify-embed-frame {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-album-empty);
+}
+
+/* The frame's size and its own counter-zoom are set inline, per zoom level. */
+.spotify-embed-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* The screenshot view shows the cover, not Spotify's player. The player stays
+   in the page so the music keeps playing; it just takes no room and is not
+   drawn. Not display: none, which some browsers treat as a reason to stop. */
+.spotify-embed-strip.is-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px !important;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.spotify-embed-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-playlist-meta);
+}
+
+/* Not connected there is only Reset under the search. */
+.spotify-search-actions.is-single {
+  grid-template-columns: 1fr;
+}
+
+.spotify-embed-action {
+  justify-self: center;
+  text-decoration: none;
+}
+
+/* The focus view's body is Spotify's player alone; its line and button are
+   in the footer. */
+.panel-spotify-surface.is-focus-view .spotify-embed-strip {
+  margin-top: 0;
+}
+
+.card-footer .spotify-embed-action {
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 2px 8px;
+  font-size: inherit;
+}

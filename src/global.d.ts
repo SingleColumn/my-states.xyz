@@ -44,6 +44,7 @@ declare global {
     showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
     Spotify?: typeof Spotify
     onSpotifyWebPlaybackSDKReady?: () => void
+    onSpotifyIframeApiReady?: (api: import('./spotifyEmbed').SpotifyIFrameApi) => void
     instgrm?: {
       Embeds: {
         process(): void

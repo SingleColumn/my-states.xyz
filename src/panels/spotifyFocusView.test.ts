@@ -166,11 +166,15 @@ describe('Music panel focus view', () => {
 // what belongs there either: what it can usefully say is that it is not
 // connected, and how to connect.
 describe('Music panel focus view, before Spotify is connected', () => {
-  it('says it is not connected and offers Spotify, and stops there', () => {
+  it("holds Spotify's smallest player, and keeps connecting an account in the menu", () => {
     const markup = renderMusicPanel(true, false)
     expect(markup).toContain('is-focus-view')
-    expect(markup).toContain('Not connected')
-    expect(markup).toContain('Connect Spotify')
+    expect(markup).toContain('spotify-embed-strip')
+    expect(markup).toContain('Previews without a login')
+    // Only in the menu: the app's own Spotify login works for allowlisted
+    // accounts alone while the app is in Spotify's development mode.
+    expect(markup).toContain('Connect Spotify account')
+    expect(markup).not.toContain('spotify-connect')
   })
 
   // The board's music is part of the board, connected or not; the focus view

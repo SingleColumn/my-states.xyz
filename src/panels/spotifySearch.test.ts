@@ -10,7 +10,7 @@
 // second half of this file drives the panel with no session at all: the
 // search still works, and choosing a playlist still only chooses it.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { StrictMode, createElement } from 'react'
+import { StrictMode, createElement, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { PanelCommands } from '../PanelHeader'
 import { PanelCommandsProvider } from '../PanelHeader'
@@ -36,6 +36,53 @@ const curated = vi.hoisted(() => ({
 }))
 
 vi.mock('@posthog/react', () => ({ usePostHog: () => ({ capture: vi.fn() }) }))
+
+// Spotify's iFrame API, standing in for the script Spotify serves. It puts a
+// real iframe where Spotify would, so focus and blur behave as in the page,
+// and lets a test report playback the way Spotify's player does.
+type EmbedHandler = (event: { data?: Record<string, unknown> }) => void
+const embed = vi.hoisted(() => ({
+  fail: false,
+  created: 0,
+  controllers: [] as Array<{
+    uri: string
+    listeners: Record<string, EmbedHandler[]>
+    loadEntity: (...args: unknown[]) => void
+    pause: () => void
+    destroy: () => void
+  }>,
+}))
+
+vi.mock('../spotifyEmbed', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../spotifyEmbed')>()
+  return {
+    ...actual,
+    loadSpotifyIframeApi: async () => {
+      if (embed.fail) throw new Error('blocked')
+      return {
+        createController(host: HTMLElement, options: { uri?: string }, callback: (controller: unknown) => void) {
+          const iframe = document.createElement('iframe')
+          host.replaceWith(iframe)
+          embed.created += 1
+          const listeners: Record<string, EmbedHandler[]> = {}
+          const controller = {
+            uri: options.uri ?? '',
+            listeners,
+            loadEntity: vi.fn(),
+            play: vi.fn(),
+            pause: vi.fn(),
+            resume: vi.fn(),
+            togglePlay: vi.fn(),
+            addListener: (name: string, handler: EmbedHandler) => { (listeners[name] ??= []).push(handler) },
+            destroy: vi.fn(() => iframe.remove()),
+          }
+          embed.controllers.push(controller)
+          callback(controller)
+        },
+      }
+    },
+  }
+})
 
 vi.mock('../spotifySuggestions', () => ({
   getSessionSuggestions: () => curated.entries,
@@ -78,6 +125,15 @@ const commands: PanelCommands = {
   expandPanelFromStartingHeight: () => {},
 }
 
+// The app re-renders the panel when its state changes; the mocked state here
+// is a plain object, so a change to it says so through this.
+let appStateChanged = () => {}
+function AppStateHarness() {
+  const [, setVersion] = useState(0)
+  appStateChanged = () => setVersion((version) => version + 1)
+  return createElement(SpotifyPanel, { panelId: 'panel_music' })
+}
+
 /** A connected panel whose search calls are spies, over the results given. */
 function mountPanel(overrides: Record<string, unknown> = {}, options: { strict?: boolean } = {}) {
   const searchPlaylists = vi.fn(async () => {})
@@ -85,12 +141,17 @@ function mountPanel(overrides: Record<string, unknown> = {}, options: { strict?:
   const clearSearchResults = vi.fn()
   const playPlaylist = vi.fn(async () => {})
   const playTrack = vi.fn(async () => {})
-  // As in the app, choosing a playlist writes it into the board's panel.
+  // As in the app, choosing a playlist writes it into the board's panel, and
+  // the panel draws again because the app's state changed.
   const selectPlaylist = vi.fn((summary: { id: string; name: string; uri: string; url: string; image: string | null }) => {
     panel.playlist = { id: summary.id, name: summary.name, uri: summary.uri, url: summary.url, image: summary.image }
+    appStateChanged()
   })
   // As in the app, a chosen song is held until it is played.
-  const selectTrack = vi.fn((track: unknown) => { spotify.state.selectedTrack = track })
+  const selectTrack = vi.fn((track: unknown) => {
+    spotify.state.selectedTrack = track
+    appStateChanged()
+  })
   const login = vi.fn(async () => {})
   const loadMorePlaylists = vi.fn(async () => {})
   const togglePlay = vi.fn(async () => {})
@@ -130,7 +191,7 @@ function mountPanel(overrides: Record<string, unknown> = {}, options: { strict?:
 
   const element = () => createElement(PanelCommandsProvider, {
     commands,
-    children: createElement(SpotifyPanel, { panelId: 'panel_music' }),
+    children: createElement(AppStateHarness),
   })
   // The app mounts everything in React.StrictMode, which in development runs
   // every effect twice. A test that means to see what the app does asks for it.
@@ -162,6 +223,16 @@ function chooseSearchType(type: 'playlists' | 'tracks') {
   fireEvent.click(screen.getByRole('menuitemradio', { name: type === 'tracks' ? 'Search for songs' : 'Search for playlists' }))
 }
 
+/**
+ * Connecting an account is in the panel menu now: while the app is in
+ * Spotify's development mode only allowlisted accounts can connect, so the
+ * body offers Spotify's own player to everyone instead of a Connect button.
+ */
+function connectFromMenu() {
+  fireEvent.click(screen.getByLabelText('Music panel actions'))
+  fireEvent.click(screen.getByText('Connect Spotify account'))
+}
+
 function typeSearch(text: string) {
   fireEvent.change(screen.getByLabelText('Search playlists'), { target: { value: text } })
 }
@@ -188,6 +259,9 @@ beforeEach(() => {
   curated.shuffled = []
   curated.summaries = []
   curated.failLookup = false
+  embed.fail = false
+  embed.created = 0
+  embed.controllers = []
   window.sessionStorage.clear()
   vi.useFakeTimers()
 })
@@ -366,7 +440,8 @@ describe('Music panel playlist link', () => {
     rerender()
 
     expect(screen.queryByLabelText('Spotify playlist URL')).toBeNull()
-    expect(screen.getByText('Connect Spotify')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Music panel actions'))
+    expect(screen.getByText('Connect Spotify account')).toBeTruthy()
   })
 
   it('does not reopen itself on the next login', async () => {
@@ -399,13 +474,14 @@ describe('Music panel and the playlist saved in the board', () => {
   const footerName = () => document.querySelector('.card-footer-meta')?.textContent
   const chosenCard = () => document.querySelector('.spotify-chosen')
 
-  it('shows it before Spotify is connected, with its cover and the one step left to play it', () => {
+  it("shows it before Spotify is connected, with its cover, Spotify's player and what to expect", () => {
     panel.playlist = { ...panel.playlist, image: 'https://example.test/deep-focus.jpg' }
     mountAnonymousPanel()
 
     expect(chosenCard()?.textContent).toContain('Deep Focus')
     expect(chosenCard()?.querySelector('img')?.getAttribute('src')).toBe('https://example.test/deep-focus.jpg')
-    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this playlist here')
+    expect(screen.getByRole('status').textContent).toContain('30-second previews')
+    expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
     expect(footerName()).toBe('Deep Focus')
   })
 
@@ -422,7 +498,7 @@ describe('Music panel and the playlist saved in the board', () => {
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
 
     expect(chosenCard()?.textContent).toContain('Rain on Glass')
-    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this playlist here')
+    expect(screen.getByRole('status').textContent).toContain('30-second previews')
     expect(footerName()).toBe('Rain on Glass')
   })
 
@@ -502,25 +578,25 @@ describe('Music panel and the playlist saved in the board', () => {
     expect(chosenCard()?.textContent).toContain('Both Sides Now')
     expect(chosenCard()?.textContent).toContain('Frank Sinatra - Cycles')
     expect(chosenCard()?.querySelector('img')?.getAttribute('src')).toBe('https://example.test/cycles.jpg')
-    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this song here')
+    expect(screen.getByRole('status').textContent).toContain('30-second previews')
     expect(footerName()).toBe('Both Sides Now')
   })
 })
 
 describe('Music panel before Spotify is connected', () => {
-  it('opens on the search and an offer to connect, not on a login wall', () => {
+  it('opens on the search, with no login wall and no Connect button in the body', () => {
     mountAnonymousPanel()
 
     expect(screen.getByLabelText('Search playlists')).toBeTruthy()
-    expect(screen.getByText('Connect Spotify')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /connect spotify/i })).toBeNull()
     // The card that used to be the whole body when logged out.
     expect(screen.queryByText('Play a playlist')).toBeNull()
     expect(screen.queryByText('Log in')).toBeNull()
   })
 
-  it('offers connecting without anything having to be chosen first', () => {
+  it('keeps connecting an account in the panel menu, for allowlisted accounts', () => {
     const { login } = mountAnonymousPanel()
-    fireEvent.click(screen.getByText('Connect Spotify'))
+    connectFromMenu()
     expect(login).toHaveBeenCalled()
   })
 
@@ -594,7 +670,7 @@ describe('Music panel before Spotify is connected', () => {
     typeSearch('rain')
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+    connectFromMenu()
 
     expect(login).toHaveBeenCalled()
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
@@ -614,7 +690,7 @@ describe('Music panel before Spotify is connected', () => {
     mountAnonymousPanel()
     typeSearch('rain')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+    connectFromMenu()
 
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toMatchObject({
       choice: { kind: 'playlist', spotifyId: 'playlist_1' },
@@ -627,7 +703,7 @@ describe('Music panel before Spotify is connected', () => {
     mountAnonymousPanel()
     typeSearch('rain')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+    connectFromMenu()
 
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toMatchObject({
       choice: null,
@@ -648,7 +724,7 @@ describe('Music panel before Spotify is connected', () => {
     panel.playlist = { ...nothingChosen }
     const { login } = mountAnonymousPanel()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+    connectFromMenu()
 
     expect(login).toHaveBeenCalled()
     expect(window.sessionStorage.getItem('mic:spotify-return-context')).toBeNull()
@@ -665,7 +741,7 @@ describe('Music panel before Spotify is connected', () => {
     mountAnonymousPanel()
     typeSearch('rain')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+    connectFromMenu()
 
     expect(JSON.parse(window.sessionStorage.getItem('mic:spotify-return-context') ?? 'null')).toEqual({
       panelId: 'panel_music',
@@ -680,7 +756,7 @@ describe('Music panel before Spotify is connected', () => {
     panel.playlist = { ...nothingChosen }
     mountAnonymousPanel()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Spotify' }))
+    connectFromMenu()
 
     expect(window.sessionStorage.getItem('mic:spotify-return-context')).toBeNull()
   })
@@ -710,78 +786,13 @@ describe('Music panel before Spotify is connected', () => {
     expect(screen.getByRole('menuitemradio', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  // The glow follows a click, not a state. A playlist saved in the board days
-  // ago is not news, and a button that glows at every visit is only noise.
-  describe('the glow on Connect Spotify', () => {
-    const rain = { id: 'p1', name: 'Rain on Glass', uri: 'spotify:playlist:p1', url: '', image: null, owner: 'Someone', trackCount: 40 }
-    const connectButton = () => screen.getByRole('button', { name: 'Connect Spotify' })
-    const glows = () => connectButton().classList.contains('is-inviting')
-
-    it('is not there for a playlist that was already saved, however it got there', () => {
-      mountAnonymousPanel()
-      expect(glows()).toBe(false)
-    })
-
-    it('starts when a search result is clicked', () => {
-      mountAnonymousPanel({ playlists: [rain] })
-      expect(glows()).toBe(false)
-
-      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
-      expect(glows()).toBe(true)
-    })
-
-    it('starts when a song is clicked', () => {
-      mountAnonymousPanel({
-        tracks: [{ id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }],
-      })
-      chooseSearchType('tracks')
-      expect(glows()).toBe(false)
-
-      fireEvent.click(screen.getByText('Xtal', { selector: '.playlist-option strong' }))
-      expect(glows()).toBe(true)
-    })
-
-    // A new element, because that is what makes the animation begin again.
-    it('starts over on the next click', () => {
-      mountAnonymousPanel({ playlists: [rain] })
-      const row = () => screen.getByText('Rain on Glass', { selector: '.playlist-option strong' })
-
-      fireEvent.click(row())
-      const first = connectButton()
-      fireEvent.click(row())
-
-      expect(glows()).toBe(true)
-      expect(connectButton()).not.toBe(first)
-    })
-
-    it('stops when the fields are reset', () => {
-      mountAnonymousPanel({ playlists: [rain] })
-      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
-      expect(glows()).toBe(true)
-
-      fireEvent.click(screen.getByText('Reset fields'))
-      expect(glows()).toBe(false)
-    })
-
-    it('is not there once Spotify is connected, when there is nothing to connect', () => {
-      mountPanel({ playlists: [rain] })
-      expect(screen.queryByRole('button', { name: 'Connect Spotify' })).toBeNull()
-    })
-
-    // A click made before connecting must not come back as a glow after a
-    // log-out, for a choice that is long since settled.
-    it('does not come back after connecting and logging out again', () => {
-      const { rerender } = mountAnonymousPanel({ playlists: [rain] })
-      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
-      expect(glows()).toBe(true)
-
-      spotify.state.tokens = { accessToken: 'test-token', refreshToken: null, expiresAt: Date.now() + 600_000 }
-      rerender()
-      spotify.state.tokens = null
-      rerender()
-
-      expect(glows()).toBe(false)
-    })
+  // The glow on a Connect button invited every visitor to a login that only
+  // allowlisted accounts can complete. Choosing now loads Spotify's player.
+  it("loads a clicked result into Spotify's player, with no Connect button to point at", () => {
+    mountAnonymousPanel({ playlists: [rainResult], })
+    fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+    expect(document.querySelector('.spotify-connect')).toBeNull()
+    expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
   })
 
   it('has no Connect Spotify to draw attention to once connected', () => {
@@ -798,13 +809,13 @@ describe('Music panel before Spotify is connected', () => {
   // A click that appears to do nothing reads as broken, so the chosen playlist
   // is answered in words: why it is not playing, and that the way back is
   // handled. Words, not a second button.
-  it('explains a chosen playlist in a line of text', () => {
+  it("says what to expect from Spotify's player, and to come back if Spotify sends them away", () => {
     mountAnonymousPanel({ playlists: [rainResult] })
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
 
     const note = screen.getByRole('status')
-    expect(note.textContent).toContain('Connect Spotify to play this playlist here')
-    expect(note.textContent).toContain('come straight back to this page')
+    expect(note.textContent).toContain('30-second previews')
+    expect(note.textContent).toContain('come back to this my-states tab')
     expect(note.querySelector('button, a')).toBeNull()
   })
 
@@ -815,20 +826,18 @@ describe('Music panel before Spotify is connected', () => {
 
     const note = screen.getByRole('status')
     expect(note.textContent).toContain('Xtal')
-    expect(note.textContent).toContain('Connect Spotify to play this song here')
+    expect(note.textContent).toContain('30-second previews')
   })
 
-  // Two buttons that look alike and do the same thing is a design fault, so
-  // there is exactly one way to connect Spotify in the panel, chosen or not.
-  it('has one Connect Spotify button, whether or not something is chosen', () => {
+  it('has no Connect Spotify button in the body, whether or not something is chosen', () => {
     mountAnonymousPanel()
-    expect(screen.getAllByRole('button', { name: /connect spotify/i })).toHaveLength(1)
+    expect(screen.queryAllByRole('button', { name: /connect spotify/i })).toHaveLength(0)
     cleanup()
 
     mountAnonymousPanel({
       selectedTrack: { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: 'https://open.spotify.com/track/t1', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 },
     })
-    expect(screen.getAllByRole('button', { name: /connect spotify/i })).toHaveLength(1)
+    expect(screen.queryAllByRole('button', { name: /connect spotify/i })).toHaveLength(0)
   })
 
   // Connecting is the only redirect to Spotify, because it is the only one
@@ -1241,15 +1250,15 @@ describe('Music panel suggestions', () => {
     expect(login).not.toHaveBeenCalled()
   })
 
-  it('starts the glow on Connect Spotify when a suggestion is clicked, as a search result does', async () => {
+  it("loads a clicked suggestion into Spotify's player, as a search result does", async () => {
     withSuggestions()
+    panel.playlist = { ...nothingChosen }
     mountAnonymousPanel()
     await settleSuggestions()
-    const connect = () => screen.getByRole('button', { name: 'Connect Spotify' })
-    expect(connect().classList.contains('is-inviting')).toBe(false)
+    expect(document.querySelector('.spotify-embed-strip')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggestion 2' }))
-    expect(connect().classList.contains('is-inviting')).toBe(true)
+    expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
   })
 
   it('plays a suggested playlist when Spotify is connected, as a search result does', async () => {
@@ -1281,7 +1290,7 @@ describe('Music panel suggestions', () => {
   })
 
   // The curated file ships empty, so this is the shipped behaviour: the panel
-  // reads exactly as it did, with search and Connect Spotify untouched.
+  // reads exactly as it did, with the search untouched.
   it('shows the ordinary empty list when nothing is curated', async () => {
     mountAnonymousPanel()
     await settleSuggestions()
@@ -1290,10 +1299,9 @@ describe('Music panel suggestions', () => {
     expect(screen.queryByText(/feel like hearing/i)).toBeNull()
     expect(document.querySelector('.playlist-list-note')).toBeNull()
     expect(screen.getByLabelText('Search playlists')).toBeTruthy()
-    expect(screen.getByText('Connect Spotify')).toBeTruthy()
   })
 
-  it('keeps search and Connect Spotify when discovery cannot be reached', async () => {
+  it('keeps search when discovery cannot be reached', async () => {
     withSuggestions()
     curated.failLookup = true
     mountAnonymousPanel()
@@ -1304,7 +1312,6 @@ describe('Music panel suggestions', () => {
     expect(screen.queryByText(/suggestions are unavailable/i)).toBeNull()
     expect(document.querySelector('.playlist-list-note')).toBeNull()
     expect(screen.getByLabelText('Search playlists')).toBeTruthy()
-    expect(screen.getByText('Connect Spotify')).toBeTruthy()
   })
 
   it('stands aside once something is playing', async () => {
@@ -1372,7 +1379,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(document.querySelector('.spotify-chosen')?.textContent).toContain('Deep Focus')
-    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this playlist here')
+    expect(screen.getByRole('status').textContent).toContain('30-second previews')
   })
 
   // Saved in the board when it was clicked too, so nothing has to be looked
@@ -1434,7 +1441,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
 
     expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
     expect(document.querySelector('.spotify-chosen')?.textContent).toContain('Deep Focus')
-    expect(screen.getByRole('status').textContent).toContain('Connect Spotify to play this playlist here')
+    expect(screen.getByRole('status').textContent).toContain('30-second previews')
   })
 
   it('does nothing when the sign-in failed but nothing had been left behind', async () => {
@@ -1537,5 +1544,184 @@ describe('Music panel names its music once, in every state', () => {
     panel.focusView = true
     mountPanel({ track: playing })
     expectNamedOnce()
+  })
+})
+
+// Spotify's own player, for everyone who has not connected Spotify. Most of
+// what matters happens inside Spotify's iframe, where this page cannot see;
+// these cover what the page itself decides.
+describe("Music panel with Spotify's own player", () => {
+  /** Let the stand-in iFrame API answer, which is a promise, not a timer. */
+  async function settlePlayer() {
+    await act(async () => { for (let i = 0; i < 5; i += 1) await Promise.resolve() })
+  }
+
+  const latest = () => embed.controllers[embed.controllers.length - 1]
+
+  /** What the browser does when someone clicks inside Spotify's iframe. */
+  function useThePlayer() {
+    const iframe = document.querySelector<HTMLIFrameElement>('.spotify-embed-strip iframe')!
+    iframe.focus()
+    act(() => { window.dispatchEvent(new Event('blur')) })
+  }
+
+  let visibility: DocumentVisibilityState = 'visible'
+  beforeEach(() => {
+    visibility = 'visible'
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility })
+  })
+
+  function leaveTheTab() {
+    visibility = 'hidden'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+  }
+
+  function comeBack() {
+    visibility = 'visible'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+  }
+
+  function reportPlaying(isPaused: boolean) {
+    act(() => { for (const handler of latest().listeners.playback_update ?? []) handler({ data: { isPaused } }) })
+  }
+
+  it("loads the board's playlist into one player, and waits for a press of play", async () => {
+    mountAnonymousPanel()
+    await settlePlayer()
+
+    expect(embed.created).toBe(1)
+    expect(latest().uri).toBe('spotify:playlist:1')
+  })
+
+  it('gives a chosen song to the same player, without building another', async () => {
+    mountAnonymousPanel({
+      tracks: [{ id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }],
+    })
+    await settlePlayer()
+    chooseSearchType('tracks')
+    fireEvent.click(screen.getByText('Xtal', { selector: '.playlist-option strong' }))
+    await settlePlayer()
+
+    expect(embed.created).toBe(1)
+    expect(latest().loadEntity).toHaveBeenCalledWith('spotify:track:t1')
+  })
+
+  it('welcomes the visitor back after they used the player and left the tab, and builds a new player', async () => {
+    mountAnonymousPanel()
+    await settlePlayer()
+
+    useThePlayer()
+    leaveTheTab()
+    comeBack()
+    await settlePlayer()
+
+    expect(screen.getByRole('status').textContent).toContain('Welcome back to my-states')
+    expect(screen.getByRole('button', { name: 'Reload page' })).toBeTruthy()
+    // A new player, so a Spotify login made meanwhile has a chance to count.
+    expect(embed.created).toBe(2)
+    expect(embed.controllers[0].destroy).toHaveBeenCalled()
+  })
+
+  it('says nothing, and leaves the music alone, when it is still playing on return', async () => {
+    mountAnonymousPanel()
+    await settlePlayer()
+
+    useThePlayer()
+    reportPlaying(false)
+    leaveTheTab()
+    comeBack()
+
+    expect(screen.getByRole('status').textContent).not.toContain('Welcome back')
+    expect(embed.created).toBe(1)
+  })
+
+  it('says nothing to someone who only switched tabs without touching the player', async () => {
+    mountAnonymousPanel()
+    await settlePlayer()
+
+    leaveTheTab()
+    comeBack()
+
+    expect(screen.getByRole('status').textContent).not.toContain('Welcome back')
+    expect(embed.created).toBe(1)
+  })
+
+  it('lets the welcome go once the music starts', async () => {
+    mountAnonymousPanel()
+    await settlePlayer()
+    useThePlayer()
+    leaveTheTab()
+    comeBack()
+    await settlePlayer()
+
+    reportPlaying(false)
+
+    expect(screen.getByRole('status').textContent).not.toContain('Welcome back')
+    expect(screen.queryByRole('button', { name: 'Reload page' })).toBeNull()
+  })
+
+  it("stops the music and loads the other board's choice when another board is opened", async () => {
+    const { rerender } = mountAnonymousPanel()
+    await settlePlayer()
+
+    panel.boardId = 'board_2'
+    panel.playlist = { id: 'other', name: 'Saved Elsewhere', uri: 'spotify:playlist:other', url: null, image: null }
+    rerender()
+    await settlePlayer()
+
+    expect(latest().pause).toHaveBeenCalled()
+    expect(latest().loadEntity).toHaveBeenCalledWith('spotify:playlist:other')
+  })
+
+  it('takes the player away, and its music with it, on a board with nothing chosen', async () => {
+    const { rerender } = mountAnonymousPanel()
+    await settlePlayer()
+
+    panel.boardId = 'board_2'
+    panel.playlist = { ...nothingChosen }
+    rerender()
+
+    expect(embed.controllers[0].destroy).toHaveBeenCalled()
+    expect(document.querySelector('.spotify-embed-strip')).toBeNull()
+  })
+
+  it('destroys the player when the panel goes', async () => {
+    mountAnonymousPanel()
+    await settlePlayer()
+
+    cleanup()
+
+    expect(embed.controllers[0].destroy).toHaveBeenCalled()
+  })
+
+  it('keeps the same player in the focus view, at its smaller size', async () => {
+    const { rerender } = mountAnonymousPanel()
+    await settlePlayer()
+
+    panel.focusView = true
+    rerender()
+    await settlePlayer()
+
+    expect(embed.created).toBe(1)
+    expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
+  })
+
+  it("says so, and offers Spotify itself, when Spotify's player cannot load", async () => {
+    embed.fail = true
+    panel.playlist = { ...deepFocus, url: 'https://open.spotify.com/playlist/1' }
+    mountAnonymousPanel()
+    await settlePlayer()
+
+    expect(screen.getByRole('status').textContent).toContain('could not load')
+    expect(screen.getByRole('link', { name: 'Open in Spotify' }).getAttribute('href')).toBe('https://open.spotify.com/playlist/1')
+    expect(document.querySelector('.spotify-embed-strip')).toBeNull()
+  })
+
+  it('has no Spotify player once an account is connected', async () => {
+    mountPanel()
+    await settlePlayer()
+
+    expect(document.querySelector('.spotify-embed-strip')).toBeNull()
+    expect(embed.created).toBe(0)
   })
 })
