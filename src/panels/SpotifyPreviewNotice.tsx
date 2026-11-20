@@ -46,7 +46,16 @@ export function SpotifyPreviewNotice({ onClose }: { onClose(): void }) {
   }
 
   return createPortal(
-    <div className="welcome-frost" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
+    // React sends events from a portal up the component tree, which here
+    // leads into the canvas. tldraw took the press as a click on the canvas and
+    // captured the pointer, so the release landed on the canvas and the
+    // buttons never got their click. Stopping the events here keeps them ours.
+    <div
+      className="welcome-frost"
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+      onMouseDown={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) close() }}
+    >
       <section
         className="welcome-card spotify-preview-notice"
         role="dialog"
