@@ -273,6 +273,20 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
     setOrder((current) => [...current.filter((other) => other !== id), id])
   }
 
+  // In focus view a panel with a size of its own (Music) is drawn at that
+  // size, as on the canvas, where it is a size in canvas units and so scales
+  // with the zoom. The saved size is left alone and comes back when focus
+  // view is left.
+  function focusViewSize(id: string) {
+    const window = windows.find((candidate) => candidate.id === id)
+    return window?.focusView ? getPanelFocusViewSize(window.type) : null
+  }
+
+  function drawnSize(id: string, saved: Rect): Rect {
+    const focusSize = focusViewSize(id)
+    return focusSize ? { ...saved, w: focusSize.w * zoom, h: focusSize.h * zoom } : saved
+  }
+
   function setMinimised(id: string, minimised: boolean) {
     updateRects((current) => ({ ...current, [id]: { ...current[id], minimised } }), true)
   }
@@ -286,7 +300,12 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
     // A minimised window is only as tall as its header; that is what has to
     // stay on screen.
     const startHeight = event.currentTarget.offsetHeight
-    const start = shown(rectsRef.current[id], layerSize(areaRef.current), startHeight)
+    // The gesture starts from the window as it is drawn. In focus view that
+    // is a short Music panel, which may sit lower than its full saved height
+    // would fit; starting from the saved height pulled it up at the first move.
+    const saved = rectsRef.current[id]
+    const start = shown(drawnSize(id, saved), layerSize(areaRef.current), startHeight)
+    const keepsSavedSize = focusViewSize(id) !== null
     const origin = { x: event.clientX, y: event.clientY }
     const bounds = layerSize(areaRef.current)
     const wasMinimised = !!start.minimised
@@ -297,7 +316,10 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
       const dx = moveEvent.clientX - origin.x
       const dy = moveEvent.clientY - origin.y
       travelled = Math.max(travelled, Math.hypot(dx, dy))
-      updateRects((current) => ({ ...current, [id]: applyGesture(start, startHeight, edge, dx, dy, bounds) }))
+      const next = applyGesture(start, startHeight, edge, dx, dy, bounds)
+      // Moving a focus-view window changes only its place; the saved size is
+      // the one it returns to when focus view is left.
+      updateRects((current) => ({ ...current, [id]: keepsSavedSize ? { ...saved, x: next.x, y: next.y } : next }))
     }
     function onUp() {
       window.removeEventListener('pointermove', onMove)
@@ -367,12 +389,8 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
           // Drawn inside the screen as it is now, so a window placed on a
           // larger screen, or before the browser was made smaller, is still
           // wholly visible. The saved place is left alone.
-          // In focus view a panel with a size of its own (Music) is drawn at
-          // that size, as on the canvas, where it is a size in canvas units and
-          // so scales with the zoom. The saved size is left alone and comes
-          // back when focus view is left.
-          const focusSize = window.focusView ? getPanelFocusViewSize(window.type) : null
-          const rect = shown(focusSize ? { ...saved, w: focusSize.w * zoom, h: focusSize.h * zoom } : saved, layer, headerHeights[window.id])
+          const focusSize = focusViewSize(window.id)
+          const rect = shown(drawnSize(window.id, saved), layer, headerHeights[window.id])
           const isSelected = selected === window.id
           const style: CSSProperties = {
             position: 'absolute',
