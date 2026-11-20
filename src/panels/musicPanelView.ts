@@ -69,6 +69,12 @@ export interface MusicPanelView {
   /** The search field and the buttons under it. */
   showSearch: boolean
   /**
+   * The visitor may put the search away, to leave the cover and the player.
+   * Connected, always; not connected, once there is music, since the cover and
+   * Spotify's player are what is left to show.
+   */
+  canPutSearchAway: boolean
+  /**
    * What takes the free room in the middle of the panel. 'cover' is the music
    * shown large; 'empty' says how to start when there is nothing else.
    */
@@ -133,6 +139,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
   if (inputs.momentView) {
     return {
       showSearch: false,
+      canPutSearchAway: false,
       middle: music ? 'cover' : 'none',
       music,
       chosen,
@@ -150,6 +157,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
   if (focusView) {
     return {
       showSearch: false,
+      canPutSearchAway: false,
       middle: 'none',
       music,
       chosen,
@@ -171,7 +179,8 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
 
   // Putting the search away is offered only when connected, where it
   // leaves the cover and the player.
-  const searchHidden = inputs.searchCollapsed && connected
+  const canPutSearchAway = connected || chosen !== null
+  const searchHidden = inputs.searchCollapsed && canPutSearchAway
   const middle: MusicPanelView['middle'] = searchHidden
     ? 'cover'
     : inputs.searchState !== 'waiting'
@@ -192,6 +201,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
 
   return {
     showSearch: !searchHidden,
+    canPutSearchAway,
     middle,
     music,
     chosen,
@@ -217,11 +227,11 @@ function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null): string | 
     if (!chosen) return null
     if (inputs.embedFailed) return 'Spotify’s player could not load here. You can still listen on Spotify.'
     if (inputs.backFromSpotify) {
-      return 'Welcome back to my-states. If you logged in to Spotify, press play again. Still only short previews? Reload this page.'
+      return 'Welcome back to my-states. If you logged in to Spotify, press play again. Still only short previews? Reload this page. Private windows stay on previews.'
     }
-    // Said before anything happens, because once Spotify's player sends the
-    // visitor away, this page cannot say anything until they come back.
-    return 'Without a Spotify login, Spotify plays 30-second previews. If Spotify takes you to its site to log in, come back to this my-states tab afterwards.'
+    // What to expect from Spotify's player is said in a card when the visitor
+    // first chooses something (SpotifyPreviewNotice), not as small print here.
+    return null
   }
   if (inputs.cameBackToPlay && !inputs.playing && chosen) {
     return inputs.playerReady

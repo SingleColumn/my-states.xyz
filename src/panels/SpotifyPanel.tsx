@@ -32,6 +32,7 @@ import { usePanelSessionState } from '../panelSessionState'
 import { musicPanelView, type MusicSearchState } from './musicPanelView'
 import { panelContentProps } from '../panelSurface'
 import { SpotifyEmbedStrip } from './SpotifyEmbedStrip'
+import { isPreviewNoticeHidden, previewNoticeVisit, SpotifyPreviewNotice } from './SpotifyPreviewNotice'
 
 type SpotifySearchType = 'tracks' | 'playlists'
 
@@ -236,6 +237,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // a chance to count.
   const [backFromSpotify, setBackFromSpotify] = useState(false)
   const [embedGeneration, setEmbedGeneration] = useState(0)
+  // What to expect from Spotify's player, said in a card the first time this
+  // visit that someone chooses music, unless they asked not to see it. The
+  // footer reopens it.
+  const [noticeOpen, setNoticeOpen] = useState(false)
   const usedEmbedRef = useRef(false)
   const leftAfterUsingEmbedRef = useRef(false)
   const embedPlayingRef = useRef(false)
@@ -531,6 +536,12 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     void run(spotify.login)
   }
 
+  function explainPreviewsOnce() {
+    if (previewNoticeVisit.shown || isPreviewNoticeHidden()) return
+    previewNoticeVisit.shown = true
+    setNoticeOpen(true)
+  }
+
   /**
    * A click on a playlist, wherever it is offered. This is the one place the
    * two kinds of visitor differ: someone connected asked for music and gets it,
@@ -541,6 +552,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     if (source === 'curated') posthog.capture('spotify_curated_playlist_selected', { authenticated: connected })
     if (!connected) {
       spotify.selectPlaylist(playlist, panelId)
+      explainPreviewsOnce()
       return
     }
     void run(async () => {
@@ -552,6 +564,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   function chooseTrack(track: SpotifyTrackSummary) {
     if (!connected) {
       spotify.selectTrack(track, panelId)
+      explainPreviewsOnce()
       return
     }
     void run(() => spotify.playTrack(track, panelId))
@@ -611,7 +624,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         ] }, { heading: 'View', items: [
           // One name whether on or off, with a tick for on, so it is in the
           // same place under the same words every time it is looked for.
-          ...(connected && !focusView ? [{
+          ...(view.canPutSearchAway && !focusView ? [{
             id: 'search-visibility',
             label: 'Show the search',
             icon: <Disc3 size={17} aria-hidden="true" />,
@@ -677,15 +690,16 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               />
             </form>
 
-            {/* Connected, these two tidy up after a search and the way
-                back to the artwork sits beside them. Not connected there
-                is no artwork view to go back to, so Reset stands alone. */}
-            <div className={`spotify-search-actions${connected ? '' : ' is-single'}`}>
+            {/* These two tidy up after a search, and the way back to the
+                artwork and the player sits beside them. With nothing chosen
+                and no account there is nothing to go back to, so Reset
+                stands alone. */}
+            <div className={`spotify-search-actions${view.canPutSearchAway ? '' : ' is-single'}`}>
               <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields}>
                 <RotateCcw size={18} />
                 Reset fields
               </button>
-              {connected ? (
+              {view.canPutSearchAway ? (
                 <button className="card-icon-button is-wide" type="button" onClick={() => setSearchCollapsed(true)}>
                   <ChevronsDownUp size={18} />
                   Hide search
@@ -835,7 +849,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           </div>
         ) : null}
 
-        {searchCollapsed && connected && !focusView && !momentView ? (
+        {searchCollapsed && view.canPutSearchAway && !focusView && !momentView ? (
           /* Quiet on purpose: with the search put away the artwork leads,
              and this is only the way back to choosing something else. It
              says music, not playlist, because a song may be what is loaded. */
@@ -1000,10 +1014,17 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           {error ? (
             <span className="error-text">{error}</span>
           ) : focusView && view.nextStep ? null : (
-            <span>{!connected ? 'Previews without a login' : spotify.isReady ? 'Ready' : spotify.status}</span>
+            !connected ? (
+              <button className="spotify-footer-link" type="button" onClick={() => setNoticeOpen(true)} title="What to expect from Spotify's player">
+                Previews without a login
+              </button>
+            ) : (
+              <span>{spotify.isReady ? 'Ready' : spotify.status}</span>
+            )
           )}
         </div>
       </footer>
+      {noticeOpen && !connected ? <SpotifyPreviewNotice onClose={() => setNoticeOpen(false)} /> : null}
     </section>
   )
 }

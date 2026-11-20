@@ -15,6 +15,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { PanelCommands } from '../PanelHeader'
 import { PanelCommandsProvider } from '../PanelHeader'
 import { SpotifyPanel } from './SpotifyPanel'
+import { previewNoticeVisit } from './SpotifyPreviewNotice'
 
 const searchDebounceMs = 300
 
@@ -259,6 +260,7 @@ beforeEach(() => {
   curated.shuffled = []
   curated.summaries = []
   curated.failLookup = false
+  previewNoticeVisit.shown = false
   embed.fail = false
   embed.created = 0
   embed.controllers = []
@@ -480,7 +482,7 @@ describe('Music panel and the playlist saved in the board', () => {
 
     expect(chosenCard()?.textContent).toContain('Deep Focus')
     expect(chosenCard()?.querySelector('img')?.getAttribute('src')).toBe('https://example.test/deep-focus.jpg')
-    expect(screen.getByRole('status').textContent).toContain('30-second previews')
+    expect(screen.queryByRole('status')).toBeNull()
     expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
     expect(footerName()).toBe('Deep Focus')
   })
@@ -498,7 +500,7 @@ describe('Music panel and the playlist saved in the board', () => {
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
 
     expect(chosenCard()?.textContent).toContain('Rain on Glass')
-    expect(screen.getByRole('status').textContent).toContain('30-second previews')
+    expect(screen.queryByRole('status')).toBeNull()
     expect(footerName()).toBe('Rain on Glass')
   })
 
@@ -578,7 +580,7 @@ describe('Music panel and the playlist saved in the board', () => {
     expect(chosenCard()?.textContent).toContain('Both Sides Now')
     expect(chosenCard()?.textContent).toContain('Frank Sinatra - Cycles')
     expect(chosenCard()?.querySelector('img')?.getAttribute('src')).toBe('https://example.test/cycles.jpg')
-    expect(screen.getByRole('status').textContent).toContain('30-second previews')
+    expect(screen.queryByRole('status')).toBeNull()
     expect(footerName()).toBe('Both Sides Now')
   })
 })
@@ -800,33 +802,94 @@ describe('Music panel before Spotify is connected', () => {
     expect(screen.queryByRole('button', { name: 'Connect Spotify' })).toBeNull()
   })
 
-  it('keeps the search visible: there is no player to reveal by hiding it', () => {
+  it('has nothing to hide the search for until something is chosen', () => {
+    panel.playlist = { ...nothingChosen }
     mountAnonymousPanel()
     expect(screen.queryByText('Hide search')).toBeNull()
     expect(screen.getByLabelText('Search playlists')).toBeTruthy()
   })
 
-  // A click that appears to do nothing reads as broken, so the chosen playlist
-  // is answered in words: why it is not playing, and that the way back is
-  // handled. Words, not a second button.
-  it("says what to expect from Spotify's player, and to come back if Spotify sends them away", () => {
-    mountAnonymousPanel({ playlists: [rainResult] })
-    fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+  it("puts the search away to leave the cover and Spotify's player, and brings it back", () => {
+    mountAnonymousPanel()
+    fireEvent.click(screen.getByText('Hide search'))
 
-    const note = screen.getByRole('status')
-    expect(note.textContent).toContain('30-second previews')
-    expect(note.textContent).toContain('come back to this my-states tab')
-    expect(note.querySelector('button, a')).toBeNull()
+    expect(screen.queryByLabelText('Search playlists')).toBeNull()
+    expect(document.querySelector('.spotify-chosen.is-featured')?.textContent).toContain('Deep Focus')
+    expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Find music'))
+    expect(screen.getByLabelText('Search playlists')).toBeTruthy()
   })
 
-  it('explains a chosen song the same way, naming it', () => {
-    mountAnonymousPanel({
-      selectedTrack: { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: 'https://open.spotify.com/track/t1', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 },
+  describe('the card about previews', () => {
+    const card = () => screen.queryByRole('dialog', { name: 'Before you press play' })
+
+    it('opens the first time something is chosen, and says what to expect and to come back', () => {
+      mountAnonymousPanel({ playlists: [rainResult] })
+      expect(card()).toBeNull()
+
+      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+
+      expect(card()?.textContent).toContain('30-second previews')
+      expect(card()?.textContent).toContain('come back to this my-states tab')
+      expect(card()?.textContent).toContain('private (incognito) window')
     })
 
-    const note = screen.getByRole('status')
-    expect(note.textContent).toContain('Xtal')
-    expect(note.textContent).toContain('30-second previews')
+    it('opens for a chosen song as well', () => {
+      mountAnonymousPanel({
+        tracks: [{ id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: '', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 }],
+      })
+      chooseSearchType('tracks')
+      fireEvent.click(screen.getByText('Xtal', { selector: '.playlist-option strong' }))
+      expect(card()).toBeTruthy()
+    })
+
+    it('does not open for music the board was saved with', () => {
+      mountAnonymousPanel()
+      expect(card()).toBeNull()
+    })
+
+    it('opens only once a visit, however many times something is chosen', () => {
+      mountAnonymousPanel({ playlists: [rainResult] })
+      const row = () => screen.getByText('Rain on Glass', { selector: '.playlist-option strong' })
+      fireEvent.click(row())
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
+      fireEvent.click(row())
+      expect(card()).toBeNull()
+    })
+
+    it('stays closed for good when asked not to show again', () => {
+      mountAnonymousPanel({ playlists: [rainResult] })
+      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+      fireEvent.click(screen.getByLabelText("Don't show this again"))
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
+      cleanup()
+
+      previewNoticeVisit.shown = false
+      mountAnonymousPanel({ playlists: [rainResult] })
+      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+      expect(card()).toBeNull()
+      window.localStorage.removeItem('mic:spotify-preview-notice-hidden')
+    })
+
+    it('closes on Escape', () => {
+      mountAnonymousPanel({ playlists: [rainResult] })
+      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+      fireEvent.keyDown(card()!, { key: 'Escape' })
+      expect(card()).toBeNull()
+    })
+
+    it('can be opened again from the footer', () => {
+      mountAnonymousPanel()
+      fireEvent.click(screen.getByRole('button', { name: 'Previews without a login' }))
+      expect(card()).toBeTruthy()
+    })
+
+    it('is not offered once an account is connected', () => {
+      mountPanel({ playlists: [rainResult] })
+      expect(screen.queryByRole('button', { name: 'Previews without a login' })).toBeNull()
+      expect(card()).toBeNull()
+    })
   })
 
   it('has no Connect Spotify button in the body, whether or not something is chosen', () => {
@@ -1379,7 +1442,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(document.querySelector('.spotify-chosen')?.textContent).toContain('Deep Focus')
-    expect(screen.getByRole('status').textContent).toContain('30-second previews')
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   // Saved in the board when it was clicked too, so nothing has to be looked
@@ -1441,7 +1504,7 @@ describe('Music panel after a sign-in that did not succeed', () => {
 
     expect((screen.getByLabelText('Search playlists') as HTMLInputElement).value).toBe('rain')
     expect(document.querySelector('.spotify-chosen')?.textContent).toContain('Deep Focus')
-    expect(screen.getByRole('status').textContent).toContain('30-second previews')
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('does nothing when the sign-in failed but nothing had been left behind', async () => {
@@ -1631,7 +1694,7 @@ describe("Music panel with Spotify's own player", () => {
     leaveTheTab()
     comeBack()
 
-    expect(screen.getByRole('status').textContent).not.toContain('Welcome back')
+    expect(screen.queryByRole('status')?.textContent ?? '').not.toContain('Welcome back')
     expect(embed.created).toBe(1)
   })
 
@@ -1642,7 +1705,7 @@ describe("Music panel with Spotify's own player", () => {
     leaveTheTab()
     comeBack()
 
-    expect(screen.getByRole('status').textContent).not.toContain('Welcome back')
+    expect(screen.queryByRole('status')?.textContent ?? '').not.toContain('Welcome back')
     expect(embed.created).toBe(1)
   })
 
@@ -1656,7 +1719,7 @@ describe("Music panel with Spotify's own player", () => {
 
     reportPlaying(false)
 
-    expect(screen.getByRole('status').textContent).not.toContain('Welcome back')
+    expect(screen.queryByRole('status')?.textContent ?? '').not.toContain('Welcome back')
     expect(screen.queryByRole('button', { name: 'Reload page' })).toBeNull()
   })
 

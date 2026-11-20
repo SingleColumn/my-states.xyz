@@ -694,3 +694,24 @@
   padding: 2px 8px;
   font-size: inherit;
 }
+
+/* The footer's status line, when it is something to open rather than read. */
+.spotify-footer-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.spotify-footer-link:hover {
+  color: var(--color-text);
+}
+
+.spotify-preview-notice {
+  width: min(520px, calc(100vw - 24px));
+}

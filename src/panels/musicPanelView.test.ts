@@ -40,8 +40,8 @@ describe('musicPanelView', () => {
     it("a board with a song: the song large, Spotify's player under it, and what to expect", () => {
       const result = view({ boardTrack: song, suggestionCount: 6 })
       expect(result).toMatchObject({ middle: 'cover', namer: 'cover', music: { title: 'Both Sides Now', meta: 'Frank Sinatra - Cycles', image: song.image }, embed: { height: 152, hidden: false } })
-      expect(result.nextStep).toContain('30-second previews')
-      expect(result.nextStep).toContain('come back to this my-states tab')
+      // What to expect is said in a card (SpotifyPreviewNotice), not here.
+      expect(result.nextStep).toBeNull()
     })
 
     it('a board with a playlist: the playlist large, with its own cover', () => {
@@ -53,7 +53,7 @@ describe('musicPanelView', () => {
     it("searching on a board with music: the results, the music in a row, and Spotify's player kept", () => {
       const result = view({ boardTrack: song, searchState: 'results' })
       expect(result).toMatchObject({ middle: 'results', namer: 'row', embed: { height: 152 } })
-      expect(result.nextStep).toContain('30-second previews')
+      expect(result.nextStep).toBeNull()
     })
 
     it('searching on a board without music: the results alone, and no player', () => {
@@ -84,8 +84,12 @@ describe('musicPanelView', () => {
       expect(view({ sessionEnded: true, boardTrack: song }).nextStep).toBe('Your Spotify connection has ended. Connect Spotify again to keep listening.')
     })
 
-    it('cannot put the search away: there would be nothing left to use', () => {
-      expect(view({ searchCollapsed: true, boardTrack: song })).toMatchObject({ showSearch: true, middle: 'cover' })
+    it("can put the search away once there is music: the cover and Spotify's player are what is left", () => {
+      expect(view({ searchCollapsed: true, boardTrack: song })).toMatchObject({ canPutSearchAway: true, showSearch: false, middle: 'cover', embed: { height: 152 } })
+    })
+
+    it('cannot put the search away with nothing chosen: there would be nothing left to show', () => {
+      expect(view({ searchCollapsed: true })).toMatchObject({ canPutSearchAway: false, showSearch: true })
     })
   })
 
