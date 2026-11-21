@@ -39,7 +39,19 @@ const EDITOR_ZOOM_MIN = 0.7
 const EDITOR_ZOOM_MAX = 1.25
 const clampEditorZoom = (zoom: number) => Math.min(EDITOR_ZOOM_MAX, Math.max(EDITOR_ZOOM_MIN, zoom))
 
-interface Rect { x: number; y: number; w: number; h: number; minimised?: boolean }
+interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+  minimised?: boolean
+  /**
+   * The window's size in focus view, once resized there, in the panel's own
+   * units (drawn times the page zoom, as the focus view's own size is). Kept
+   * apart from w and h, which are the size focus view gives back.
+   */
+  focus?: { w: number; h: number }
+}
 type Edge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 interface Size { width: number; height: number }
 
@@ -273,10 +285,27 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
     setOrder((current) => [...current.filter((other) => other !== id), id])
   }
 
+  // A press inside an embedded player (Spotify's, in the Music panel) never
+  // reaches this page: it goes to the player's own page. What does reach it is
+  // this page losing focus to that player, so that selects the window too --
+  // in focus view the player is nearly all of the Music window.
+  const bringToFrontRef = useRef(bringToFront)
+  bringToFrontRef.current = bringToFront
+  useEffect(() => {
+    function onBlur() {
+      const active = document.activeElement
+      if (!(active instanceof HTMLIFrameElement)) return
+      const id = active.closest<HTMLElement>('[data-spike-window]')?.dataset.spikeWindow
+      if (id) bringToFrontRef.current(id)
+    }
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+  }, [])
+
   // In focus view a panel with a size of its own (Music) is drawn at that
   // size, as on the canvas, where it is a size in canvas units and so scales
-  // with the zoom. The saved size is left alone and comes back when focus
-  // view is left.
+  // with the zoom -- or at the size it was resized to in focus view. The
+  // saved size is left alone and comes back when focus view is left.
   function focusViewSize(id: string) {
     const window = windows.find((candidate) => candidate.id === id)
     return window?.focusView ? getPanelFocusViewSize(window.type) : null
@@ -284,7 +313,18 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
 
   function drawnSize(id: string, saved: Rect): Rect {
     const focusSize = focusViewSize(id)
-    return focusSize ? { ...saved, w: focusSize.w * zoom, h: focusSize.h * zoom } : saved
+    if (!focusSize) return saved
+    const size = saved.focus ?? focusSize
+    return { ...saved, w: size.w * zoom, h: size.h * zoom }
+  }
+
+  // The smallest a window may be resized to. In focus view that is no more
+  // than the focus view's own size, so a window resized there can always get
+  // back to it, at any page zoom.
+  function minimumSize(id: string): Size {
+    const focusSize = focusViewSize(id)
+    if (!focusSize) return { width: MIN_W, height: MIN_H }
+    return { width: Math.min(MIN_W, focusSize.w * zoom), height: Math.min(MIN_H, focusSize.h * zoom) }
   }
 
   function setMinimised(id: string, minimised: boolean) {
@@ -306,6 +346,7 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
     const saved = rectsRef.current[id]
     const start = shown(drawnSize(id, saved), layerSize(areaRef.current), startHeight)
     const keepsSavedSize = focusViewSize(id) !== null
+    const minimum = minimumSize(id)
     const origin = { x: event.clientX, y: event.clientY }
     const bounds = layerSize(areaRef.current)
     const wasMinimised = !!start.minimised
@@ -316,10 +357,16 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
       const dx = moveEvent.clientX - origin.x
       const dy = moveEvent.clientY - origin.y
       travelled = Math.max(travelled, Math.hypot(dx, dy))
-      const next = applyGesture(start, startHeight, edge, dx, dy, bounds)
-      // Moving a focus-view window changes only its place; the saved size is
-      // the one it returns to when focus view is left.
-      updateRects((current) => ({ ...current, [id]: keepsSavedSize ? { ...saved, x: next.x, y: next.y } : next }))
+      const next = applyGesture(start, startHeight, edge, dx, dy, bounds, minimum)
+      // In focus view the place is shared, and a resize is kept as the focus
+      // view's own size; the saved size is the one it returns to when focus
+      // view is left.
+      updateRects((current) => ({
+        ...current,
+        [id]: keepsSavedSize
+          ? { ...saved, x: next.x, y: next.y, focus: edge === 'move' ? saved.focus : { w: next.w / zoom, h: next.h / zoom } }
+          : next,
+      }))
     }
     function onUp() {
       window.removeEventListener('pointermove', onMove)
@@ -392,7 +439,6 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
           // Drawn inside the screen as it is now, so a window placed on a
           // larger screen, or before the browser was made smaller, is still
           // wholly visible. The saved place is left alone.
-          const focusSize = focusViewSize(window.id)
           const rect = shown(drawnSize(window.id, saved), layer, headerHeights[window.id])
           const isSelected = selected === window.id
           const style: CSSProperties = {
@@ -412,8 +458,7 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
               onPointerDownCapture={(event) => onWindowPointerDown(event, window.id)}
             >
               <Frame type={window.type} panelId={window.id} zoom={zoom} style={{ position: 'absolute', inset: 0 }} />
-              {/* No edges in a fixed-size focus view: dragging one would change a size that is not shown. */}
-              {(focusSize ? [] : rect.minimised ? MINIMISED_EDGES : EDGES).map((edge) => <div key={edge} className={`spike-edge spike-edge-${edge}`} data-spike-edge={edge} />)}
+              {(rect.minimised ? MINIMISED_EDGES : EDGES).map((edge) => <div key={edge} className={`spike-edge spike-edge-${edge}`} data-spike-edge={edge} />)}
             </div>
           )
         })}
@@ -436,7 +481,9 @@ function shown(rect: Rect, bounds: Size, headerHeight = 0): Rect {
   return { ...rect, w, h, x: clamp(rect.x, 0, bounds.width - w), y: clamp(rect.y, 0, bounds.height - visibleHeight) }
 }
 
-function applyGesture(start: Rect, startHeight: number, edge: Edge | 'move', dx: number, dy: number, bounds: Size): Rect {
+function applyGesture(start: Rect, startHeight: number, edge: Edge | 'move', dx: number, dy: number, bounds: Size, minimum: Size = { width: MIN_W, height: MIN_H }): Rect {
+  const minW = minimum.width
+  const minH = minimum.height
   if (edge === 'move') {
     // A minimised window is stopped by its header, so it can sit at the very
     // bottom; opening it again moves it up just enough to fit (see `shown`).
@@ -448,15 +495,15 @@ function applyGesture(start: Rect, startHeight: number, edge: Edge | 'move', dx:
   }
   if (start.minimised) {
     let { x, w } = start
-    if (edge.includes('e')) w = clamp(start.w + dx, MIN_W, bounds.width - start.x)
+    if (edge.includes('e')) w = clamp(start.w + dx, minW, bounds.width - start.x)
     if (edge.includes('w')) {
-      x = clamp(start.x + dx, 0, start.x + start.w - MIN_W)
+      x = clamp(start.x + dx, 0, start.x + start.w - minW)
       w = start.x + start.w - x
     }
     if (edge.includes('s') && dy > OPEN_PULL) {
       // Opens from the header's own height downward, so the bottom edge
       // follows the pointer as on an open window.
-      const h = clamp(startHeight + dy, MIN_H, bounds.height - start.y)
+      const h = clamp(startHeight + dy, minH, bounds.height - start.y)
       return { ...start, x, w, h, minimised: false }
     }
     return { ...start, x, w }
@@ -466,14 +513,14 @@ function applyGesture(start: Rect, startHeight: number, edge: Edge | 'move', dx:
   let { x, y, w, h } = start
   // Each edge moves on its own and stops at the screen's edge; the minimum
   // size stops it before it passes the opposite edge.
-  if (edge.includes('e')) w = clamp(start.w + dx, MIN_W, bounds.width - start.x)
-  if (edge.includes('s')) h = clamp(start.h + dy, MIN_H, bounds.height - start.y)
+  if (edge.includes('e')) w = clamp(start.w + dx, minW, bounds.width - start.x)
+  if (edge.includes('s')) h = clamp(start.h + dy, minH, bounds.height - start.y)
   if (edge.includes('w')) {
-    x = clamp(start.x + dx, 0, right - MIN_W)
+    x = clamp(start.x + dx, 0, right - minW)
     w = right - x
   }
   if (edge.includes('n')) {
-    y = clamp(start.y + dy, 0, bottom - MIN_H)
+    y = clamp(start.y + dy, 0, bottom - minH)
     h = bottom - y
   }
   return { ...start, x, y, w, h }
