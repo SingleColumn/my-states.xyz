@@ -7,7 +7,7 @@ export type SpotifyEmbedStatus = 'loading' | 'ready' | 'failed'
 export type SpotifyEmbedHeight = 152 | 80
 
 /**
- * Spotify's player for a visitor who has not connected Spotify to my-states.
+ * Spotify's own embedded player, which plays all the Music panel's music.
  *
  * It lives inside the panel, not above the canvas: a player drawn over the
  * canvas covered the panel's menus and stayed on top of panels moved in front

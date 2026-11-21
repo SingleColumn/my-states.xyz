@@ -33,7 +33,7 @@ const posthogOptions = {
 
 // Before anything reads storage: a local copy opened at the wrong one of its
 // two addresses would show, and save into, a different set of boards.
-const localOrigin = localOriginToUse(window.location.href, import.meta.env.VITE_SPOTIFY_REDIRECT_URI?.trim())
+const localOrigin = localOriginToUse(window.location.href, import.meta.env.VITE_LOCAL_ORIGIN?.trim())
 if (localOrigin) {
   window.location.replace(`${localOrigin}${window.location.pathname}${window.location.search}${window.location.hash}`)
 } else {

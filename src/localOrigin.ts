@@ -2,26 +2,25 @@
  * The one address a local copy of the app should be used at, when it is
  * being used at another.
  *
- * Spotify sends a visitor back to the exact return address it was given, and
- * it refuses `localhost` as one, so a local copy is registered under
- * `127.0.0.1`. The same app opened at `localhost` is, to the browser, a
- * different site with its own storage: the sign-in that started there comes
- * back to a site that never saw it (and cannot finish it), showing boards
- * that are not the ones the visitor left. Moving to the return address before
- * anything is read keeps the whole visit on one site.
+ * Boards are kept in the browser, filed under the site that saved them, and
+ * to the browser `localhost` and `127.0.0.1` are two different sites even on
+ * the same port. A local copy opened at one would show, and save into, a
+ * different set of boards from the same copy opened at the other. Moving to
+ * the chosen address before anything is read keeps every visit on one site,
+ * and so on one set of boards.
  *
  * Only ever between loopback addresses on the same port: a deployed site's
  * address is its host's business, and is never changed from here.
  */
 const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
 
-export function localOriginToUse(currentUrl: string, returnAddress: string | undefined): string | null {
-  if (!returnAddress) return null
+export function localOriginToUse(currentUrl: string, chosenAddress: string | undefined): string | null {
+  if (!chosenAddress) return null
   let here: URL
   let there: URL
   try {
     here = new URL(currentUrl)
-    there = new URL(returnAddress)
+    there = new URL(chosenAddress)
   } catch {
     return null
   }

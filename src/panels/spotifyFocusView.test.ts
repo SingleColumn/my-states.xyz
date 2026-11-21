@@ -116,14 +116,4 @@ describe('Music panel focus view', () => {
     expect(markup.indexOf('>Focus view<')).toBeLessThan(markup.indexOf('>Expand panel to full screen<'))
     expect(renderMusicPanel(true)).toContain('>Focus view<')
   })
-
-  // Signing in to a Spotify account went with the Web Playback SDK approach
-  // (docs/spotify-sdk-approach.md).
-  it('offers no Spotify account in any view', () => {
-    for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
-      expect(markup).not.toContain('Connect Spotify')
-      expect(markup).not.toContain('>Log out<')
-      expect(markup).not.toContain('Play from a Spotify link')
-    }
-  })
 })

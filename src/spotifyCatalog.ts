@@ -4,8 +4,8 @@
  * It talks to this app's own endpoints, never to Spotify. The application
  * credentials that make those requests possible stay on the server; nothing
  * here holds, receives or could reveal a token of any kind. What comes back
- * is public catalog metadata, already reduced to the same summaries the
- * connected path produces.
+ * is public catalog metadata, already reduced to the summaries the panel
+ * shows.
  */
 import type {
   SpotifyPlaylistSearchResult,

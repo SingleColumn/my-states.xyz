@@ -356,23 +356,6 @@ describe('Music panel search', () => {
   })
 })
 
-// Pasting a playlist link and signing in to a Spotify account went with the
-// Web Playback SDK approach (docs/spotify-sdk-approach.md).
-describe('Music panel menu', () => {
-  it('offers no Spotify account and no playlist link', async () => {
-    mountAnonymousPanel()
-    fireEvent.click(screen.getByLabelText('Music panel actions'))
-    expect(screen.queryByText('Connect Spotify account')).toBeNull()
-    expect(screen.queryByText('Log out')).toBeNull()
-  })
-
-  it('has no playlist link field', async () => {
-    mountAnonymousPanel()
-    expect(screen.queryByText('Play from a Spotify link')).toBeNull()
-    expect(screen.queryByLabelText('Spotify playlist URL')).toBeNull()
-  })
-})
-
 // The music saved in a board is part of the board. Someone who imports a
 // board, or is sent one, has chosen its music along with it, and expects to
 // find it there.
@@ -459,13 +442,9 @@ describe('Music panel and the playlist saved in the board', () => {
 })
 
 describe('Music panel choosing music', () => {
-  it('opens on the search, with no login wall and no Connect button in the body', () => {
+  it('opens on the search', () => {
     mountAnonymousPanel()
-
     expect(screen.getByLabelText('Search playlists')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /connect spotify/i })).toBeNull()
-    // The card that used to be the whole body when logged out.
-    expect(screen.queryByText('Play a playlist')).toBeNull()
   })
 
   // The footer says previews play without a login; the body of the panel
@@ -659,10 +638,9 @@ describe('Music panel choosing music', () => {
     expect(screen.getByRole('menuitemradio', { name: 'Search for songs' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  it("loads a clicked result into Spotify's player, with no Connect button to point at", () => {
+  it("loads a clicked result into Spotify's player", () => {
     mountAnonymousPanel({ playlists: [rainResult], })
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
-    expect(document.querySelector('.spotify-connect')).toBeNull()
     expect(document.querySelector('.spotify-embed-strip')).toBeTruthy()
   })
 
@@ -749,17 +727,6 @@ describe('Music panel choosing music', () => {
       expect(card()).toBeTruthy()
     })
 
-  })
-
-  it('has no Connect Spotify button in the body, whether or not something is chosen', () => {
-    mountAnonymousPanel()
-    expect(screen.queryAllByRole('button', { name: /connect spotify/i })).toHaveLength(0)
-    cleanup()
-
-    mountAnonymousPanel({
-      selectedTrack: { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: 'https://open.spotify.com/track/t1', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 },
-    })
-    expect(screen.queryAllByRole('button', { name: /connect spotify/i })).toHaveLength(0)
   })
 
   // The one link to Spotify is its login page, and it opens in a new tab so
