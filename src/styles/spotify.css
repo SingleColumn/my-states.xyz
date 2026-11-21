@@ -431,6 +431,10 @@
 
 .spotify-player-block.is-framed {
   padding: var(--space-playlist-gap);
+  /* The player's own corner plus the padding round it, so the two curves run
+     side by side, an even gap apart. The player sets its corner here in the
+     panel's pixels, since it keeps one size on screen at every zoom. */
+  border-radius: calc(var(--spotify-player-radius, 12px) + var(--space-playlist-gap));
 }
 
 /* Room above and below the login line, so it is not pressed against the

@@ -139,6 +139,20 @@ export function SpotifyEmbedStrip({
   // that 152 would take over the panel, it drops to the 80 strip.
   const screenHeight: SpotifyEmbedHeight = height === 80 || 152 * zoom < 116 ? 80 : 152
   const stripHeight = sharp ? screenHeight / zoom : height
+  // The player's corner, in the panel's own pixels, handed to whatever frames
+  // the player so that frame's corner can follow the same curve one padding
+  // further out. The corner is 12 screen pixels at every zoom (see
+  // .spotify-embed-frame), so in the panel's pixels it changes with the zoom.
+  const playerRadius = sharp ? playerCornerPx / zoom : playerCornerPx
+  useEffect(() => {
+    const holder = stripRef.current?.parentElement
+    if (!holder || hidden) return
+    holder.style.setProperty('--spotify-player-radius', `${playerRadius}px`)
+    return () => {
+      holder.style.removeProperty('--spotify-player-radius')
+    }
+  }, [playerRadius, hidden])
+
   const frameStyle = !sharp || zoom === 1
     ? undefined
     : { width: `${100 * zoom}%`, height: screenHeight, transform: `scale(${1 / zoom})`, transformOrigin: '0 0' }
@@ -152,6 +166,9 @@ export function SpotifyEmbedStrip({
     </div>
   )
 }
+
+/** Spotify's own card corner, matched by .spotify-embed-frame in spotify.css. */
+const playerCornerPx = 12
 
 /**
  * Whether to draw the player at screen size. On by default; `?embed-sharp=0`
