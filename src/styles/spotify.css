@@ -457,6 +457,12 @@
   padding: var(--space-playlist-gap);
 }
 
+/* Room above and below the login line, so it is not pressed against the
+   player or the frame's edge. The results' frame gives up the height. */
+.spotify-player-block.is-framed .spotify-login-link {
+  margin-block: var(--space-control-inner-gap) calc(var(--space-control-inner-gap) * 1.5);
+}
+
 /* Under the results the gap is fixed: the results' frame takes the free room. */
 .spotify-results-frame + .spotify-player-block {
   margin-top: var(--space-playlist-gap);
