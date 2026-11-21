@@ -27,6 +27,12 @@ export interface MusicItem {
   url: string | null
 }
 
+/**
+ * After a trip to Spotify's site, what the first press of play showed: still
+ * waiting for it, 30-second previews, or whole songs.
+ */
+export type ReturnCheck = 'waiting' | 'previews' | 'whole'
+
 export interface MusicPanelInputs {
   focusView: boolean
   /** The board is showing as a moment: the music and nothing to operate. */
@@ -45,9 +51,16 @@ export interface MusicPanelInputs {
   embedFailed?: boolean
   /**
    * The visitor used Spotify's player, left this tab, and came back with
-   * nothing playing: most likely a trip to Spotify's site to log in.
+   * nothing playing: most likely a trip to Spotify's site to log in. Null
+   * when there was no such trip, or it has been dealt with.
    */
-  backFromSpotify?: boolean
+  returnCheck?: ReturnCheck | null
+  /**
+   * Spotify's player has played a whole song in this visit, so the visitor is
+   * logged in to Spotify. The panel cannot see a login itself; it can only
+   * see how long the song that is playing lasts.
+   */
+  wholeSongs?: boolean
 }
 
 /** Spotify's own player. */
@@ -59,26 +72,34 @@ export interface MusicEmbedView {
 }
 
 export interface MusicPanelView {
-  /** The search field and the buttons under it. */
+  /** The search field. */
   showSearch: boolean
   /**
-   * The visitor may put the search away once there is music, since the cover
-   * and Spotify's player are what is left to show.
+   * Reset panel and Hide search under the field. Only once there is music:
+   * before that there is nothing to reset or to hide the search for, and the
+   * field's own × clears what was typed.
+   */
+  showSearchActions: boolean
+  /**
+   * The visitor may put the search away once there is music, since Spotify's
+   * player is what is left to show.
    */
   canPutSearchAway: boolean
   /**
-   * What takes the free room in the middle of the panel. 'cover' is the music
-   * shown large; 'empty' says how to start when there is nothing else.
+   * What takes the free room in the middle of the panel. 'player': Spotify's
+   * player, which shows the music's cover and name itself, so the panel adds
+   * no cover of its own. 'cover': the music shown large, where there is no
+   * player to show it (a moment, or a player that could not load). 'empty'
+   * says how to start when there is nothing else.
    */
-  middle: 'cover' | 'suggestions' | 'results' | 'empty' | 'none'
+  middle: 'player' | 'cover' | 'suggestions' | 'results' | 'empty' | 'none'
   /** The music the board has chosen, which Spotify's player is given. */
   chosen: MusicItem | null
   /**
-   * The one place that names the music -- title, artist, album. 'cover':
-   * under the large cover. 'row': a small row with the cover, used while
-   * searching.
+   * The one place in the body that names the music. 'player': Spotify's
+   * player does. 'cover': the words under the panel's own cover.
    */
-  namer: 'cover' | 'row' | null
+  namer: 'player' | 'cover' | null
   /** The one line saying what to do next, or what is happening; never two. */
   nextStep: string | null
   /**
@@ -88,6 +109,13 @@ export interface MusicPanelView {
   embed: MusicEmbedView | null
   /** Offer a reload: the one way left to pick up a Spotify login made elsewhere. */
   offerReload: boolean
+  /**
+   * Where the way to log in to Spotify goes. 'body': in the panel, right under
+   * Spotify's player (or under the line on how to start); 'footer': as small
+   * print, where the body has no room. Null once whole songs play, since the
+   * visitor is logged in, and wherever logging in would not help.
+   */
+  login: 'body' | 'footer' | null
 }
 
 /**
@@ -108,13 +136,19 @@ export function chosenMusic(inputs: Pick<MusicPanelInputs, 'heldTrack' | 'boardT
 export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
   const { focusView } = inputs
   const chosen = chosenMusic(inputs)
+  const returnCheck = chosen && !inputs.embedFailed ? inputs.returnCheck ?? null : null
 
   // Spotify's player is there whenever there is something to play. It is
   // never taken away by a change of view, only hidden or made smaller,
   // because taking it away is what stops the music.
   const embedFor = (height: MusicEmbedView['height'], hidden = false): MusicEmbedView | null =>
     chosen && !inputs.embedFailed ? { height, hidden } : null
-  const offerReload = Boolean(inputs.backFromSpotify) && chosen !== null
+  // A reload only once a press of play has shown it is needed: straight after
+  // coming back, the rebuilt player may already have the login.
+  const offerReload = returnCheck === 'previews'
+  // Logging in changes what Spotify's player plays. With whole songs already
+  // playing, or no player at all, there is nothing for it to change.
+  const loginWanted = !inputs.wholeSongs && !inputs.embedFailed
 
   // A moment shows which song it is, whatever the panel was doing: a search
   // left open or a panel in its focus view gives way to the cover, and no
@@ -122,6 +156,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
   if (inputs.momentView) {
     return {
       showSearch: false,
+      showSearchActions: false,
       canPutSearchAway: false,
       middle: chosen ? 'cover' : 'none',
       chosen,
@@ -129,6 +164,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
       nextStep: null,
       embed: embedFor(focusView ? 80 : 152, true),
       offerReload: false,
+      login: null,
     }
   }
 
@@ -138,6 +174,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
   if (focusView) {
     return {
       showSearch: false,
+      showSearchActions: false,
       canPutSearchAway: false,
       middle: 'none',
       chosen,
@@ -148,35 +185,48 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
         ? null
         : inputs.embedFailed
           ? 'Spotify’s player could not load here.'
-          : inputs.backFromSpotify
-            ? 'Welcome back. Press play again.'
-            : null,
+          : returnCheck === 'waiting'
+            ? 'Welcome back. Press play to check.'
+            : returnCheck === 'previews'
+              ? 'Still previews.'
+              : returnCheck === 'whole'
+                ? 'Logged in: whole songs play.'
+                : null,
       embed: embedFor(80),
       offerReload,
+      login: chosen && loginWanted ? 'footer' : null,
     }
   }
 
   const canPutSearchAway = chosen !== null
   const searchHidden = inputs.searchCollapsed && canPutSearchAway
+  const embed = embedFor(152)
+  // With no player to show the music, the panel shows its cover instead, so
+  // the music is still named somewhere.
+  const resting: MusicPanelView['middle'] = embed ? 'player' : 'cover'
   const middle: MusicPanelView['middle'] = searchHidden
-    ? 'cover'
+    ? resting
     : inputs.searchState !== 'waiting'
       ? 'results'
       : chosen
-        ? 'cover'
+        ? resting
         : inputs.suggestionCount > 0
           ? 'suggestions'
           : 'empty'
 
   return {
     showSearch: !searchHidden,
+    showSearchActions: !searchHidden && chosen !== null,
     canPutSearchAway,
     middle,
     chosen,
-    namer: !chosen ? null : middle === 'cover' ? 'cover' : 'row',
-    nextStep: nextStep(inputs, chosen),
-    embed: embedFor(152),
+    // Spotify's player shows the cover and the name; a second cover or name
+    // beside it only says the same thing twice.
+    namer: !chosen ? null : embed ? 'player' : middle === 'cover' ? 'cover' : null,
+    nextStep: nextStep(inputs, chosen, returnCheck),
+    embed,
     offerReload,
+    login: !loginWanted ? null : embed || middle === 'empty' ? 'body' : 'footer',
   }
 }
 
@@ -185,11 +235,14 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
  * What to expect from Spotify's player is said in a card when the visitor
  * first chooses something (SpotifyPreviewNotice), not as small print here.
  */
-function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null): string | null {
+function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null, returnCheck: ReturnCheck | null): string | null {
   if (!chosen) return null
   if (inputs.embedFailed) return 'Spotify’s player could not load here. You can still listen on Spotify.'
-  if (inputs.backFromSpotify) {
-    return 'Welcome back to my-states. If you logged in to Spotify, press play again. Still only short previews? Reload this page. Private windows stay on previews.'
-  }
+  // The panel cannot see a Spotify login, only how long the song it plays
+  // lasts: 30 seconds is a preview, longer is the whole song. So the check is
+  // a press of play, and the panel says so.
+  if (returnCheck === 'waiting') return 'Welcome back. Press play: if whole songs play, you’re logged in.'
+  if (returnCheck === 'previews') return 'Still previews. Reload this page, or use a normal (not private) window.'
+  if (returnCheck === 'whole') return 'You’re logged in: whole songs will play.'
   return null
 }

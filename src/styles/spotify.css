@@ -162,6 +162,38 @@
   margin-top: 0;
 }
 
+/* The x that clears what was typed sits inside the field, at its end, the
+   way search fields usually offer it, so it reads as part of the field and
+   not as a third button beside Reset panel and Hide search. */
+.spotify-search-row {
+  position: relative;
+}
+
+.spotify-search-row input {
+  padding-right: calc(var(--size-input-padding-x) + 24px);
+}
+
+.spotify-search-clear {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-input-placeholder);
+  cursor: pointer;
+}
+
+.spotify-search-clear:hover,
+.spotify-search-clear:focus-visible {
+  background: var(--card-button-bg-hover);
+  color: var(--color-text);
+}
+
 .spotify-show-search {
   display: inline-flex;
   flex: 0 0 auto;
@@ -331,24 +363,6 @@
   margin: 0;
 }
 
-/* The chosen song or playlist with its cover, laid out like a result row
-   but not one: it is not a button, and is not counted among the results. */
-.spotify-chosen-item {
-  display: grid;
-  grid-template-columns: var(--size-playlist-art) minmax(0, 1fr);
-  gap: var(--space-playlist-image-gap);
-  align-items: center;
-}
-
-.spotify-chosen-item > img,
-.spotify-chosen-item > div:first-child {
-  width: var(--size-playlist-art);
-  height: var(--size-playlist-art);
-  border-radius: var(--radius-playlist-art);
-  background: var(--color-control);
-  object-fit: cover;
-}
-
 /* The music shown as an album -- with the search open and nothing typed, or
    with the search put away: the cover takes whatever height the column has
    left and stays square within it, the words sit under it. */
@@ -402,12 +416,37 @@
   color: var(--color-text);
 }
 
-/* Under the chosen music: its own line, centred, never squeezed away. */
-.spotify-chosen .spotify-login-link {
-  justify-self: center;
-  align-self: center;
+/* Spotify's player with the line about it above and the way to log in
+   under it: one block, kept at the bottom of the panel while there are
+   results to sit above it, and in the middle of the free room when the
+   player is all there is, rather than leaving the room as a hole above it. */
+.spotify-player-block {
   flex: 0 0 auto;
+  display: grid;
+  gap: var(--space-control-inner-gap);
+  margin-top: auto;
+  padding-top: var(--space-control-inner-gap);
   text-align: center;
+}
+
+.spotify-player-block:empty {
+  display: none;
+}
+
+.panel-spotify-surface.is-player-middle .spotify-player-block {
+  margin-bottom: auto;
+}
+
+.spotify-player-block .spotify-embed-strip {
+  margin-top: 0;
+}
+
+.spotify-player-block .spotify-login-link {
+  justify-self: center;
+}
+
+.panel-spotify-surface.is-focus-view .spotify-player-block {
+  padding-top: 0;
 }
 
 /* The card's login is a link styled as its second button. */
@@ -592,11 +631,6 @@ a.welcome-card-secondary {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-playlist-meta);
-}
-
-/* Not connected there is only Reset under the search. */
-.spotify-search-actions.is-single {
-  grid-template-columns: 1fr;
 }
 
 .spotify-embed-action {

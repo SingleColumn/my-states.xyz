@@ -25,6 +25,7 @@ export function SpotifyEmbedStrip({
   onStatus,
   onInteract,
   onPlayingChange,
+  onPlayedLength,
 }: {
   entity: string
   height: SpotifyEmbedHeight
@@ -35,6 +36,12 @@ export function SpotifyEmbedStrip({
   onInteract(): void
   /** Whether Spotify reports sound playing, as far as it says. */
   onPlayingChange(playing: boolean): void
+  /**
+   * How long Spotify says the song playing lasts, in milliseconds. Spotify
+   * only says so once play is pressed, and for a visitor who is not logged in
+   * it gives the 30-second preview's length rather than the song's.
+   */
+  onPlayedLength?(milliseconds: number): void
 }) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const sessionRef = useRef<SpotifyEmbedSession | null>(null)
@@ -45,6 +52,8 @@ export function SpotifyEmbedStrip({
   onInteractRef.current = onInteract
   const onPlayingRef = useRef(onPlayingChange)
   onPlayingRef.current = onPlayingChange
+  const onPlayedLengthRef = useRef(onPlayedLength)
+  onPlayedLengthRef.current = onPlayedLength
   const [status, setStatus] = useState<SpotifyEmbedStatus>('loading')
 
   const report = useCallback((next: SpotifyEmbedStatus) => {
@@ -57,6 +66,10 @@ export function SpotifyEmbedStrip({
     controller.addListener('playback_update', (event) => {
       const paused = event.data?.isPaused
       if (typeof paused === 'boolean') onPlayingRef.current(!paused)
+      // Only while playing: a paused player loaded with new music can still
+      // report the length of what it played before.
+      const length = event.data?.duration
+      if (paused === false && typeof length === 'number' && length > 0) onPlayedLengthRef.current?.(length)
     })
   }, [report])
 
