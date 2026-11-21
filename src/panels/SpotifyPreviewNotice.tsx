@@ -75,7 +75,8 @@ export function SpotifyPreviewNotice({ onClose }: { onClose(): void }) {
         <ul className="welcome-card-list">
           <li>Music here plays through Spotify’s own player. <strong>Without a Spotify login you will hear 30-second previews.</strong></li>
           <li>Private (incognito) windows may not recognise a Spotify login, so you will probably only hear previews there.</li>
-          <li>To hear whole songs, use a normal browser window and be logged in to Spotify in it. Spotify may take you to its own website to log in: <strong>when you are done, come back to this my-states tab</strong>, then press play again.</li>
+          <li>To hear whole songs, use a normal browser window and be logged in to Spotify in it. <strong>Log in</strong> at the bottom of the Music panel opens Spotify’s website in a new tab: <strong>when you are done, come back to this my-states tab</strong>, then press play again.</li>
+          <li>Some browsers keep a login on Spotify’s website apart from the player here, so you may still hear previews after logging in.</li>
         </ul>
         <div className="welcome-card-footer">
           <label className="welcome-card-check">

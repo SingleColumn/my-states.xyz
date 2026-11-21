@@ -456,7 +456,25 @@ describe('Music panel choosing music', () => {
     expect(screen.queryByRole('button', { name: /connect spotify/i })).toBeNull()
     // The card that used to be the whole body when logged out.
     expect(screen.queryByText('Play a playlist')).toBeNull()
-    expect(screen.queryByText('Log in')).toBeNull()
+  })
+
+  // The footer says previews play without a login; the panel also says how
+  // to get one. In the middle while nothing is chosen, where people look
+  // first, and in the footer once the middle is taken by the music.
+  it('offers Spotify login in the middle while nothing is chosen, and in the footer after', () => {
+    panel.playlist = { ...nothingChosen }
+    mountAnonymousPanel()
+    const middle = screen.getByRole('link', { name: 'Log in to Spotify to hear whole songs' })
+    expect(middle.closest('.spotify-empty')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()
+    cleanup()
+
+    mountAnonymousPanel({
+      selectedTrack: { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: 'https://open.spotify.com/track/t1', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 },
+    })
+    expect(screen.queryByRole('link', { name: 'Log in to Spotify to hear whole songs' })).toBeNull()
+    const footer = screen.getByRole('link', { name: 'Log in' })
+    expect(footer.closest('.card-footer')).not.toBeNull()
   })
 
   it('searches the catalog on the same debounce', async () => {
@@ -644,15 +662,18 @@ describe('Music panel choosing music', () => {
     expect(screen.queryAllByRole('button', { name: /connect spotify/i })).toHaveLength(0)
   })
 
-  // Connecting is the only redirect to Spotify, because it is the only one
-  // that brings the visitor back. A link out that leaves them stranded is not
-  // offered, even for a song that has an address to link to.
-  it('never offers a way out of the app to Spotify', () => {
+  // The one link to Spotify is its login page, and it opens in a new tab so
+  // the board stays where it was. A link to the music itself would leave the
+  // visitor listening on Spotify, away from the board.
+  it('links to Spotify only to log in, in a new tab', () => {
     mountAnonymousPanel({
       selectedTrack: { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: 'https://open.spotify.com/track/t1', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 },
     })
 
-    expect(screen.queryByRole('link')).toBeNull()
+    const links = screen.getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(links[0].getAttribute('href')).toBe('https://accounts.spotify.com/login')
+    expect(links[0].getAttribute('target')).toBe('_blank')
     expect(screen.queryByText(/open (it )?in spotify/i)).toBeNull()
     expect(document.querySelector('a[href*="open.spotify.com"]')).toBeNull()
   })

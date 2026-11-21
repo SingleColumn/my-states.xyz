@@ -229,6 +229,15 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
 
+  // Spotify's login page, in a new tab so the board stays open behind it.
+  // When the panel already has a player, leaving through this link counts as
+  // using it: coming back then rebuilds the player, so the login can count,
+  // and says what to do next.
+  function leaveToLogIn() {
+    if (embedEntity) usedEmbedRef.current = true
+    posthogRef.current?.capture('spotify_login_link_opened')
+  }
+
   const results = searchType === 'tracks' ? spotify.tracks : spotify.playlists
   const searchState: MusicSearchState = query.trim().length < minSearchLength
     ? 'waiting'
@@ -603,6 +612,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
              start, rather than a blank panel that reads as broken. */
           <div key="empty" className="spotify-empty">
             <p className="muted">{`Search for a ${searchType === 'tracks' ? 'song' : 'playlist'} to play with this board.`}</p>
+            <a className="spotify-login-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn}>
+              Log in to Spotify to hear whole songs
+            </a>
           </div>
         ) : null}
 
@@ -672,9 +684,17 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           {error ? (
             <span className="error-text">{error}</span>
           ) : focusView && view.nextStep ? null : (
-            <button className="spotify-footer-link" type="button" onClick={() => setNoticeOpen(true)} title="What to expect from Spotify's player">
-              Previews without a login
-            </button>
+            <>
+              <button className="spotify-footer-link" type="button" onClick={() => setNoticeOpen(true)} title="What to expect from Spotify's player">
+                Previews without a login
+              </button>
+              {/* The middle of the panel already offers it while nothing is chosen. */}
+              {view.middle === 'empty' ? null : (
+                <a className="spotify-footer-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn} title="Opens Spotify's login page in a new tab">
+                  Log in
+                </a>
+              )}
+            </>
           )}
         </div>
       </footer>
@@ -682,6 +702,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     </section>
   )
 }
+
+/** Spotify's own login page. my-states never sees the login itself. */
+const SPOTIFY_LOGIN_URL = 'https://accounts.spotify.com/login'
 
 /**
  * The footer's line in the focus view, where it is the only place the loaded

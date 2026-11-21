@@ -384,6 +384,24 @@
   margin: 0;
 }
 
+/* Under the empty panel's one line: the way to whole songs, quieter than
+   the search above it, which is still the first thing to do. */
+.spotify-empty {
+  align-content: center;
+  gap: var(--space-control-inner-gap);
+}
+
+.spotify-login-link {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.spotify-login-link:hover {
+  color: var(--color-text);
+}
+
 .spotify-featured-cover {
   flex: 0 1 auto;
   min-height: 0;
