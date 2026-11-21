@@ -426,10 +426,11 @@
   background: color-mix(in srgb, var(--color-input-bg) 55%, transparent);
 }
 
-/* Takes the room the column has; the list is rounded to whole rows inside
-   it, and what the rounding leaves stays inside the frame. */
+/* Fits its rows: the list is rounded to the whole rows the column has room
+   for, and the frame takes the list's height, so no blank strip is left
+   inside it. What the rounding leaves falls at the foot of the panel. */
 .spotify-results-frame {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -437,6 +438,8 @@
 }
 
 .spotify-results-frame .playlist-list {
+  /* Its own height, not a share of the frame's: the frame follows it. */
+  flex: 0 1 auto;
   margin: 0;
 }
 

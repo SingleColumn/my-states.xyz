@@ -287,14 +287,17 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // whole cards that is either there or not.
   const listRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
+    // The list sits in a frame, and the frame in the panel's column. The
+    // frame takes the list's height, so the room is measured in the column.
     const list = listRef.current
-    const column = list?.parentElement
+    const column = list?.parentElement?.parentElement
     if (!list || !column) return
 
     function snapToWholeRows() {
       const list = listRef.current
-      const column = list?.parentElement
-      if (!list || !column) return
+      const frame = list?.parentElement
+      const column = frame?.parentElement
+      if (!list || !frame || !column) return
       const row = list.querySelector<HTMLElement>('.playlist-option')
       if (!row) {
         list.style.minHeight = ''
@@ -316,13 +319,21 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // feed each rounding back into the next one, and the list would creep
       // shorter on every pass.
       const columnStyle = getComputedStyle(column)
+      const frameStyle = getComputedStyle(frame)
       let available = column.clientHeight
         - Number.parseFloat(columnStyle.paddingTop)
         - Number.parseFloat(columnStyle.paddingBottom)
         - Number.parseFloat(listStyle.marginTop)
         - Number.parseFloat(listStyle.marginBottom)
+        // The frame's own edges: its margins, padding and border.
+        - Number.parseFloat(frameStyle.marginTop)
+        - Number.parseFloat(frameStyle.marginBottom)
+        - Number.parseFloat(frameStyle.paddingTop)
+        - Number.parseFloat(frameStyle.paddingBottom)
+        - Number.parseFloat(frameStyle.borderTopWidth)
+        - Number.parseFloat(frameStyle.borderBottomWidth)
       for (const sibling of column.children) {
-        if (sibling === list) continue
+        if (sibling === frame) continue
         const siblingStyle = getComputedStyle(sibling)
         available -= (sibling as HTMLElement).offsetHeight
           + Number.parseFloat(siblingStyle.marginTop)
@@ -344,15 +355,23 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // would put a sliced row back at the bottom of a short panel.
       list.style.minHeight = `${height}px`
       list.style.maxHeight = `${height}px`
-      // Rounding down leaves up to a row over. It stays inside the results'
-      // frame, under the last row, so the frame and the player's frame keep
-      // one fixed gap between them instead of a gap that changes with it.
+      // Rounding down leaves up to a row over. The frame fits the rows, so
+      // that room falls below the player's frame, at the foot of the panel:
+      // inside the frame it read as a box too tall for what it held, and
+      // between the frames as a gap that changed size.
     }
 
     snapToWholeRows()
     const observer = new ResizeObserver(snapToWholeRows)
     observer.observe(column)
     observer.observe(list)
+    // Everything else in the column takes room from the list, and changes
+    // size on its own: Spotify's player settles on its height only once it
+    // has loaded, and again when the canvas zoom changes. Without this the
+    // list kept the room it had before, and a whole row's worth sat empty.
+    for (const sibling of column.children) {
+      if (sibling !== list.parentElement) observer.observe(sibling)
+    }
     return () => observer.disconnect()
   }, [searchHidden, searchType, results.length, view.middle, view.nextStep])
 
