@@ -692,3 +692,22 @@ a.welcome-card-secondary {
 .spotify-preview-notice {
   width: min(520px, calc(100vw - 24px));
 }
+
+/* With no title the close button sits in the corner and the first line runs
+   beside it, rather than leaving an empty row above the text. */
+.spotify-preview-notice .welcome-card-header {
+  float: right;
+  margin: -4px -6px 0 8px;
+}
+
+.spotify-preview-notice .welcome-card-list {
+  margin-top: 0;
+}
+
+/* Centred on the card, not on the bullet's text: the left margin undoes the
+   list's indent (.welcome-card-list). */
+.spotify-preview-notice-login {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0 0 -20px;
+}

@@ -66,16 +66,35 @@ export function SpotifyPreviewNotice({ onClose, loginUrl, onLogIn }: { onClose()
           close()
         }}
       >
+        {/* No title: the card is short, and the first line says what it is about. */}
         <header className="welcome-card-header">
-          <h2>Before you press play</h2>
           <button className="welcome-card-close" type="button" aria-label="Close" title="Close" onClick={close}>
             <X size={16} aria-hidden="true" />
           </button>
         </header>
         <ul className="welcome-card-list">
-          <li>Music here plays through Spotify’s own player. <strong>Without a Spotify login you will hear 30-second previews.</strong></li>
+          <li><strong>Without a Spotify login you will only hear 30-second previews.</strong></li>
           <li>Private (incognito) windows may not recognise a Spotify login, so you will probably only hear previews there.</li>
-          <li>To hear whole songs, use a normal browser window and be logged in to Spotify in it. <strong>Log in to Spotify</strong>, here or in the Music panel, opens Spotify’s website in a new tab: <strong>when you are done, come back to this my-states tab</strong>, then press play again.</li>
+          <li>
+            To hear whole songs use the <strong>Log in to Spotify</strong> option, it opens Spotify’s website in a new tab; when you are done, come back to this tab.
+            {/* Logging in is what this card is about, so it can be done from
+                here, right under the line that explains it. The card closes:
+                the visitor comes back to the panel. */}
+            <div className="spotify-preview-notice-login">
+              <a
+                className="welcome-card-secondary"
+                href={loginUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  onLogIn()
+                  close()
+                }}
+              >
+                Log in to Spotify
+              </a>
+            </div>
+          </li>
           <li>Some browsers keep a login on Spotify’s website apart from the player here, so you may still hear previews after logging in.</li>
         </ul>
         <div className="welcome-card-footer">
@@ -85,20 +104,6 @@ export function SpotifyPreviewNotice({ onClose, loginUrl, onLogIn }: { onClose()
           </label>
           <div className="welcome-card-actions">
             <button className="welcome-card-primary" type="button" autoFocus onClick={close}>Got it</button>
-            {/* Logging in is what this card is about, so it can be done from
-                here. The card closes: the visitor comes back to the panel. */}
-            <a
-              className="welcome-card-secondary"
-              href={loginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                onLogIn()
-                close()
-              }}
-            >
-              Log in to Spotify
-            </a>
           </div>
         </div>
       </section>

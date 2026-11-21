@@ -673,7 +673,7 @@ describe('Music panel choosing music', () => {
       fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
 
       expect(card()?.textContent).toContain('30-second previews')
-      expect(card()?.textContent).toContain('come back to this my-states tab')
+      expect(card()?.textContent).toContain('come back to this tab')
       expect(card()?.textContent).toContain('Private (incognito) windows may not recognise')
     })
 
