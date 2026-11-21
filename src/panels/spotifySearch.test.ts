@@ -1183,4 +1183,32 @@ describe("Music panel with Spotify's own player", () => {
     expect(document.querySelector('.spotify-embed-strip')).toBeNull()
   })
 
+  // A failure once, such as a moment offline, must not keep the player away.
+  it('tries to load Spotify\'s player again on Try again', async () => {
+    embed.fail = true
+    mountAnonymousPanel()
+    await settlePlayer()
+    expect(document.querySelector('.spotify-embed-strip')).toBeNull()
+
+    embed.fail = false
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await settlePlayer()
+
+    expect(document.querySelector('.spotify-embed-strip iframe')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('tries again by itself when other music is chosen', async () => {
+    embed.fail = true
+    const { rerender } = mountAnonymousPanel()
+    await settlePlayer()
+
+    embed.fail = false
+    panel.playlist = { ...deepFocus, id: 'playlist_2', uri: 'spotify:playlist:2' }
+    rerender()
+    await settlePlayer()
+
+    expect(document.querySelector('.spotify-embed-strip iframe')).toBeTruthy()
+  })
+
 })

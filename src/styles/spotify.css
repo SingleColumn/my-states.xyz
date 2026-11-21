@@ -664,6 +664,15 @@ a.welcome-card-secondary {
   text-decoration: none;
 }
 
+/* Try again beside Open in Spotify, when Spotify's player could not load. */
+.spotify-embed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  justify-self: center;
+  gap: var(--space-control-inner-gap);
+}
+
 /* The focus view's body is Spotify's player alone; its line and button are
    in the footer. */
 .panel-spotify-surface.is-focus-view .spotify-embed-strip {

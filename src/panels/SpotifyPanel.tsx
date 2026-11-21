@@ -167,8 +167,11 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       .filter((summary): summary is SpotifyPlaylistSummary => summary !== null)
   }, [suggestions, suggestionSummaries])
 
-  // Spotify's own player could not load (blocked, offline).
-  const [embedFailed, setEmbedFailed] = useState(false)
+  // What Spotify's own player could not load (blocked, offline). Kept as
+  // the music it failed on, so choosing other music tries again by itself:
+  // a failure once, such as a moment offline, must not keep the player away
+  // for the rest of the visit.
+  const [failedEntity, setFailedEntity] = useState<string | null>(null)
   // Spotify's player can send the visitor to Spotify's site to log in, and
   // this page is told nothing about it: the click happens inside Spotify's
   // iframe. What it can see is the visitor using the player, this tab being
@@ -204,6 +207,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const shownPlaylist = panelPlaylist
   const panelTrack = panel?.config.track ?? null
   const shownSong = spotify.selectedTrack ?? panelTrack
+  // What Spotify's player is given: the song if the board keeps one, else the
+  // playlist. Both are public Spotify URIs.
+  const embedEntity = shownSong?.uri ?? shownPlaylist.uri ?? null
+  const embedFailed = failedEntity !== null && failedEntity === embedEntity
 
   // A different board has a different saved playlist, and nothing chosen in
   // the last one carries over to it.
@@ -281,9 +288,6 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     returnCheck,
     wholeSongs,
   })
-  // What Spotify's player is given: the song if the board keeps one, else the
-  // playlist. Both are public Spotify URIs.
-  const embedEntity = shownSong?.uri ?? shownPlaylist.uri ?? null
   const searchHidden = !view.showSearch
   const chosen = view.chosen
 
@@ -550,11 +554,27 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       <RotateCcw size={16} aria-hidden="true" />
       Reload page
     </button>
-  ) : embedFailed && chosen?.url ? (
-    <a className="card-icon-button is-wide spotify-embed-action" href={chosen.url} target="_blank" rel="noreferrer">
-      <ExternalLink size={16} aria-hidden="true" />
-      Open in Spotify
-    </a>
+  ) : embedFailed ? (
+    <div className="spotify-embed-actions">
+      {/* A new player, which loads Spotify's player afresh. */}
+      <button
+        className="card-icon-button is-wide spotify-embed-action"
+        type="button"
+        onClick={() => {
+          setFailedEntity(null)
+          setEmbedGeneration((generation) => generation + 1)
+        }}
+      >
+        <RotateCcw size={16} aria-hidden="true" />
+        Try again
+      </button>
+      {chosen?.url ? (
+        <a className="card-icon-button is-wide spotify-embed-action" href={chosen.url} target="_blank" rel="noreferrer">
+          <ExternalLink size={16} aria-hidden="true" />
+          Open in Spotify
+        </a>
+      ) : null}
+    </div>
   ) : null
 
   return (
@@ -821,7 +841,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               height={view.embed.height}
               hidden={view.embed.hidden}
               onStatus={(status) => {
-                if (status === 'failed') setEmbedFailed(true)
+                if (status === 'failed') setFailedEntity(embedEntity)
               }}
               onInteract={() => {
                 usedEmbedRef.current = true

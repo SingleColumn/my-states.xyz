@@ -237,7 +237,7 @@ export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
  */
 function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null, returnCheck: ReturnCheck | null): string | null {
   if (!chosen) return null
-  if (inputs.embedFailed) return 'Spotify’s player could not load here. You can still listen on Spotify.'
+  if (inputs.embedFailed) return 'Spotify’s player could not load here. Try again, or listen on Spotify.'
   // The panel cannot see a Spotify login, only how long the song it plays
   // lasts: 30 seconds is a preview, longer is the whole song. So the check is
   // a press of play, and the panel says so.
