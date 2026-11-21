@@ -353,6 +353,9 @@ function Windows({ outer, zoom, hostId, windows }: { outer: PanelCommands; zoom:
   const commands: PanelCommands = {
     ...outer,
     menuLayer,
+    // A window here has its own size, not the canvas shape's; changing the
+    // shape's height would resize something nobody can see.
+    setPanelHeight: undefined,
     // The page reports itself as full screen so the Writing panel shows its
     // page treatment (paper width, zoom, toolbar toggle); nothing is resized.
     isPanelFullScreen: (panelId) => panelId === hostId,

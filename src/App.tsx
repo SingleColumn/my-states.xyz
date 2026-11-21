@@ -459,6 +459,18 @@ function AppContent() {
     else expandPanelFromStartingHeight(editor, panelId)
   }, [])
 
+  const setPanelHeight = useCallback((panelId: string, height: (current: number) => number) => {
+    const editor = editorRef.current
+    const shape = editor ? getPanelShape(editor, panelId) : undefined
+    if (!editor || !shape || shape.isLocked || editor.getIsReadonly()) return undefined
+    const current = shape.props.h
+    const next = Math.round(height(current))
+    if (Number.isFinite(next) && next > 0 && next !== current) {
+      writePanelShape(editor, panelId, { props: { h: next } }, { history: 'ignore' })
+    }
+    return current
+  }, [])
+
   const restorePanelDefaultSizeForId = useCallback((panelId: string) => {
     const editor = editorRef.current
     const shape = editor ? getPanelShape(editor, panelId) : undefined
@@ -763,7 +775,7 @@ function AppContent() {
       data-panel-full-screen={fullScreenPanelId ? 'true' : undefined}
       style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
     >
-      <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId, menuLayer: canvasMenuLayer }}>
+      <PanelCommandsProvider commands={{ hidePanel, deletePanel, togglePanelFullScreen, restorePanelDefaultSize: restorePanelDefaultSizeForId, isPanelFullScreen: (panelId) => previousPanelGeometryRef.current.has(panelId), togglePanelFocusView, expandPanelFromStartingHeight: expandPanelFromStartingHeightForId, setPanelHeight, menuLayer: canvasMenuLayer }}>
         <AppChromePropsProvider value={appChromeProps}>
           <MomentViewProvider value={momentView.isOn}>
             <WordGraphProvider boardId={boards.activeBoard.id}>

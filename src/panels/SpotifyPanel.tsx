@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import {
   ChevronsDownUp,
@@ -181,6 +181,14 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const [wholeSongs, setWholeSongs] = useState(() => visitPlayback.wholeSongs)
   const setSearchCollapsedRef = useRef(setSearchCollapsed)
   setSearchCollapsedRef.current = setSearchCollapsed
+  // Putting the search away leaves Spotify's player alone in a panel sized
+  // for a list of results, so the panel is made to fit what is left, and
+  // given its height back when the search returns. Set when the search is
+  // put away, and acted on once the panel has been drawn without it.
+  const fitAfterHidingRef = useRef(false)
+  const [heightBeforeHiding, setHeightBeforeHiding] = usePanelSessionState<number | null>(panelId, 'height-before-hiding-search', null)
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const [embedGeneration, setEmbedGeneration] = useState(0)
   // What to expect from Spotify's player, said in a card the first time this
   // visit that someone chooses music, unless they asked not to see it. The
@@ -230,6 +238,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       setReturnCheck('waiting')
       // The results put away, so what to do next is the first thing seen,
       // beside the player it is about, rather than squeezed under a list.
+      fitAfterHidingRef.current = true
       setSearchCollapsedRef.current(true)
       setEmbedGeneration((generation) => generation + 1)
       posthogRef.current?.capture('spotify_embed_returned')
@@ -277,6 +286,42 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const embedEntity = shownSong?.uri ?? shownPlaylist.uri ?? null
   const searchHidden = !view.showSearch
   const chosen = view.chosen
+
+  // The panel made to fit what is left once the search is put away: the
+  // way back to it, and Spotify's player in its frame. Measured from the
+  // panel as drawn, since the player's height follows the canvas zoom.
+  useLayoutEffect(() => {
+    if (!fitAfterHidingRef.current || !searchHidden) return
+    fitAfterHidingRef.current = false
+    const section = sectionRef.current
+    const body = bodyRef.current
+    if (!section || !body || !commands.setPanelHeight || focusView || commands.isPanelFullScreen(panelId)) return
+    const bodyStyle = getComputedStyle(body)
+    let needed = Number.parseFloat(bodyStyle.paddingTop) + Number.parseFloat(bodyStyle.paddingBottom)
+    for (const child of body.children) {
+      const element = child as HTMLElement
+      const style = getComputedStyle(element)
+      if (style.position === 'absolute' || style.display === 'none') continue
+      // The player's block is centred with automatic margins, which read
+      // back as all the free room; the gap above it is Find music's own.
+      const margins = element.classList.contains('spotify-player-block')
+        ? 0
+        : Number.parseFloat(style.marginTop) + Number.parseFloat(style.marginBottom)
+      needed += element.offsetHeight + margins
+    }
+    const surplus = body.clientHeight - needed
+    if (surplus <= 1 || section.offsetHeight <= 0) return
+    // The panel is measured in its own pixels and sized in the canvas's;
+    // the ratio between the two carries the one into the other.
+    const drawnHeight = section.offsetHeight
+    const before = commands.setPanelHeight(panelId, (current) => current - (surplus * current) / drawnHeight)
+    if (before !== undefined) setHeightBeforeHiding(before)
+  }, [searchHidden, commands, focusView, panelId, setHeightBeforeHiding])
+
+  function hideSearch() {
+    fitAfterHidingRef.current = true
+    setSearchCollapsed(true)
+  }
 
   // The list is given whatever height the column has left over, which lands
   // mid-row as often as not and leaves a sliced playlist along the bottom
@@ -405,6 +450,13 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   function showSearchAgain() {
     setSearchCollapsed(false)
     setReturnCheck(null)
+    // The height the panel had before the search was put away, so the
+    // results have their room again. Never shorter than it is now: a panel
+    // made taller meanwhile keeps what it was given.
+    if (heightBeforeHiding !== null) {
+      commands.setPanelHeight?.(panelId, (current) => Math.max(current, heightBeforeHiding))
+      setHeightBeforeHiding(null)
+    }
   }
 
   // Spotify gives a visitor who is not logged in a 30-second preview, and
@@ -481,7 +533,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   ) : null
 
   return (
-    <section className={`panel panel-spotify-surface${focusView && !momentView ? ' is-focus-view' : ''}${searchHidden ? ' is-search-hidden' : ''}${momentView && !view.chosen ? ' is-moment-empty' : ''}${view.middle === 'player' ? ' is-player-middle' : ''}`}>
+    <section ref={sectionRef} className={`panel panel-spotify-surface${focusView && !momentView ? ' is-focus-view' : ''}${searchHidden ? ' is-search-hidden' : ''}${momentView && !view.chosen ? ' is-moment-empty' : ''}${view.middle === 'player' ? ' is-player-middle' : ''}`}>
       <PanelHeader
         panelId={panelId}
         panelType="spotify"
@@ -514,7 +566,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             label: 'Show the search',
             icon: <Disc3 size={17} aria-hidden="true" />,
             checked: !searchCollapsed,
-            onSelect: () => (searchCollapsed ? showSearchAgain() : setSearchCollapsed(true)),
+            onSelect: () => (searchCollapsed ? showSearchAgain() : hideSearch()),
           }] : []),
           {
             id: 'focus-view',
@@ -526,7 +578,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         ] }]}
       />
 
-      <div className="panel-body" {...panelContentProps}>
+      <div ref={bodyRef} className="panel-body" {...panelContentProps}>
         {view.showSearch ? (
           /* Results follow the typing, so the only thing left for Enter to
              do is skip the wait -- there is no button to press. */
@@ -567,7 +619,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               <RotateCcw size={18} />
               Reset panel
             </button>
-            <button className="card-icon-button is-wide" type="button" onClick={() => setSearchCollapsed(true)}>
+            <button className="card-icon-button is-wide" type="button" onClick={hideSearch}>
               <ChevronsDownUp size={18} />
               Hide search
             </button>

@@ -15,6 +15,14 @@ export interface PanelCommands {
   /** Grow a panel that is still at its short starting height to its default height. */
   expandPanelFromStartingHeight(panelId: string): void
   /**
+   * Set a panel's height, keeping its top edge where it is, from the height
+   * it has now. Returns the height it had, or undefined when there is no such
+   * panel. Not an undo step: it follows a change of what the panel shows,
+   * which is not one either. Optional: where it is missing, the panel keeps
+   * its size.
+   */
+  setPanelHeight?(panelId: string, height: (current: number) => number): number | undefined
+  /**
    * SPIKE: Editor mode's own panel actions for a window (minimise, hide,
    * delete). When it returns a list, it replaces the canvas ones and the
    * panel's focus-view item, which act on a canvas shape nobody can see.
