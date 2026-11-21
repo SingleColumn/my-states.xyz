@@ -163,6 +163,13 @@ function mountPanel(overrides: Record<string, unknown> = {}, options: { strict?:
     searchTracks,
     loadMorePlaylists,
     loadPlaylistFromUrl: async () => {},
+    // As in the app, removing the music empties the board's panel.
+    removeMusic: vi.fn(() => {
+      panel.playlist = { id: null, name: null, uri: null, url: null, image: null }
+      panel.track = null
+      spotify.state.selectedTrack = null
+      appStateChanged()
+    }),
     selectPlaylist,
     selectTrack,
     ...overrides,
@@ -424,11 +431,11 @@ describe('Music panel and the playlist saved in the board', () => {
     expect(chosenCard()?.textContent).not.toContain('Rain on Glass')
   })
 
-  it('stays after the fields are reset, since the choice was made', () => {
+  it('stays after the search is cleared, since the choice was made', () => {
     mountAnonymousPanel({ playlists: [rainResult] })
     fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
 
-    fireEvent.click(screen.getByText('Reset fields'))
+    fireEvent.click(screen.getByText('Clear search'))
 
     expect(chosenCard()?.textContent).toContain('Rain on Glass')
   })
@@ -462,6 +469,50 @@ describe('Music panel choosing music', () => {
   // says how to get one, wherever it shows something to play or how to
   // start. The footer's text is too small to be noticed as a way to log in,
   // so it offers it only where the body has no room: the focus view.
+  // Clear search clears the search and nothing else; the music is the
+  // board's. With nothing to clear it is greyed out rather than doing nothing.
+  describe('Clear search and Remove music', () => {
+    const clearButton = () => screen.getByRole('button', { name: 'Clear search' }) as HTMLButtonElement
+
+    it('greys out Clear search while there is nothing typed and no results', () => {
+      mountAnonymousPanel()
+      expect(clearButton().disabled).toBe(true)
+    })
+
+    it('offers Clear search once something is typed', () => {
+      mountAnonymousPanel()
+      typeSearch('rain')
+      expect(clearButton().disabled).toBe(false)
+    })
+
+    it('takes the music off the board from the panel menu, back to the empty panel', () => {
+      mountAnonymousPanel()
+      expect(document.querySelector('.spotify-chosen.is-featured')).not.toBeNull()
+
+      fireEvent.click(screen.getByLabelText('Music panel actions'))
+      fireEvent.click(screen.getByText('Remove music'))
+
+      expect(document.querySelector('.spotify-chosen')).toBeNull()
+      expect(screen.getByText('Search for a playlist to play with this board.')).toBeTruthy()
+    })
+
+    it('does not offer Remove music when there is no music', () => {
+      panel.playlist = { ...nothingChosen }
+      mountAnonymousPanel()
+      fireEvent.click(screen.getByLabelText('Music panel actions'))
+      expect(screen.queryByText('Remove music')).toBeNull()
+    })
+
+    // The focus view has no search, so an empty one says how to find some.
+    it('says what to do in a focus view with no music, and leaves it on Find music', () => {
+      panel.playlist = { ...nothingChosen }
+      panel.focusView = true
+      mountAnonymousPanel()
+      expect(screen.getByText('No music chosen yet.')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Find music' })).toBeTruthy()
+    })
+  })
+
   describe('Spotify login link', () => {
     const bodyLink = () => screen.queryByRole('link', { name: 'Log in to Spotify to hear whole songs' })
     const footerLink = () => screen.queryByRole('link', { name: 'Log in to Spotify' })

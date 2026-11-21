@@ -35,6 +35,8 @@ export interface SpotifyState {
   selectPlaylist(summary: SpotifyPlaylistSummary, panelId?: string): void
   /** A song (not null) is also saved in the panel, in place of its playlist. */
   selectTrack(summary: SpotifyTrackSummary | null, panelId?: string): void
+  /** Takes the panel's music off the board: no playlist and no song. Undo brings it back. */
+  removeMusic(panelId?: string): void
 }
 
 // One page of results, so a search is one request. Paging further used to
@@ -241,8 +243,18 @@ export function useSpotifyState(board: Board | null, panels: PanelsState): Spoti
     }
   }, [chooseBoardTrack])
 
+  // An undo step like any other choice, so a slip of the hand in the menu
+  // costs one Ctrl+Z.
+  const removeMusic = useCallback((panelId?: string) => {
+    const current = panelsRef.current
+    const panel = (panelId ? current.get(panelId) : undefined) ?? current.all.find((candidate) => candidate.type === 'spotify')
+    if (panel?.type === 'spotify') current.updateConfig<'spotify'>(panel.id, { playlist: { ...defaultSpotifyPlaylistReference }, track: null })
+    setSelectedTrack(null)
+    setError(null)
+  }, [])
+
   return {
-    playlists, tracks, selectedTrack, error, clearSearchResults,
+    playlists, tracks, selectedTrack, error, clearSearchResults, removeMusic,
     searchPlaylists, searchTracks, loadPlaylistFromUrl, selectPlaylist, selectTrack,
     playlistsHaveMore, loadMorePlaylists,
   }

@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Search,
   Shuffle,
+  X,
 } from 'lucide-react'
 import { useAppState } from '../AppState'
 import { defaultSpotifyPlaylistReference } from '../storage'
@@ -356,6 +357,12 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     return () => observer.disconnect()
   }, [searchHidden, searchType, results.length, view.middle, view.nextStep])
 
+  // Clearing the search only clears the search: the music chosen with it is
+  // the board's, and is removed from the panel menu instead. So with nothing
+  // typed and no results there is nothing to clear, and the button says so by
+  // being greyed out rather than by doing nothing.
+  const canClearSearch = query !== '' || results.length > 0
+
   function resetFields() {
     setQuery('')
     setLocalError(null)
@@ -430,6 +437,17 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         // looks, then the panel itself (focus view joins it, beside the other
         // sizes).
         menuSections={[{ heading: 'Find music', items: [
+          // Taking the music off the board: the only way back to an empty
+          // panel. Clear search leaves it alone, since the board keeps it.
+          ...(chosen && !momentView ? [{
+            id: 'remove-music',
+            label: 'Remove music',
+            icon: <X size={17} aria-hidden="true" />,
+            onSelect: () => {
+              resetFields()
+              spotify.removeMusic(panelId)
+            },
+          }] : []),
           // What the search looks for is a setting, not something to decide on
           // every visit, so it lives here and the field gets the whole row. The
           // field's own placeholder says which is on.
@@ -492,9 +510,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                 and no account there is nothing to go back to, so Reset
                 stands alone. */}
             <div className={`spotify-search-actions${view.canPutSearchAway ? '' : ' is-single'}`}>
-              <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields}>
+              <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields} disabled={!canClearSearch}>
                 <RotateCcw size={18} />
-                Reset fields
+                Clear search
               </button>
               {view.canPutSearchAway ? (
                 <button className="card-icon-button is-wide" type="button" onClick={() => setSearchCollapsed(true)}>
@@ -626,6 +644,18 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           <div key="empty" className="spotify-empty">
             <p className="muted">{`Search for a ${searchType === 'tracks' ? 'song' : 'playlist'} to play with this board.`}</p>
             {loginLink}
+          </div>
+        ) : null}
+
+        {focusView && !momentView && !chosen ? (
+          /* The focus view has no search, so with nothing chosen it would be
+             an empty box. Say so, and offer the way back to the search. */
+          <div key="focus-empty" className="spotify-empty spotify-focus-empty">
+            <p className="muted">No music chosen yet.</p>
+            <button className="card-icon-button is-wide" type="button" onClick={() => commands.togglePanelFocusView(panelId)}>
+              <Search size={16} aria-hidden="true" />
+              Find music
+            </button>
           </div>
         ) : null}
 

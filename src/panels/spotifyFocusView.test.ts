@@ -67,7 +67,7 @@ function renderMusicPanel(focusView: boolean) {
 // The focus view is the panel a few centimetres tall: Spotify's smallest
 // player, and the music's name in the footer.
 describe('Music panel focus view', () => {
-  it('names the loaded playlist in both views, so it survives Reset fields', () => {
+  it('names the loaded playlist in both views, so it survives Clear search', () => {
     for (const markup of [renderMusicPanel(false), renderMusicPanel(true)]) {
       expect(markup).toContain('Deep Focus')
       expect(markup).not.toContain('No playlist loaded')
@@ -84,14 +84,14 @@ describe('Music panel focus view', () => {
   it('drops the search, the results and the suggestions from the focus view', () => {
     const focused = renderMusicPanel(true)
     expect(focused).not.toContain('Search playlists')
-    expect(focused).not.toContain('Reset fields')
+    expect(focused).not.toContain('Clear search')
     expect(focused).not.toContain('Playlist search results')
     expect(focused).not.toContain('Suggested for this session')
 
     const full = renderMusicPanel(false)
     expect(full).not.toContain('is-focus-view')
     expect(full).toContain('Search playlists')
-    expect(full).toContain('Reset fields')
+    expect(full).toContain('Clear search')
     // No search typed: the chosen music fills the room the results would take.
     expect(full).toContain('is-featured')
   })
