@@ -393,6 +393,18 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     explainPreviewsOnce()
   }
 
+  // The way to whole songs, said in the body of the panel wherever the panel
+  // shows something to play or how to start: the footer's text is too small
+  // to be noticed as a way to log in. Only the focus view, whose body is
+  // Spotify's player alone, leaves it to the footer.
+  const loginLink = (
+    <a className="spotify-login-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn}>
+      Log in to Spotify to hear whole songs
+    </a>
+  )
+  const showsChosenRow = view.middle !== 'cover' && !focusView && (view.namer === 'row' || view.nextStep !== null)
+  const loginInBody = view.middle === 'empty' || (chosen !== null && (view.middle === 'cover' || showsChosenRow))
+
   // The one action that goes with the line about Spotify's player, when there
   // is one: reload after a login elsewhere, or listen on Spotify itself when
   // its player cannot load here.
@@ -515,6 +527,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             ) : null}
             {view.nextStep ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
             {embedHelp}
+            {view.chosen ? loginLink : null}
           </div>
         ) : view.middle === 'suggestions' ? (
           <section className="spotify-suggestions" aria-label="Suggested playlists">
@@ -612,9 +625,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
              start, rather than a blank panel that reads as broken. */
           <div key="empty" className="spotify-empty">
             <p className="muted">{`Search for a ${searchType === 'tracks' ? 'song' : 'playlist'} to play with this board.`}</p>
-            <a className="spotify-login-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn}>
-              Log in to Spotify to hear whole songs
-            </a>
+            {loginLink}
           </div>
         ) : null}
 
@@ -633,7 +644,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         {/* In the focus view the body is Spotify's player alone: drawn at
             screen size, it needs all the room a zoomed-out panel has, so
             the one line about it goes in the footer instead. */}
-        {view.middle !== 'cover' && !focusView && (view.namer === 'row' || view.nextStep) ? (
+        {showsChosenRow ? (
           <div className="spotify-chosen" role={view.nextStep ? 'status' : undefined}>
             {view.namer === 'row' && view.chosen ? (
               <div className="spotify-chosen-item">
@@ -646,6 +657,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             ) : null}
             {view.nextStep ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
             {embedHelp}
+            {view.chosen ? loginLink : null}
           </div>
         ) : null}
 
@@ -688,17 +700,18 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               <button className="spotify-footer-link" type="button" onClick={() => setNoticeOpen(true)} title="What to expect from Spotify's player">
                 Previews without a login
               </button>
-              {/* The middle of the panel already offers it while nothing is chosen. */}
-              {view.middle === 'empty' ? null : (
+              {/* Only where the body has no room for it: the focus view, and
+                  the suggestions before anything is chosen. */}
+              {loginInBody ? null : (
                 <a className="spotify-footer-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn} title="Opens Spotify's login page in a new tab">
-                  Log in
+                  Log in to Spotify
                 </a>
               )}
             </>
           )}
         </div>
       </footer>
-      {noticeOpen ? <SpotifyPreviewNotice onClose={() => setNoticeOpen(false)} /> : null}
+      {noticeOpen ? <SpotifyPreviewNotice onClose={() => setNoticeOpen(false)} loginUrl={SPOTIFY_LOGIN_URL} onLogIn={leaveToLogIn} /> : null}
     </section>
   )
 }

@@ -402,6 +402,21 @@
   color: var(--color-text);
 }
 
+/* Under the chosen music: its own line, centred, never squeezed away. */
+.spotify-chosen .spotify-login-link {
+  justify-self: center;
+  align-self: center;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+/* The card's login is a link styled as its second button. */
+a.welcome-card-secondary {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .spotify-featured-cover {
   flex: 0 1 auto;
   min-height: 0;

@@ -35,7 +35,8 @@
 :root[data-moment-view] .image-expand-button,
 :root[data-moment-view] .focus-view-hint,
 :root[data-moment-view] .notes-document-controls,
-:root[data-moment-view] .notes-writing-toolbar-host {
+:root[data-moment-view] .notes-writing-toolbar-host,
+:root[data-moment-view] .spotify-login-link {
   display: none;
 }
 

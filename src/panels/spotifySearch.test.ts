@@ -458,23 +458,59 @@ describe('Music panel choosing music', () => {
     expect(screen.queryByText('Play a playlist')).toBeNull()
   })
 
-  // The footer says previews play without a login; the panel also says how
-  // to get one. In the middle while nothing is chosen, where people look
-  // first, and in the footer once the middle is taken by the music.
-  it('offers Spotify login in the middle while nothing is chosen, and in the footer after', () => {
-    panel.playlist = { ...nothingChosen }
-    mountAnonymousPanel()
-    const middle = screen.getByRole('link', { name: 'Log in to Spotify to hear whole songs' })
-    expect(middle.closest('.spotify-empty')).not.toBeNull()
-    expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()
-    cleanup()
+  // The footer says previews play without a login; the body of the panel
+  // says how to get one, wherever it shows something to play or how to
+  // start. The footer's text is too small to be noticed as a way to log in,
+  // so it offers it only where the body has no room: the focus view.
+  describe('Spotify login link', () => {
+    const bodyLink = () => screen.queryByRole('link', { name: 'Log in to Spotify to hear whole songs' })
+    const footerLink = () => screen.queryByRole('link', { name: 'Log in to Spotify' })
 
-    mountAnonymousPanel({
-      selectedTrack: { id: 't1', name: 'Xtal', uri: 'spotify:track:t1', url: 'https://open.spotify.com/track/t1', image: null, artists: 'Aphex Twin', album: 'SAW 85-92', durationMs: 1000 },
+    it('is in the middle while nothing is chosen', () => {
+      panel.playlist = { ...nothingChosen }
+      mountAnonymousPanel()
+      expect(bodyLink()?.closest('.spotify-empty')).not.toBeNull()
+      expect(footerLink()).toBeNull()
     })
-    expect(screen.queryByRole('link', { name: 'Log in to Spotify to hear whole songs' })).toBeNull()
-    const footer = screen.getByRole('link', { name: 'Log in' })
-    expect(footer.closest('.card-footer')).not.toBeNull()
+
+    it('is under the chosen music, not in the footer', () => {
+      mountAnonymousPanel()
+      expect(bodyLink()?.closest('.spotify-chosen.is-featured')).not.toBeNull()
+      expect(footerLink()).toBeNull()
+    })
+
+    // The case that was reported: a result chosen, the card closed, and the
+    // search results still showing.
+    it('stays in sight under the search results once something is chosen', async () => {
+      mountAnonymousPanel({ playlists: [rainResult] })
+      typeSearch('rain')
+      await settle()
+      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
+
+      expect(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' })).toBeTruthy()
+      const link = bodyLink()
+      expect(link?.closest('.spotify-chosen')).not.toBeNull()
+      expect(link?.getAttribute('href')).toBe('https://accounts.spotify.com/login')
+      expect(link?.getAttribute('target')).toBe('_blank')
+    })
+
+    it('is in the footer in the focus view, where the body is the player alone', () => {
+      panel.focusView = true
+      mountAnonymousPanel()
+      expect(bodyLink()).toBeNull()
+      expect(footerLink()?.closest('.card-footer')).not.toBeNull()
+    })
+
+    it('is offered by the card about previews too', () => {
+      mountAnonymousPanel({ playlists: [rainResult] })
+      fireEvent.click(screen.getByText('Rain on Glass', { selector: '.playlist-option strong' }))
+      const card = screen.getByRole('dialog', { name: 'Before you press play' })
+      const link = card.querySelector('a')
+      expect(link?.textContent).toBe('Log in to Spotify')
+      expect(link?.getAttribute('href')).toBe('https://accounts.spotify.com/login')
+      expect(link?.getAttribute('target')).toBe('_blank')
+    })
   })
 
   it('searches the catalog on the same debounce', async () => {
@@ -671,9 +707,11 @@ describe('Music panel choosing music', () => {
     })
 
     const links = screen.getAllByRole('link')
-    expect(links).toHaveLength(1)
-    expect(links[0].getAttribute('href')).toBe('https://accounts.spotify.com/login')
-    expect(links[0].getAttribute('target')).toBe('_blank')
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      expect(link.getAttribute('href')).toBe('https://accounts.spotify.com/login')
+      expect(link.getAttribute('target')).toBe('_blank')
+    }
     expect(screen.queryByText(/open (it )?in spotify/i)).toBeNull()
     expect(document.querySelector('a[href*="open.spotify.com"]')).toBeNull()
   })
