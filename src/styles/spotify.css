@@ -416,6 +416,30 @@
   color: var(--color-text);
 }
 
+/* The two boxes the panel is made of while there is music: the results, and
+   Spotify's player with what goes with it. One frame for both, so they read
+   as a pair stacked down the panel, a fixed gap apart. */
+.spotify-frame {
+  padding: var(--space-playlist-gap);
+  border: var(--border-width-hairline) solid var(--color-panel-divider);
+  border-radius: calc(var(--radius-playlist-card) + var(--space-playlist-gap));
+  background: color-mix(in srgb, var(--color-input-bg) 55%, transparent);
+}
+
+/* Takes the room the column has; the list is rounded to whole rows inside
+   it, and what the rounding leaves stays inside the frame. */
+.spotify-results-frame {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-playlist-top);
+}
+
+.spotify-results-frame .playlist-list {
+  margin: 0;
+}
+
 /* Spotify's player with the line about it above and the way to log in
    under it: one block, kept at the bottom of the panel while there are
    results to sit above it, and in the middle of the free room when the
@@ -427,6 +451,15 @@
   margin-top: auto;
   padding-top: var(--space-control-inner-gap);
   text-align: center;
+}
+
+.spotify-player-block.is-framed {
+  padding: var(--space-playlist-gap);
+}
+
+/* Under the results the gap is fixed: the results' frame takes the free room. */
+.spotify-results-frame + .spotify-player-block {
+  margin-top: var(--space-playlist-gap);
 }
 
 .spotify-player-block:empty {

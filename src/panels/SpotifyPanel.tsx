@@ -344,10 +344,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // would put a sliced row back at the bottom of a short panel.
       list.style.minHeight = `${height}px`
       list.style.maxHeight = `${height}px`
-      // Rounding down leaves up to a row over. It goes between the list and
-      // Spotify's player (whose block takes the free space above it), never
-      // above the list: there it read as a hole under the search, with the
-      // results hanging below it.
+      // Rounding down leaves up to a row over. It stays inside the results'
+      // frame, under the last row, so the frame and the player's frame keep
+      // one fixed gap between them instead of a gap that changes with it.
     }
 
     snapToWholeRows()
@@ -624,7 +623,8 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             </button>
           </section>
         ) : view.middle === 'results' && searchType === 'tracks' ? (
-          <div key="results" ref={listRef} className="playlist-list" aria-label="Track search results">
+          <div key="results" className="spotify-frame spotify-results-frame">
+          <div ref={listRef} className="playlist-list" aria-label="Track search results">
             {spotify.tracks.map((track) => {
               const isChosen = spotify.selectedTrack?.id === track.id
               return (
@@ -647,8 +647,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             {searchState === 'searching' ? <p className="playlist-list-note">Looking for songs…</p> : null}
             {searchState === 'no-matches' ? <p className="playlist-list-note">No songs match that search.</p> : null}
           </div>
+          </div>
         ) : view.middle === 'results' ? (
-          <div key="results" ref={listRef} className="playlist-list" aria-label="Playlist search results">
+          <div key="results" className="spotify-frame spotify-results-frame">
+          <div ref={listRef} className="playlist-list" aria-label="Playlist search results">
             {spotify.playlists.map((playlist) => {
               const isChosen = playlist.id === shownPlaylist.id
               return (
@@ -679,6 +681,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             {searchState === 'searching' ? <p className="playlist-list-note">Looking for playlists…</p> : null}
             {searchState === 'no-matches' ? <p className="playlist-list-note">No playlists match that search.</p> : null}
           </div>
+          </div>
         ) : view.middle === 'empty' ? (
           /* Nothing chosen and nothing to suggest: one line on how to
              start, rather than a blank panel that reads as broken. */
@@ -705,7 +708,11 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             so the player never jumps and the login is always found under it.
             It is always drawn, even empty, so that a change of view never
             moves the player in the page, which would restart it. */}
-        <div className="spotify-player-block" role={noteWithPlayer ? 'status' : undefined}>
+        {/* Framed like the results above it, so the panel reads as two
+            stacked boxes -- what you can choose, and what is playing --
+            rather than parts scattered down the column. Not in the focus
+            view, where the player is the whole body, nor when it is hidden. */}
+        <div className={`spotify-player-block${view.embed && !view.embed.hidden && !focusView ? ' spotify-frame is-framed' : ''}`} role={noteWithPlayer ? 'status' : undefined}>
           {noteWithPlayer ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
           {noteWithPlayer ? embedHelp : null}
           {view.embed && embedEntity ? (
