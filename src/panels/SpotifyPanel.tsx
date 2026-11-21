@@ -290,12 +290,11 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // The panel made to fit what is left once the search is put away: the
   // way back to it, and Spotify's player in its frame. Measured from the
   // panel as drawn, since the player's height follows the canvas zoom.
-  useLayoutEffect(() => {
-    if (!fitAfterHidingRef.current || !searchHidden) return
-    fitAfterHidingRef.current = false
+  // Returns the height the panel had, or undefined when it was left alone.
+  function fitPanelToPlayer(): number | undefined {
     const section = sectionRef.current
     const body = bodyRef.current
-    if (!section || !body || !commands.setPanelHeight || focusView || commands.isPanelFullScreen(panelId)) return
+    if (!section || !body || !commands.setPanelHeight || focusView || commands.isPanelFullScreen(panelId)) return undefined
     const bodyStyle = getComputedStyle(body)
     let needed = Number.parseFloat(bodyStyle.paddingTop) + Number.parseFloat(bodyStyle.paddingBottom)
     for (const child of body.children) {
@@ -309,14 +308,40 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
         : Number.parseFloat(style.marginTop) + Number.parseFloat(style.marginBottom)
       needed += element.offsetHeight + margins
     }
+    // Negative when the player has grown past the panel: it then grows too.
     const surplus = body.clientHeight - needed
-    if (surplus <= 1 || section.offsetHeight <= 0) return
+    if (Math.abs(surplus) <= 1 || section.offsetHeight <= 0) return undefined
     // The panel is measured in its own pixels and sized in the canvas's;
     // the ratio between the two carries the one into the other.
     const drawnHeight = section.offsetHeight
-    const before = commands.setPanelHeight(panelId, (current) => current - (surplus * current) / drawnHeight)
+    return commands.setPanelHeight(panelId, (current) => current - (surplus * current) / drawnHeight)
+  }
+  const fitPanelToPlayerRef = useRef(fitPanelToPlayer)
+  fitPanelToPlayerRef.current = fitPanelToPlayer
+
+  useLayoutEffect(() => {
+    if (!fitAfterHidingRef.current || !searchHidden) return
+    fitAfterHidingRef.current = false
+    const before = fitPanelToPlayerRef.current()
     if (before !== undefined) setHeightBeforeHiding(before)
-  }, [searchHidden, commands, focusView, panelId, setHeightBeforeHiding])
+  }, [searchHidden, setHeightBeforeHiding])
+
+  // Spotify's player keeps its size on screen, so zooming the board changes
+  // its height in the panel's own pixels: the panel follows it while it is
+  // fitted to the player. Only a change in the player's height counts, so a
+  // panel the visitor resizes by hand is not pulled back.
+  useEffect(() => {
+    const block = bodyRef.current?.querySelector<HTMLElement>('.spotify-player-block')
+    if (!searchHidden || heightBeforeHiding === null || !block) return
+    let lastHeight = block.offsetHeight
+    const observer = new ResizeObserver(() => {
+      if (block.offsetHeight === lastHeight) return
+      lastHeight = block.offsetHeight
+      fitPanelToPlayerRef.current()
+    })
+    observer.observe(block)
+    return () => observer.disconnect()
+  }, [searchHidden, heightBeforeHiding])
 
   function hideSearch() {
     fitAfterHidingRef.current = true
