@@ -97,7 +97,7 @@ export function SpotifyPreviewNotice({ onClose, loginUrl, onLogIn }: { onClose()
           <li>Private (incognito) windows may not recognise a Spotify login, so you will probably only hear previews despite a log in.</li>
           {/* Named from how each browser treats logins from other websites by
               default, not from testing Spotify's player in each. */}
-          <li>Some browsers keep a login on Spotify’s website apart from the player here, so you may still hear previews after logging in. Safari, Firefox and Brave are the most likely to do this; Chrome and Edge usually are not.</li>
+          <li>Some browsers keep a login on Spotify’s website apart from the player here, so you may still hear previews after logging in. Safari, Firefox and Brave are the most likely to do this; Chrome and Edge usually don’t.</li>
         </ul>
         <div className="welcome-card-footer">
           <label className="welcome-card-check">
