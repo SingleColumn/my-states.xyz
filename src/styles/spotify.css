@@ -623,6 +623,12 @@ a.welcome-card-secondary {
   background: var(--color-album-empty);
 }
 
+/* Holds Spotify's iframe, so the player can move between views as one piece. */
+.spotify-embed-holder {
+  width: 100%;
+  height: 100%;
+}
+
 /* The frame's size and its own counter-zoom are set inline, per zoom level. */
 .spotify-embed-frame iframe {
   display: block;

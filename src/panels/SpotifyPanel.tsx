@@ -816,6 +816,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               // A new key is a new player: how the panel picks up a Spotify
               // login made in another tab while the visitor was away.
               key={embedGeneration}
+              keepAs={{ panelId, generation: embedGeneration }}
               entity={embedEntity}
               height={view.embed.height}
               hidden={view.embed.hidden}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { loadSpotifyIframeApi, SpotifyEmbedSession, type SpotifyEmbedController } from '../spotifyEmbed'
 
 export type SpotifyEmbedStatus = 'loading' | 'ready' | 'failed'
@@ -16,9 +16,11 @@ export type SpotifyEmbedHeight = 152 | 80
  * One controller for the life of this component. A new choice goes through
  * loadEntity on that controller, so typing, searching or resizing never
  * rebuilds the iframe or cuts the music. Unmounting destroys it, which is what
- * stops the music when the panel is deleted or the board has nothing to play.
+ * stops the music when the panel is deleted or the board has nothing to play --
+ * unless the same panel draws the player again straight away (see keptPlayers).
  */
 export function SpotifyEmbedStrip({
+  keepAs,
   entity,
   height,
   hidden,
@@ -27,6 +29,11 @@ export function SpotifyEmbedStrip({
   onPlayingChange,
   onPlayedLength,
 }: {
+  /**
+   * Which panel and player this is. A strip mounted with the same value
+   * shortly after another unmounted takes over that player, still playing.
+   */
+  keepAs: { panelId: string; generation: number }
   entity: string
   height: SpotifyEmbedHeight
   /** Kept playing but not drawn: the screenshot view shows the cover instead. */
@@ -44,7 +51,6 @@ export function SpotifyEmbedStrip({
   onPlayedLength?(milliseconds: number): void
 }) {
   const frameRef = useRef<HTMLDivElement | null>(null)
-  const sessionRef = useRef<SpotifyEmbedSession | null>(null)
   const entityRef = useRef(entity)
   const onStatusRef = useRef(onStatus)
   onStatusRef.current = onStatus
@@ -61,61 +67,86 @@ export function SpotifyEmbedStrip({
     onStatusRef.current(next)
   }, [])
 
-  const configure = useCallback((controller: SpotifyEmbedController) => {
-    controller.addListener('ready', () => report('ready'))
-    controller.addListener('playback_update', (event) => {
-      const paused = event.data?.isPaused
-      if (typeof paused === 'boolean') onPlayingRef.current(!paused)
-      // Only while playing: a paused player loaded with new music can still
-      // report the length of what it played before.
-      const length = event.data?.duration
-      if (paused === false && typeof length === 'number' && length > 0) onPlayedLengthRef.current?.(length)
-    })
-  }, [report])
+  // What the player says goes to whichever strip is drawing it now, which
+  // after a move between views is not the one that built it.
+  const ownerRef = useRef<PlayerOwner>({ report, playing: () => {}, playedLength: () => {} })
+  ownerRef.current = {
+    report,
+    playing: (playing) => onPlayingRef.current(playing),
+    playedLength: (milliseconds) => onPlayedLengthRef.current?.(milliseconds),
+  }
 
-  useEffect(() => {
+  const { panelId, generation } = keepAs
+  // A layout effect, so that its clean-up runs while the panel is still in
+  // the page: an ordinary effect's runs after React has removed it, and the
+  // player, removed with it, has already reloaded.
+  useLayoutEffect(() => {
     const frame = frameRef.current
     if (!frame) return
-    let active = true
-    // Spotify replaces the element it is given with its own iframe, so it gets
-    // a child of its own and the frame we style stays ours.
-    const host = document.createElement('div')
-    frame.append(host)
-    report('loading')
 
-    void loadSpotifyIframeApi()
-      .then(async (api) => {
-        if (!active) return
-        // Fills the frame, whose size follows the canvas zoom (see useCanvasZoom).
-        sessionRef.current = new SpotifyEmbedSession(api, host, configure, '100%')
-        await sessionRef.current.load(entityRef.current)
-      })
-      .catch(() => {
-        if (active) report('failed')
-      })
+    const kept = claimKeptPlayer(panelId, generation)
+    if (kept) {
+      // The same player, moved here without reloading: the music goes on.
+      movePreservingState(frame, kept.holder)
+      kept.owner = ownerRef
+      entityRef.current = kept.entity
+      report(kept.status)
+      onPlayingRef.current(kept.playing)
+    } else {
+      const player = newKeptPlayer(panelId, generation, entityRef.current)
+      frame.append(player.holder)
+      player.owner = ownerRef
+      report('loading')
+      // Spotify replaces the element it is given with its own iframe, so it
+      // gets a child of its own inside the holder, which is what moves.
+      const host = document.createElement('div')
+      player.holder.append(host)
+      void loadSpotifyIframeApi()
+        .then(async (api) => {
+          if (player.released) return
+          // Fills the frame, whose size follows the canvas zoom (see useCanvasZoom).
+          player.session = new SpotifyEmbedSession(api, host, (controller) => listen(player, controller), '100%')
+          await player.session.load(player.entity)
+        })
+        .catch(() => {
+          if (!player.released) setStatusOf(player, 'failed')
+        })
+    }
 
     return () => {
-      active = false
+      const player = keptPlayers.get(panelId)
+      if (!player || player.owner !== ownerRef) return
+      player.owner = null
+      // Switching between the canvas and Editor mode draws the panel afresh,
+      // in another part of the page. The player waits out of sight for a
+      // moment, playing, for the new panel to take it over; if none does, the
+      // panel is really gone and so is the music.
+      if (canMoveWithoutReload()) {
+        movePreservingState(parkingLot(), player.holder)
+        player.releaseTimer = window.setTimeout(() => releaseKeptPlayer(player), keepPlayerMs)
+      } else {
+        releaseKeptPlayer(player)
+      }
       onPlayingRef.current(false)
-      sessionRef.current?.destroy()
-      sessionRef.current = null
-      frame.replaceChildren()
     }
     // Built once. The player fills its frame, so a change of size (a change of
     // view, or of zoom) needs no new player and never stops the music.
-  }, [configure, report])
+  }, [panelId, generation, report])
 
   useEffect(() => {
     if (entityRef.current === entity) return
     entityRef.current = entity
-    const session = sessionRef.current
+    const player = keptPlayers.get(panelId)
+    if (!player || player.owner !== ownerRef) return
+    player.entity = entity
+    const session = player.session
     if (!session) return
     // A new board's music is chosen, not started: whatever was playing stops
     // here and waits for the visitor's own press of play.
     session.currentController?.pause()
     onPlayingRef.current(false)
     void session.load(entity).catch(() => report('failed'))
-  }, [entity, report])
+  }, [entity, panelId, report])
 
   // A click inside a cross-origin iframe never reaches this page as a click.
   // What does reach it is the window losing focus to that iframe, which is the
@@ -165,6 +196,120 @@ export function SpotifyEmbedStrip({
       {status === 'loading' ? <p className="spotify-embed-loading">Loading Spotify’s player…</p> : null}
     </div>
   )
+}
+
+interface PlayerOwner {
+  report(status: SpotifyEmbedStatus): void
+  playing(playing: boolean): void
+  playedLength(milliseconds: number): void
+}
+
+/**
+ * A Spotify player that can outlive the strip that built it, one per Music
+ * panel. Moving an iframe in the page normally reloads it, which stops the
+ * music; the newer moveBefore moves it as it is, still playing. Where a
+ * browser has no moveBefore (Safari, for now), the player is not kept and a
+ * change of view restarts it, as before.
+ */
+interface KeptPlayer {
+  panelId: string
+  generation: number
+  /** Ours, holding Spotify's iframe: the one element that is moved. */
+  holder: HTMLDivElement
+  session: SpotifyEmbedSession | null
+  /** What it was last asked to play, so a strip taking it over knows. */
+  entity: string
+  status: SpotifyEmbedStatus
+  playing: boolean
+  owner: { current: PlayerOwner } | null
+  releaseTimer: number
+  released: boolean
+}
+
+const keptPlayers = new Map<string, KeptPlayer>()
+
+/** Long enough for the other view to draw the panel; short enough that a deleted panel's music stops at once. */
+const keepPlayerMs = 400
+
+function newKeptPlayer(panelId: string, generation: number, entity: string): KeptPlayer {
+  // One player per panel: an older one (a new generation is a new player on
+  // purpose) goes now.
+  const older = keptPlayers.get(panelId)
+  if (older) releaseKeptPlayer(older)
+  const holder = document.createElement('div')
+  holder.className = 'spotify-embed-holder'
+  const player: KeptPlayer = { panelId, generation, holder, session: null, entity, status: 'loading', playing: false, owner: null, releaseTimer: 0, released: false }
+  keptPlayers.set(panelId, player)
+  return player
+}
+
+function claimKeptPlayer(panelId: string, generation: number): KeptPlayer | null {
+  const player = keptPlayers.get(panelId)
+  if (!player || player.owner || player.generation !== generation || !canMoveWithoutReload()) return null
+  window.clearTimeout(player.releaseTimer)
+  return player
+}
+
+function releaseKeptPlayer(player: KeptPlayer) {
+  window.clearTimeout(player.releaseTimer)
+  player.released = true
+  player.session?.destroy()
+  player.session = null
+  player.holder.remove()
+  if (keptPlayers.get(player.panelId) === player) keptPlayers.delete(player.panelId)
+}
+
+function listen(player: KeptPlayer, controller: SpotifyEmbedController) {
+  controller.addListener('ready', () => setStatusOf(player, 'ready'))
+  controller.addListener('playback_update', (event) => {
+    const paused = event.data?.isPaused
+    if (typeof paused === 'boolean') {
+      player.playing = !paused
+      player.owner?.current.playing(!paused)
+    }
+    // Only while playing: a paused player loaded with new music can still
+    // report the length of what it played before.
+    const length = event.data?.duration
+    if (paused === false && typeof length === 'number' && length > 0) player.owner?.current.playedLength(length)
+  })
+}
+
+function setStatusOf(player: KeptPlayer, status: SpotifyEmbedStatus) {
+  player.status = status
+  player.owner?.current.report(status)
+}
+
+type MovableParent = Element & { moveBefore?: (node: Node, before: Node | null) => void }
+
+function canMoveWithoutReload() {
+  return typeof (Element.prototype as MovableParent).moveBefore === 'function'
+}
+
+function movePreservingState(parent: Element, child: Element) {
+  const move = (parent as MovableParent).moveBefore
+  if (move) {
+    try {
+      move.call(parent, child, null)
+      return
+    } catch {
+      // Not movable as it is (for one, if either end has left the page): an
+      // ordinary move, which reloads the player, is the fallback.
+    }
+  }
+  parent.append(child)
+}
+
+/** Where a kept player waits between views: in the page, so it keeps playing, but out of sight. */
+let parking: HTMLDivElement | null = null
+function parkingLot() {
+  if (parking?.isConnected) return parking
+  parking = document.createElement('div')
+  parking.setAttribute('aria-hidden', 'true')
+  // Off screen rather than display: none, which some browsers treat as a
+  // reason to stop; sized like the player so Spotify keeps its layout.
+  Object.assign(parking.style, { position: 'fixed', left: '-10000px', top: '0', width: '400px', height: '152px', pointerEvents: 'none' })
+  document.body.append(parking)
+  return parking
 }
 
 /** Spotify's own card corner, matched by .spotify-embed-frame in spotify.css. */

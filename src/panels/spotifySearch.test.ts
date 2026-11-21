@@ -1118,6 +1118,48 @@ describe("Music panel with Spotify's own player", () => {
     expect(embed.controllers[0].destroy).toHaveBeenCalled()
   })
 
+  // Switching between the canvas and Editor mode draws the panel afresh in
+  // another part of the page. Browsers with moveBefore can move the player
+  // there without reloading it; this stand-in only moves it.
+  describe('in a browser that can move the player without reloading it', () => {
+    const prototype = Element.prototype as Element & { moveBefore?: (node: Node, before: Node | null) => void }
+    const original = prototype.moveBefore
+    beforeEach(() => {
+      prototype.moveBefore = function (this: Element, node: Node, before: Node | null) { this.insertBefore(node, before) }
+    })
+    afterEach(() => {
+      // Lets go of any player still waiting, so the next test starts clean.
+      vi.advanceTimersByTime(1000)
+      if (original) prototype.moveBefore = original
+      else delete prototype.moveBefore
+    })
+
+    it('keeps the same player, and its music, when the panel is drawn again elsewhere', async () => {
+      mountAnonymousPanel()
+      await settlePlayer()
+      const iframe = document.querySelector('.spotify-embed-strip iframe')
+
+      cleanup()
+      mountAnonymousPanel()
+      await settlePlayer()
+
+      expect(embed.created).toBe(1)
+      expect(embed.controllers[0].destroy).not.toHaveBeenCalled()
+      expect(document.querySelector('.spotify-embed-strip iframe')).toBe(iframe)
+    })
+
+    it('still stops the music soon after the panel goes for good', async () => {
+      mountAnonymousPanel()
+      await settlePlayer()
+
+      cleanup()
+      expect(embed.controllers[0].destroy).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1000)
+
+      expect(embed.controllers[0].destroy).toHaveBeenCalled()
+    })
+  })
+
   it('keeps the same player in the focus view, at its smaller size', async () => {
     const { rerender } = mountAnonymousPanel()
     await settlePlayer()
