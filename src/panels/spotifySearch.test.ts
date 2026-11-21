@@ -675,6 +675,7 @@ describe('Music panel choosing music', () => {
       expect(card()?.textContent).toContain('30-second previews')
       expect(card()?.textContent).toContain('come back to this tab')
       expect(card()?.textContent).toContain('Private (incognito) windows may not recognise')
+      expect(card()?.textContent).toContain('Safari, Firefox and Brave')
     })
 
     it('opens for a chosen song as well', () => {

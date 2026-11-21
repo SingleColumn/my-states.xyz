@@ -469,6 +469,7 @@
 }
 
 /* The card's login is a link styled as its second button. */
+a.welcome-card-primary,
 a.welcome-card-secondary {
   display: inline-flex;
   align-items: center;

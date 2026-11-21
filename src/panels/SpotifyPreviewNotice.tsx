@@ -74,7 +74,6 @@ export function SpotifyPreviewNotice({ onClose, loginUrl, onLogIn }: { onClose()
         </header>
         <ul className="welcome-card-list">
           <li><strong>Without a Spotify login you will only hear 30-second previews.</strong></li>
-          <li>Private (incognito) windows may not recognise a Spotify login, so you will probably only hear previews there.</li>
           <li>
             To hear whole songs use the <strong>Log in to Spotify</strong> option, it opens Spotify’s website in a new tab; when you are done, come back to this tab.
             {/* Logging in is what this card is about, so it can be done from
@@ -82,7 +81,7 @@ export function SpotifyPreviewNotice({ onClose, loginUrl, onLogIn }: { onClose()
                 the visitor comes back to the panel. */}
             <div className="spotify-preview-notice-login">
               <a
-                className="welcome-card-secondary"
+                className="welcome-card-primary"
                 href={loginUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -95,7 +94,10 @@ export function SpotifyPreviewNotice({ onClose, loginUrl, onLogIn }: { onClose()
               </a>
             </div>
           </li>
-          <li>Some browsers keep a login on Spotify’s website apart from the player here, so you may still hear previews after logging in.</li>
+          <li>Private (incognito) windows may not recognise a Spotify login, so you will probably only hear previews despite a log in.</li>
+          {/* Named from how each browser treats logins from other websites by
+              default, not from testing Spotify's player in each. */}
+          <li>Some browsers keep a login on Spotify’s website apart from the player here, so you may still hear previews after logging in. Safari, Firefox and Brave are the most likely to do this; Chrome and Edge usually are not.</li>
         </ul>
         <div className="welcome-card-footer">
           <label className="welcome-card-check">
