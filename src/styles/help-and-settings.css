@@ -1,32 +1,3 @@
-/* Hangs off the header so the panel body keeps one way in and the link stays
-   a step someone chooses to take. */
-.spotify-link-popover {
-  position: absolute;
-  top: calc(100% + var(--space-popover-offset));
-  right: var(--card-padding);
-  z-index: 3;
-  width: min(360px, calc(100cqw - (var(--card-padding) * 2)));
-  padding: clamp(10px, 2cqi, 14px);
-  border: var(--card-border);
-  border-radius: var(--content-radius);
-  background: var(--card-bg-gradient);
-  box-shadow: var(--shadow-panel);
-}
-
-.spotify-link-popover .input-row {
-  margin-top: 0;
-}
-
-.spotify-link-heading {
-  display: block;
-  margin-bottom: 8px;
-  color: color-mix(in srgb, var(--accent) 55%, var(--accent-lift));
-  font-size: var(--card-footer-meta-size);
-  font-weight: var(--font-weight-emphasis);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-}
-
 .architecture-report-backdrop {
   position: fixed;
   inset: 0;

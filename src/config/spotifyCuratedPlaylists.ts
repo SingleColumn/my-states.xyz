@@ -68,7 +68,7 @@ export interface CuratedSpotifyPlaylist {
  * It is empty in this repository because inventing plausible-looking Spotify
  * ids would ship suggestions that 404 for everyone. The panel behaves
  * correctly with an empty pool: the suggestion area simply does not appear,
- * and search and Connect Spotify are unaffected. Add real ids here to turn
+ * and search is unaffected. Add real ids here to turn
  * suggestions on.
  */
 export const curatedSpotifyPlaylists: CuratedSpotifyPlaylist[] = [

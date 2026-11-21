@@ -3,10 +3,9 @@
  *
  * This authenticates *this app* to Spotify, never a visitor. It reaches only
  * the endpoints that carry no user data, which is exactly what anonymous
- * catalog browsing needs. It is a separate thing from the browser's
- * Authorization Code + PKCE token in src/spotify.ts, which authenticates the
- * visitor for playback, and the two must never be mistaken for one another:
- * this one is minted from a secret and must never leave the server.
+ * catalog browsing needs. It is minted from a secret and must never leave
+ * the server: the browser asks this app's own endpoints, and gets back only
+ * what they found.
  *
  * Nothing here is logged. A credential that reaches a log has left the
  * server as surely as one that reaches the browser.

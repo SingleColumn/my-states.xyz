@@ -1,36 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import {
   ChevronsDownUp,
   Disc3,
   ExternalLink,
-  Link2,
-  LogIn,
-  LogOut,
-  Pause,
-  Play,
   RotateCcw,
   Search,
   Shuffle,
-  SkipBack,
-  SkipForward,
-  Volume2,
+  X,
 } from 'lucide-react'
 import { useAppState } from '../AppState'
 import { defaultSpotifyPlaylistReference } from '../storage'
-import { debounce, formatDuration } from '../utils'
+import { debounce } from '../utils'
 import type { DebouncedFunction } from '../utils'
 import type { Panel } from '../types'
 import type { SpotifyPlaylistSummary, SpotifyTrackSummary } from '../spotify'
 import { fetchCuratedPlaylists } from '../spotifyCatalog'
 import type { CuratedSpotifyPlaylist } from '../config/spotifyCuratedPlaylists'
 import { getSessionSuggestions, shuffleSessionSuggestions } from '../spotifySuggestions'
-import { forgetReturnContext, rememberReturnContext, takeReturnContext, type SpotifyReturnContext } from '../spotifyReturnContext'
 import { PanelHeader, usePanelCommands } from '../PanelHeader'
 import { useMomentView } from '../momentView'
 import { usePanelSessionState } from '../panelSessionState'
-import { musicPanelView, type MusicSearchState } from './musicPanelView'
+import { musicPanelView, type MusicSearchState, type ReturnCheck } from './musicPanelView'
 import { panelContentProps } from '../panelSurface'
+import { SpotifyEmbedStrip } from './SpotifyEmbedStrip'
+import { isPreviewNoticeHidden, previewNoticeVisit, SpotifyPreviewNotice } from './SpotifyPreviewNotice'
 
 type SpotifySearchType = 'tracks' | 'playlists'
 
@@ -50,13 +44,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const panel = found?.type === 'spotify' ? (found as Panel<'spotify'>) : undefined
   const panelPlaylist = panel?.config.playlist ?? defaultSpotifyPlaylistReference
   // Focus view keeps what someone glances at while they write or look at
-  // images: the playlist, the track, and the playback controls.
+  // images: Spotify's player at its smallest, and the music's name.
   const focusView = panel?.focusView === true
   const momentView = useMomentView()
-  // Connecting Spotify is what playback needs. It is not what the panel
-  // needs: searching and choosing happen either way, and this flag marks the
-  // boundary between the two rather than the door into the panel.
-  const connected = Boolean(spotify.tokens)
   // The choices below are kept per panel rather than in this copy of it, so
   // they survive a switch between the canvas and Editor mode (see
   // panelSessionState).
@@ -65,12 +55,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // long as someone is looking at them, where a single song stops after three
   // minutes. Songs stay available, but finding a playlist is the default step.
   const [searchType, setSearchType] = usePanelSessionState<SpotifySearchType>(panelId, 'search-type', 'playlists')
-  const [playlistUrl, setPlaylistUrl] = usePanelSessionState(panelId, 'playlist-url', panelPlaylist.url ?? '')
-  const [isLinkFieldOpen, setIsLinkFieldOpen] = usePanelSessionState(panelId, 'link-field-open', false)
   // Putting the search away is what brings the artwork out: the panel shows
   // one or the other, never both, and the choice is the person's to make.
   const [searchCollapsed, setSearchCollapsed] = usePanelSessionState(panelId, 'search-collapsed', false)
-  const [volume, setVolume] = usePanelSessionState(panelId, 'volume', 70)
   const [busy, setBusy] = useState(false)
   // Distinct from `busy`, which any action sets: this one says a search is
   // owed an answer, so the list can wait instead of reporting no matches.
@@ -97,40 +84,10 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const posthogRef = useRef(posthog)
   posthogRef.current = posthog
 
-  useEffect(() => {
-    setPlaylistUrl(panelPlaylist.url ?? '')
-  }, [boards.activeBoard?.id, panelPlaylist.url])
-
-  // A keyboard's dedicated volume keys reach the page as keydown events
-  // (code "AudioVolume*"), separate from the OS volume they also adjust.
-  // Following them here keeps the on-screen slider, and Spotify's own
-  // playback volume, in step with whichever one someone actually used.
-  useEffect(() => {
-    if (!spotify.tokens) return
-    function handleVolumeKey(event: KeyboardEvent) {
-      if (event.code !== 'AudioVolumeUp' && event.code !== 'AudioVolumeDown' && event.code !== 'AudioVolumeMute') return
-      event.preventDefault()
-      setVolume((current) => {
-        const next = event.code === 'AudioVolumeMute'
-          ? (current === 0 ? 70 : 0)
-          : Math.max(0, Math.min(100, current + (event.code === 'AudioVolumeUp' ? 5 : -5)))
-        void runRef.current(() => spotifyRef.current.setVolume(next / 100))
-        return next
-      })
-    }
-    window.addEventListener('keydown', handleVolumeKey)
-    return () => window.removeEventListener('keydown', handleVolumeKey)
-  }, [spotify.tokens])
-
-  useEffect(() => {
-    if (!spotify.tokens) setIsLinkFieldOpen(false)
-  }, [spotify.tokens])
-
   // Searching while someone types removes the separate "now search" step that
   // a submit button asks for. The debounce keeps a typed word to one request;
   // the sequence guard inside the search calls drops any reply that a later
-  // keystroke has already overtaken. None of this depends on being connected:
-  // the same field, the same wait and the same guard serve both.
+  // keystroke has already overtaken.
   const searchRef = useRef<DebouncedFunction<(text: string, type: SpotifySearchType) => void> | null>(null)
   useEffect(() => {
     const search = debounce((text: string, type: SpotifySearchType) => {
@@ -141,11 +98,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
           } else {
             await spotifyRef.current.searchPlaylists(text)
           }
-          // One event for a search, whoever asked and for whichever kind, so
-          // the two paths cannot be counted twice or compared against
-          // different definitions. The words typed are not sent.
+          // One event for a search, for whichever kind. The words typed are
+          // not sent.
           posthogRef.current?.capture('spotify_catalog_searched', {
-            authenticated: Boolean(spotifyRef.current.tokens),
             search_type: type === 'tracks' ? 'track' : 'playlist',
           })
         } finally {
@@ -172,7 +127,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     }
     setSearching(true)
     searchRef.current?.(trimmed, searchType)
-  }, [query, searchType, spotify.tokens])
+  }, [query, searchType])
 
   // The suggestions this page session offers. Chosen once, in a module that
   // holds the choice, so that a rerender, a resize, a change of board or
@@ -193,7 +148,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       } catch {
         // Discovery being unavailable costs the suggestions and nothing else,
         // and says nothing about it: the panel simply has none to offer. The
-        // search field and Connect Spotify both stay where they were.
+        // search field stays where it was.
         if (!cancelled) setSuggestionSummaries([])
       }
     })()
@@ -212,120 +167,102 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       .filter((summary): summary is SpotifyPlaylistSummary => summary !== null)
   }, [suggestions, suggestionSummaries])
 
-  // Someone who left to connect Spotify is put back where they were, rather
-  // than facing an empty box and no sign of what they had chosen. The words
-  // they had typed come back and the search runs again, so the results — with
-  // their playlist marked among them — are on screen when they arrive. A
-  // playlist needs nothing else: the panel's reference is part of the board
-  // and outlived the redirect. A song is only ever a runtime choice, so it is
-  // looked up again by its id.
-  //
-  // Nothing plays on arrival — a browser will not start sound without a click,
-  // and a page that began playing by itself would be its own surprise — so the
-  // panel says so instead, and the player's own Play button is the one to press.
-  const [cameBackToPlay, setCameBackToPlay] = useState(false)
-  // How many times someone has clicked a playlist or song they cannot yet play.
-  // Counts rather than flags so that each click can start the glow on the
-  // Connect Spotify button over again.
-  const [invitations, setInvitations] = useState(0)
-  // A song chosen before connecting is looked up again on the way back, and
-  // until that answers there is nothing to play it with. Without this the
-  // panel falls back to the board's saved playlist in the meantime — names it,
-  // and starts it on Play — when the visitor asked for a song.
-  const [restoringSong, setRestoringSong] = useState(false)
+  // What Spotify's own player could not load (blocked, offline). Kept as
+  // the music it failed on, so choosing other music tries again by itself:
+  // a failure once, such as a moment offline, must not keep the player away
+  // for the rest of the visit.
+  const [failedEntity, setFailedEntity] = useState<string | null>(null)
+  // Spotify's player can send the visitor to Spotify's site to log in, and
+  // this page is told nothing about it: the click happens inside Spotify's
+  // iframe. What it can see is the visitor using the player, this tab being
+  // left, and the tab coming back with nothing playing. That is when it
+  // welcomes them back, and rebuilds the player so a login made meanwhile has
+  // a chance to count. The next press of play then shows whether it did.
+  const [returnCheck, setReturnCheck] = useState<ReturnCheck | null>(null)
+  // Whole songs heard in this visit: the visitor is logged in to Spotify, and
+  // the panel stops offering the login.
+  const [wholeSongs, setWholeSongs] = useState(() => visitPlayback.wholeSongs)
+  const setSearchCollapsedRef = useRef(setSearchCollapsed)
+  setSearchCollapsedRef.current = setSearchCollapsed
+  // Putting the search away leaves Spotify's player alone in a panel sized
+  // for a list of results, so the panel is made to fit what is left, and
+  // given its height back when the search returns. Set when the search is
+  // put away, and acted on once the panel has been drawn without it.
+  const fitAfterHidingRef = useRef(false)
+  const [heightBeforeHiding, setHeightBeforeHiding] = usePanelSessionState<number | null>(panelId, 'height-before-hiding-search', null)
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const [embedGeneration, setEmbedGeneration] = useState(0)
+  // What to expect from Spotify's player, said in a card the first time this
+  // visit that someone chooses music, unless they asked not to see it. The
+  // footer reopens it.
+  const [noticeOpen, setNoticeOpen] = useState(false)
+  const usedEmbedRef = useRef(false)
+  const leftAfterUsingEmbedRef = useRef(false)
+  const embedPlayingRef = useRef(false)
 
   // The music saved in the board is part of the board, and is shown to
-  // whoever opens it, connected or not: someone who imports or is sent a board
-  // has chosen its music along with it, and an empty panel reads as music
-  // lost. Not connected, it is shown with the one step left to play it.
+  // whoever opens it: someone who imports or is sent a board has chosen its
+  // music along with it, and an empty panel reads as music lost.
   const shownPlaylist = panelPlaylist
   const panelTrack = panel?.config.track ?? null
   const shownSong = spotify.selectedTrack ?? panelTrack
+  // What Spotify's player is given: the song if the board keeps one, else the
+  // playlist. Both are public Spotify URIs.
+  const embedEntity = shownSong?.uri ?? shownPlaylist.uri ?? null
+  const embedFailed = failedEntity !== null && failedEntity === embedEntity
 
   // A different board has a different saved playlist, and nothing chosen in
   // the last one carries over to it.
   //
-  // Only a change counts. React's development mode runs every effect twice when
-  // a component mounts, and this one runs before the effects that give back
-  // what the visitor was doing on the way back from Spotify: run again, it wiped
-  // what they had just restored, and the context they read it from was already
-  // used up. So it remembers which board it last saw and does nothing when the
-  // board is the same.
+  // Only a change counts: React's development mode runs every effect twice when
+  // a component mounts, so it remembers which board it last saw and does
+  // nothing when the board is the same.
   const lastBoardIdRef = useRef(boards.activeBoard?.id)
   useEffect(() => {
     if (lastBoardIdRef.current === boards.activeBoard?.id) return
     lastBoardIdRef.current = boards.activeBoard?.id
-    setInvitations(0)
-    setRestoringSong(false)
-    // The "press play to start…" prompt is about what was chosen before leaving
-    // for Spotify, in the board it was chosen in. Left standing, another board
-    // would show it beside its own saved playlist: music nobody picked there.
-    setCameBackToPlay(false)
+    // "Welcome back" is about the music of the board it was said in.
+    setReturnCheck(null)
+    usedEmbedRef.current = false
+    leftAfterUsingEmbedRef.current = false
   }, [boards.activeBoard?.id])
 
-  // Whose is a context? It was read from this tab's own storage, but the page
-  // that came back opens whichever board is active in storage shared by every
-  // tab, and another tab may have opened a different one while this tab was at
-  // Spotify. A context for another panel or board is not this panel's to
-  // restore — its query and song would land in the wrong board. Whatever reads
-  // one has already taken it, so one that is not ours is simply dropped.
-  const isOurContext = (context: SpotifyReturnContext) =>
-    context.panelId === panelId && (context.boardId === null || context.boardId === boards.activeBoard?.id)
-
+  // Leaving the tab after using Spotify's player, then coming back to it.
+  // Coming back to music that is still playing says nothing and touches
+  // nothing: the visitor only looked at another tab, and rebuilding the player
+  // would cut the music off.
   useEffect(() => {
-    if (!connected) return
-    const context = takeReturnContext()
-    if (!context) return
-    if (!isOurContext(context)) return
-    setSearchType(context.searchType)
-    setQuery(context.query)
-    if (!context.choice) return
-    setCameBackToPlay(true)
-    const { choice } = context
-    if (choice.kind === 'track') {
-      setRestoringSong(true)
-      void runRef.current(() => spotifyRef.current.lookupTrack(choice.spotifyId)).finally(() => setRestoringSong(false))
+    function handleVisibility() {
+      if (document.visibilityState === 'hidden') {
+        if (usedEmbedRef.current) leftAfterUsingEmbedRef.current = true
+        return
+      }
+      if (!leftAfterUsingEmbedRef.current) return
+      leftAfterUsingEmbedRef.current = false
+      if (embedPlayingRef.current) return
+      usedEmbedRef.current = false
+      setReturnCheck('waiting')
+      // The results put away, so what to do next is the first thing seen,
+      // beside the player it is about, rather than squeezed under a list.
+      fitAfterHidingRef.current = true
+      setSearchCollapsedRef.current(true)
+      setEmbedGeneration((generation) => generation + 1)
+      posthogRef.current?.capture('spotify_embed_returned')
     }
-  }, [connected])
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
-  // A sign-in that comes back without succeeding — cancelled at Spotify,
-  // refused, or a code that could not be exchanged — leaves the visitor here,
-  // not connected, on a page that has reloaded: the search, its results and
-  // what they had chosen are gone. Some of that can be given back, and is.
-  //
-  // The search text and type can. What they had chosen needs nothing: a
-  // playlist or song is saved in the board as soon as it is clicked, and the
-  // board's music is always shown.
-  //
-  // This waits to be told the sign-in failed rather than restoring whenever the
-  // panel opens signed out, because a sign-in that is about to succeed also
-  // opens signed out for a board, and must find its context still there.
-  useEffect(() => {
-    if (!spotify.signInFailed || connected) return
-    const context = takeReturnContext()
-    if (!context) return
-    if (!isOurContext(context)) return
-    setSearchType(context.searchType)
-    setQuery(context.query)
-  }, [spotify.signInFailed])
+  // Spotify's login page, in a new tab so the board stays open behind it.
+  // When the panel already has a player, leaving through this link counts as
+  // using it: coming back then rebuilds the player, so the login can count,
+  // and says what to do next.
+  function leaveToLogIn() {
+    if (embedEntity) usedEmbedRef.current = true
+    posthogRef.current?.capture('spotify_login_link_opened')
+  }
 
-  // Once something is playing, or the session ends, the prompt has done its job
-  // — and so has a song that was only being held until Play was pressed.
-  useEffect(() => {
-    if (spotify.track || !connected) setCameBackToPlay(false)
-    if (spotify.track && spotify.selectedTrack) spotifyRef.current.selectTrack(null)
-  }, [spotify.track, spotify.selectedTrack, connected])
-
-  // Connected, there is nothing left to invite anyone to, and a later log-out
-  // must not resurrect a glow for a click made in an earlier session.
-  useEffect(() => {
-    if (connected) setInvitations(0)
-  }, [connected])
-
-  // The menu entry that opens the link field is absent in the focus view and
-  // when not connected, so the popover it opens goes with it rather than
-  // outliving the only way back to it.
-  const linkFieldOpen = isLinkFieldOpen && connected && !focusView
   const results = searchType === 'tracks' ? spotify.tracks : spotify.playlists
   const searchState: MusicSearchState = query.trim().length < minSearchLength
     ? 'waiting'
@@ -339,23 +276,81 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // music, the one line about what to do next -- is decided in one place,
   // from these inputs, and only drawn here. See musicPanelView.ts.
   const view = musicPanelView({
-    connected,
     focusView,
     momentView,
     searchCollapsed,
     searchState,
     suggestionCount: suggestionCards.length,
-    playing: spotify.track,
     heldTrack: spotify.selectedTrack,
     boardTrack: panelTrack,
     boardPlaylist: panelPlaylist,
-    cameBackToPlay,
-    restoringSong,
-    playerReady: spotify.isReady,
-    sessionEnded: spotify.sessionEnded,
+    embedFailed,
+    returnCheck,
+    wholeSongs,
   })
   const searchHidden = !view.showSearch
   const chosen = view.chosen
+
+  // The panel made to fit what is left once the search is put away: the
+  // way back to it, and Spotify's player in its frame. Measured from the
+  // panel as drawn, since the player's height follows the canvas zoom.
+  // Returns the height the panel had, or undefined when it was left alone.
+  function fitPanelToPlayer(): number | undefined {
+    const section = sectionRef.current
+    const body = bodyRef.current
+    if (!section || !body || !commands.setPanelHeight || focusView || commands.isPanelFullScreen(panelId)) return undefined
+    const bodyStyle = getComputedStyle(body)
+    let needed = Number.parseFloat(bodyStyle.paddingTop) + Number.parseFloat(bodyStyle.paddingBottom)
+    for (const child of body.children) {
+      const element = child as HTMLElement
+      const style = getComputedStyle(element)
+      if (style.position === 'absolute' || style.display === 'none') continue
+      // The player's block is centred with automatic margins, which read
+      // back as all the free room; the gap above it is Find music's own.
+      const margins = element.classList.contains('spotify-player-block')
+        ? 0
+        : Number.parseFloat(style.marginTop) + Number.parseFloat(style.marginBottom)
+      needed += element.offsetHeight + margins
+    }
+    // Negative when the player has grown past the panel: it then grows too.
+    const surplus = body.clientHeight - needed
+    if (Math.abs(surplus) <= 1 || section.offsetHeight <= 0) return undefined
+    // The panel is measured in its own pixels and sized in the canvas's;
+    // the ratio between the two carries the one into the other.
+    const drawnHeight = section.offsetHeight
+    return commands.setPanelHeight(panelId, (current) => current - (surplus * current) / drawnHeight)
+  }
+  const fitPanelToPlayerRef = useRef(fitPanelToPlayer)
+  fitPanelToPlayerRef.current = fitPanelToPlayer
+
+  useLayoutEffect(() => {
+    if (!fitAfterHidingRef.current || !searchHidden) return
+    fitAfterHidingRef.current = false
+    const before = fitPanelToPlayerRef.current()
+    if (before !== undefined) setHeightBeforeHiding(before)
+  }, [searchHidden, setHeightBeforeHiding])
+
+  // Spotify's player keeps its size on screen, so zooming the board changes
+  // its height in the panel's own pixels: the panel follows it while it is
+  // fitted to the player. Only a change in the player's height counts, so a
+  // panel the visitor resizes by hand is not pulled back.
+  useEffect(() => {
+    const block = bodyRef.current?.querySelector<HTMLElement>('.spotify-player-block')
+    if (!searchHidden || heightBeforeHiding === null || !block) return
+    let lastHeight = block.offsetHeight
+    const observer = new ResizeObserver(() => {
+      if (block.offsetHeight === lastHeight) return
+      lastHeight = block.offsetHeight
+      fitPanelToPlayerRef.current()
+    })
+    observer.observe(block)
+    return () => observer.disconnect()
+  }, [searchHidden, heightBeforeHiding])
+
+  function hideSearch() {
+    fitAfterHidingRef.current = true
+    setSearchCollapsed(true)
+  }
 
   // The list is given whatever height the column has left over, which lands
   // mid-row as often as not and leaves a sliced playlist along the bottom
@@ -366,14 +361,17 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // whole cards that is either there or not.
   const listRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
+    // The list sits in a frame, and the frame in the panel's column. The
+    // frame takes the list's height, so the room is measured in the column.
     const list = listRef.current
-    const column = list?.parentElement
+    const column = list?.parentElement?.parentElement
     if (!list || !column) return
 
     function snapToWholeRows() {
       const list = listRef.current
-      const column = list?.parentElement
-      if (!list || !column) return
+      const frame = list?.parentElement
+      const column = frame?.parentElement
+      if (!list || !frame || !column) return
       const row = list.querySelector<HTMLElement>('.playlist-option')
       if (!row) {
         list.style.minHeight = ''
@@ -386,13 +384,8 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // mixing them measures the list in one unit and the room for it in
       // another — true at zoom 1, and wrong by the zoom factor everywhere
       // else. Full screen is where the two are furthest apart.
-      // Measure against the stylesheet's own top margin, never the one a
-      // previous pass wrote below, or each pass would count its own slack
-      // again and walk the list up the panel.
-      list.style.marginTop = ''
       const listStyle = getComputedStyle(list)
       const gap = Number.parseFloat(listStyle.rowGap) || 0
-      const baseMarginTop = Number.parseFloat(listStyle.marginTop) || 0
       const pitch = row.offsetHeight + gap
       if (pitch <= 0) return
       // The room the column has for the list, worked out from everything that
@@ -400,13 +393,21 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // feed each rounding back into the next one, and the list would creep
       // shorter on every pass.
       const columnStyle = getComputedStyle(column)
+      const frameStyle = getComputedStyle(frame)
       let available = column.clientHeight
         - Number.parseFloat(columnStyle.paddingTop)
         - Number.parseFloat(columnStyle.paddingBottom)
         - Number.parseFloat(listStyle.marginTop)
         - Number.parseFloat(listStyle.marginBottom)
+        // The frame's own edges: its margins, padding and border.
+        - Number.parseFloat(frameStyle.marginTop)
+        - Number.parseFloat(frameStyle.marginBottom)
+        - Number.parseFloat(frameStyle.paddingTop)
+        - Number.parseFloat(frameStyle.paddingBottom)
+        - Number.parseFloat(frameStyle.borderTopWidth)
+        - Number.parseFloat(frameStyle.borderBottomWidth)
       for (const sibling of column.children) {
-        if (sibling === list) continue
+        if (sibling === frame) continue
         const siblingStyle = getComputedStyle(sibling)
         available -= (sibling as HTMLElement).offsetHeight
           + Number.parseFloat(siblingStyle.marginTop)
@@ -428,128 +429,163 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       // would put a sliced row back at the bottom of a short panel.
       list.style.minHeight = `${height}px`
       list.style.maxHeight = `${height}px`
-      // Rounding down leaves up to a row over. Left alone it settles under the
-      // playback controls, which then float by however much the rounding
-      // happened to leave — and shift again when the search is put away. Sent
-      // above the list it costs nothing: the controls keep the bottom edge and
-      // the row that names the playlist stays put. It cannot be an `auto`
-      // margin, which would take the free space the list itself grows into and
-      // leave the results with none.
-      list.style.marginTop = `${baseMarginTop + (available - height)}px`
+      // Rounding down leaves up to a row over. The frame fits the rows, so
+      // that room falls below the player's frame, at the foot of the panel:
+      // inside the frame it read as a box too tall for what it held, and
+      // between the frames as a gap that changed size.
     }
 
     snapToWholeRows()
     const observer = new ResizeObserver(snapToWholeRows)
     observer.observe(column)
     observer.observe(list)
+    // Everything else in the column takes room from the list, and changes
+    // size on its own: Spotify's player settles on its height only once it
+    // has loaded, and again when the canvas zoom changes. Without this the
+    // list kept the room it had before, and a whole row's worth sat empty.
+    for (const sibling of column.children) {
+      if (sibling !== list.parentElement) observer.observe(sibling)
+    }
     return () => observer.disconnect()
   }, [searchHidden, searchType, results.length, view.middle, view.nextStep])
 
-  function resetFields() {
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+
+  // The × in the field: what was typed, and the results with it. The music
+  // stays.
+  function clearTyping() {
     setQuery('')
-    setPlaylistUrl('')
+    setLocalError(null)
+    setReturnCheck(null)
+    searchInputRef.current?.focus()
+  }
+
+  // Back to how a new panel starts: nothing typed, nothing found, no music.
+  // Undo in the top bar brings the music back, as for any other change to
+  // the board.
+  function resetPanel() {
+    setQuery('')
     setLocalError(null)
     searchRef.current?.cancel()
     spotify.clearSearchResults()
-    spotify.selectTrack(null)
-    setInvitations(0)
+    spotify.removeMusic(panelId)
+    setReturnCheck(null)
+    setSearchCollapsed(false)
   }
 
-  // A new board starts this panel short. Using it makes room: typing, a
-  // search or choice restored after coming back from Spotify, or being
-  // connected already all mean the panel is in use.
-  const inUse = query.trim() !== '' || chosen !== null || connected
+  // Going back to the search is moving on: the note about coming back from
+  // Spotify goes, rather than squeezing in again between the results and
+  // the player.
+  function showSearchAgain() {
+    setSearchCollapsed(false)
+    setReturnCheck(null)
+    // The height the panel had before the search was put away, so the
+    // results have their room again. Never shorter than it is now: a panel
+    // made taller meanwhile keeps what it was given.
+    if (heightBeforeHiding !== null) {
+      commands.setPanelHeight?.(panelId, (current) => Math.max(current, heightBeforeHiding))
+      setHeightBeforeHiding(null)
+    }
+  }
+
+  // Spotify gives a visitor who is not logged in a 30-second preview, and
+  // says so only through the length it reports once play is pressed. A
+  // little over 30 seconds leaves room for rounding; a real song that short
+  // is rare, and would only bring the login link back.
+  function notePlayedLength(milliseconds: number) {
+    const whole = milliseconds > previewLengthLimitMs
+    visitPlayback.wholeSongs = whole
+    setWholeSongs(whole)
+    setReturnCheck((current) => (current === null ? null : whole ? 'whole' : 'previews'))
+    if (whole) posthogRef.current?.capture('spotify_whole_song_played')
+  }
+
+  // A new board starts this panel short. Using it makes room: typing or
+  // music chosen both mean the panel is in use.
+  const inUse = query.trim() !== '' || chosen !== null
   const { expandPanelFromStartingHeight } = commands
   useEffect(() => {
     if (inUse) expandPanelFromStartingHeight(panelId)
   }, [inUse, expandPanelFromStartingHeight, panelId])
 
-  /**
-   * Connecting Spotify. The only way to it in this panel, and the only time
-   * anyone leaves the page: Spotify sends them straight back once they have
-   * agreed, which is what makes it worth leaving for.
-   */
-  function connect() {
-    // Grow now: the page is about to be left, and the panel should look the
-    // same on return as the person left it.
-    commands.expandPanelFromStartingHeight(panelId)
-    posthog.capture('spotify_connect_clicked', { has_selection: chosen !== null })
-    if (chosen || query.trim()) {
-      // The crumbs that lead back to where they were: the search, and what they
-      // had chosen. No token — only the words, a panel id and a public Spotify
-      // id — and none of it is sent anywhere.
-      rememberReturnContext({
-        panelId,
-        boardId: boards.activeBoard?.id ?? null,
-        choice: chosen ? { kind: chosen.kind, spotifyId: chosen.id } : null,
-        query,
-        searchType,
-      })
-    } else {
-      // Nothing to come back to, so nothing may be left over from an earlier
-      // attempt: a sign-in that was cancelled or failed never read its context,
-      // and it would be restored after this one, complete with a song the
-      // visitor has since cleared.
-      forgetReturnContext()
-    }
-    void run(spotify.login)
+  function explainPreviewsOnce() {
+    setReturnCheck(null)
+    // Whole songs already playing: there are no previews to explain.
+    if (visitPlayback.wholeSongs) return
+    if (previewNoticeVisit.shown || isPreviewNoticeHidden()) return
+    previewNoticeVisit.shown = true
+    setNoticeOpen(true)
   }
 
   /**
-   * A click on a playlist, wherever it is offered. This is the one place the
-   * two kinds of visitor differ: someone connected asked for music and gets it,
-   * exactly as before; someone who has not connected has it chosen for them,
-   * and the panel then explains the one step left (see the selection card).
+   * A click on a playlist, wherever it is offered. It is chosen, and Spotify's
+   * own player below loads it, waiting for the visitor to press play.
    */
   function choosePlaylist(playlist: SpotifyPlaylistSummary, source: 'search' | 'curated') {
-    if (source === 'curated') posthog.capture('spotify_curated_playlist_selected', { authenticated: connected })
-    if (!connected) {
-      spotify.selectPlaylist(playlist, panelId)
-      setInvitations((count) => count + 1)
-      return
-    }
-    void run(async () => {
-      await spotify.playPlaylist(playlist, panelId)
-      posthog.capture('spotify_playlist_played', { source, authenticated: true })
-    })
+    if (source === 'curated') posthog.capture('spotify_curated_playlist_selected')
+    spotify.selectPlaylist(playlist, panelId)
+    explainPreviewsOnce()
   }
 
   function chooseTrack(track: SpotifyTrackSummary) {
-    if (!connected) {
-      spotify.selectTrack(track, panelId)
-      setInvitations((count) => count + 1)
-      return
-    }
-    void run(() => spotify.playTrack(track, panelId))
+    spotify.selectTrack(track, panelId)
+    explainPreviewsOnce()
   }
 
-  // Someone has just clicked something that cannot be played until Spotify is
-  // connected: the button that fixes that is where the eye should go next. It
-  // follows the click, not the state — a playlist saved in the board, chosen
-  // days ago, is not news, and a button that glows at every visit is noise.
-  // The count is the key, so each new click starts the glow again.
-  const invitingToConnect = !connected && chosen !== null && invitations > 0
-  const connectButton = (
-    <button
-      key={invitingToConnect ? `invite-${invitations}` : 'connect'}
-      className={`card-icon-button is-primary is-wide spotify-connect${invitingToConnect ? ' is-inviting' : ''}`}
-      type="button"
-      onClick={connect}
-    >
-      <LogIn size={18} />
-      Connect Spotify
-    </button>
+  // The way to whole songs. In the body it always sits in one place, right
+  // under Spotify's player, so it is found where it was last seen; the
+  // footer's small print is only for where the body has no room. Gone once
+  // whole songs play: the visitor is logged in.
+  const loginLink = (
+    <a className="spotify-login-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn}>
+      Log in to Spotify to hear whole songs
+    </a>
   )
+  // The line about Spotify's player goes with the player, above it. Only the
+  // panel's own cover, shown when the player could not load, keeps it under
+  // itself; the focus view keeps it in the footer.
+  const noteWithPlayer = view.nextStep !== null && !focusView && view.middle !== 'cover'
+
+  // The one action that goes with the line about Spotify's player, when there
+  // is one: reload after a login elsewhere, or listen on Spotify itself when
+  // its player cannot load here.
+  const embedHelp = view.offerReload ? (
+    <button className="card-icon-button is-wide spotify-embed-action" type="button" onClick={() => window.location.reload()}>
+      <RotateCcw size={16} aria-hidden="true" />
+      Reload page
+    </button>
+  ) : embedFailed ? (
+    <div className="spotify-embed-actions">
+      {/* A new player, which loads Spotify's player afresh. */}
+      <button
+        className="card-icon-button is-wide spotify-embed-action"
+        type="button"
+        onClick={() => {
+          setFailedEntity(null)
+          setEmbedGeneration((generation) => generation + 1)
+        }}
+      >
+        <RotateCcw size={16} aria-hidden="true" />
+        Try again
+      </button>
+      {chosen?.url ? (
+        <a className="card-icon-button is-wide spotify-embed-action" href={chosen.url} target="_blank" rel="noreferrer">
+          <ExternalLink size={16} aria-hidden="true" />
+          Open in Spotify
+        </a>
+      ) : null}
+    </div>
+  ) : null
 
   return (
-    <section className={`panel panel-spotify-surface${focusView && !momentView ? ' is-focus-view' : ''}${searchHidden ? ' is-search-hidden' : ''}${momentView && !view.music ? ' is-moment-empty' : ''}`}>
+    <section ref={sectionRef} className={`panel panel-spotify-surface${focusView && !momentView ? ' is-focus-view' : ''}${searchHidden ? ' is-search-hidden' : ''}${momentView && !view.chosen ? ' is-moment-empty' : ''}${view.middle === 'player' ? ' is-player-middle' : ''}`}>
       <PanelHeader
         panelId={panelId}
         panelType="spotify"
         title="Music"
         // SPIKE: grouped like the Writing menu -- finding music, how the panel
-        // looks, the panel itself (focus view joins it, beside the other
-        // sizes), and the Spotify account last.
+        // looks, then the panel itself (focus view joins it, beside the other
+        // sizes).
         menuSections={[{ heading: 'Find music', items: [
           // What the search looks for is a setting, not something to decide on
           // every visit, so it lives here and the field gets the whole row. The
@@ -567,25 +603,15 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
               { id: 'songs', label: 'Search for songs', content: 'Songs', checked: searchType === 'tracks', onSelect: () => setSearchType('tracks') },
             ],
           }] : []),
-          // Pasting a link is how someone plays a playlist they already have
-          // in hand, which is a rarer thing to arrive wanting than searching
-          // for one. It waits here so the body holds a single way in.
-          ...(connected && !focusView ? [{
-            id: 'playlist-link',
-            label: 'Play from a Spotify link',
-            icon: <Link2 size={17} aria-hidden="true" />,
-            checked: linkFieldOpen,
-            onSelect: () => setIsLinkFieldOpen((current) => !current),
-          }] : []),
         ] }, { heading: 'View', items: [
           // One name whether on or off, with a tick for on, so it is in the
           // same place under the same words every time it is looked for.
-          ...(connected && !focusView ? [{
+          ...(view.canPutSearchAway && !focusView ? [{
             id: 'search-visibility',
             label: 'Show the search',
             icon: <Disc3 size={17} aria-hidden="true" />,
             checked: !searchCollapsed,
-            onSelect: () => setSearchCollapsed((current) => !current),
+            onSelect: () => (searchCollapsed ? showSearchAgain() : hideSearch()),
           }] : []),
           {
             id: 'focus-view',
@@ -595,369 +621,288 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
             onSelect: () => commands.togglePanelFocusView(panelId),
           },
         ] }]}
-        trailingMenuHeading="Spotify"
-        trailingMenuItems={connected ? [
-          { id: 'log-out', label: 'Log out', icon: <LogOut size={17} aria-hidden="true" />, onSelect: () => spotify.logout() },
-        ] : undefined}
-      >
-        {linkFieldOpen ? (
-          <section className="spotify-link-popover" id="spotify-link-field" aria-label="Play from a Spotify link" {...panelContentProps}>
-            <span className="spotify-link-heading">Play from a Spotify link</span>
-            <form
-              className="input-row"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void run(async () => {
-                  await spotify.loadPlaylistFromUrl(playlistUrl, panelId)
-                  posthog.capture('spotify_playlist_played', { source: 'link', authenticated: true })
-                  setIsLinkFieldOpen(false)
-                })
+      />
+
+      <div ref={bodyRef} className="panel-body" {...panelContentProps}>
+        {view.showSearch ? (
+          /* Results follow the typing, so the only thing left for Enter to
+             do is skip the wait -- there is no button to press. */
+          <form
+            className="input-row spotify-search-row"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault()
+              searchRef.current?.flush()
+            }}
+          >
+            <input
+              ref={searchInputRef}
+              aria-label={searchType === 'tracks' ? 'Search songs' : 'Search playlists'}
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setReturnCheck(null)
+              }}
+              placeholder={searchType === 'tracks' ? 'Search songs' : 'Search playlists'}
+            />
+            {/* Clears what was typed and nothing else, inside the field it
+                belongs to. Reset panel, below, is the bigger step. */}
+            {query !== '' ? (
+              <button className="spotify-search-clear" type="button" onClick={clearTyping} aria-label="Clear what you typed" title="Clear what you typed">
+                <X size={16} aria-hidden="true" />
+              </button>
+            ) : null}
+          </form>
+        ) : null}
+
+        {view.showSearchActions ? (
+          /* Once there is music: start over, or put the search away and
+             leave Spotify's player. Two halves, so neither looks like the
+             more important one. */
+          <div className="spotify-search-actions">
+            <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetPanel} title="Clears the search and takes the music off the board. Undo brings it back.">
+              <RotateCcw size={18} />
+              Reset panel
+            </button>
+            <button className="card-icon-button is-wide" type="button" onClick={hideSearch}>
+              <ChevronsDownUp size={18} />
+              Hide search
+            </button>
+          </div>
+        ) : null}
+
+        {searchCollapsed && view.canPutSearchAway && !focusView && !momentView ? (
+          /* Quiet on purpose: with the search put away the music leads, and
+             this is only the way back to choosing something else. It says
+             music, not playlist, because a song may be what is loaded. */
+          <button className="spotify-show-search" type="button" onClick={showSearchAgain}>
+            <Search size={16} aria-hidden="true" />
+            Find music
+          </button>
+        ) : null}
+
+        {/* Each of these has a key because they share one spot in the panel,
+            and most are a plain div. Without keys React would reuse one
+            element for all of them, and the height snapToWholeRows writes
+            on the list would stay behind on whatever replaced it. The two
+            lists share a key: that effect runs again when they swap. */}
+        {view.middle === 'cover' ? (
+          /* The music shown the way an album is, where Spotify's player is
+             not there to show it: in a moment, or when the player could not
+             load. */
+          <div key="cover" className="spotify-chosen is-featured" role={view.nextStep ? 'status' : undefined}>
+            <div className="spotify-featured-cover">
+              {view.chosen?.image ? <img src={view.chosen.image} alt="" /> : <div className="album-frame-empty" />}
+            </div>
+            {view.namer === 'cover' && view.chosen ? (
+              <div className="track-copy">
+                <p className="track-title">{view.chosen.title}</p>
+                <p className="track-meta">{view.chosen.meta}</p>
+              </div>
+            ) : null}
+            {view.nextStep ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
+            {embedHelp}
+          </div>
+        ) : view.middle === 'suggestions' ? (
+          <section className="spotify-suggestions" aria-label="Suggested playlists">
+            <h3 className="spotify-suggestions-heading">Suggested for this session</h3>
+            <div className="spotify-suggestion-grid">
+              {suggestionCards.map((suggestion) => {
+                const isChosen = suggestion.id === shownPlaylist.id
+                return (
+                  <button
+                    className={isChosen ? 'suggestion-card is-current' : 'suggestion-card'}
+                    type="button"
+                    key={suggestion.id}
+                    aria-pressed={isChosen}
+                    disabled={busy}
+                    onClick={() => choosePlaylist(suggestion, 'curated')}
+                  >
+                    {suggestion.image ? <img src={suggestion.image} alt="" /> : <div className="suggestion-card-art" />}
+                    <strong>{suggestion.name}</strong>
+                  </button>
+                )
+              })}
+            </div>
+            {/* Secondary on purpose: searching is what this panel is for,
+                and this only redeals the cards. */}
+            <button
+              className="spotify-suggestions-shuffle"
+              type="button"
+              onClick={() => {
+                setSuggestions(shuffleSessionSuggestions())
+                posthog.capture('spotify_suggestions_shuffled')
               }}
             >
-              <input aria-label="Spotify playlist URL" value={playlistUrl} onChange={(event) => setPlaylistUrl(event.target.value)} placeholder="Spotify playlist URL" />
-              <button className="card-icon-button" type="submit" title="Load Spotify playlist URL" aria-label="Load Spotify playlist URL" disabled={busy}>
-                <ExternalLink size={18} aria-hidden="true" />
-              </button>
-            </form>
+              <Shuffle size={15} aria-hidden="true" />
+              Shuffle suggestions
+            </button>
           </section>
-        ) : null}
-      </PanelHeader>
-
-      <div className="panel-body" {...panelContentProps}>
-        {view.connectOnly ? (
-          /* The focus view is the panel at its smallest. Six suggestion cards
-             are not what belongs in it: what it can usefully say is that
-             playing needs Spotify. The footer already names the music. */
-          <div className="spotify-focus-connect">
-            <p className="muted">Not connected</p>
-            {connectButton}
-            {error ? <p className="error-text">{error}</p> : null}
-          </div>
-        ) : (
-          <>
-            {view.showSearch ? (
-              <>
-                {/* Results follow the typing, so the only thing left for Enter
-                    to do is skip the wait — there is no button to press. */}
-                <form
-                  className="input-row spotify-search-row"
-                  role="search"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    searchRef.current?.flush()
-                  }}
-                >
-                  <input
-                    aria-label={searchType === 'tracks' ? 'Search songs' : 'Search playlists'}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={searchType === 'tracks' ? 'Search songs' : 'Search playlists'}
-                  />
-                </form>
-
-                {/* Connected, these two tidy up after a search and the way
-                    back to the artwork sits beside them. Not connected, the
-                    second of the pair is the offer to connect: directly under
-                    the search, so nobody has to choose a playlist to find it. */}
-                <div className="spotify-search-actions">
-                  <button className="card-icon-button is-wide spotify-reset-button" type="button" onClick={resetFields}>
-                    <RotateCcw size={18} />
-                    Reset fields
-                  </button>
-                  {connected ? (
-                    <button className="card-icon-button is-wide" type="button" onClick={() => setSearchCollapsed(true)}>
-                      <ChevronsDownUp size={18} />
-                      Hide search
-                    </button>
-                  ) : connectButton}
-                </div>
-              </>
-            ) : null}
-
-            {/* Each of these has a key because they share one spot in the panel,
-                and most are a plain div. Without keys React would reuse one
-                element for all of them, and the height snapToWholeRows writes
-                on the list would stay behind on whatever replaced it. The two
-                lists share a key: that effect runs again when they swap. */}
-            {view.middle === 'cover' ? (
-              /* The music shown the way an album is: its cover large, the
-                 words under it, the next step set apart below them. The same
-                 with the search open or put away, connected or not. */
-              <div key="cover" className="spotify-chosen is-featured" role={view.nextStep ? 'status' : undefined}>
-                <div className="spotify-featured-cover">
-                  {view.music?.image ? <img src={view.music.image} alt="" /> : <div className="album-frame-empty" />}
-                </div>
-                {view.namer === 'cover' && view.music ? (
-                  <div className="track-copy">
-                    <div className="track-title-row">
-                      <p className="track-title">{view.music.title}</p>
-                      {spotify.track?.url ? (
-                        <a
-                          className="current-playback-link"
-                          href={spotify.track.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label="Open current item in Spotify"
-                          title="Open current item in Spotify"
-                        >
-                          <ExternalLink aria-hidden="true" />
-                        </a>
-                      ) : null}
-                    </div>
-                    <p className="track-meta">{view.music.meta}</p>
-                  </div>
-                ) : null}
-                {view.nextStep ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
-              </div>
-            ) : view.middle === 'suggestions' ? (
-              <section className="spotify-suggestions" aria-label="Suggested playlists">
-                <h3 className="spotify-suggestions-heading">Suggested for this session</h3>
-                <div className="spotify-suggestion-grid">
-                  {suggestionCards.map((suggestion) => {
-                    const isChosen = suggestion.id === shownPlaylist.id
-                    return (
-                      <button
-                        className={isChosen ? 'suggestion-card is-current' : 'suggestion-card'}
-                        type="button"
-                        key={suggestion.id}
-                        aria-pressed={isChosen}
-                        disabled={busy}
-                        onClick={() => choosePlaylist(suggestion, 'curated')}
-                      >
-                        {suggestion.image ? <img src={suggestion.image} alt="" /> : <div className="suggestion-card-art" />}
-                        <strong>{suggestion.name}</strong>
-                      </button>
-                    )
-                  })}
-                </div>
-                {/* Secondary on purpose: searching and connecting are what
-                    this panel is for, and this only redeals the cards. */}
+        ) : view.middle === 'results' && searchType === 'tracks' ? (
+          <div key="results" className="spotify-frame spotify-results-frame">
+          <div ref={listRef} className="playlist-list" aria-label="Track search results">
+            {spotify.tracks.map((track) => {
+              const isChosen = spotify.selectedTrack?.id === track.id
+              return (
                 <button
-                  className="spotify-suggestions-shuffle"
+                  className={isChosen ? 'playlist-option is-current' : 'playlist-option'}
                   type="button"
-                  onClick={() => {
-                    setSuggestions(shuffleSessionSuggestions())
-                    posthog.capture('spotify_suggestions_shuffled')
-                  }}
+                  key={track.id}
+                  aria-pressed={isChosen}
+                  disabled={busy}
+                  onClick={() => chooseTrack(track)}
                 >
-                  <Shuffle size={15} aria-hidden="true" />
-                  Shuffle suggestions
+                  {track.image ? <img src={track.image} alt="" /> : <div />}
+                  <span>
+                    <strong>{track.name}</strong>
+                    <small>{track.artists} - {track.album}</small>
+                  </span>
                 </button>
-              </section>
-            ) : view.middle === 'results' && searchType === 'tracks' ? (
-              <div key="results" ref={listRef} className="playlist-list" aria-label="Track search results">
-                {spotify.tracks.map((track) => {
-                  // Playback reports a track by its Spotify page, not its
-                  // id, so that is what the playing row is recognised by.
-                  const isPlaying = Boolean(spotify.track?.url && spotify.track.url === track.url)
-                  const isChosen = isPlaying || spotify.selectedTrack?.id === track.id
-                  return (
-                    <button
-                      className={isChosen ? 'playlist-option is-current' : 'playlist-option'}
-                      type="button"
-                      key={track.id}
-                      aria-pressed={isChosen}
-                      disabled={busy}
-                      onClick={() => chooseTrack(track)}
-                    >
-                      {track.image ? <img src={track.image} alt="" /> : <div />}
-                      <span>
-                        <strong>{track.name}</strong>
-                        <small>{track.artists} - {track.album}</small>
-                      </span>
-                    </button>
-                  )
-                })}
-                {searchState === 'searching' ? <p className="playlist-list-note">Looking for songs…</p> : null}
-                {searchState === 'no-matches' ? <p className="playlist-list-note">No songs match that search.</p> : null}
-              </div>
-            ) : view.middle === 'results' ? (
-              <div key="results" ref={listRef} className="playlist-list" aria-label="Playlist search results">
-                {spotify.playlists.map((playlist) => {
-                  const isChosen = playlist.id === shownPlaylist.id
-                  return (
-                    <button
-                      className={isChosen ? 'playlist-option is-current' : 'playlist-option'}
-                      type="button"
-                      key={playlist.id}
-                      aria-pressed={isChosen}
-                      disabled={busy}
-                      // Connected, this plays. Not connected, it chooses
-                      // the playlist and never sends anyone to a login
-                      // screen: see choosePlaylist.
-                      onClick={() => choosePlaylist(playlist, 'search')}
-                    >
-                      {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
-                      <span>
-                        <strong>{playlist.name}</strong>
-                        <small>
-                          {playlist.owner} - {playlist.trackCount} tracks
-                        </small>
-                      </span>
-                    </button>
-                  )
-                })}
-                {searchState === 'results' && spotify.playlistsHaveMore ? (
-                  <button className="card-icon-button is-wide playlist-list-more" type="button" disabled={busy} onClick={() => void run(spotify.loadMorePlaylists)}>
-                    Show more playlists
-                  </button>
-                ) : null}
-                {searchState === 'searching' ? <p className="playlist-list-note">Looking for playlists…</p> : null}
-                {searchState === 'no-matches' ? <p className="playlist-list-note">No playlists match that search.</p> : null}
-              </div>
-            ) : view.middle === 'empty' ? (
-              /* Nothing chosen and nothing to suggest: one line on how to
-                 start, rather than a blank panel that reads as broken. */
-              <div key="empty" className="spotify-empty">
-                <p className="muted">{`Search for a ${searchType === 'tracks' ? 'song' : 'playlist'} to play with this board.`}</p>
-              </div>
-            ) : null}
-
-            {searchCollapsed && connected && !focusView && !momentView ? (
-              /* Quiet on purpose: with the search put away the artwork leads,
-                 and this is only the way back to choosing something else. It
-                 says music, not playlist, because a song may be what is loaded. */
-              <button className="spotify-show-search" type="button" onClick={() => setSearchCollapsed(false)}>
-                <Search size={16} aria-hidden="true" />
-                Find music
+              )
+            })}
+            {searchState === 'searching' ? <p className="playlist-list-note">Looking for songs…</p> : null}
+            {searchState === 'no-matches' ? <p className="playlist-list-note">No songs match that search.</p> : null}
+          </div>
+          </div>
+        ) : view.middle === 'results' ? (
+          <div key="results" className="spotify-frame spotify-results-frame">
+          <div ref={listRef} className="playlist-list" aria-label="Playlist search results">
+            {spotify.playlists.map((playlist) => {
+              const isChosen = playlist.id === shownPlaylist.id
+              return (
+                <button
+                  className={isChosen ? 'playlist-option is-current' : 'playlist-option'}
+                  type="button"
+                  key={playlist.id}
+                  aria-pressed={isChosen}
+                  disabled={busy}
+                  // Chooses the playlist; Spotify's player loads it.
+                  onClick={() => choosePlaylist(playlist, 'search')}
+                >
+                  {playlist.image ? <img src={playlist.image} alt="" /> : <div />}
+                  <span>
+                    <strong>{playlist.name}</strong>
+                    <small>
+                      {playlist.owner} - {playlist.trackCount} tracks
+                    </small>
+                  </span>
+                </button>
+              )
+            })}
+            {searchState === 'results' && spotify.playlistsHaveMore ? (
+              <button className="card-icon-button is-wide playlist-list-more" type="button" disabled={busy} onClick={() => void run(spotify.loadMorePlaylists)}>
+                Show more playlists
               </button>
             ) : null}
+            {searchState === 'searching' ? <p className="playlist-list-note">Looking for playlists…</p> : null}
+            {searchState === 'no-matches' ? <p className="playlist-list-note">No playlists match that search.</p> : null}
+          </div>
+          </div>
+        ) : view.middle === 'empty' ? (
+          /* Nothing chosen and nothing to suggest: one line on how to
+             start, rather than a blank panel that reads as broken. */
+          <div key="empty" className="spotify-empty">
+            <p className="muted">{`Search for a ${searchType === 'tracks' ? 'song' : 'playlist'} to play with this board.`}</p>
+            {view.login === 'body' ? loginLink : null}
+          </div>
+        ) : null}
 
-            {/* Away from the cover -- while searching -- the next step sits
-                under the results, with the music in a small row above it when
-                nothing else names it (not connected: there is no player). */}
-            {view.middle !== 'cover' && (view.namer === 'row' || view.nextStep) ? (
-              <div className="spotify-chosen" role={view.nextStep ? 'status' : undefined}>
-                {view.namer === 'row' && view.music ? (
-                  <div className="spotify-chosen-item">
-                    {view.music.image ? <img src={view.music.image} alt="" /> : <div />}
-                    <div className="track-copy">
-                      <p className="track-title">{view.music.title}</p>
-                      <p className="track-meta">{view.music.meta}</p>
-                    </div>
-                  </div>
-                ) : null}
-                {view.nextStep ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
-              </div>
-            ) : null}
+        {focusView && !momentView && !chosen ? (
+          /* The focus view has no search, so with nothing chosen it would be
+             an empty box. Say so, and offer the way back to the search. */
+          <div key="focus-empty" className="spotify-empty spotify-focus-empty">
+            <p className="muted">No music chosen yet.</p>
+            <button className="card-icon-button is-wide" type="button" onClick={() => commands.togglePanelFocusView(panelId)}>
+              <Search size={16} aria-hidden="true" />
+              Find music
+            </button>
+          </div>
+        ) : null}
 
-            {view.showPlayer ? (
-              <>
-                {view.namer === 'player' && view.music ? (
-                  <div className="track-copy">
-                    <div className="track-title-row">
-                      <p className="track-title">{view.music.title}</p>
-                      {spotify.track?.url && !focusView ? (
-                        <a
-                          className="current-playback-link"
-                          href={spotify.track.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label="Open current item in Spotify"
-                          title="Open current item in Spotify"
-                        >
-                          <ExternalLink aria-hidden="true" />
-                        </a>
-                      ) : null}
-                    </div>
-                    <p className="track-meta">{view.music.meta}</p>
-                  </div>
-                ) : null}
+        {/* Spotify's player with what goes with it: the line about it above,
+            the way to log in under it. One block in one place in every view,
+            so the player never jumps and the login is always found under it.
+            It is always drawn, even empty, so that a change of view never
+            moves the player in the page, which would restart it. */}
+        {/* Framed like the results above it, so the panel reads as two
+            stacked boxes -- what you can choose, and what is playing --
+            rather than parts scattered down the column. Not in the focus
+            view, where the player is the whole body, nor when it is hidden. */}
+        <div className={`spotify-player-block${view.embed && !view.embed.hidden && !focusView ? ' spotify-frame is-framed' : ''}`} role={noteWithPlayer ? 'status' : undefined}>
+          {noteWithPlayer ? <p className="spotify-chosen-note">{view.nextStep}</p> : null}
+          {noteWithPlayer ? embedHelp : null}
+          {view.embed && embedEntity ? (
+            <SpotifyEmbedStrip
+              // A new key is a new player: how the panel picks up a Spotify
+              // login made in another tab while the visitor was away.
+              key={embedGeneration}
+              keepAs={{ panelId, generation: embedGeneration }}
+              entity={embedEntity}
+              height={view.embed.height}
+              hidden={view.embed.hidden}
+              onStatus={(status) => {
+                if (status === 'failed') setFailedEntity(embedEntity)
+              }}
+              onInteract={() => {
+                usedEmbedRef.current = true
+              }}
+              onPlayingChange={(playing) => {
+                embedPlayingRef.current = playing
+              }}
+              onPlayedLength={notePlayedLength}
+            />
+          ) : null}
+          {view.login === 'body' && view.embed && !view.embed.hidden ? loginLink : null}
+        </div>
 
-                <div className="progress-row">
-                  <span>{formatDuration(spotify.track?.positionMs ?? 0)}</span>
-                  <input
-                    aria-label="Seek"
-                    type="range"
-                    min={0}
-                    max={spotify.track?.durationMs ?? 1}
-                    value={spotify.track?.positionMs ?? 0}
-                    onChange={(event) => void run(() => spotify.seek(Number(event.target.value)))}
-                  />
-                  <span>{formatDuration(spotify.track?.durationMs ?? 0)}</span>
-                </div>
-
-                <div className="transport-row">
-                  <button className="card-icon-button" type="button" title="Previous track" onClick={() => void run(spotify.previousTrack)}>
-                    <SkipBack size={18} />
-                  </button>
-                  <button
-                    className="card-icon-button is-primary is-large"
-                    type="button"
-                    title="Play or pause"
-                    disabled={restoringSong}
-                    onClick={() => void run(async () => {
-                      const wasPlaying = Boolean(spotify.track)
-                      // A song picked before connecting is what Play is for
-                      // until something is playing; otherwise it is the panel's
-                      // playlist, or a pause.
-                      if (!wasPlaying && spotify.selectedTrack) {
-                        await spotify.playTrack(spotify.selectedTrack, panelId)
-                        return
-                      }
-                      await spotify.togglePlay(panelId)
-                      // The first press on a panel with nothing playing is
-                      // what starts the chosen playlist; a pause is not a play.
-                      if (!wasPlaying) posthog.capture('spotify_playlist_played', { source: 'search', authenticated: true })
-                    })}
-                  >
-                    {spotify.track?.paused === false ? <Pause size={20} /> : <Play size={20} />}
-                  </button>
-                  <button className="card-icon-button" type="button" title="Next track" onClick={() => void run(spotify.nextTrack)}>
-                    <SkipForward size={18} />
-                  </button>
-                  <label className="volume-control">
-                    <Volume2 size={16} />
-                    <input
-                      aria-label="Volume"
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={volume}
-                      onChange={(event) => {
-                        const next = Number(event.target.value)
-                        setVolume(next)
-                        void run(() => spotify.setVolume(next / 100))
-                      }}
-                    />
-                  </label>
-                </div>
-              </>
-            ) : null}
-          </>
-        )}
       </div>
 
       <footer className="card-footer" {...panelContentProps}>
-        <span className="card-footer-meta">{focusView ? loadedMusicLabel(shownSong, shownPlaylist.name) : shownSong?.name ?? shownPlaylist.name ?? 'No playlist loaded'}</span>
+        <span className="card-footer-meta" role={focusView && view.nextStep ? 'status' : undefined}>
+          {focusView ? view.nextStep ?? loadedMusicLabel(shownSong, shownPlaylist.name) : shownSong?.name ?? shownPlaylist.name ?? 'No playlist loaded'}
+        </span>
         <div className="card-footer-status">
-          {/* In the focus view the text above is one left-aligned column, so
-              the link to Spotify waits here rather than beside the title. */}
-          {focusView && spotify.track?.url ? (
-            <a
-              className="current-playback-link"
-              href={spotify.track.url}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Open current item in Spotify"
-              title="Open current item in Spotify"
-            >
-              <ExternalLink aria-hidden="true" />
-            </a>
-          ) : null}
-          {/* The panel is titled "Music", so the service is credited here instead —
-              and it stays visible once connected, where the body no longer names it. */}
+          {focusView ? embedHelp : null}
+          {/* The panel is titled "Music", so the service is credited here instead. */}
           <span className="card-footer-service">Spotify</span>
           {error ? (
             <span className="error-text">{error}</span>
-          ) : (
-            <span>{!connected ? 'Not connected' : spotify.isReady ? 'Ready' : spotify.status}</span>
+          ) : (focusView && view.nextStep) || wholeSongs ? null : (
+            <>
+              <button className="spotify-footer-link" type="button" onClick={() => setNoticeOpen(true)} title="What to expect from Spotify's player">
+                Previews without a login
+              </button>
+              {/* Only where the body has no room for it: the focus view, and
+                  the suggestions or results before anything is chosen. */}
+              {view.login === 'footer' ? (
+                <a className="spotify-footer-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn} title="Opens Spotify's login page in a new tab">
+                  Log in to Spotify
+                </a>
+              ) : null}
+            </>
           )}
         </div>
       </footer>
+      {noticeOpen ? <SpotifyPreviewNotice onClose={() => setNoticeOpen(false)} loginUrl={SPOTIFY_LOGIN_URL} onLogIn={leaveToLogIn} /> : null}
     </section>
   )
 }
+
+/** Spotify's own login page. my-states never sees the login itself. */
+const SPOTIFY_LOGIN_URL = 'https://accounts.spotify.com/login'
+
+/**
+ * Longest length Spotify reports for a preview. Measured: 29,713 ms for a
+ * preview of a 4:49 song, for a visitor not logged in.
+ */
+const previewLengthLimitMs = 31_000
+
+/**
+ * What this visit has learned from Spotify's player, kept outside any one
+ * copy of the panel so a second Music panel, or the same one redrawn in
+ * Editor mode, does not offer a login the visitor already has.
+ */
+export const visitPlayback = { wholeSongs: false }
 
 /**
  * The footer's line in the focus view, where it is the only place the loaded

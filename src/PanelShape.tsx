@@ -127,7 +127,7 @@ export class PanelShapeUtil extends BaseBoxShapeUtil<PanelShape> {
 
   override onResize(shape: PanelShape, info: Parameters<BaseBoxShapeUtil<PanelShape>['onResize']>[1]) {
     const resized = super.onResize(shape, info) as PanelShape
-    const minimum = getPanelMinimumSize(shape.props.panel.type)
+    const minimum = getPanelMinimumSize(shape.props.panel.type, shape.props.focusView)
     return {
       ...resized,
       props: {

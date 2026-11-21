@@ -191,8 +191,9 @@ const spotify: PanelDefinition<'spotify'> = {
   minimumSize: { w: 320, h: 260 },
   // The Music panel drops the playlist URL, search, results and cover in focus
   // view and keeps the song's name and playback, so it needs far less room.
-  // Tall enough for a song title that wraps onto a second line.
-  focusViewSize: { w: 380, h: 260 },
+  // Wide enough for Spotify's own player, whose controls are cut off when the
+  // panel is narrow, and short enough for the player's 80px and little else.
+  focusViewSize: { w: 520, h: 210 },
   createConfig: () => ({ playlist: { ...defaultSpotifyPlaylistReference } }),
   configValidator: spotifyConfigValidator,
   normalizeConfig: (value) => {

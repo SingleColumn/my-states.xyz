@@ -131,12 +131,6 @@ export interface NoteDocument {
   doc: Record<string, unknown>
 }
 
-export interface SpotifyTokens {
-  accessToken: string
-  refreshToken: string | null
-  expiresAt: number
-}
-
 export interface SpotifyPlaylistReference {
   id: string | null
   uri: string | null
@@ -149,8 +143,8 @@ export interface SpotifyPlaylistReference {
 /**
  * A song chosen in the Music panel, kept with the board like the playlist is,
  * so it is still there after a reload or an export. It is a whole description
- * rather than an id because the panel names the song and shows its cover
- * before anyone has connected Spotify, when nothing can be looked up. Absent
+ * rather than an id because the panel names the song when a board is opened,
+ * without looking anything up on Spotify first. Absent
  * on every board saved before songs were kept, which means no song.
  */
 export interface SpotifySavedTrack {
@@ -208,13 +202,3 @@ export interface BoardSummary {
   themeId?: string
 }
 
-export interface SpotifyTrackState {
-  title: string
-  artist: string
-  album: string
-  albumArt: string | null
-  url: string | null
-  durationMs: number
-  positionMs: number
-  paused: boolean
-}

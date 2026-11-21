@@ -1,16 +1,3 @@
-/* The focus view, with no Spotify session. The full view can offer search
-   and six suggestions; this one is a few centimetres tall, so all it says is
-   that playing needs Spotify. The footer names the playlist. */
-.spotify-focus-connect {
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: var(--space-spotify-login-gap);
-  min-height: 100%;
-  padding: var(--card-padding);
-}
-
-.spotify-focus-connect p,
 .muted {
   margin: 0;
   color: var(--color-text-muted);
@@ -20,10 +7,9 @@
 
 /*
  * Focus view — the Music panel shrunk to what someone glances at while they
- * write or look at images. The search, the results and the cover are not
- * rendered. The controls take the Images panel's compact sizes so neither
- * panel's buttons outweigh the other's, and the text keeps one left edge,
- * wrapping rather than cutting off, as the Images panel's labels do.
+ * write or look at images: Spotify's player, and nothing of the search. Its
+ * buttons (Find music, Reload page) take the Images panel's compact sizes so
+ * neither panel's buttons outweigh the other's.
  */
 .panel-spotify-surface.is-focus-view .panel-body {
   --card-header-button-size: 28px;
@@ -35,8 +21,8 @@
   overflow: auto;
 }
 
-/* The body centres what it holds, so a gap under the last row would show as
-   extra room under the volume rather than as space between rows. */
+/* The body centres what it holds, so a gap under the last part would show
+   as extra room under it rather than as space between parts. */
 .panel-spotify-surface.is-focus-view .panel-body > :last-child {
   margin-bottom: 0;
 }
@@ -59,40 +45,6 @@
   text-align: left;
 }
 
-.track-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-control-inner-gap);
-  min-width: 0;
-}
-
-.track-title-row .track-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.current-playback-link {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: var(--card-footer-button-size);
-  height: var(--card-footer-button-size);
-  border: var(--border-width-hairline) solid var(--card-button-border);
-  border-radius: var(--button-radius);
-  color: var(--card-button-icon-color);
-}
-
-.current-playback-link:hover {
-  color: var(--card-button-active-icon);
-  background: var(--card-button-bg-hover);
-}
-
-.current-playback-link svg {
-  width: var(--size-control-icon);
-  height: var(--size-control-icon);
-}
-
 .track-title {
   margin: 0 0 var(--space-track-title-bottom);
   overflow-wrap: anywhere;
@@ -112,7 +64,6 @@
   -webkit-line-clamp: 2;
 }
 
-.progress-row,
 .transport-row,
 .input-row {
   display: flex;
@@ -121,28 +72,8 @@
   min-width: 0;
 }
 
-.progress-row {
-  margin-bottom: var(--space-row-bottom);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-progress);
-}
-
-.progress-row input,
-.volume-control input {
-  flex: 1;
-}
-
 .transport-row {
   margin-bottom: var(--space-row-bottom);
-}
-
-.volume-control {
-  display: flex;
-  align-items: center;
-  gap: var(--space-control-inner-gap);
-  min-width: var(--size-volume-min);
-  flex: 1;
-  color: var(--color-text-muted);
 }
 
 .input-row {
@@ -217,6 +148,38 @@
   margin-top: 0;
 }
 
+/* The x that clears what was typed sits inside the field, at its end, the
+   way search fields usually offer it, so it reads as part of the field and
+   not as a third button beside Reset panel and Hide search. */
+.spotify-search-row {
+  position: relative;
+}
+
+.spotify-search-row input {
+  padding-right: calc(var(--size-input-padding-x) + 24px);
+}
+
+.spotify-search-clear {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-input-placeholder);
+  cursor: pointer;
+}
+
+.spotify-search-clear:hover,
+.spotify-search-clear:focus-visible {
+  background: var(--card-button-bg-hover);
+  color: var(--color-text);
+}
+
 .spotify-show-search {
   display: inline-flex;
   flex: 0 0 auto;
@@ -241,69 +204,6 @@
 .spotify-show-search:focus-visible {
   background: var(--card-button-bg-hover);
   color: var(--color-text);
-}
-
-/* Connecting Spotify sits in the same row as Reset fields, which is styled
-   down to the field's weight so the search leads. This one is the offer that
-   row exists to carry, so it keeps the primary fill and the control weight
-   the rest of the panel's primary actions have. */
-.spotify-search-actions .spotify-connect {
-  background: var(--card-primary-bg);
-  border-color: var(--card-primary-border);
-  color: var(--card-primary-icon);
-  font-weight: var(--font-weight-control);
-}
-
-/* Someone has just clicked a playlist and only connecting Spotify can play it,
-   so the button that does that draws the eye. It is the same slow halo as the
-   About button's — three pulses over twenty seconds, each rising over ~1.4s,
-   holding ~1.6s and fading over ~2s — in the same theme colour, so the two
-   read as one family of "look here". Unlike the About button it rests in this
-   button's own primary colours rather than the neutral ones. */
-.spotify-connect.is-inviting {
-  animation: spotify-connect-invite 20s ease-in-out 1;
-}
-
-@keyframes spotify-connect-invite {
-  0%,
-  5%,
-  30%,
-  38%,
-  63%,
-  71%,
-  96%,
-  100% {
-    border-color: var(--card-primary-border);
-    background: var(--card-primary-bg);
-    box-shadow:
-      0 0 0 0 transparent,
-      0 0 0 0 transparent;
-  }
-  12%,
-  20%,
-  45%,
-  53%,
-  78%,
-  86% {
-    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-primary-border));
-    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-primary-bg));
-    box-shadow:
-      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
-      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
-  }
-}
-
-/* No movement was asked for, but the invitation is still worth making: the
-   glow at its brightest, held still for as long as the choice stands. */
-@media (prefers-reduced-motion: reduce) {
-  .spotify-connect.is-inviting {
-    animation: none;
-    border-color: color-mix(in srgb, var(--color-attention-glow) 75%, var(--card-primary-border));
-    background: color-mix(in srgb, var(--color-attention-glow) 14%, var(--card-primary-bg));
-    box-shadow:
-      0 0 28px 8px color-mix(in srgb, var(--color-attention-glow) 48%, transparent),
-      0 0 10px 2px color-mix(in srgb, var(--color-attention-glow) 72%, transparent);
-  }
 }
 
 /*
@@ -403,8 +303,8 @@
   -webkit-line-clamp: 2;
 }
 
-/* Below search and below Connect Spotify in the order of things, so it is
-   drawn as a link rather than as a third button competing with them. */
+/* Below search in the order of things, so it is drawn as a link rather than
+   as a button competing with it. */
 .spotify-suggestions-shuffle {
   display: inline-flex;
   align-items: center;
@@ -434,24 +334,6 @@
 
 .spotify-chosen .track-copy {
   margin: 0;
-}
-
-/* The chosen song or playlist with its cover, laid out like a result row
-   but not one: it is not a button, and is not counted among the results. */
-.spotify-chosen-item {
-  display: grid;
-  grid-template-columns: var(--size-playlist-art) minmax(0, 1fr);
-  gap: var(--space-playlist-image-gap);
-  align-items: center;
-}
-
-.spotify-chosen-item > img,
-.spotify-chosen-item > div:first-child {
-  width: var(--size-playlist-art);
-  height: var(--size-playlist-art);
-  border-radius: var(--radius-playlist-art);
-  background: var(--color-control);
-  object-fit: cover;
 }
 
 /* The music shown as an album -- with the search open and nothing typed, or
@@ -489,6 +371,111 @@
   margin: 0;
 }
 
+/* Under the empty panel's one line: the way to whole songs, quieter than
+   the search above it, which is still the first thing to do. */
+.spotify-empty {
+  align-content: center;
+  gap: var(--space-control-inner-gap);
+}
+
+.spotify-login-link {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.spotify-login-link:hover {
+  color: var(--color-text);
+}
+
+/* The two boxes the panel is made of while there is music: the results, and
+   Spotify's player with what goes with it. One frame for both, so they read
+   as a pair stacked down the panel, a fixed gap apart. */
+.spotify-frame {
+  padding: var(--space-playlist-gap);
+  border: var(--border-width-hairline) solid var(--color-panel-divider);
+  border-radius: calc(var(--radius-playlist-card) + var(--space-playlist-gap));
+  background: color-mix(in srgb, var(--color-input-bg) 55%, transparent);
+}
+
+/* Fits its rows: the list is rounded to the whole rows the column has room
+   for, and the frame takes the list's height, so no blank strip is left
+   inside it. What the rounding leaves falls at the foot of the panel. */
+.spotify-results-frame {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-playlist-top);
+}
+
+.spotify-results-frame .playlist-list {
+  /* Its own height, not a share of the frame's: the frame follows it. */
+  flex: 0 1 auto;
+  margin: 0;
+}
+
+/* Spotify's player with the line about it above and the way to log in
+   under it: one block, kept at the bottom of the panel while there are
+   results to sit above it, and in the middle of the free room when the
+   player is all there is, rather than leaving the room as a hole above it. */
+.spotify-player-block {
+  flex: 0 0 auto;
+  display: grid;
+  gap: var(--space-control-inner-gap);
+  margin-top: auto;
+  padding-top: var(--space-control-inner-gap);
+  text-align: center;
+}
+
+.spotify-player-block.is-framed {
+  padding: var(--space-playlist-gap);
+  /* The player's own corner plus the padding round it, so the two curves run
+     side by side, an even gap apart. The player sets its corner here in the
+     panel's pixels, since it keeps one size on screen at every zoom. */
+  border-radius: calc(var(--spotify-player-radius, 12px) + var(--space-playlist-gap));
+}
+
+/* Room above and below the login line, so it is not pressed against the
+   player or the frame's edge. The results' frame gives up the height. */
+.spotify-player-block.is-framed .spotify-login-link {
+  margin-block: var(--space-control-inner-gap) calc(var(--space-control-inner-gap) * 1.5);
+}
+
+/* Under the results the gap is fixed: the results' frame takes the free room. */
+.spotify-results-frame + .spotify-player-block {
+  margin-top: var(--space-playlist-gap);
+}
+
+.spotify-player-block:empty {
+  display: none;
+}
+
+.panel-spotify-surface.is-player-middle .spotify-player-block {
+  margin-bottom: auto;
+}
+
+.spotify-player-block .spotify-embed-strip {
+  margin-top: 0;
+}
+
+.spotify-player-block .spotify-login-link {
+  justify-self: center;
+}
+
+.panel-spotify-surface.is-focus-view .spotify-player-block {
+  padding-top: 0;
+}
+
+/* The card's login is a link styled as its second button. */
+a.welcome-card-primary,
+a.welcome-card-secondary {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .spotify-featured-cover {
   flex: 0 1 auto;
   min-height: 0;
@@ -519,10 +506,6 @@
 .spotify-chosen.is-featured .spotify-chosen-note {
   margin: 0;
   text-align: center;
-}
-
-.spotify-chosen.is-featured .track-title-row {
-  justify-content: center;
 }
 
 /* What to do next is not part of the song's description, so it stands
@@ -619,4 +602,128 @@
   margin-top: var(--space-playlist-meta-top);
   color: var(--color-text-muted);
   font-size: var(--font-size-playlist-meta);
+}
+
+/* Spotify's own player, which plays all the panel's music. Its look is
+   Spotify's, so it gets a fixed, compact strip and nothing more: the rest of
+   the panel stays in the app's own style. */
+.spotify-embed-strip {
+  position: relative;
+  flex: 0 0 auto;
+  margin-top: var(--space-control-inner-gap);
+}
+
+/* Rounded to Spotify's own 12px card, in screen pixels (the frame is drawn
+   at screen size), so no corner of the iframe's white page shows round it. */
+.spotify-embed-frame {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-album-empty);
+}
+
+/* Holds Spotify's iframe, so the player can move between views as one piece. */
+.spotify-embed-holder {
+  width: 100%;
+  height: 100%;
+}
+
+/* The frame's size and its own counter-zoom are set inline, per zoom level. */
+.spotify-embed-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* The screenshot view shows the cover, not Spotify's player. The player stays
+   in the page so the music keeps playing; it just takes no room and is not
+   drawn. Not display: none, which some browsers treat as a reason to stop. */
+.spotify-embed-strip.is-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px !important;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.spotify-embed-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-playlist-meta);
+}
+
+.spotify-embed-action {
+  justify-self: center;
+  text-decoration: none;
+}
+
+/* Try again beside Open in Spotify, when Spotify's player could not load. */
+.spotify-embed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  justify-self: center;
+  gap: var(--space-control-inner-gap);
+}
+
+/* The focus view's body is Spotify's player alone; its line and button are
+   in the footer. */
+.panel-spotify-surface.is-focus-view .spotify-embed-strip {
+  margin-top: 0;
+}
+
+.card-footer .spotify-embed-action {
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 2px 8px;
+  font-size: inherit;
+}
+
+/* The footer's status line, when it is something to open rather than read. */
+.spotify-footer-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.spotify-footer-link:hover {
+  color: var(--color-text);
+}
+
+.spotify-preview-notice {
+  width: min(520px, calc(100vw - 24px));
+}
+
+/* With no title the close button sits in the corner and the first line runs
+   beside it, rather than leaving an empty row above the text. */
+.spotify-preview-notice .welcome-card-header {
+  float: right;
+  margin: -4px -6px 0 8px;
+}
+
+.spotify-preview-notice .welcome-card-list {
+  margin-top: 0;
+}
+
+/* Centred on the card, not on the bullet's text: the left margin undoes the
+   list's indent (.welcome-card-list). */
+.spotify-preview-notice-login {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0 0 -20px;
 }

@@ -36,7 +36,7 @@
 :root[data-moment-view] .focus-view-hint,
 :root[data-moment-view] .notes-document-controls,
 :root[data-moment-view] .notes-writing-toolbar-host,
-:root[data-moment-view] .current-playback-link {
+:root[data-moment-view] .spotify-login-link {
   display: none;
 }
 
@@ -281,10 +281,6 @@
     width: auto;
     max-width: calc(100cqw - var(--moment-cover-size) - 3 * var(--moment-card-padding));
     text-align: left;
-  }
-
-  :root[data-moment-view] .spotify-chosen.is-featured .track-title-row {
-    justify-content: flex-start;
   }
 }
 

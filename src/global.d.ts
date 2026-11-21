@@ -3,8 +3,7 @@ import 'react'
 declare global {
   interface ImportMetaEnv {
     readonly DEV: boolean
-    readonly VITE_SPOTIFY_CLIENT_ID?: string
-    readonly VITE_SPOTIFY_REDIRECT_URI?: string
+    readonly VITE_LOCAL_ORIGIN?: string
     readonly VITE_ENABLE_PANEL_REPORT?: string
     readonly VITE_IMAGE_COLLECTIONS_BASE_URL?: string
     readonly VITE_POSTHOG_HOST: string
@@ -42,8 +41,7 @@ declare global {
     /** The canvas as data and its verbs as commands; see canvasApi.ts. Present while the canvas is mounted. */
     myStates?: import('./canvasApi').CanvasApi
     showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
-    Spotify?: typeof Spotify
-    onSpotifyWebPlaybackSDKReady?: () => void
+    onSpotifyIframeApiReady?: (api: import('./spotifyEmbed').SpotifyIFrameApi) => void
     instgrm?: {
       Embeds: {
         process(): void
@@ -51,52 +49,6 @@ declare global {
     }
   }
 
-  namespace Spotify {
-    interface PlaybackState {
-      paused: boolean
-      position: number
-      duration: number
-      track_window: {
-        current_track: {
-          name: string
-          uri?: string
-          artists: Array<{ name: string }>
-          album: {
-            name: string
-            images: Array<{ url: string; width?: number; height?: number }>
-          }
-        }
-      }
-    }
-
-    interface WebPlaybackError {
-      message: string
-    }
-
-    interface PlayerInit {
-      name: string
-      getOAuthToken: (callback: (token: string) => void) => void
-      volume?: number
-    }
-
-    class Player {
-      constructor(init: PlayerInit)
-      connect(): Promise<boolean>
-      disconnect(): void
-      addListener(event: 'ready', callback: (event: { device_id: string }) => void): boolean
-      addListener(event: 'not_ready', callback: (event: { device_id: string }) => void): boolean
-      addListener(event: 'player_state_changed', callback: (state: PlaybackState | null) => void): boolean
-      addListener(
-        event: 'initialization_error' | 'authentication_error' | 'account_error' | 'playback_error',
-        callback: (event: WebPlaybackError) => void,
-      ): boolean
-      togglePlay(): Promise<void>
-      previousTrack(): Promise<void>
-      nextTrack(): Promise<void>
-      setVolume(volume: number): Promise<void>
-      seek(positionMs: number): Promise<void>
-    }
-  }
 }
 
 declare module 'react' {

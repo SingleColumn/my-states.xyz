@@ -8,6 +8,10 @@
  * at once, and the component only draws what this returns. A new view is a
  * change to this function, where every other state is in sight, and its
  * tests walk through each state the panel can be in.
+ *
+ * Music plays through Spotify's own embedded player. The panel once also
+ * offered connecting a Spotify account and drew its own controls; that
+ * approach is kept in docs/spotify-sdk-approach.md.
  */
 
 export type MusicSearchState = 'waiting' | 'searching' | 'no-matches' | 'results'
@@ -23,63 +27,101 @@ export interface MusicItem {
   url: string | null
 }
 
+/**
+ * After a trip to Spotify's site, what the first press of play showed: still
+ * waiting for it, 30-second previews, or whole songs.
+ */
+export type ReturnCheck = 'waiting' | 'previews' | 'whole'
+
 export interface MusicPanelInputs {
-  connected: boolean
   focusView: boolean
   /** The board is showing as a moment: the music and nothing to operate. */
   momentView?: boolean
-  /** The person put the search away. Only means anything when connected. */
+  /** The person put the search away. Only means anything once there is music. */
   searchCollapsed: boolean
   searchState: MusicSearchState
   suggestionCount: number
-  /** What Spotify reports playing, if anything. */
-  playing: { title: string; artist: string; album: string; albumArt: string | null; url: string | null } | null
-  /** A song held for Play: chosen, or looked up again after connecting. */
+  /** A song picked from the results in this visit. */
   heldTrack: { id: string; name: string; artists: string; album: string; url: string; image: string | null } | null
   /** The board's saved song, if it keeps one. */
   boardTrack: { id: string; name: string; artists: string; album: string; url: string; image: string | null } | null
   /** The board's saved playlist; all null when it keeps none. */
   boardPlaylist: { id: string | null; uri: string | null; name: string | null; url: string | null; image?: string | null }
-  /** Back from connecting, with the choice made before leaving waiting for Play. */
-  cameBackToPlay: boolean
-  /** Back from connecting with a song, which is being looked up again. */
-  restoringSong: boolean
-  /** Spotify's player in this page is ready to play. */
-  playerReady: boolean
-  /** The Spotify session ended on its own (expired), not by logging out. */
-  sessionEnded: boolean
+  /** Could Spotify's player load? */
+  embedFailed?: boolean
+  /**
+   * The visitor used Spotify's player, left this tab, and came back with
+   * nothing playing: most likely a trip to Spotify's site to log in. Null
+   * when there was no such trip, or it has been dealt with.
+   */
+  returnCheck?: ReturnCheck | null
+  /**
+   * Spotify's player has played a whole song in this visit, so the visitor is
+   * logged in to Spotify. The panel cannot see a login itself; it can only
+   * see how long the song that is playing lasts.
+   */
+  wholeSongs?: boolean
+}
+
+/** Spotify's own player. */
+export interface MusicEmbedView {
+  /** Spotify's documented compact heights, in screen pixels. */
+  height: 152 | 80
+  /** Kept playing but not drawn (the screenshot view shows the cover). */
+  hidden: boolean
 }
 
 export interface MusicPanelView {
-  /** Not connected and in the focus view: only the offer to connect. */
-  connectOnly: boolean
-  /** The search field and the buttons under it. */
+  /** The search field. */
   showSearch: boolean
   /**
-   * What takes the free room in the middle of the panel. 'cover' is the music
-   * shown large; 'empty' says how to start when there is nothing else.
+   * Reset panel and Hide search under the field. Only once there is music:
+   * before that there is nothing to reset or to hide the search for, and the
+   * field's own × clears what was typed.
    */
-  middle: 'cover' | 'suggestions' | 'results' | 'empty' | 'none'
-  /** The music the panel is about: what is playing, else what is chosen. */
-  music: MusicItem | null
-  /** The music the board has chosen, which Play starts when nothing plays. */
+  showSearchActions: boolean
+  /**
+   * The visitor may put the search away once there is music, since Spotify's
+   * player is what is left to show.
+   */
+  canPutSearchAway: boolean
+  /**
+   * What takes the free room in the middle of the panel. 'player': Spotify's
+   * player, which shows the music's cover and name itself, so the panel adds
+   * no cover of its own. 'cover': the music shown large, where there is no
+   * player to show it (a moment, or a player that could not load). 'empty'
+   * says how to start when there is nothing else.
+   */
+  middle: 'player' | 'cover' | 'suggestions' | 'results' | 'empty' | 'none'
+  /** The music the board has chosen, which Spotify's player is given. */
   chosen: MusicItem | null
   /**
-   * The one place that names the music -- title, artist, album. 'cover':
-   * under the large cover. 'row': a small row with the cover, used while
-   * searching before connecting. 'player': the player's title line.
+   * The one place in the body that names the music. 'player': Spotify's
+   * player does. 'cover': the words under the panel's own cover.
    */
-  namer: 'cover' | 'row' | 'player' | null
+  namer: 'player' | 'cover' | null
   /** The one line saying what to do next, or what is happening; never two. */
   nextStep: string | null
-  /** The playback controls: connected, in every view. */
-  showPlayer: boolean
+  /**
+   * Spotify's own player, whenever something is chosen. Present in every
+   * view, so a change of view never stops the music it is playing.
+   */
+  embed: MusicEmbedView | null
+  /** Offer a reload: the one way left to pick up a Spotify login made elsewhere. */
+  offerReload: boolean
+  /**
+   * Where the way to log in to Spotify goes. 'body': in the panel, right under
+   * Spotify's player (or under the line on how to start); 'footer': as small
+   * print, where the body has no room. Null once whole songs play, since the
+   * visitor is logged in, and wherever logging in would not help.
+   */
+  login: 'body' | 'footer' | null
 }
 
 /**
- * The music the board has chosen. A song held for Play comes first: it was
- * picked most recently. Then the board's saved song, then its playlist; a
- * board keeps one or the other, never both.
+ * The music the board has chosen. A song picked in this visit comes first:
+ * it was picked most recently. Then the board's saved song, then its
+ * playlist; a board keeps one or the other, never both.
  */
 export function chosenMusic(inputs: Pick<MusicPanelInputs, 'heldTrack' | 'boardTrack' | 'boardPlaylist'>): MusicItem | null {
   const track = inputs.heldTrack ?? inputs.boardTrack
@@ -92,98 +134,115 @@ export function chosenMusic(inputs: Pick<MusicPanelInputs, 'heldTrack' | 'boardT
 }
 
 export function musicPanelView(inputs: MusicPanelInputs): MusicPanelView {
-  const { connected, focusView, playing } = inputs
-  // While a song chosen before connecting is looked up again, it is the song
-  // that will play: the board's playlist must not be named in its place.
-  const chosen = inputs.restoringSong && !(inputs.heldTrack ?? inputs.boardTrack) ? null : chosenMusic(inputs)
-  const music: MusicItem | null = playing
-    ? { kind: 'track', id: playing.url ?? playing.title, title: playing.title, meta: `${playing.artist} - ${playing.album}`, image: playing.albumArt, url: playing.url }
-    : chosen
+  const { focusView } = inputs
+  const chosen = chosenMusic(inputs)
+  const returnCheck = chosen && !inputs.embedFailed ? inputs.returnCheck ?? null : null
+
+  // Spotify's player is there whenever there is something to play. It is
+  // never taken away by a change of view, only hidden or made smaller,
+  // because taking it away is what stops the music.
+  const embedFor = (height: MusicEmbedView['height'], hidden = false): MusicEmbedView | null =>
+    chosen && !inputs.embedFailed ? { height, hidden } : null
+  // A reload only once a press of play has shown it is needed: straight after
+  // coming back, the rebuilt player may already have the login.
+  const offerReload = returnCheck === 'previews'
+  // Logging in changes what Spotify's player plays. With whole songs already
+  // playing, or no player at all, there is nothing for it to change.
+  const loginWanted = !inputs.wholeSongs && !inputs.embedFailed
 
   // A moment shows which song it is, whatever the panel was doing: a search
   // left open or a panel in its focus view gives way to the cover, and no
-  // connecting step or player belongs in a picture of the board.
+  // player belongs in a picture of the board.
   if (inputs.momentView) {
     return {
-      connectOnly: false,
       showSearch: false,
-      middle: music ? 'cover' : 'none',
-      music,
+      showSearchActions: false,
+      canPutSearchAway: false,
+      middle: chosen ? 'cover' : 'none',
       chosen,
-      namer: music ? 'cover' : null,
+      namer: chosen ? 'cover' : null,
       nextStep: null,
-      showPlayer: false,
+      embed: embedFor(focusView ? 80 : 152, true),
+      offerReload: false,
+      login: null,
     }
   }
 
   // The focus view is the panel at its smallest: no search and no cover.
-  // Not connected, all it can usefully offer is the way to connect; the
-  // footer names the music.
+  // Spotify's smallest player is the whole of it; the footer names the music.
+  // Only a problem or coming back from Spotify earns a line of text.
   if (focusView) {
     return {
-      connectOnly: !connected,
       showSearch: false,
+      showSearchActions: false,
+      canPutSearchAway: false,
       middle: 'none',
-      music,
       chosen,
-      namer: connected && music ? 'player' : null,
-      nextStep: null,
-      showPlayer: connected,
+      namer: null,
+      // One short line, beside its button: the focus view has room for
+      // Spotify's player and very little else, and the player matters more.
+      nextStep: !chosen
+        ? null
+        : inputs.embedFailed
+          ? 'Spotify’s player could not load here.'
+          : returnCheck === 'waiting'
+            ? 'Welcome back. Press play to check.'
+            : returnCheck === 'previews'
+              ? 'Still previews.'
+              : returnCheck === 'whole'
+                ? 'Logged in: whole songs play.'
+                : null,
+      embed: embedFor(80),
+      offerReload,
+      login: chosen && loginWanted ? 'footer' : null,
     }
   }
 
-  // Putting the search away is offered only when connected, where it
-  // leaves the cover and the player.
-  const searchHidden = inputs.searchCollapsed && connected
+  const canPutSearchAway = chosen !== null
+  const searchHidden = inputs.searchCollapsed && canPutSearchAway
+  const embed = embedFor(152)
+  // With no player to show the music, the panel shows its cover instead, so
+  // the music is still named somewhere.
+  const resting: MusicPanelView['middle'] = embed ? 'player' : 'cover'
   const middle: MusicPanelView['middle'] = searchHidden
-    ? 'cover'
+    ? resting
     : inputs.searchState !== 'waiting'
       ? 'results'
-      : music || inputs.restoringSong
-        ? 'cover'
+      : chosen
+        ? resting
         : inputs.suggestionCount > 0
           ? 'suggestions'
           : 'empty'
 
-  const namer: MusicPanelView['namer'] = !music
-    ? null
-    : middle === 'cover'
-      ? 'cover'
-      : connected
-        ? 'player'
-        : 'row'
-
   return {
-    connectOnly: false,
     showSearch: !searchHidden,
+    showSearchActions: !searchHidden && chosen !== null,
+    canPutSearchAway,
     middle,
-    music,
     chosen,
-    namer,
-    nextStep: nextStep(inputs, chosen),
-    showPlayer: connected,
+    // Spotify's player shows the cover and the name; a second cover or name
+    // beside it only says the same thing twice.
+    namer: !chosen ? null : embed ? 'player' : middle === 'cover' ? 'cover' : null,
+    nextStep: nextStep(inputs, chosen, returnCheck),
+    embed,
+    offerReload,
+    login: !loginWanted ? null : embed || middle === 'empty' ? 'body' : 'footer',
   }
 }
 
 /**
  * Said in words because a click that seems to do nothing reads as broken.
- * In order of what matters most: something in progress, a session that
- * ended, then the one step left before the chosen music can play.
+ * What to expect from Spotify's player is said in a card when the visitor
+ * first chooses something (SpotifyPreviewNotice), not as small print here.
  */
-function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null): string | null {
-  if (inputs.restoringSong) return 'Getting the song you chose ready…'
-  if (!inputs.connected && inputs.sessionEnded) {
-    return 'Your Spotify connection has ended. Connect Spotify again to keep listening.'
-  }
-  if (!inputs.connected) {
-    return chosen
-      ? `Connect Spotify to play this ${chosen.kind === 'track' ? 'song' : 'playlist'} here. You will come straight back to this page.`
-      : null
-  }
-  if (inputs.cameBackToPlay && !inputs.playing && chosen) {
-    return inputs.playerReady
-      ? `Spotify is connected. Press play to start ${chosen.title}.`
-      : 'Spotify is connected. Getting it ready to play…'
-  }
+function nextStep(inputs: MusicPanelInputs, chosen: MusicItem | null, returnCheck: ReturnCheck | null): string | null {
+  if (!chosen) return null
+  if (inputs.embedFailed) return 'Spotify’s player could not load here. Try again, or listen on Spotify.'
+  // The panel cannot see a Spotify login, only how long the song it plays
+  // lasts: 30 seconds is a preview, longer is the whole song. So the check is
+  // a press of play, and the panel says so.
+  if (returnCheck === 'waiting') return 'Welcome back. Press play: if whole songs play, you’re logged in.'
+  if (returnCheck === 'previews') return 'Still previews. Reload this page, or use a normal (not private) window.'
+  if (returnCheck === 'whole') return 'You’re logged in: whole songs will play.'
   return null
 }
