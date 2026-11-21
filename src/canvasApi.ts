@@ -2,6 +2,7 @@ import type { Editor } from 'tldraw'
 import type { AppStateValue } from './AppState'
 import type { PanelConfigs, PanelType } from './types'
 import { PANEL_TYPES, getPanelDefinition, isPanelType } from './panelRegistry'
+import { getPanelMinimumSize } from './panelLayout'
 import { createPanelShape, getPanelShape, listPanelShapes, panelFromShape, setPanelFocusView, setPanelVisible, updatePanelConfig, writePanelShape } from './panelStore'
 import { isSelectableVideoId } from './videoCatalog'
 
@@ -153,7 +154,7 @@ export function createCanvasApi(editor: Editor, getState: () => AppStateValue): 
         }
         case 'panel.resize': {
           const shape = requirePanel(command.panelId)
-          const minimum = getPanelDefinition(shape.props.panel.type).minimumSize
+          const minimum = getPanelMinimumSize(shape.props.panel.type, shape.props.focusView)
           writePanelShape(editor, command.panelId, { props: { w: Math.max(minimum.w, command.w), h: Math.max(minimum.h, command.h) } })
           return
         }

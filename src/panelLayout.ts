@@ -7,8 +7,15 @@ export function getCanonicalPanelLayout(panelType: PanelType): Omit<PanelLayout,
   return { panelType, ...getPanelDefinition(panelType).defaultLayout }
 }
 
-export function getPanelMinimumSize(panelType: PanelType) {
-  return getPanelDefinition(panelType).minimumSize
+/**
+ * The smallest a panel can be resized to. In focus view a panel that has a
+ * focus-view size may go down to that size: the focus view is drawn for it,
+ * and a floor above it meant a panel resized once could never get back.
+ */
+export function getPanelMinimumSize(panelType: PanelType, focusView = false) {
+  const { minimumSize, focusViewSize } = getPanelDefinition(panelType)
+  if (!focusView || !focusViewSize) return minimumSize
+  return { w: Math.min(minimumSize.w, focusViewSize.w), h: Math.min(minimumSize.h, focusViewSize.h) }
 }
 
 /** Null when this kind of panel keeps its size in focus view. */

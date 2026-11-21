@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PanelLayout } from './types'
-import { getCanonicalPanelLayout, getCollectivePanelBounds, resetPanelLayoutSize } from './panelLayout'
+import { getCanonicalPanelLayout, getCollectivePanelBounds, getPanelFocusViewSize, getPanelMinimumSize, resetPanelLayoutSize } from './panelLayout'
 
 describe('panel layout helpers', () => {
   const layouts: PanelLayout[] = [
@@ -21,5 +21,21 @@ describe('panel layout helpers', () => {
 
   it('calculates fit bounds without mutating panel dimensions', () => {
     expect(getCollectivePanelBounds(layouts)).toEqual({ x: 10, y: 20, w: 900, h: 1100 })
+  })
+})
+
+// A panel resized in focus view must be able to get back to the focus view's
+// own size, so the floor there is no higher than that size.
+describe('getPanelMinimumSize', () => {
+  it('lets a panel in focus view shrink to its focus-view size', () => {
+    const focus = getPanelFocusViewSize('spotify')!
+    const minimum = getPanelMinimumSize('spotify', true)
+    expect(minimum.h).toBeLessThanOrEqual(focus.h)
+    expect(minimum.w).toBeLessThanOrEqual(focus.w)
+  })
+
+  it('keeps the usual floor outside focus view, and for panels with no focus-view size', () => {
+    expect(getPanelMinimumSize('spotify')).toEqual({ w: 320, h: 260 })
+    expect(getPanelMinimumSize('notes', true)).toEqual(getPanelMinimumSize('notes'))
   })
 })
