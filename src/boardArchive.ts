@@ -433,7 +433,7 @@ export interface BoardArchiveImport {
   theme?: { name: string; outcome: ThemeImportOutcome }
 }
 
-export async function importBoardArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue): Promise<BoardArchiveImport> {
+export async function importBoardArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue, shareId?: string): Promise<BoardArchiveImport> {
   if (file.size > boardLimits.maxArchiveBytes) {
     throw new Error('The selected archive exceeds the 260 MB limit.')
   }
@@ -484,8 +484,12 @@ export async function importBoardArchive(file: File, supportsCssValue: SupportsC
     canvas: manifest.canvas,
     notes,
     assets,
-  })
+  }, shareId)
   return { board, ...(theme ? { theme } : {}) }
+}
+
+export function importSharedBoardArchive(file: File, shareId: string): Promise<BoardArchiveImport> {
+  return importBoardArchive(file, acceptEveryValue, shareId)
 }
 
 async function themeForArchive(themeId: string): Promise<BoardManifest['theme']> {

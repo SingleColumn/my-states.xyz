@@ -8,7 +8,8 @@ import type {
   Board,
   BoardSummary,
 } from './types'
-import { downloadBoardArchive, duplicateBoard as duplicateStoredBoard, exportBoardArchive, importBoardArchive } from './boardArchive'
+import { downloadBoardArchive, duplicateBoard as duplicateStoredBoard, exportBoardArchive, importBoardArchive, importSharedBoardArchive } from './boardArchive'
+import { getSharedBoardId } from './storage'
 import { useAppearanceState, type AppearanceState } from './appearanceState'
 import { nextDuplicateName } from './utils'
 import { withRestoreWriteAccess } from './canvasRestore'
@@ -51,6 +52,8 @@ interface BoardsState {
    * `wholeCollections` asks for every picture in it.
    */
   exportActive(options?: { wholeCollections?: boolean }): Promise<void>
+  prepareShareArchive(): Promise<Blob>
+  importShared(file: File, shareId: string): Promise<void>
   /**
    * Resolves to a notice worth showing (a theme that came with the archive
    * was renamed), or null. `name`, when given, overrides the archive's own
@@ -160,6 +163,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             : { scope: 'visible', visibleItemIds: shownCuratedItemIds(slideshowRef.current, panelsRef.current.all) },
         })
         downloadBoardArchive(blob, boardCore.activeBoard.name)
+      }),
+      prepareShareArchive: () => boardCore.operation.run(async () => {
+        await notes.flush()
+        if (!boardCore.activeBoard) throw new Error('No board is open.')
+        await boardCore.flush()
+        return exportBoardArchive(boardCore.activeBoard.id, {
+          curated: { scope: 'visible', visibleItemIds: shownCuratedItemIds(slideshowRef.current, panelsRef.current.all) },
+        })
+      }),
+      importShared: (file, shareId) => boardCore.operation.run(async () => {
+        await notes.flush()
+        await boardCore.flush()
+        let boardId = await getSharedBoardId(shareId)
+        if (!boardId) {
+          try {
+            const imported = await importSharedBoardArchive(file, shareId)
+            boardId = imported.board.id
+            if (imported.theme) await appearance.refreshLibrary()
+          } catch (error) {
+            // A different tab may have committed the unique share mapping first.
+            boardId = await getSharedBoardId(shareId)
+            if (!boardId) throw error
+          }
+        }
+        await boardCore.refreshSummaries()
+        await boardCore.open(boardId)
       }),
       importFile: (file, name) => boardCore.operation.run(async () => {
         await notes.flush()

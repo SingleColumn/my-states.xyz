@@ -480,6 +480,36 @@
 
 .board-toolbar-notice { color: var(--color-text-muted); }
 
+.board-share-dialog { width: min(620px, 94vw); }
+.board-share-body { display: grid; gap: 14px; padding: 22px; overflow: auto; }
+.board-share-body p, .board-share-body h3 { margin: 0; }
+.board-share-body form, .board-share-link { display: grid; gap: 8px; }
+.board-share-body input {
+  width: 100%;
+  min-height: var(--size-input-height);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+}
+.board-share-body button {
+  width: fit-content;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+  cursor: pointer;
+}
+.board-share-body button:disabled { opacity: .55; cursor: default; }
+.board-share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.board-share-body ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.board-share-body li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.board-share-body [role="alert"] { color: var(--color-danger, #ff9b9b); }
+.board-share-receiver { z-index: 2000; }
+
 .settings-launcher {
   width: var(--size-top-toolbar-control);
   justify-content: center;

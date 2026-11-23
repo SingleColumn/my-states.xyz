@@ -35,7 +35,7 @@ export { DEFAULT_SLIDESHOW_ZOOM, defaultSlideshowSettings, defaultSpotifyPlaylis
  * lost, but that build cannot read it.
  */
 const DB_NAME = 'my-states'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const ACTIVE_BOARD_KEY = 'active-board-id'
 const GLOBAL_THEME_KEY = 'global-theme-id'
 const THEME_MODE_KEY = 'theme-mode-preference'
@@ -133,6 +133,10 @@ interface MyStatesDb extends DBSchema {
     key: string
     value: StoredTheme
   }
+  shareImports: {
+    key: string
+    value: { shareId: string; boardId: string }
+  }
 }
 
 let storageStatus: string | null = null
@@ -159,6 +163,9 @@ const dbPromise = openDB<MyStatesDb>(DB_NAME, DB_VERSION, {
     }
     if (oldVersion < 2) {
       db.createObjectStore('themes', { keyPath: 'id' })
+    }
+    if (oldVersion < 3) {
+      db.createObjectStore('shareImports', { keyPath: 'shareId' })
     }
   },
   blocking() {
@@ -351,7 +358,8 @@ export async function deleteBoard(boardId: string) {
   await tx.done
 }
 
-export async function importBoardContent(content: ImportedBoardContent) {
+export async function importBoardContent(content: ImportedBoardContent, shareId?: string) {
+  if (shareId !== undefined && !/^[a-f0-9]{48}$/.test(shareId)) throw new Error('Invalid share ID.')
   validateAssets(content.assets)
   const sourceNoteIds = new Set<string>()
   for (const note of content.notes) {
@@ -375,7 +383,10 @@ export async function importBoardContent(content: ImportedBoardContent) {
   })
   const board = makeBoard(content.name, { panels, canvas: remapLayouts(content.canvas, panelIdMap) }, content.themeId)
 
-  const tx = (await dbPromise).transaction(['boards', 'notes', 'assets'], 'readwrite')
+  const tx = (await dbPromise).transaction(['boards', 'notes', 'assets', 'shareImports'], 'readwrite')
+  // The unique share ID and board are committed together. A concurrent tab's
+  // duplicate add aborts this entire transaction, including its new board.
+  if (shareId) await tx.objectStore('shareImports').add({ shareId, boardId: board.id })
   await tx.objectStore('boards').put(board)
 
   for (const note of content.notes) {
@@ -400,6 +411,17 @@ export async function importBoardContent(content: ImportedBoardContent) {
 
   await tx.done
   return board
+}
+
+export async function getSharedBoardId(shareId: string): Promise<string | null> {
+  if (!/^[a-f0-9]{48}$/.test(shareId)) return null
+  const tx = (await dbPromise).transaction(['shareImports', 'boards'], 'readwrite')
+  const mapping = await tx.objectStore('shareImports').get(shareId)
+  if (!mapping) { await tx.done; return null }
+  const board = await tx.objectStore('boards').get(mapping.boardId)
+  if (!board) await tx.objectStore('shareImports').delete(shareId)
+  await tx.done
+  return board ? mapping.boardId : null
 }
 
 export async function getBoardSummaries(): Promise<BoardSummary[]> {

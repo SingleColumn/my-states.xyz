@@ -53,11 +53,18 @@ describe('The files that are deployed as server functions', () => {
   it('are the ones this test thinks it is checking', () => {
     const names = deployed.map((file) => file.location).sort()
     expect(names).toEqual([
+      '/api/_lib/creatorAuth.ts',
       '/api/_lib/httpAdapter.ts',
+      '/api/_lib/shareArchive.ts',
+      '/api/_lib/shareConfig.ts',
+      '/api/_lib/shareR2.ts',
+      '/api/_lib/shareService.ts',
+      '/api/_lib/shareSession.ts',
       '/api/_lib/spotifyAppToken.ts',
       '/api/_lib/spotifyCatalog.ts',
       '/api/_lib/spotifyCatalogTypes.ts',
       '/api/ai.ts',
+      '/api/boardShares.ts',
       '/api/spotify/playlists.ts',
       '/api/spotify/search.ts',
     ])

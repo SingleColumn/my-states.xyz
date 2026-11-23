@@ -1,9 +1,10 @@
-import { Check, Copy, Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, FilePlus2, FolderUp, MoreHorizontal, Pencil, Share2, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
 import { useBoardThemeOptions } from './BoardThemeSelect'
 import { peekBoardArchiveName } from './boardArchive'
 import { BoardSaveStatus } from './BoardSaveStatus'
+import { BoardShareDialog } from './BoardShareDialog'
 import { importNameSuggestion } from './utils'
 
 export function BoardToolbar() {
@@ -30,6 +31,7 @@ export function BoardToolbar() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isShareOpen, setIsShareOpen] = useState(false)
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -182,6 +184,9 @@ export function BoardToolbar() {
             <button type="button" role="menuitem" onClick={() => runMenuAction(() => inputRef.current?.click())}>
               <FolderUp size={17} aria-hidden="true" /><span>Import board</span>
             </button>
+            <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => setIsShareOpen(true))}>
+              <Share2 size={17} aria-hidden="true" /><span>Share board…</span>
+            </button>
             <div className="board-actions-menu-divider" role="separator" />
             <button className="is-destructive" type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(deleteBoard)}>
               <Trash2 size={17} aria-hidden="true" /><span>Delete board</span>
@@ -213,6 +218,7 @@ export function BoardToolbar() {
       />
       {error ? <span className="board-toolbar-error">{error}</span> : null}
       {notice ? <span className="board-toolbar-error board-toolbar-notice" role="status">{notice}</span> : null}
+      {isShareOpen ? <BoardShareDialog onClose={() => setIsShareOpen(false)} /> : null}
     </section>
   )
 }
