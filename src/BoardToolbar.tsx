@@ -150,6 +150,15 @@ export function BoardToolbar() {
       >
         <FilePlus2 size={17} />
       </button>
+      <button
+        className="board-share-launcher"
+        type="button"
+        title="Share this board"
+        disabled={busy || !boards.activeBoard}
+        onClick={() => setIsShareOpen(true)}
+      >
+        <Share2 size={16} aria-hidden="true" /><span>Share</span>
+      </button>
       <span className="board-menu-anchor">
         <button
           ref={menuTriggerRef}
@@ -183,9 +192,6 @@ export function BoardToolbar() {
             ) : null}
             <button type="button" role="menuitem" onClick={() => runMenuAction(() => inputRef.current?.click())}>
               <FolderUp size={17} aria-hidden="true" /><span>Import board</span>
-            </button>
-            <button type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(() => setIsShareOpen(true))}>
-              <Share2 size={17} aria-hidden="true" /><span>Share board…</span>
             </button>
             <div className="board-actions-menu-divider" role="separator" />
             <button className="is-destructive" type="button" role="menuitem" disabled={!boards.activeBoard} onClick={() => runMenuAction(deleteBoard)}>

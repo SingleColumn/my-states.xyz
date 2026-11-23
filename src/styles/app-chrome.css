@@ -159,6 +159,28 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   min-width: var(--size-top-toolbar-control);
 }
 
+.board-share-launcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-detail-2);
+  height: var(--size-top-toolbar-control);
+  padding: 0 var(--space-detail-3);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg);
+  color: var(--color-app-badge-text);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.board-share-launcher:hover:not(:disabled),
+.board-share-launcher:focus-visible {
+  background: var(--card-button-bg-hover);
+}
+
+.board-share-launcher:disabled { opacity: var(--opacity-disabled); cursor: default; }
+
 .board-actions-menu .is-destructive:hover:not(:disabled) {
   color: var(--color-danger);
 }

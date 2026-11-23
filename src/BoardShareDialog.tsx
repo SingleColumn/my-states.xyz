@@ -101,6 +101,7 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
           {checking ? <p role="status">Checking creator access…</p> : null}
           {!checking && !authenticated ? (
             <form onSubmit={(event) => { event.preventDefault(); login() }}>
+              <p>Only the designated creator can make or disable share links. Sign in to continue.</p>
               <label htmlFor="board-share-passphrase">Creator passphrase</label>
               <input id="board-share-passphrase" type="password" autoComplete="off" value={password}
                 onChange={(event) => setPassword(event.target.value)} />
