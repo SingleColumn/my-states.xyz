@@ -33,7 +33,8 @@ describe('creator configuration and API gates', () => {
       BOARD_SHARE_SESSION_SIGNING_KEY: config.sessionSigningKey, BOARD_SHARE_ALLOWED_ORIGIN: config.allowedOrigin,
     }
     expect(readShareConfig(env).bucket).toBe('trial-bucket')
-    expect(() => readShareConfig({ ...env, BOARD_SHARE_SESSION_SIGNING_KEY: 'bad' })).toThrow('invalid creator authentication')
+    expect(() => readShareConfig({ ...env, BOARD_SHARE_SESSION_SIGNING_KEY: 'bad' })).toThrow('BOARD_SHARE_SESSION_SIGNING_KEY format')
+    expect(() => readShareConfig({ ...env, BOARD_SHARE_CREATOR_PASSWORD_HASH: '{}' })).toThrow('BOARD_SHARE_CREATOR_PASSWORD_HASH format')
     expect(() => readShareConfig({ ...env, BOARD_SHARE_R2_ENDPOINT: 'http://example.test' })).toThrow('invalid endpoint')
     expect(() => readShareConfig({ ...env, BOARD_SHARE_R2_BUCKET: undefined })).toThrow('BOARD_SHARE_R2_BUCKET is missing')
   })

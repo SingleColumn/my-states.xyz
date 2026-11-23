@@ -46,11 +46,9 @@ export function readShareConfig(env: Record<string, string | undefined>): ShareC
   ) throw new Error('Board sharing has an invalid endpoint or allowed origin.')
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(result.bucket)) throw new Error('Board sharing has an invalid bucket name.')
   if (result.accessKeyId.length < 10 || result.secretAccessKey.length < 20) throw new Error('Board sharing has invalid R2 credentials.')
-  try {
-    validateCreatorPasswordVerifier(result.passwordVerifier)
-    decodeSessionSigningKey(result.sessionSigningKey)
-  } catch {
-    throw new Error('Board sharing has invalid creator authentication configuration.')
-  }
+  try { validateCreatorPasswordVerifier(result.passwordVerifier) }
+  catch { throw new Error('Board sharing has invalid BOARD_SHARE_CREATOR_PASSWORD_HASH format.') }
+  try { decodeSessionSigningKey(result.sessionSigningKey) }
+  catch { throw new Error('Board sharing has invalid BOARD_SHARE_SESSION_SIGNING_KEY format.') }
   return result as unknown as ShareConfig
 }
