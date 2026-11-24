@@ -17,7 +17,7 @@ async function api<T>(action: string, method: 'GET' | 'POST', body?: unknown, id
   const response = await fetch(url, {
     method, credentials: 'same-origin', cache: 'no-store',
     ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
-  })
+  }).catch(() => { throw new Error('The board-sharing service could not be reached. Check your connection and try again.') })
   let value: Record<string, unknown>
   try { value = await response.json() } catch { throw new Error('The sharing service returned an unreadable response.') }
   if (!response.ok) throw new Error(typeof value.error === 'string' ? value.error : 'The sharing request failed.')
@@ -32,6 +32,7 @@ export async function listCreatedShares(cursor?: string) {
   url.searchParams.set('action', 'list')
   if (cursor) url.searchParams.set('cursor', cursor)
   const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+    .catch(() => { throw new Error('Could not refresh your trial shares. Check your connection and try again.') })
   const value = await response.json() as { shares?: Array<{ id: string; status: string; createdAt: number; link?: string }>; cursor?: string; error?: string }
   if (!response.ok || !Array.isArray(value.shares)) throw new Error(value.error ?? 'Could not list trial shares.')
   return { shares: value.shares, cursor: value.cursor }
@@ -46,7 +47,10 @@ export async function createSharedBoard(
   signal?: AbortSignal,
 ): Promise<{ id: string; link: string }> {
   stage('preparing')
-  const archive = await prepare()
+  const archive = await prepare().catch((error: unknown) => {
+    if (error instanceof TypeError) throw new Error('An online resource needed to prepare this board could not be reached.')
+    throw error
+  })
   if (archive.size < 1 || archive.size > MAX_SHARE_ARCHIVE_BYTES) throw new Error('This board exceeds the 32 MiB sharing limit.')
   const sha256 = await digest(await archive.arrayBuffer())
   if (signal?.aborted) throw new DOMException('Sharing was cancelled.', 'AbortError')
@@ -56,8 +60,11 @@ export async function createSharedBoard(
   stage('uploading')
   const upload = await fetch(created.url, {
     method: 'PUT', body: archive, headers: created.headers, signal, cache: 'no-store', redirect: 'error',
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    throw new Error('The browser could not upload the board to private storage. Check the bucket browser-access rule and your connection, then try again.')
   })
-  if (!upload.ok) throw new Error('The archive upload failed. Start a new share or retry before its upload window closes.')
+  if (!upload.ok) throw new Error(`Private storage rejected the board upload (error ${upload.status}). Try sharing again.`)
   stage('confirming')
   const confirmed = await api<{ id: string; link: string }>('complete', 'POST', undefined, created.id)
   return confirmed

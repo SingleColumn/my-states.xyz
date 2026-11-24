@@ -65,7 +65,8 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
       await signInCreator(password)
       setPassword('')
       setAuthenticated(true)
-      setShares(await allTrialShares())
+      try { setShares(await allTrialShares()) }
+      catch { setNotice('Signed in. Your share list could not be refreshed yet.') }
     })
   }
 
@@ -75,7 +76,8 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
       abortRef.current = controller
       const result = await createSharedBoard(() => boards.prepareShareArchive(), setStage, controller.signal)
       setLink(result.link)
-      setShares(await allTrialShares())
+      try { setShares(await allTrialShares()) }
+      catch { setNotice('The board was shared. Your share list could not be refreshed yet.') }
     })
   }
 
@@ -83,9 +85,10 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
     if (!window.confirm('Disable this share? People who already imported it keep their local copies.')) return
     void run(async () => {
       await disableCreatedShare(id)
-      setShares(await allTrialShares())
       if (link?.endsWith(id)) setLink(null)
       setNotice('The remote share is disabled. Existing local copies remain usable.')
+      try { setShares(await allTrialShares()) }
+      catch { setNotice('The remote share is disabled, but the list could not be refreshed yet.') }
     })
   }
 
