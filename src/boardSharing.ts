@@ -38,6 +38,7 @@ export async function listCreatedShares(cursor?: string) {
   return { shares: value.shares, cursor: value.cursor }
 }
 export const disableCreatedShare = (id: string) => api<{ ok: true }>('disable', 'POST', undefined, id)
+export const dismissDisabledShare = (id: string) => api<{ ok: true }>('dismiss', 'POST', undefined, id)
 export const cleanupCreatedShares = (stagingCursor?: string, sharesCursor?: string) =>
   api<{ removed: number; stagingCursor?: string; sharesCursor?: string }>('cleanup', 'POST', { stagingCursor, sharesCursor })
 

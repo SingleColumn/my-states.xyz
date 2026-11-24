@@ -71,3 +71,28 @@ test('a list refresh failure does not erase a confirmed share link', async ({ pa
   await expect(page.getByLabel('Share link')).toHaveValue(`https://trial.example.test/share/${id}`)
   await expect(page.getByText('The board was shared. Your share list could not be refreshed yet.')).toBeVisible()
 })
+
+test('creator can remove a disabled share from the panel', async ({ page }) => {
+  const id = 'c'.repeat(48)
+  let dismissed = false
+  await page.route('**/api/boardShares?action=session', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: '{"authenticated":true}',
+  }))
+  await page.route('**/api/boardShares?action=list*', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ shares: dismissed ? [] : [{ id, status: 'disabled', createdAt: 1000 }] }),
+  }))
+  await page.route('**/api/boardShares?action=dismiss*', (route) => {
+    dismissed = true
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  })
+  await openApp(page)
+  await page.getByRole('button', { name: 'Share', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Remove from list' })).toBeVisible()
+  await page.getByRole('button', { name: 'Remove from list' }).click()
+  await expect(page.getByRole('button', { name: 'Remove from list' })).toHaveCount(0)
+  await expect(page.getByText('Removed from this list. The share link remains disabled.')).toBeVisible()
+  await page.getByRole('button', { name: 'Close sharing' }).click()
+  await page.getByRole('button', { name: 'Share', exact: true }).click()
+  await expect(page.getByText('No shares yet.')).toBeVisible()
+})

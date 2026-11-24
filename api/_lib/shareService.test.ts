@@ -134,6 +134,23 @@ describe('R2 share status and completion', () => {
     await expect(expired.complete(created.id)).rejects.toMatchObject({ status: 410 })
   })
 
+  it('removes only disabled entries from the creator list while retaining their tombstones', async () => {
+    const { r2, service } = setup()
+    const { created, status } = await pending(r2, service)
+    await expect(service.dismiss(created.id)).rejects.toMatchObject({ status: 409 })
+    await service.disable(created.id)
+    expect((await service.list()).shares.map((share) => share.id)).toContain(created.id)
+    await Promise.all([service.dismiss(created.id), service.dismiss(created.id)])
+    expect((await service.list()).shares.map((share) => share.id)).not.toContain(created.id)
+    expect(r2.status(created.id)).toMatchObject({ status: 'disabled', dismissedAt: expect.any(Number) })
+    expect(r2.objects.has(`shares/${created.id}/status.json`)).toBe(true)
+    await expect(service.resolve(created.id)).rejects.toMatchObject({ status: 410 })
+    await expect(service.complete(created.id)).rejects.toMatchObject({ status: 410 })
+    await service.cleanup()
+    expect(r2.objects.has(`shares/${created.id}/status.json`)).toBe(true)
+    expect(r2.objects.has(status.finalKey)).toBe(false)
+  })
+
   it('does not report success if disable wins just after ready publication', async () => {
     const { r2, service } = setup()
     const { created, status, bytes } = await pending(r2, service)

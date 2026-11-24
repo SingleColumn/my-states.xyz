@@ -28,6 +28,7 @@ export interface ShareStatus {
   finalKey: string
   byteLength: number
   sha256: string
+  dismissedAt?: number
 }
 const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
@@ -49,6 +50,7 @@ export class ShareService {
       || !['pending', 'ready', 'disabled'].includes(entry.status)
       || !Number.isSafeInteger(entry.createdAt) || !Number.isSafeInteger(entry.updatedAt)
       || !Number.isSafeInteger(entry.uploadDeadline) || !Number.isSafeInteger(entry.byteLength)
+      || (entry.dismissedAt !== undefined && (entry.status !== 'disabled' || !Number.isSafeInteger(entry.dismissedAt) || entry.dismissedAt < 0))
       || entry.byteLength < 1 || entry.byteLength > MAX_COMPRESSED_BYTES || !SHA256.test(entry.sha256)
       || typeof entry.stagingKey !== 'string' || !entry.stagingKey.startsWith(`staging/${id}/`)
       || entry.finalKey !== `shares/${id}/archive.board.zip`) {
@@ -179,13 +181,31 @@ export class ShareService {
     await this.r2.delete(value.stagingKey)
   }
 
+  /** Hide a disabled entry from creator management without removing its tombstone. */
+  async dismiss(id: string): Promise<void> {
+    const found = await this.readStatus(id)
+    if (!found) throw new ShareError('Share not found.', 404)
+    if (found.value.status !== 'disabled') throw new ShareError('Disable this share before removing it from the list.', 409)
+    if (found.value.dismissedAt !== undefined) return
+    try {
+      await this.r2.putJson(statusKey(id), {
+        ...found.value, dismissedAt: this.now(), updatedAt: this.now(),
+      }, { etag: found.etag })
+    } catch (error) {
+      if (!isConflict(error)) throw error
+      const current = await this.readStatus(id)
+      if (current?.value.status === 'disabled' && current.value.dismissedAt !== undefined) return
+      throw new ShareError('The share changed. Try removing it again.', 409)
+    }
+  }
+
   async list(cursor?: string) {
     const page = await this.r2.list('shares/', cursor, 100)
     const shares: Array<Pick<ShareStatus, 'id' | 'status' | 'createdAt' | 'updatedAt'>> = []
     for (const key of page.keys.filter((candidate) => /^shares\/[a-f0-9]{48}\/status\.json$/.test(candidate))) {
       const id = key.split('/')[1]
       const found = await this.readStatus(id)
-      if (found) {
+      if (found && found.value.dismissedAt === undefined) {
         const { status, createdAt, updatedAt } = found.value
         shares.push({ id, status, createdAt, updatedAt })
       }

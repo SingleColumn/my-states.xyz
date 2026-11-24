@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from './AppState'
 import {
-  cleanupCreatedShares, createSharedBoard, creatorSession, disableCreatedShare,
+  cleanupCreatedShares, createSharedBoard, creatorSession, disableCreatedShare, dismissDisabledShare,
   listCreatedShares, signInCreator, signOutCreator, type ShareStage,
 } from './boardSharing'
 
@@ -92,6 +92,15 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
     })
   }
 
+  function removeDisabled(id: string) {
+    void run(async () => {
+      await dismissDisabledShare(id)
+      setShares((current) => current.filter((item) => item.id !== id))
+      if (link?.endsWith(id)) setLink(null)
+      setNotice('Removed from this list. The share link remains disabled.')
+    })
+  }
+
   return (
     <div className="help-about-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
       <section className="help-about-dialog board-share-dialog" role="dialog" aria-modal="true" aria-labelledby="board-share-title">
@@ -138,6 +147,7 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
                     () => setNotice('Link copied.'), () => setError('Could not copy the link.'),
                   )}>Copy link</button> : null}
                   {item.status !== 'disabled' ? <button type="button" disabled={busy} onClick={() => disable(item.id)}>Disable</button> : null}
+                  {item.status === 'disabled' ? <button type="button" disabled={busy} onClick={() => removeDisabled(item.id)}>Remove from list</button> : null}
                 </li>
               ))}</ul> : <p>No shares yet.</p>}
               <button type="button" disabled={busy} onClick={() => void run(async () => {

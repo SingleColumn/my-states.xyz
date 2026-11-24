@@ -70,6 +70,10 @@ export function createBoardSharesHandler(
         await service.disable(idOf(request))
         return json({ ok: true })
       }
+      if (request.method === 'POST' && action === 'dismiss') {
+        await service.dismiss(idOf(request))
+        return json({ ok: true })
+      }
       if (request.method === 'POST' && action === 'cleanup') {
         const body = await bodyOf(request)
         if ((body.stagingCursor !== undefined && typeof body.stagingCursor !== 'string')
