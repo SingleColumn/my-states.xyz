@@ -120,3 +120,44 @@ test('a missing mapped board is imported again while the share is ready', async 
   expect(second.links).toHaveLength(1)
   expect(second.links[0].boardId).not.toBe(firstId)
 })
+
+test('an imported local copy survives remote expiration; a deleted copy shows expiry', async ({ context, page }) => {
+  let expired = false
+  let downloads = 0
+  await context.route('**/api/boardShares?action=resolve*', async (route) => {
+    await route.fulfill(expired
+      ? { status: 410, contentType: 'application/json', body: '{"error":"This share has expired."}' }
+      : { status: 200, contentType: 'application/json', body: JSON.stringify({
+        url: 'https://trial-r2.example.test/archive.board.zip', byteLength: archive.length, sha256,
+      }) })
+  })
+  await context.route('https://trial-r2.example.test/archive.board.zip', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/zip', body: Buffer.from(archive),
+      headers: { 'Access-Control-Allow-Origin': '*' } })
+  })
+  page.on('download', () => downloads++)
+  await page.goto(`/share/${id}`)
+  await expect(page.getByRole('button', { name: 'Continue to board' })).toBeVisible()
+  const boardId = (await mappings(page)).links[0].boardId
+  expired = true
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Continue to board' })).toBeVisible()
+  expect((await mappings(page)).links[0].boardId).toBe(boardId)
+  await page.evaluate(async (idToDelete) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('my-states')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const tx = db.transaction('boards', 'readwrite')
+    tx.objectStore('boards').delete(idToDelete)
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+  }, boardId)
+  await page.reload()
+  await expect(page.getByRole('alert')).toHaveText('This share has expired.')
+  expect(downloads).toBe(0)
+})

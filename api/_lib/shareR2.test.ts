@@ -6,7 +6,7 @@ import type { ShareConfig } from './shareConfig'
 const config: ShareConfig = {
   endpoint: `https://${'a'.repeat(32)}.r2.cloudflarestorage.com`, bucket: 'trial-bucket',
   accessKeyId: 'test-access-key', secretAccessKey: 'test-secret-access-key',
-  passwordVerifier: '', sessionSigningKey: '', allowedOrigin: 'https://trial.example.test',
+  sessionSigningKey: 'ab'.repeat(32), allowedOrigin: 'https://trial.example.test',
 }
 
 describe('SDK presigning', () => {

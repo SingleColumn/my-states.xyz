@@ -1,12 +1,12 @@
-import { verifyCreatorPassword } from './_lib/creatorAuth.js'
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import { isIP } from 'node:net'
+import { decodeSessionSigningKey } from './_lib/creatorAuth.js'
 import { readShareConfig, type ShareConfig } from './_lib/shareConfig.js'
 import { ShareR2 } from './_lib/shareR2.js'
 import { ShareError, ShareService } from './_lib/shareService.js'
-import { clearSession, hasCreatorSession, issueSession } from './_lib/shareSession.js'
 
 const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
-const json = (body: unknown, status = 200, cookie?: string) =>
-  new Response(JSON.stringify(body), { status, headers: { ...headers, ...(cookie ? { 'Set-Cookie': cookie } : {}) } })
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers })
 const actionOf = (request: Request) => new URL(request.url).searchParams.get('action')
 const idOf = (request: Request) => new URL(request.url).searchParams.get('id') ?? ''
 
@@ -21,66 +21,60 @@ async function bodyOf(request: Request): Promise<Record<string, unknown>> {
   return value as Record<string, unknown>
 }
 
+// Vercel overwrites X-Forwarded-For at its ingress. Never use a browser-supplied
+// address on a non-Vercel deployment as a durable rate-limit identity.
+function platformAddress(request: Request): string | null {
+  if (process.env.VERCEL !== '1') return null
+  const address = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  return address && isIP(address) ? address : null
+}
+
+function sourceKey(config: ShareConfig, address: string | null): string {
+  if (!address) throw new ShareError('Sharing is temporarily unavailable. Try again later.', 503)
+  return createHmac('sha256', decodeSessionSigningKey(config.sessionSigningKey)).update(address).digest('hex')
+}
+
+function hasOperationsKey(request: Request, config: ShareConfig): boolean {
+  const authorization = request.headers.get('authorization')
+  if (!authorization || !/^Bearer [a-f0-9]{64}$/.test(authorization)) return false
+  const provided = Uint8Array.from(authorization.slice(7).match(/../g) ?? [], (pair) => Number.parseInt(pair, 16))
+  return timingSafeEqual(provided, decodeSessionSigningKey(config.sessionSigningKey))
+}
+
 export function createBoardSharesHandler(
   configForRequest: () => ShareConfig,
   serviceForConfig: (config: ShareConfig) => ShareService,
+  addressOf: (request: Request) => string | null = platformAddress,
 ) {
   return { async fetch(request: Request): Promise<Response> {
     try {
       const config = configForRequest()
       const action = actionOf(request)
-      if (request.method === 'POST' && request.headers.get('origin') !== config.allowedOrigin) {
-        return json({ error: 'This request came from an unapproved origin.' }, 403)
-      }
       const service = serviceForConfig(config)
-      if (request.method === 'POST' && action === 'login') {
-        const body = await bodyOf(request)
-        if (typeof body.password !== 'string' || body.password.length < 1 || body.password.length > 256) {
-          return json({ error: 'Enter a creator passphrase.' }, 400)
-        }
-        await service.reserveSignInAttempt()
-        if (!await verifyCreatorPassword(body.password, config.passwordVerifier)) {
-          return json({ error: 'The passphrase was not accepted.' }, 401)
-        }
-        return json({ ok: true }, 200, issueSession(config.sessionSigningKey))
-      }
       if (request.method === 'GET' && action === 'resolve') {
+        await service.reserveResolve(sourceKey(config, addressOf(request)))
         return json(await service.resolve(idOf(request)))
       }
-      const authorized = hasCreatorSession(request.headers.get('cookie'), config.sessionSigningKey)
-      if (!authorized) return json({ error: 'Creator sign-in is required.' }, 401)
-      if (request.method === 'GET' && action === 'session') return json({ authenticated: true })
-      if (request.method === 'POST' && action === 'logout') return json({ ok: true }, 200, clearSession())
-      if (request.method === 'GET' && action === 'list') {
-        const cursor = new URL(request.url).searchParams.get('cursor') ?? undefined
-        const page = await service.list(cursor)
-        return json({ ...page, shares: page.shares.map((share) => ({
-          ...share, ...(share.status === 'ready' ? { link: `${config.allowedOrigin}/share/${share.id}` } : {}),
-        })) })
-      }
-      if (request.method === 'POST' && action === 'create') {
-        const body = await bodyOf(request)
-        return json(await service.create(body.byteLength as number, body.sha256 as string), 201)
-      }
-      if (request.method === 'POST' && action === 'complete') {
-        const share = await service.complete(idOf(request))
-        return json({ id: share.id, link: `${config.allowedOrigin}/share/${share.id}` })
-      }
-      if (request.method === 'POST' && action === 'disable') {
-        await service.disable(idOf(request))
-        return json({ ok: true })
-      }
-      if (request.method === 'POST' && action === 'dismiss') {
-        await service.dismiss(idOf(request))
-        return json({ ok: true })
-      }
-      if (request.method === 'POST' && action === 'cleanup') {
+      if (request.method === 'POST' && (action === 'cleanup' || action === 'disable')) {
+        if (!hasOperationsKey(request, config)) return json({ error: 'Operational authorization is required.' }, 401)
+        if (action === 'disable') { await service.disable(idOf(request)); return json({ ok: true }) }
         const body = await bodyOf(request)
         if ((body.stagingCursor !== undefined && typeof body.stagingCursor !== 'string')
           || (body.sharesCursor !== undefined && typeof body.sharesCursor !== 'string')) {
           return json({ error: 'Invalid cleanup cursor.' }, 400)
         }
         return json(await service.cleanup(body.stagingCursor as string | undefined, body.sharesCursor as string | undefined))
+      }
+      if (request.method === 'POST' && (action === 'create' || action === 'complete')) {
+        if (request.headers.get('origin') !== config.allowedOrigin)
+          return json({ error: 'This request came from an unapproved origin.' }, 403)
+        const body = await bodyOf(request)
+        if (action === 'create') {
+          return json(await service.create(body.byteLength as number, body.sha256 as string,
+            sourceKey(config, addressOf(request))), 201)
+        }
+        const share = await service.complete(idOf(request), body.uploadToken as string)
+        return json({ id: share.id, link: `${config.allowedOrigin}/share/${share.id}`, expiresAt: share.expiresAt ?? null })
       }
       return json({ error: 'Unknown board-sharing request.' }, 404)
     } catch (error) {

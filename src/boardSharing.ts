@@ -24,29 +24,11 @@ async function api<T>(action: string, method: 'GET' | 'POST', body?: unknown, id
   return value as T
 }
 
-export const signInCreator = (password: string) => api<{ ok: true }>('login', 'POST', { password })
-export const signOutCreator = () => api<{ ok: true }>('logout', 'POST')
-export const creatorSession = () => api<{ authenticated: boolean }>('session', 'GET')
-export async function listCreatedShares(cursor?: string) {
-  const url = new URL('/api/boardShares', window.location.origin)
-  url.searchParams.set('action', 'list')
-  if (cursor) url.searchParams.set('cursor', cursor)
-  const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store' })
-    .catch(() => { throw new Error('Could not refresh your trial shares. Check your connection and try again.') })
-  const value = await response.json() as { shares?: Array<{ id: string; status: string; createdAt: number; link?: string }>; cursor?: string; error?: string }
-  if (!response.ok || !Array.isArray(value.shares)) throw new Error(value.error ?? 'Could not list trial shares.')
-  return { shares: value.shares, cursor: value.cursor }
-}
-export const disableCreatedShare = (id: string) => api<{ ok: true }>('disable', 'POST', undefined, id)
-export const dismissDisabledShare = (id: string) => api<{ ok: true }>('dismiss', 'POST', undefined, id)
-export const cleanupCreatedShares = (stagingCursor?: string, sharesCursor?: string) =>
-  api<{ removed: number; stagingCursor?: string; sharesCursor?: string }>('cleanup', 'POST', { stagingCursor, sharesCursor })
-
 export async function createSharedBoard(
   prepare: () => Promise<Blob>,
   stage: (value: ShareStage) => void,
   signal?: AbortSignal,
-): Promise<{ id: string; link: string }> {
+): Promise<{ id: string; link: string; expiresAt: number }> {
   stage('preparing')
   const archive = await prepare().catch((error: unknown) => {
     if (error instanceof TypeError) throw new Error('An online resource needed to prepare this board could not be reached.')
@@ -55,7 +37,7 @@ export async function createSharedBoard(
   if (archive.size < 1 || archive.size > MAX_SHARE_ARCHIVE_BYTES) throw new Error('This board exceeds the 32 MiB sharing limit.')
   const sha256 = await digest(await archive.arrayBuffer())
   if (signal?.aborted) throw new DOMException('Sharing was cancelled.', 'AbortError')
-  const created = await api<{ id: string; url: string; headers: Record<string, string> }>('create', 'POST', {
+  const created = await api<{ id: string; url: string; headers: Record<string, string>; uploadToken: string }>('create', 'POST', {
     byteLength: archive.size, sha256,
   })
   stage('uploading')
@@ -63,11 +45,12 @@ export async function createSharedBoard(
     method: 'PUT', body: archive, headers: created.headers, signal, cache: 'no-store', redirect: 'error',
   }).catch((error: unknown) => {
     if (error instanceof Error && error.name === 'AbortError') throw error
-    throw new Error('The browser could not upload the board to private storage. Check the bucket browser-access rule and your connection, then try again.')
+    throw new Error('The board could not be uploaded. Check your connection and try again.')
   })
-  if (!upload.ok) throw new Error(`Private storage rejected the board upload (error ${upload.status}). Try sharing again.`)
+  if (!upload.ok) throw new Error(`The board upload was rejected (error ${upload.status}). Try sharing again.`)
   stage('confirming')
-  const confirmed = await api<{ id: string; link: string }>('complete', 'POST', undefined, created.id)
+  const confirmed = await api<{ id: string; link: string; expiresAt: number }>('complete', 'POST',
+    { uploadToken: created.uploadToken }, created.id)
   return confirmed
 }
 

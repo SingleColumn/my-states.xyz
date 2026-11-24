@@ -1,104 +1,37 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAppState } from './AppState'
-import {
-  cleanupCreatedShares, createSharedBoard, creatorSession, disableCreatedShare, dismissDisabledShare,
-  listCreatedShares, signInCreator, signOutCreator, type ShareStage,
-} from './boardSharing'
+import { createSharedBoard, type ShareStage } from './boardSharing'
 
 const labels: Record<ShareStage, string> = {
-  preparing: 'Preparing this board…', uploading: 'Uploading the archive…',
-  confirming: 'Confirming the shared copy…', resolving: 'Finding the shared board…',
-  receiving: 'Receiving the archive…', importing: 'Adding the board here…',
-}
-
-async function allTrialShares() {
-  const shares: Array<{ id: string; status: string; createdAt: number; link?: string }> = []
-  let cursor: string | undefined
-  for (let page = 0; page < 20; page++) {
-    const result = await listCreatedShares(cursor)
-    shares.push(...result.shares)
-    if (!result.cursor) return shares
-    cursor = result.cursor
-  }
-  throw new Error('The share list is too long for this trial view.')
+  preparing: 'Preparing this board…', uploading: 'Uploading this board…',
+  confirming: 'Confirming the share…', resolving: 'Finding the shared board…',
+  receiving: 'Receiving the board…', importing: 'Adding the board here…',
 }
 
 export function BoardShareDialog({ onClose }: { onClose(): void }) {
   const { boards } = useAppState()
-  const [authenticated, setAuthenticated] = useState(false)
-  const [checking, setChecking] = useState(true)
-  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [stage, setStage] = useState<ShareStage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [link, setLink] = useState<string | null>(null)
-  const [shares, setShares] = useState<Array<{ id: string; status: string; createdAt: number; link?: string }>>([])
+  const [result, setResult] = useState<{ link: string; expiresAt: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    let active = true
-    creatorSession().then(() => {
-      if (active) { setAuthenticated(true); void allTrialShares().then((value) => active && setShares(value)).catch((error) => active && setError(error.message)) }
-    }).catch((caught) => {
-      if (active && !(caught instanceof Error && caught.message === 'Creator sign-in is required.')) {
-        setError(caught instanceof Error ? caught.message : 'Sharing is unavailable.')
-      }
-    }).finally(() => { if (active) setChecking(false) })
-    return () => { active = false; abortRef.current?.abort() }
-  }, [])
-
-  async function run(action: () => Promise<void>) {
+  async function share() {
     setBusy(true)
     setError(null)
     setNotice(null)
-    try { await action() }
-    catch (caught) {
+    setResult(null)
+    const controller = new AbortController()
+    abortRef.current = controller
+    try {
+      const completed = await createSharedBoard(() => boards.prepareShareArchive(), setStage, controller.signal)
+      setResult({ link: completed.link, expiresAt: completed.expiresAt })
+    } catch (caught) {
       setError(caught instanceof Error && caught.name === 'AbortError'
         ? 'Sharing was cancelled. No link was created.'
-        : caught instanceof Error ? caught.message : 'Sharing could not be completed.')
+        : caught instanceof Error ? caught.message : 'Sharing could not be completed. Try again.')
     } finally { setBusy(false); setStage(null); abortRef.current = null }
-  }
-
-  function login() {
-    void run(async () => {
-      await signInCreator(password)
-      setPassword('')
-      setAuthenticated(true)
-      try { setShares(await allTrialShares()) }
-      catch { setNotice('Signed in. Your share list could not be refreshed yet.') }
-    })
-  }
-
-  function share() {
-    void run(async () => {
-      const controller = new AbortController()
-      abortRef.current = controller
-      const result = await createSharedBoard(() => boards.prepareShareArchive(), setStage, controller.signal)
-      setLink(result.link)
-      try { setShares(await allTrialShares()) }
-      catch { setNotice('The board was shared. Your share list could not be refreshed yet.') }
-    })
-  }
-
-  function disable(id: string) {
-    if (!window.confirm('Disable link? This prevents new downloads. Copies already opened and saved by recipients remain available to them.')) return
-    void run(async () => {
-      await disableCreatedShare(id)
-      if (link?.endsWith(id)) setLink(null)
-      setNotice('The remote share is disabled. Existing local copies remain usable.')
-      try { setShares(await allTrialShares()) }
-      catch { setNotice('The remote share is disabled, but the list could not be refreshed yet.') }
-    })
-  }
-
-  function removeDisabled(id: string) {
-    void run(async () => {
-      await dismissDisabledShare(id)
-      setShares((current) => current.filter((item) => item.id !== id))
-      if (link?.endsWith(id)) setLink(null)
-      setNotice('Removed from this list. The share link remains disabled.')
-    })
   }
 
   return (
@@ -110,52 +43,19 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
         </header>
         <div className="board-share-body">
           <p>Share a fixed copy of the open board. Later edits stay on your board.</p>
-          {checking ? <p role="status">Checking creator access…</p> : null}
-          {!checking && !authenticated ? (
-            <form onSubmit={(event) => { event.preventDefault(); login() }}>
-              <p>Only the designated creator can make or disable share links. Sign in to continue.</p>
-              <label htmlFor="board-share-passphrase">Creator passphrase</label>
-              <input id="board-share-passphrase" type="password" autoComplete="off" value={password}
-                onChange={(event) => setPassword(event.target.value)} />
-              <button type="submit" disabled={busy || !password}>Sign in</button>
-            </form>
-          ) : null}
-          {authenticated ? (
-            <>
-              <div className="board-share-actions">
-                <button type="button" disabled={busy || !boards.activeBoard} onClick={share}>Share this board</button>
-                <button type="button" disabled={busy} onClick={() => void run(async () => {
-                  await signOutCreator(); setAuthenticated(false); setShares([]); setLink(null)
-                })}>Sign out</button>
-              </div>
-              {stage ? <p role="status">{labels[stage]}</p> : null}
-              {busy && stage === 'uploading' ? <button type="button" onClick={() => abortRef.current?.abort()}>Cancel upload</button> : null}
-              {link ? (
-                <div className="board-share-link">
-                  <label htmlFor="board-share-ready-link">Share link</label>
-                  <input id="board-share-ready-link" value={link} readOnly />
-                  <button type="button" onClick={() => void navigator.clipboard.writeText(link).then(
-                    () => setNotice('Link copied.'), () => setError('Could not copy the link. Select and copy it instead.'),
-                  )}>Copy link</button>
-                </div>
-              ) : null}
-              <h3>Your trial shares</h3>
-              <p>Disable link: Prevents new downloads. Copies already opened and saved by recipients remain available to them.</p>
-              {shares.length ? <ul>{shares.map((item) => (
-                <li key={item.id}>
-                  <span>{new Date(item.createdAt).toLocaleString()} — {item.status}</span>
-                  {item.link ? <button type="button" onClick={() => void navigator.clipboard.writeText(item.link!).then(
-                    () => setNotice('Link copied.'), () => setError('Could not copy the link.'),
-                  )}>Copy link</button> : null}
-                  {item.status !== 'disabled' ? <button type="button" disabled={busy} onClick={() => disable(item.id)}>Disable</button> : null}
-                  {item.status === 'disabled' ? <button type="button" disabled={busy} onClick={() => removeDisabled(item.id)}>Remove from list</button> : null}
-                </li>
-              ))}</ul> : <p>No shares yet.</p>}
-              <button type="button" disabled={busy} onClick={() => void run(async () => {
-                const result = await cleanupCreatedShares()
-                setNotice(`Cleanup checked a bounded batch and removed ${result.removed} objects.`)
-              })}>Clean up expired uploads</button>
-            </>
+          <button type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Share this board</button>
+          {stage ? <p role="status">{labels[stage]}</p> : null}
+          {busy && stage === 'uploading' ? <button type="button" onClick={() => abortRef.current?.abort()}>Cancel upload</button> : null}
+          {result ? (
+            <div className="board-share-link">
+              <label htmlFor="board-share-ready-link">Share link</label>
+              <input id="board-share-ready-link" value={result.link} readOnly />
+              <button type="button" onClick={() => void navigator.clipboard.writeText(result.link).then(
+                () => setNotice('Link copied.'), () => setError('Could not copy the link. Select and copy it instead.'),
+              )}>Copy link</button>
+              <p>Link available for 24 hours, until {new Date(result.expiresAt).toLocaleString()}.</p>
+              <p>People who already opened and saved the board keep their own copies after the link expires.</p>
+            </div>
           ) : null}
           {error ? <p role="alert">{error}</p> : null}
           {notice ? <p role="status">{notice}</p> : null}

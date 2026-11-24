@@ -1,15 +1,20 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { MAX_COMPRESSED_BYTES, validateTrialArchive } from './shareArchive.js'
 import { isConflict, type ShareR2 } from './shareR2.js'
 
 export const TRIAL_OWNER = 'trial-creator-v1'
 export const PENDING_MS = 30 * 60 * 1000
+export const SHARE_MS = 24 * 60 * 60 * 1000
+const DAY_MS = SHARE_MS
+const SHORT_MS = 15 * 60 * 1000
+const RETENTION_MS = 30 * DAY_MS
 const ID = /^[a-f0-9]{48}$/
 const SHA256 = /^[a-f0-9]{64}$/
 const STATUS_LIMIT = 4096
-const RATE_KEY = 'trial/sign-in-rate.json'
-const RATE_WINDOW_MS = 15 * 60 * 1000
-const RATE_ATTEMPTS = 5
+const USAGE_KEY = 'trial/share-usage-v1.json'
+const RESOLVE_KEY = 'trial/resolve-usage-v1.json'
+type UsageEntry = { id: string; source: string; at: number; bytes: number; deadline: number; completed?: true }
+type ResolveEntry = { source: string; at: number }
 type R2 = Pick<ShareR2, 'read' | 'head' | 'putJson' | 'delete' | 'copyCreateOnly' | 'signedPut' | 'signedGet' | 'list'>
 
 export class ShareError extends Error {
@@ -20,7 +25,7 @@ export interface ShareStatus {
   schemaVersion: 1
   id: string
   owner: typeof TRIAL_OWNER
-  status: 'pending' | 'ready' | 'disabled'
+  status: 'pending' | 'ready' | 'disabled' | 'expired'
   createdAt: number
   updatedAt: number
   uploadDeadline: number
@@ -28,9 +33,14 @@ export interface ShareStatus {
   finalKey: string
   byteLength: number
   sha256: string
+  uploadVerifier?: string
+  completionAttempts?: number
+  publishedAt?: number
+  expiresAt?: number
   dismissedAt?: number
 }
 const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+const fromHex = (value: string) => Uint8Array.from(value.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16))
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 const statusKey = (id: string) => `shares/${id}/status.json`
 const safeId = (id: string) => { if (!ID.test(id)) throw new ShareError('Invalid share link.', 400) }
@@ -47,10 +57,14 @@ export class ShareService {
     try { value = JSON.parse(decode(found.bytes)) } catch { throw new ShareError('Share metadata is unreadable.', 503) }
     const entry = value as ShareStatus
     if (!entry || entry.schemaVersion !== 1 || entry.id !== id || entry.owner !== TRIAL_OWNER
-      || !['pending', 'ready', 'disabled'].includes(entry.status)
+      || !['pending', 'ready', 'disabled', 'expired'].includes(entry.status)
       || !Number.isSafeInteger(entry.createdAt) || !Number.isSafeInteger(entry.updatedAt)
       || !Number.isSafeInteger(entry.uploadDeadline) || !Number.isSafeInteger(entry.byteLength)
       || (entry.dismissedAt !== undefined && (entry.status !== 'disabled' || !Number.isSafeInteger(entry.dismissedAt) || entry.dismissedAt < 0))
+      || (entry.uploadVerifier !== undefined && !SHA256.test(entry.uploadVerifier))
+      || (entry.completionAttempts !== undefined && (!Number.isSafeInteger(entry.completionAttempts) || entry.completionAttempts < 0 || entry.completionAttempts > 5))
+      || (entry.publishedAt !== undefined && (!Number.isSafeInteger(entry.publishedAt) || entry.publishedAt < entry.createdAt))
+      || (entry.expiresAt !== undefined && (!Number.isSafeInteger(entry.expiresAt) || entry.expiresAt !== (entry.publishedAt ?? 0) + SHARE_MS))
       || entry.byteLength < 1 || entry.byteLength > MAX_COMPRESSED_BYTES || !SHA256.test(entry.sha256)
       || typeof entry.stagingKey !== 'string' || !entry.stagingKey.startsWith(`staging/${id}/`)
       || entry.finalKey !== `shares/${id}/archive.board.zip`) {
@@ -59,65 +73,142 @@ export class ShareService {
     return { value: entry, etag: found.etag }
   }
 
-  /** Global, durable attempt budget: no client-supplied IP address is trusted. */
-  async reserveSignInAttempt(): Promise<void> {
-    for (let retry = 0; retry < 6; retry++) {
-      const found = await this.r2.read(RATE_KEY, 1024)
-      let state: { windowStart: number; attempts: number } | null = null
-      if (found) {
-        try { state = JSON.parse(decode(found.bytes)) } catch { throw new ShareError('Sign-in protection is unavailable.', 503) }
-        if (!state || !Number.isSafeInteger(state.windowStart) || !Number.isSafeInteger(state.attempts)) {
-          throw new ShareError('Sign-in protection is unavailable.', 503)
-        }
-      }
+  private async readEntries<T>(key: string, valid: (entry: T) => boolean): Promise<{ entries: T[]; etag?: string }> {
+    const found = await this.r2.read(key, 256 * 1024)
+    if (!found) return { entries: [] }
+    let entries: unknown
+    try { entries = JSON.parse(decode(found.bytes)) } catch { throw new ShareError('Sharing limits are unavailable.', 503) }
+    if (!Array.isArray(entries) || !entries.every((entry) => valid(entry as T))) throw new ShareError('Sharing limits are unavailable.', 503)
+    return { entries: entries as T[], etag: found.etag }
+  }
+
+  private async reserveCreate(id: string, source: string, bytes: number, deadline: number): Promise<void> {
+    for (let retry = 0; retry < 32; retry++) {
+      const found = await this.readEntries<UsageEntry>(USAGE_KEY, (entry) =>
+        typeof entry.id === 'string' && ID.test(entry.id) && SHA256.test(entry.source)
+        && Number.isSafeInteger(entry.at) && Number.isSafeInteger(entry.bytes)
+        && Number.isSafeInteger(entry.deadline) && (entry.completed === undefined || entry.completed === true))
       const now = this.now()
-      if (state && now - state.windowStart < RATE_WINDOW_MS && state.attempts >= RATE_ATTEMPTS) {
-        throw new ShareError('Too many sign-in attempts. Try again later.', 429)
+      const entries = found.entries.filter((entry) => entry.at > now - DAY_MS)
+      const bySource = entries.filter((entry) => entry.source === source)
+      const pending = entries.filter((entry) => !entry.completed && entry.deadline > now)
+      const activeBytes = entries.filter((entry) => entry.completed || entry.deadline > now).reduce((sum, entry) => sum + entry.bytes, 0)
+      const retryAt = Math.min(...bySource.filter((entry) => entry.at > now - SHORT_MS).map((entry) => entry.at + SHORT_MS), now + SHORT_MS)
+      if (bySource.filter((entry) => entry.at > now - SHORT_MS).length >= 4)
+        throw new ShareError(`Too many shares from this connection. Try again after ${new Date(retryAt).toISOString()}.`, 429)
+      if (bySource.length >= 12 || entries.length >= 100) {
+        const first = Math.min(...(bySource.length >= 12 ? bySource : entries).map((entry) => entry.at))
+        throw new ShareError(`The daily sharing limit has been reached. Try again after ${new Date(first + DAY_MS).toISOString()}.`, 429)
       }
-      const next = !state || now - state.windowStart >= RATE_WINDOW_MS
-        ? { windowStart: now, attempts: 1 }
-        : { windowStart: state.windowStart, attempts: state.attempts + 1 }
+      if (pending.filter((entry) => entry.source === source).length >= 4 || pending.length >= 20)
+        throw new ShareError('Too many uploads are in progress. Try again in about 30 minutes.', 429)
+      if (activeBytes + bytes > 512 * 1024 * 1024)
+        throw new ShareError('The daily sharing capacity is full. Try again later.', 429)
       try {
-        await this.r2.putJson(RATE_KEY, next, found ? { etag: found.etag } : { none: true })
+        await this.r2.putJson(USAGE_KEY, [...entries, { id, source, at: now, bytes, deadline }],
+          found.etag ? { etag: found.etag } : { none: true })
         return
       } catch (error) { if (!isConflict(error)) throw error }
     }
-    throw new ShareError('Sign-in protection is busy. Try again.', 503)
+    throw new ShareError('Sharing is busy. Try again shortly.', 503)
   }
 
-  async create(byteLength: number, sha256: string) {
+  private async markCompleted(id: string): Promise<void> {
+    for (let retry = 0; retry < 10; retry++) {
+      const found = await this.readEntries<UsageEntry>(USAGE_KEY, (entry) =>
+        typeof entry.id === 'string' && ID.test(entry.id) && SHA256.test(entry.source)
+        && Number.isSafeInteger(entry.at) && Number.isSafeInteger(entry.bytes)
+        && Number.isSafeInteger(entry.deadline) && (entry.completed === undefined || entry.completed === true))
+      const entry = found.entries.find((item) => item.id === id)
+      if (!entry || entry.completed) return
+      try {
+        await this.r2.putJson(USAGE_KEY, found.entries.map((item) => item.id === id ? { ...item, completed: true } : item), { etag: found.etag })
+        return
+      } catch (error) { if (!isConflict(error)) throw error }
+    }
+    // A conservative pending reservation remains until its deadline if the ledger is busy.
+  }
+
+  async reserveResolve(source: string): Promise<void> {
+    for (let retry = 0; retry < 10; retry++) {
+      const found = await this.readEntries<ResolveEntry>(RESOLVE_KEY, (entry) =>
+        SHA256.test(entry.source) && Number.isSafeInteger(entry.at))
+      const now = this.now()
+      const entries = found.entries.filter((entry) => entry.at > now - SHORT_MS)
+      if (entries.length >= 1000 || entries.filter((entry) => entry.source === source).length >= 60)
+        throw new ShareError('Too many links opened from this connection. Try again in 15 minutes.', 429)
+      try {
+        await this.r2.putJson(RESOLVE_KEY, [...entries, { source, at: now }], found.etag ? { etag: found.etag } : { none: true })
+        return
+      } catch (error) { if (!isConflict(error)) throw error }
+    }
+    throw new ShareError('Sharing is busy. Try again shortly.', 503)
+  }
+
+  async create(byteLength: number, sha256: string, source: string) {
     if (!Number.isSafeInteger(byteLength) || byteLength < 1 || byteLength > MAX_COMPRESSED_BYTES || !SHA256.test(sha256)) {
       throw new ShareError('The archive size or digest is invalid.', 400)
     }
-    for (let retry = 0; retry < 3; retry++) {
-      const id = hex(randomBytes(24))
-      const now = this.now()
-      const value: ShareStatus = {
-        schemaVersion: 1, id, owner: TRIAL_OWNER, status: 'pending', createdAt: now, updatedAt: now,
-        uploadDeadline: now + PENDING_MS,
-        stagingKey: `staging/${id}/${hex(randomBytes(16))}.board.zip`,
-        finalKey: `shares/${id}/archive.board.zip`,
-        byteLength, sha256,
-      }
-      try {
-        await this.r2.putJson(statusKey(id), value, { none: true })
-        return { id, uploadDeadline: value.uploadDeadline, ...await this.r2.signedPut(value.stagingKey) }
-      } catch (error) { if (!isConflict(error)) throw error }
+    if (!SHA256.test(source)) throw new ShareError('Sharing source is unavailable.', 503)
+    const id = hex(randomBytes(24))
+    const uploadToken = hex(randomBytes(32))
+    const now = this.now()
+    const value: ShareStatus = {
+      schemaVersion: 1, id, owner: TRIAL_OWNER, status: 'pending', createdAt: now, updatedAt: now,
+      uploadDeadline: now + PENDING_MS,
+      stagingKey: `staging/${id}/${hex(randomBytes(16))}.board.zip`,
+      finalKey: `shares/${id}/archive.board.zip`,
+      byteLength, sha256, uploadVerifier: digest(new TextEncoder().encode(uploadToken)),
     }
-    throw new ShareError('Could not allocate a share ID.', 503)
+    await this.reserveCreate(id, source, byteLength, value.uploadDeadline)
+    try { await this.r2.putJson(statusKey(id), value, { none: true }) }
+    catch (error) {
+      if (isConflict(error)) throw new ShareError('Could not allocate a share ID. Try again.', 503)
+      throw error
+    }
+    return { id, uploadToken, uploadDeadline: value.uploadDeadline, ...await this.r2.signedPut(value.stagingKey) }
   }
 
-  async complete(id: string): Promise<ShareStatus> {
-    const found = await this.readStatus(id)
+  async complete(id: string, uploadToken: string): Promise<ShareStatus> {
+    let found = await this.readStatus(id)
     if (!found) throw new ShareError('Share not found.', 404)
-    const value = found.value
+    let value = found.value
+    if (!value.uploadVerifier || !/^[a-f0-9]{64}$/.test(uploadToken)
+      || !timingSafeEqual(fromHex(value.uploadVerifier), fromHex(digest(new TextEncoder().encode(uploadToken))))) {
+      throw new ShareError('Upload authorization was not accepted.', 403)
+    }
     if (value.status === 'ready') {
+      if (value.expiresAt !== undefined && this.now() >= value.expiresAt) throw new ShareError('This share has expired.', 410)
       const final = await this.r2.head(value.finalKey)
       if (!final || final.size !== value.byteLength) throw new ShareError('This shared board is temporarily unavailable.', 503)
+      await this.markCompleted(id).catch(() => undefined)
       return value
     }
-    if (value.status === 'disabled') throw new ShareError('This share has been disabled.', 410)
+    if (value.status === 'disabled' || value.status === 'expired') throw new ShareError('This share is no longer available.', 410)
     if (this.now() > value.uploadDeadline) throw new ShareError('The upload window expired. Start a new share.', 410)
+    // Each valid-token attempt is reserved before expensive download and ZIP validation.
+    for (let retry = 0; retry < 10; retry++) {
+      if ((value.completionAttempts ?? 0) >= 5) throw new ShareError('This upload could not be confirmed. Start a new share.', 429)
+      try {
+        await this.r2.putJson(statusKey(id), { ...value, completionAttempts: (value.completionAttempts ?? 0) + 1 }, { etag: found.etag })
+        found = await this.readStatus(id)
+        if (!found) throw new ShareError('Share not found.', 404)
+        value = found.value
+        break
+      } catch (error) {
+        if (!isConflict(error)) throw error
+        found = await this.readStatus(id)
+        if (!found) throw new ShareError('Share not found.', 404)
+        value = found.value
+        if (value.status === 'ready') {
+          if (value.expiresAt !== undefined && this.now() >= value.expiresAt) throw new ShareError('This share has expired.', 410)
+          return value
+        }
+        if (value.status !== 'pending') throw new ShareError('This share is no longer available.', 410)
+        if (retry === 9) throw new ShareError('Share confirmation is busy. Try again.', 503)
+      }
+    }
+    if (value.status !== 'pending') throw new ShareError('This share is no longer available.', 410)
     const staged = await this.r2.head(value.stagingKey)
     if (!staged) throw new ShareError('The upload has not arrived yet.', 409)
     if (staged.size !== value.byteLength) throw new ShareError('The uploaded archive has the wrong size.', 422)
@@ -135,13 +226,17 @@ export class ShareService {
         throw new ShareError('Another completion changed this share. Try again.', 409)
       }
     }
-    const ready: ShareStatus = { ...value, status: 'ready', updatedAt: this.now() }
+    const publishedAt = this.now()
+    const ready: ShareStatus = { ...value, status: 'ready', updatedAt: publishedAt, publishedAt, expiresAt: publishedAt + SHARE_MS }
     try { await this.r2.putJson(statusKey(id), ready, { etag: found.etag }) }
     catch (error) {
       if (!isConflict(error)) throw error
       const current = await this.readStatus(id)
-      if (current?.value.status === 'ready') return current.value
-      if (current?.value.status === 'disabled') {
+      if (current?.value.status === 'ready') {
+        if (current.value.expiresAt !== undefined && this.now() >= current.value.expiresAt) throw new ShareError('This share has expired.', 410)
+        await this.markCompleted(id).catch(() => undefined); return current.value
+      }
+      if (current?.value.status === 'disabled' || current?.value.status === 'expired') {
         await this.r2.delete(value.finalKey)
         throw new ShareError('This share has been disabled.', 410)
       }
@@ -151,6 +246,7 @@ export class ShareService {
     await this.r2.delete(value.stagingKey).catch(() => undefined)
     const current = await this.readStatus(id)
     if (current?.value.status !== 'ready') throw new ShareError('This share was disabled during completion.', 410)
+    await this.markCompleted(id).catch(() => undefined)
     return current.value
   }
 
@@ -159,9 +255,16 @@ export class ShareService {
     if (!found) throw new ShareError('Share not found.', 404)
     if (found.value.status === 'pending') throw new ShareError('This board is still being prepared.', 409)
     if (found.value.status === 'disabled') throw new ShareError('This share has been disabled.', 410)
+    if (found.value.status === 'expired' || (found.value.expiresAt !== undefined && this.now() >= found.value.expiresAt))
+      throw new ShareError('This share has expired.', 410)
     const head = await this.r2.head(found.value.finalKey)
     if (!head || head.size !== found.value.byteLength) throw new ShareError('This shared board is temporarily unavailable.', 503)
-    return { url: await this.r2.signedGet(found.value.finalKey), byteLength: found.value.byteLength, sha256: found.value.sha256 }
+    // Signing time is rounded to whole seconds; leave five seconds of margin.
+    const now = this.now()
+    const seconds = found.value.expiresAt === undefined ? 120
+      : Math.min(120, Math.floor((found.value.expiresAt - (now - now % 1000)) / 1000) - 5)
+    if (seconds < 1) throw new ShareError('This share has expired.', 410)
+    return { url: await this.r2.signedGet(found.value.finalKey, seconds), byteLength: found.value.byteLength, sha256: found.value.sha256 }
   }
 
   async disable(id: string): Promise<void> {
@@ -181,38 +284,6 @@ export class ShareService {
     await this.r2.delete(value.stagingKey)
   }
 
-  /** Hide a disabled entry from creator management without removing its tombstone. */
-  async dismiss(id: string): Promise<void> {
-    const found = await this.readStatus(id)
-    if (!found) throw new ShareError('Share not found.', 404)
-    if (found.value.status !== 'disabled') throw new ShareError('Disable this share before removing it from the list.', 409)
-    if (found.value.dismissedAt !== undefined) return
-    try {
-      await this.r2.putJson(statusKey(id), {
-        ...found.value, dismissedAt: this.now(), updatedAt: this.now(),
-      }, { etag: found.etag })
-    } catch (error) {
-      if (!isConflict(error)) throw error
-      const current = await this.readStatus(id)
-      if (current?.value.status === 'disabled' && current.value.dismissedAt !== undefined) return
-      throw new ShareError('The share changed. Try removing it again.', 409)
-    }
-  }
-
-  async list(cursor?: string) {
-    const page = await this.r2.list('shares/', cursor, 100)
-    const shares: Array<Pick<ShareStatus, 'id' | 'status' | 'createdAt' | 'updatedAt'>> = []
-    for (const key of page.keys.filter((candidate) => /^shares\/[a-f0-9]{48}\/status\.json$/.test(candidate))) {
-      const id = key.split('/')[1]
-      const found = await this.readStatus(id)
-      if (found && found.value.dismissedAt === undefined) {
-        const { status, createdAt, updatedAt } = found.value
-        shares.push({ id, status, createdAt, updatedAt })
-      }
-    }
-    return { shares, cursor: page.cursor }
-  }
-
   /** Bounded, repeatable protected sweep; callers can pass returned cursors. */
   async cleanup(stagingCursor?: string, sharesCursor?: string) {
     const staged = await this.r2.list('staging/', stagingCursor, 100)
@@ -230,24 +301,37 @@ export class ShareService {
     for (const key of statuses.keys.filter((candidate) => /^shares\/[a-f0-9]{48}\/status\.json$/.test(candidate))) {
       const id = key.split('/')[1]
       const found = await this.readStatus(id)
-      if (found?.value.status !== 'pending' || this.now() <= found.value.uploadDeadline) continue
+      if (!found) continue
+      const value = found.value
+      const expiredPending = value.status === 'pending' && this.now() > value.uploadDeadline
+      const expiredReady = value.status === 'ready' && value.expiresAt !== undefined && this.now() >= value.expiresAt
+      if (value.status === 'disabled' || value.status === 'expired') {
+        await this.r2.delete(value.stagingKey)
+        await this.r2.delete(value.finalKey)
+        removed += 2
+        if (this.now() - value.updatedAt >= RETENTION_MS) { await this.r2.delete(key); removed++ }
+        continue
+      }
+      if (!expiredPending && !expiredReady) continue
       try {
         await this.r2.putJson(statusKey(id), {
-          ...found.value, status: 'disabled', updatedAt: this.now(),
+          ...value, status: 'expired', updatedAt: this.now(),
         }, { etag: found.etag })
       } catch (error) {
         if (!isConflict(error)) throw error
         const current = await this.readStatus(id)
-        if (current?.value.status !== 'disabled') continue
+        if (current?.value.status !== 'expired' && current?.value.status !== 'disabled') continue
       }
-      await this.r2.delete(found.value.stagingKey)
-      await this.r2.delete(found.value.finalKey)
+      await this.r2.delete(value.stagingKey)
+      await this.r2.delete(value.finalKey)
       removed += 2
     }
     for (const key of statuses.keys.filter((candidate) => /^shares\/[a-f0-9]{48}\/archive\.board\.zip$/.test(candidate))) {
       const id = key.split('/')[1]
       const found = await this.readStatus(id)
-      if (!found || found.value.status === 'disabled' || (found.value.status === 'pending' && this.now() > found.value.uploadDeadline)) {
+      if (!found || found.value.status === 'disabled' || found.value.status === 'expired'
+        || (found.value.status === 'ready' && found.value.expiresAt !== undefined && this.now() >= found.value.expiresAt)
+        || (found.value.status === 'pending' && this.now() > found.value.uploadDeadline)) {
         await this.r2.delete(key)
         removed++
       }

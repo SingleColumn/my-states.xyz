@@ -1,30 +1,51 @@
 import { expect, test } from '@playwright/test'
 import { openApp } from './helpers'
 
-test('Share is visible before creator sign-in and opens its entry form', async ({ page }) => {
-  await page.route('**/api/boardShares?action=session', async (route) => {
-    await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Creator sign-in is required.' }) })
-  })
+test('Share is immediately available without a passphrase or registration', async ({ page }) => {
   await openApp(page)
-  const share = page.getByRole('button', { name: 'Share', exact: true })
-  await expect(share).toBeVisible()
-  await expect(share).toBeEnabled()
-  await share.click()
+  await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Share a board' })).toBeVisible()
-  await expect(page.getByLabel('Creator passphrase')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Share this board' })).toBeEnabled()
+  await expect(page.getByLabel('Creator passphrase')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Disable' })).toHaveCount(0)
 })
 
-test('a blocked storage upload identifies the failed stage without exposing its URL', async ({ page }) => {
-  await page.route('**/api/boardShares?action=session', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: '{"authenticated":true}',
-  }))
-  await page.route('**/api/boardShares?action=list*', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: '{"shares":[]}',
-  }))
+test('anonymous share shows its link and publication expiry only after confirmation', async ({ page }) => {
+  const id = 'b'.repeat(48)
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000
+  let completionToken: string | undefined
   await page.route('**/api/boardShares?action=create*', (route) => route.fulfill({
     status: 201, contentType: 'application/json', body: JSON.stringify({
-      id: 'a'.repeat(48), url: 'https://trial-r2.example.test/staging/archive.board.zip',
+      id, uploadToken: 'upload-only-token', url: 'https://trial-r2.example.test/staging/archive.board.zip',
+      headers: { 'Content-Type': 'application/zip', 'If-None-Match': '*' },
+    }),
+  }))
+  await page.route('https://trial-r2.example.test/staging/archive.board.zip', (route) => route.fulfill({
+    status: route.request().method() === 'OPTIONS' ? 204 : 200,
+    headers: { 'Access-Control-Allow-Origin': new URL(page.url()).origin,
+      'Access-Control-Allow-Methods': 'PUT', 'Access-Control-Allow-Headers': 'Content-Type, If-None-Match' },
+  }))
+  await page.route('**/api/boardShares?action=complete*', async (route) => {
+    completionToken = (route.request().postDataJSON() as { uploadToken: string }).uploadToken
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ id, link: `https://trial.example.test/share/${id}`, expiresAt }) })
+  })
+  await openApp(page)
+  await page.getByRole('button', { name: 'Share', exact: true }).click()
+  await expect(page.getByLabel('Share link')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Share this board' }).click()
+  await expect(page.getByLabel('Share link')).toHaveValue(`https://trial.example.test/share/${id}`)
+  await expect(page.getByText('Link available for 24 hours', { exact: false })).toBeVisible()
+  expect(completionToken).toBe('upload-only-token')
+  await expect(page.getByText('upload-only-token')).toHaveCount(0)
+})
+
+test('a failed upload gives a retryable message without exposing its storage address', async ({ page }) => {
+  await page.route('**/api/boardShares?action=create*', (route) => route.fulfill({
+    status: 201, contentType: 'application/json', body: JSON.stringify({
+      id: 'a'.repeat(48), uploadToken: 'upload-only-token',
+      url: 'https://trial-r2.example.test/staging/archive.board.zip',
       headers: { 'Content-Type': 'application/zip', 'If-None-Match': '*' },
     }),
   }))
@@ -32,67 +53,6 @@ test('a blocked storage upload identifies the failed stage without exposing its 
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await page.getByRole('button', { name: 'Share this board' }).click()
-  await expect(page.getByRole('alert')).toContainText('could not upload the board to private storage')
+  await expect(page.getByRole('alert')).toContainText('could not be uploaded')
   await expect(page.getByRole('alert')).not.toContainText('trial-r2.example.test')
-})
-
-test('a list refresh failure does not erase a confirmed share link', async ({ page }) => {
-  const id = 'b'.repeat(48)
-  let listCalls = 0
-  await page.route('**/api/boardShares?action=session', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: '{"authenticated":true}',
-  }))
-  await page.route('**/api/boardShares?action=list*', (route) => {
-    listCalls++
-    return listCalls === 1
-      ? route.fulfill({ status: 200, contentType: 'application/json', body: '{"shares":[]}' })
-      : route.abort('failed')
-  })
-  await page.route('**/api/boardShares?action=create*', (route) => route.fulfill({
-    status: 201, contentType: 'application/json', body: JSON.stringify({
-      id, url: 'https://trial-r2.example.test/staging/archive.board.zip',
-      headers: { 'Content-Type': 'application/zip', 'If-None-Match': '*' },
-    }),
-  }))
-  await page.route('https://trial-r2.example.test/staging/archive.board.zip', (route) => route.fulfill({
-    status: route.request().method() === 'OPTIONS' ? 204 : 200,
-    headers: { 'Access-Control-Allow-Origin': new URL(page.url()).origin,
-      'Access-Control-Allow-Methods': 'PUT',
-      'Access-Control-Allow-Headers': 'Content-Type, If-None-Match' },
-  }))
-  await page.route('**/api/boardShares?action=complete*', (route) => route.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({ id, link: `https://trial.example.test/share/${id}` }),
-  }))
-  await openApp(page)
-  await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Share this board' })).toBeVisible()
-  await page.getByRole('button', { name: 'Share this board' }).click()
-  await expect(page.getByLabel('Share link')).toHaveValue(`https://trial.example.test/share/${id}`)
-  await expect(page.getByText('The board was shared. Your share list could not be refreshed yet.')).toBeVisible()
-})
-
-test('creator can remove a disabled share from the panel', async ({ page }) => {
-  const id = 'c'.repeat(48)
-  let dismissed = false
-  await page.route('**/api/boardShares?action=session', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: '{"authenticated":true}',
-  }))
-  await page.route('**/api/boardShares?action=list*', (route) => route.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({ shares: dismissed ? [] : [{ id, status: 'disabled', createdAt: 1000 }] }),
-  }))
-  await page.route('**/api/boardShares?action=dismiss*', (route) => {
-    dismissed = true
-    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
-  })
-  await openApp(page)
-  await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Remove from list' })).toBeVisible()
-  await page.getByRole('button', { name: 'Remove from list' }).click()
-  await expect(page.getByRole('button', { name: 'Remove from list' })).toHaveCount(0)
-  await expect(page.getByText('Removed from this list. The share link remains disabled.')).toBeVisible()
-  await page.getByRole('button', { name: 'Close sharing' }).click()
-  await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('No shares yet.')).toBeVisible()
 })

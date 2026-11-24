@@ -106,8 +106,9 @@ export class ShareR2 {
     return { url, headers }
   }
 
-  async signedGet(key: string): Promise<string> {
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: 120 })
+  async signedGet(key: string, expiresIn = 120): Promise<string> {
+    if (!Number.isSafeInteger(expiresIn) || expiresIn < 1 || expiresIn > 120) throw new Error('Invalid download lifetime.')
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn })
   }
 
   async list(prefix: string, cursor?: string, limit = 100): Promise<{ keys: string[]; cursor?: string }> {
