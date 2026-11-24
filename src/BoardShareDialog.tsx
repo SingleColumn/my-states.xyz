@@ -82,7 +82,7 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
   }
 
   function disable(id: string) {
-    if (!window.confirm('Disable this share? People who already imported it keep their local copies.')) return
+    if (!window.confirm('Disable link? This prevents new downloads. Copies already opened and saved by recipients remain available to them.')) return
     void run(async () => {
       await disableCreatedShare(id)
       if (link?.endsWith(id)) setLink(null)
@@ -140,6 +140,7 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
                 </div>
               ) : null}
               <h3>Your trial shares</h3>
+              <p>Disable link: Prevents new downloads. Copies already opened and saved by recipients remain available to them.</p>
               {shares.length ? <ul>{shares.map((item) => (
                 <li key={item.id}>
                   <span>{new Date(item.createdAt).toLocaleString()} — {item.status}</span>
