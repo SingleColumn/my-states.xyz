@@ -20,7 +20,7 @@ test.describe('top toolbar', () => {
     await expect(page.getByRole('button', { name: 'About', exact: true })).toHaveCount(0)
   })
 
-  test('keeps only New board visible; the rest is in one ··· menu', async ({ page }) => {
+  test('keeps one combined board and panel menu', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await openApp(page)
     await expect(page.getByRole('button', { name: 'New board' })).toBeVisible()
@@ -28,9 +28,11 @@ test.describe('top toolbar', () => {
       await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
     }
 
-    await page.getByRole('button', { name: 'More board actions' }).click()
-    const menu = page.getByRole('menu', { name: 'Board actions' })
-    await expect(menu.getByRole('menuitem')).toHaveText(['Rename board', 'Duplicate board', 'Export board', 'Import board', 'Delete board'])
+    await page.getByRole('button', { name: 'Board and panel options' }).click()
+    const menu = page.getByRole('menu', { name: 'Board and panel options' })
+    await expect(menu.getByRole('group', { name: 'Board', exact: true }).getByRole('menuitem')).toHaveText([
+      'Rename board', 'Duplicate board', 'Export board', 'Import board', 'Prepare board for screenshot', 'Delete board',
+    ])
     // The theme selector stays in the toolbar on a wide window, so the menu does not repeat it.
     await expect(page.getByRole('combobox', { name: 'Theme for this board' })).toBeVisible()
     await expect(menu.getByRole('group', { name: 'Theme for this board' })).toBeHidden()
@@ -43,7 +45,7 @@ test.describe('top toolbar', () => {
     await page.setViewportSize({ width: 1000, height: 800 })
     await openApp(page)
     await expect(page.getByRole('combobox', { name: 'Theme for this board' })).toBeHidden()
-    await page.getByRole('button', { name: 'More board actions' }).click()
+    await page.getByRole('button', { name: 'Board and panel options' }).click()
     await expect(page.getByRole('group', { name: 'Theme for this board' })).toBeVisible()
   })
 

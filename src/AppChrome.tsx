@@ -119,7 +119,20 @@ export function AppChrome({
           <span className="app-chrome-brand-name">{HELP_ABOUT_LABEL}</span>
         </button>
         <SpikeModeSwitch />
-        <BoardToolbar />
+        <BoardToolbar
+          isCanvasReady={isCanvasReady}
+          editorMode={editorMode}
+          canUseSelectedPanel={canUseSelectedPanel}
+          canHideSelectedPanel={canHideSelectedPanel}
+          hiddenPanels={hiddenPanels}
+          onFitAllPanels={onFitAllPanels}
+          onFitSelectedPanel={onFitSelectedPanel}
+          onResetSelectedPanel={onResetSelectedPanel}
+          onResetPanelLayout={onResetPanelLayout}
+          onHideSelectedPanel={onHideSelectedPanel}
+          onRestorePanel={onRestorePanel}
+          onEnterMomentView={onEnterMomentView}
+        />
       </div>
 
       <section className="app-chrome-canvas" aria-label={editorMode ? 'Panel controls' : 'Canvas view controls'}>
@@ -138,16 +151,6 @@ export function AppChrome({
         <CanvasViewControls
           isReady={isCanvasReady}
           onAddPanel={onAddPanel}
-          canUseSelectedPanel={canUseSelectedPanel}
-          onFitPanels={onFitAllPanels}
-          onFitSelectedPanel={onFitSelectedPanel}
-          onResetSelectedPanel={onResetSelectedPanel}
-          onResetPanelLayout={onResetPanelLayout}
-          canHideSelectedPanel={canHideSelectedPanel}
-          hiddenPanels={hiddenPanels}
-          onHideSelectedPanel={onHideSelectedPanel}
-          onRestorePanel={onRestorePanel}
-          onEnterMomentView={onEnterMomentView}
           editorMode={editorMode}
         />
       </section>

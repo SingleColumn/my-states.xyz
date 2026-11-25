@@ -492,7 +492,7 @@ function AppContent() {
     }
     const added = panels.add(panelType)
     if (!added) {
-      setCallbackStatus(`Only one ${getPanelDefinition(panelType).label} panel is allowed on the canvas. Restore the existing panel from the panel view menu if it is hidden.`)
+      setCallbackStatus(`Only one ${getPanelDefinition(panelType).label} panel is allowed on the canvas. Restore the existing panel from Panels in the toolbar options menu if it is hidden.`)
       return
     }
     setCallbackStatus(null)

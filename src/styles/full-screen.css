@@ -168,7 +168,7 @@
     display: none !important;
   }
 
-  .board-actions-menu-theme {
+  .board-actions-menu .board-actions-menu-theme {
     display: grid;
   }
 
@@ -224,10 +224,14 @@
     justify-content: space-between;
   }
 
-  /* The board controls sit at the right edge here, so the menu opens leftwards, not off screen. */
-  .board-actions-menu {
-    left: auto;
-    right: 0;
+  .board-actions-menu { grid-template-columns: minmax(0, 1fr); }
+
+  .board-actions-menu-board {
+    margin-top: var(--space-menu-padding);
+    padding-top: var(--space-menu-padding);
+    padding-left: 0;
+    border-left: 0;
+    border-top: var(--border-width-hairline) solid var(--color-panel-divider);
   }
 
   .app-chrome-canvas {
@@ -248,6 +252,11 @@
       "tldraw tldraw";
     grid-template-columns: auto minmax(0, 1fr);
   }
+
+  .app-chrome-boards,
+  .board-toolbar { flex-wrap: wrap; }
+
+  .board-toolbar { width: 100%; }
 
   .board-toolbar select {
     width: clamp(105px, 28vw, 145px);

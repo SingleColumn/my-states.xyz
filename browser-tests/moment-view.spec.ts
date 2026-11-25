@@ -25,7 +25,7 @@ import {
  */
 
 const prepareForScreenshot = async (page: Page) => {
-  await page.getByRole('button', { name: 'Open panel view and layout actions' }).click()
+  await page.getByRole('button', { name: 'Board and panel options' }).click()
   await page.getByRole('menuitem', { name: 'Prepare board for screenshot' }).click()
 }
 const panelsOnly = async (page: Page) => (await describeCanvas(page)).panels.map(({ panelId, x, y, w, h, visible, focusView, config }) => ({ panelId, x, y, w, h, visible, focusView, config }))

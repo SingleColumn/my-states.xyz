@@ -1,5 +1,4 @@
-import { Camera, EyeOff, Focus, FocusIcon, MoreHorizontal, PanelsTopLeft, PanelTop, RotateCcw } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { PanelType } from './types'
 import { PANEL_TYPES, getPanelDefinition } from './panelRegistry'
 import { useAppState } from './AppState'
@@ -7,77 +6,15 @@ import { useAppState } from './AppState'
 interface CanvasViewControlsProps {
   isReady: boolean
   onAddPanel(panelType: PanelType): void
-  canUseSelectedPanel: boolean
-  onFitPanels(): void
-  onFitSelectedPanel(): void
-  onResetSelectedPanel(): void
-  onResetPanelLayout(): void
-  canHideSelectedPanel: boolean
-  hiddenPanels: Array<{ id: string; type: PanelType }>
-  onHideSelectedPanel(): void
-  onRestorePanel(panelId: string): void
-  onEnterMomentView(): void
-  /**
-   * SPIKE: in Editor mode only the menu's "Hidden panels" section is kept,
-   * since a restored panel opens as a window. Fitting, resetting and hiding
-   * act on the hidden canvas, and the screenshot view shows the canvas.
-   */
   editorMode?: boolean
 }
 
-export function CanvasViewControls({
-  isReady,
-  onAddPanel,
-  canUseSelectedPanel,
-  onFitPanels,
-  onFitSelectedPanel,
-  onResetSelectedPanel,
-  onResetPanelLayout,
-  canHideSelectedPanel,
-  hiddenPanels,
-  onHideSelectedPanel,
-  onRestorePanel,
-  onEnterMomentView,
-  editorMode = false,
-}: CanvasViewControlsProps) {
+export function CanvasViewControls({ isReady, onAddPanel, editorMode = false }: CanvasViewControlsProps) {
   const { panels } = useAppState()
-  // SPIKE: Editor mode draws one Writing panel, the page. A second one would
-  // be added to the board and never shown, so the choice is left out while
-  // the page is showing. With no visible Writing panel it is offered: the
-  // new one becomes the page.
+  // Editor mode draws one Writing panel as the page, so a second one is only
+  // offered when the existing Writing panel is hidden.
   const writingIsThePage = editorMode && panels.all.some((panel) => panel.type === 'notes' && panel.visible)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [panelTypeToAdd, setPanelTypeToAdd] = useState<PanelType | ''>('')
-  const rootRef = useRef<HTMLDivElement | null>(null)
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
-
-  useEffect(() => {
-    if (!isMenuOpen) return
-
-    function handlePointerDown(event: PointerEvent) {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setIsMenuOpen(false)
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return
-      setIsMenuOpen(false)
-      triggerRef.current?.focus()
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isMenuOpen])
-
-  const menuLabel = editorMode ? 'Hidden panels' : 'Panel view and layout actions'
-
-  function runMenuAction(action: () => void) {
-    setIsMenuOpen(false)
-    action()
-  }
 
   function handleAddPanel(event: React.ChangeEvent<HTMLSelectElement>) {
     const panelType = event.target.value as PanelType | ''
@@ -88,107 +25,16 @@ export function CanvasViewControls({
   }
 
   return (
-    <div
-      ref={rootRef}
-      className="canvas-view-controls"
-      onClick={(event) => event.stopPropagation()}
-      onMouseDown={(event) => event.stopPropagation()}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      <select
-        className="app-dropdown app-chrome-control app-chrome-panel-add-control"
-        aria-label="Add panel"
-        title="Choose a panel type to add"
-        value={panelTypeToAdd}
-        disabled={!isReady}
-        onChange={handleAddPanel}
-      >
+    <div className="canvas-view-controls" onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+      <select className="app-dropdown app-chrome-control app-chrome-panel-add-control"
+        aria-label="Add panel" title="Choose a panel type to add" value={panelTypeToAdd}
+        disabled={!isReady} onChange={handleAddPanel}>
         <option value="">Add panel</option>
         {PANEL_TYPES.filter((type) => type !== 'video' && !(type === 'notes' && writingIsThePage)).map((type) => (
           <option value={type} key={type}>{getPanelDefinition(type).label}</option>
         ))}
       </select>
-      {editorMode && !hiddenPanels.length ? null : <button
-        ref={triggerRef}
-        className="app-chrome-control app-chrome-menu-trigger"
-        type="button"
-        title={menuLabel}
-        aria-label={`Open ${menuLabel.toLowerCase()}`}
-        aria-haspopup="menu"
-        aria-expanded={isMenuOpen}
-        disabled={!isReady}
-        onClick={() => setIsMenuOpen((open) => !open)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </button>}
-      {isMenuOpen && (!editorMode || hiddenPanels.length) ? (
-        <div className="canvas-view-menu" role="menu" aria-label={menuLabel}>
-          {editorMode ? null : <>
-          <button type="button" role="menuitem" title="Fit all panels into view" onClick={() => runMenuAction(onFitPanels)}>
-            <Focus size={16} aria-hidden="true" />
-            <span>Fit all panels</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canUseSelectedPanel}
-            title={canUseSelectedPanel ? 'Fit the selected panel into the usable workspace' : 'Select exactly one panel to fit it'}
-            onClick={() => runMenuAction(onFitSelectedPanel)}
-          >
-            <FocusIcon size={16} aria-hidden="true" />
-            <span>Fit selected panel</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canUseSelectedPanel}
-            title={canUseSelectedPanel ? 'Reset the selected panel to its default size' : 'Select exactly one panel to reset its size'}
-            onClick={() => runMenuAction(onResetSelectedPanel)}
-          >
-            <PanelTop size={16} aria-hidden="true" />
-            <span>Reset selected panel size</span>
-          </button>
-          <button type="button" role="menuitem" onClick={() => runMenuAction(onResetPanelLayout)}>
-            <PanelsTopLeft size={16} aria-hidden="true" />
-            <span>Reset panel layout</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canHideSelectedPanel}
-            title={canHideSelectedPanel ? 'Hide the selected panel without deleting it' : 'Select exactly one panel to hide it'}
-            onClick={() => runMenuAction(onHideSelectedPanel)}
-          >
-            <EyeOff size={16} aria-hidden="true" />
-            <span>Hide selected panel</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            title="Hide the toolbar and panel controls, leaving your image, writing and song ready for a screenshot"
-            onClick={() => runMenuAction(onEnterMomentView)}
-          >
-            <Camera size={16} aria-hidden="true" />
-            <span>Prepare board for screenshot</span>
-          </button>
-          </>}
-          {hiddenPanels.length ? (
-            <div className="canvas-view-menu-section" role="group" aria-label="Hidden panels">
-              <span className="canvas-view-menu-heading">Hidden panels</span>
-              {hiddenPanels.map((panel, index) => (
-                <button key={panel.id} type="button" role="menuitem" onClick={() => runMenuAction(() => onRestorePanel(panel.id))}>
-                  <RotateCcw size={16} aria-hidden="true" />
-                  <span>Restore {panelTypeLabel(panel.type)} {index + 1}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   )
-}
-
-function panelTypeLabel(type: PanelType) {
-  return getPanelDefinition(type).label
 }
