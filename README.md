@@ -103,6 +103,15 @@ npm run dev
 
 Then open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
+To use another port in PowerShell, set `PORT` for this terminal before starting the app:
+
+```powershell
+$env:PORT = '5185'
+npm run dev
+```
+
+Then open `http://127.0.0.1:5185/`. If that port is busy, Vite reports the conflict instead of starting at a different address. Clear the setting with `Remove-Item Env:PORT` to return to port 5173.
+
 Other commands:
 
 ```bash
