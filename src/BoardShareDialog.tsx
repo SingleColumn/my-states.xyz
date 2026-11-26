@@ -70,9 +70,7 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
               </div>
               <div className="board-share-notes">
                 <p>Link available for 24 hours, until {new Date(result.expiresAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.</p>
-                <p>People who already opened and saved the board keep their own copies after the link expires.</p>
-                <button className="board-share-text-button" type="button" onClick={() => { setResult(null); setCopied(false) }}>Share again</button>
-              </div>
+                <p>People who already opened and saved the board keep their own copies after the link expires.</p>              </div>
             </div>
           ) : (
             <div className="board-share-actions">

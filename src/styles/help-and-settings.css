@@ -535,17 +535,6 @@
 }
 .board-share-body .board-share-primary:hover:not(:disabled),
 .board-share-body .board-share-primary:focus-visible { filter: brightness(0.9); }
-.board-share-body .board-share-text-button {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-text-muted);
-  font-size: var(--type-sm);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.board-share-body .board-share-text-button:hover { color: var(--color-text); }
 .board-share-body .board-share-actions { align-items: center; gap: 12px; }
 .board-share-body .board-share-status { color: var(--color-text-muted); font-size: var(--type-sm); }
 .board-share-body .board-share-error {
