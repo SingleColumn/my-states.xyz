@@ -5,13 +5,11 @@ test('Share is immediately available without a passphrase or registration', asyn
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Share a board' })).toBeVisible()
-  // No heading. Before anything is uploaded, the card says what will happen:
-  // a copy leaves this computer, anyone with the link can open it, for 24 hours.
+  // No heading. Before anything is created, the card says who can open the
+  // copy and for how long.
   const dialog = page.getByRole('dialog', { name: 'Share a board' })
   await expect(dialog.getByRole('heading')).toHaveCount(0)
-  await expect(dialog.getByText('Upload a copy of this board, with its notes and images, and get a link.')).toBeVisible()
-  await expect(dialog.getByText('Anyone with the link can open it for 24 hours.', { exact: false })).toBeVisible()
-  await expect(dialog.getByText('Your later edits stay on this board.')).toBeVisible()
+  await expect(dialog.getByText('Share a copy of this board. Anyone with the link can open it for 24 hours.')).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Create link', exact: true })).toBeEnabled()
   // Nothing is created by opening the card.
   await expect(page.getByLabel('Share link')).toHaveCount(0)

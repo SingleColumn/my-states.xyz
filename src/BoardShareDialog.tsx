@@ -57,15 +57,11 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
       <section className="help-about-dialog board-share-dialog" role="dialog" aria-modal="true" aria-label="Share a board">
         <div className="board-share-body">
           <div className="board-share-intro">
-            {result ? <p>Your link is ready.</p> : (
-              // Said before anything is uploaded: this is the only point where
-              // the person can still decide, so it states what leaves their
-              // computer, who can open it, and for how long.
-              <div className="board-share-lead">
-                <p>Upload a copy of this board, with its notes and images, and get a link. Anyone with the link can open it for 24 hours.</p>
-                <p className="board-share-aside">Your later edits stay on this board.</p>
-              </div>
-            )}
+            {/* Said before anything is created, while the person can still decide:
+                who can open the copy, and for how long. It describes what sharing
+                does rather than telling the person to do anything; their only
+                step is the button below, if they want to share. */}
+            <p>{result ? 'Your link is ready.' : 'Share a copy of this board. Anyone with the link can open it for 24 hours.'}</p>
             <button className="help-about-close" type="button" aria-label="Close sharing" disabled={busy} onClick={onClose}>×</button>
           </div>
           {result ? (
