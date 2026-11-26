@@ -31,7 +31,7 @@ Each run processes at most 100 staging keys and 100 share keys. R2 stores durabl
 | Variable/binding | Type | Preview/test value | Production value after approval |
 | --- | --- | --- | --- |
 | `BOARD_SHARE_R2_ENDPOINT` | Vercel Config | HTTPS S3 endpoint for test account | HTTPS S3 endpoint for intended production account |
-| `BOARD_SHARE_R2_BUCKET` | Vercel Config | Existing private test bucket | Separate private production bucket |
+| `BOARD_SHARE_R2_BUCKET` | Vercel Config | `my-states-board-sharing-test`; must be the same bucket as the Worker's `BOARD_SHARES` binding, because the Worker reads the pending status the API writes there | Separate private production bucket, matching the production Worker binding |
 | `BOARD_SHARE_R2_ACCESS_KEY_ID` | Vercel Secret | Test bucket-scoped Object Read & Write token ID | Separate production bucket-scoped token ID |
 | `BOARD_SHARE_R2_SECRET_ACCESS_KEY` | Vercel Secret | Matching test token secret | Matching production token secret |
 | `BOARD_SHARE_ALLOWED_ORIGIN` | Vercel Config + Worker variable | `https://music-images-canvas-git-experiment-74365d-robert-tomas-projects.vercel.app` | `https://www.my-states.xyz` (observed canonical redirect; recheck at release) |
@@ -39,20 +39,19 @@ Each run processes at most 100 staging keys and 100 share keys. R2 stores durabl
 | `BOARD_SHARE_SESSION_SIGNING_KEY` | Vercel Secret | Existing 32 random bytes as 64 lowercase hex | Separate production value; also operations bearer and IP-HMAC key |
 | `CRON_SECRET` | Vercel Secret | Same value as Preview signing key | Same value as Production signing key; required by path schedule |
 | `BOARD_SHARE_CLEANUP_ALERT_URL` | Vercel Secret | HTTPS operator-managed notification webhook; no board data is sent | Separate production notification webhook; required for failure notification |
-| `BOARD_SHARES` | Worker R2 binding | Existing private test bucket | Separate private production bucket |
+| `BOARD_SHARES` | Worker R2 binding | `my-states-board-sharing-test`, as named by the operator; its existence and privacy have not yet been confirmed in Cloudflare (`npx wrangler r2 bucket list`) | Separate private production bucket |
 | `BOARD_SHARE_CREATOR_PASSWORD_HASH` | Obsolete | Remove when safe | Do not set |
 
-Copy `worker/wrangler.preview.example.jsonc` to ignored `worker/wrangler.preview.jsonc`, replace its bucket placeholder with the existing **test** bucket, authenticate Wrangler through an operator-approved Cloudflare session, deploy the Worker, and set its exact `workers.dev` origin as `BOARD_SHARE_UPLOAD_ORIGIN` on the Preview branch. Never paste a credential into the config file. Test Worker CORS needs exact Preview origin, method `PUT`, headers `Authorization` and `Content-Type`; R2 browser CORS is needed only for signed GET (`GET` from exact app origin) after this change. Verify the bucket stays private and credentials are bucket-scoped. New R2 presigned PUT URLs are no longer issued by this candidate, but old URLs remain usable until their individual 15-minute expiry; staging cleanup handles their late objects.
+The tracked `worker/wrangler.preview.jsonc` binds `BOARD_SHARES` to the existing **test** bucket `my-states-board-sharing-test`, the name supplied by the operator. The Worker has one public configuration variable, `BOARD_SHARE_ALLOWED_ORIGIN`, set there to the exact stable Preview origin. It needs **no Worker secret**: R2 access comes from the binding and each upload uses a per-share token issued by the Vercel API. Authenticate Wrangler through an operator-approved Cloudflare session, deploy, and set the resulting exact `workers.dev` HTTPS origin as `BOARD_SHARE_UPLOAD_ORIGIN` on the Vercel Preview branch. Never paste a credential into the config file. Test Worker CORS needs exact Preview origin, method `PUT`, headers `Authorization` and `Content-Type`; R2 browser CORS is needed only for signed GET (`GET` from exact app origin) after this change. Verify the bucket stays private and Vercel's S3 credentials are bucket-scoped. New R2 presigned PUT URLs are no longer issued by this candidate, but old URLs remain usable until their individual 15-minute expiry; staging cleanup handles their late objects.
 
-From the repository root, after changing only `bucket_name` in the copied config:
+From the repository root:
 
 ```powershell
-Copy-Item worker/wrangler.preview.example.jsonc worker/wrangler.preview.jsonc
 npx wrangler login
 npx wrangler deploy --config worker/wrangler.preview.jsonc
 ```
 
-Cloudflare documents `wrangler deploy --config` in its [Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/) and requires a known-length stream for R2 `put`; the Worker uses `FixedLengthStream` as documented in the [R2 Worker API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/). The copy step must precede editing `bucket_name`; do not run it again after editing or it will overwrite the local configuration.
+Cloudflare documents `wrangler deploy --config` in its [Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/) and requires a known-length stream for R2 `put`; the Worker uses `FixedLengthStream` as documented in the [R2 Worker API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/). The binding remains in the tracked config for later deployments.
 
 The separate curated-image feed must permit browser fetches from the app origin for export; its root comes from `VITE_IMAGE_COLLECTIONS_BASE_URL`. This root was not identified in the checkout. Other app-wide variables include `VITE_POSTHOG_HOST`, `VITE_POSTHOG_PROJECT_TOKEN`, `VITE_POSTHOG_INTERNAL_TESTER`, `VITE_LOCAL_ORIGIN`, and `VITE_TLDRAW_LICENSE_KEY`. None of the server secrets may have a `VITE_` prefix. Do not copy Preview objects or legacy trial statuses into Production.
 

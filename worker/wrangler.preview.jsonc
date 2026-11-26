@@ -1,12 +1,11 @@
 {
-  // Copy to wrangler.preview.jsonc (ignored) and set the existing test bucket.
   "name": "my-states-board-upload-preview",
   "main": "./boardShareUpload.mjs",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
   "r2_buckets": [{
     "binding": "BOARD_SHARES",
-    "bucket_name": "REPLACE_WITH_EXISTING_TEST_BUCKET"
+    "bucket_name": "my-states-board-sharing-test"
   }],
   "vars": {
     "BOARD_SHARE_ALLOWED_ORIGIN": "https://music-images-canvas-git-experiment-74365d-robert-tomas-projects.vercel.app"
