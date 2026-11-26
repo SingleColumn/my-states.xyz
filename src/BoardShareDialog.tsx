@@ -52,12 +52,20 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
 
   return (
     <div className="help-about-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
-      {/* No visible heading: the sentence says what this does. The dialog keeps
-          a name for screen readers, which announce it on opening. */}
+      {/* No visible heading: the opening text says what this does. The dialog
+          keeps a name for screen readers, which announce it on opening. */}
       <section className="help-about-dialog board-share-dialog" role="dialog" aria-modal="true" aria-label="Share a board">
         <div className="board-share-body">
           <div className="board-share-intro">
-            <p>Share a copy of this board. Your later edits stay on this board.</p>
+            {result ? <p>Your link is ready.</p> : (
+              // Said before anything is uploaded: this is the only point where
+              // the person can still decide, so it states what leaves their
+              // computer, who can open it, and for how long.
+              <div className="board-share-lead">
+                <p>Upload a copy of this board, with its notes and images, and get a link. Anyone with the link can open it for 24 hours.</p>
+                <p className="board-share-aside">Your later edits stay on this board.</p>
+              </div>
+            )}
             <button className="help-about-close" type="button" aria-label="Close sharing" disabled={busy} onClick={onClose}>×</button>
           </div>
           {result ? (
@@ -70,11 +78,12 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
               </div>
               <div className="board-share-notes">
                 <p>Link available for 24 hours, until {new Date(result.expiresAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.</p>
-                <p>People who already opened and saved the board keep their own copies after the link expires.</p>              </div>
+                <p>People who already opened and saved the board keep their own copies after the link expires.</p>
+              </div>
             </div>
           ) : (
             <div className="board-share-actions">
-              <button className="board-share-primary" type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Share</button>
+              <button className="board-share-primary" type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Create link</button>
               {stage ? <p className="board-share-status" role="status">{labels[stage]}</p> : null}
               {busy && stage === 'uploading' ? <button type="button" onClick={() => abortRef.current?.abort()}>Cancel upload</button> : null}
             </div>

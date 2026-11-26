@@ -490,7 +490,9 @@
    negative margin pulls it toward the corner so it lines up with the padding
    edge rather than floating inside it. */
 .board-share-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.board-share-intro p { padding-top: 4px; line-height: 1.5; }
+.board-share-intro > p, .board-share-lead { padding-top: 4px; line-height: 1.5; }
+.board-share-lead { display: grid; gap: 8px; }
+.board-share-aside { color: var(--color-text-muted); font-size: var(--type-sm); }
 .board-share-body .board-share-intro .help-about-close {
   width: 32px;
   min-height: 32px;

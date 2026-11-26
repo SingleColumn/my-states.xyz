@@ -5,10 +5,16 @@ test('Share is immediately available without a passphrase or registration', asyn
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Share a board' })).toBeVisible()
-  // No heading, just the sentence and a one-word button.
-  await expect(page.getByRole('dialog', { name: 'Share a board' }).getByRole('heading')).toHaveCount(0)
-  await expect(page.getByText('Share a copy of this board. Your later edits stay on this board.')).toBeVisible()
-  await expect(page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Share', exact: true })).toBeEnabled()
+  // No heading. Before anything is uploaded, the card says what will happen:
+  // a copy leaves this computer, anyone with the link can open it, for 24 hours.
+  const dialog = page.getByRole('dialog', { name: 'Share a board' })
+  await expect(dialog.getByRole('heading')).toHaveCount(0)
+  await expect(dialog.getByText('Upload a copy of this board, with its notes and images, and get a link.')).toBeVisible()
+  await expect(dialog.getByText('Anyone with the link can open it for 24 hours.', { exact: false })).toBeVisible()
+  await expect(dialog.getByText('Your later edits stay on this board.')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Create link', exact: true })).toBeEnabled()
+  // Nothing is created by opening the card.
+  await expect(page.getByLabel('Share link')).toHaveCount(0)
   await expect(page.getByLabel('Creator passphrase')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Disable' })).toHaveCount(0)
@@ -37,8 +43,11 @@ test('anonymous share shows its link and publication expiry only after confirmat
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByLabel('Share link')).toHaveCount(0)
-  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Share', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Create link', exact: true }).click()
   await expect(page.getByLabel('Share link')).toHaveValue(`https://trial.example.test/share/${id}`)
+  // The result replaces the explanation and the Create link button.
+  await expect(page.getByText('Your link is ready.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create link', exact: true })).toHaveCount(0)
   await expect(page.getByText('Link available for 24 hours', { exact: false })).toBeVisible()
   expect(completionToken).toBe('upload-only-token')
   await expect(page.getByText('upload-only-token')).toHaveCount(0)
@@ -55,7 +64,7 @@ test('a failed upload gives a retryable message without exposing its storage add
   await page.route('https://trial-r2.example.test/staging/archive.board.zip', (route) => route.abort('failed'))
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Share', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Create link', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('could not be uploaded')
   await expect(page.getByRole('alert')).not.toContainText('trial-r2.example.test')
 })
