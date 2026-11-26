@@ -36,14 +36,15 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
 
   return (
     <div className="help-about-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
-      <section className="help-about-dialog board-share-dialog" role="dialog" aria-modal="true" aria-labelledby="board-share-title">
-        <header className="help-about-header">
-          <h2 id="board-share-title">Share a board</h2>
-          <button className="help-about-close" type="button" aria-label="Close sharing" disabled={busy} onClick={onClose}>×</button>
-        </header>
+      {/* No visible heading: the sentence says what this does. The dialog keeps
+          a name for screen readers, which announce it on opening. */}
+      <section className="help-about-dialog board-share-dialog" role="dialog" aria-modal="true" aria-label="Share a board">
         <div className="board-share-body">
-          <p>Share a fixed copy of the open board. Later edits stay on your board.</p>
-          <button type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Share this board</button>
+          <div className="board-share-intro">
+            <p>Share a copy of this board. Your later edits stay on this board.</p>
+            <button className="help-about-close" type="button" aria-label="Close sharing" disabled={busy} onClick={onClose}>×</button>
+          </div>
+          <button type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Share</button>
           {stage ? <p role="status">{labels[stage]}</p> : null}
           {busy && stage === 'uploading' ? <button type="button" onClick={() => abortRef.current?.abort()}>Cancel upload</button> : null}
           {result ? (
