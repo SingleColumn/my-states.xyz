@@ -49,7 +49,7 @@ export function BoardShareReceiver() {
           ) : null}
           {error ? (
             <>
-              <p role="alert">{error}</p>
+              <p className="board-share-error" role="alert">{error}</p>
               <div className="board-share-actions">
                 <button type="button" onClick={() => setAttempt((value) => value + 1)}>Try again</button>
                 <button type="button" onClick={() => { window.history.replaceState(null, '', '/'); setDismissed(true) }}>Open my boards</button>
