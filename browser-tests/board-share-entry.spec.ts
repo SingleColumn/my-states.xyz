@@ -10,7 +10,7 @@ test('Share is immediately available without a passphrase or registration', asyn
   const dialog = page.getByRole('dialog', { name: 'Share a board' })
   await expect(dialog.getByRole('heading')).toHaveCount(0)
   await expect(dialog.getByText('Share a copy of this board. Anyone with the link can open it for 24 hours.')).toBeVisible()
-  await expect(dialog.getByRole('button', { name: 'Create link', exact: true })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Share', exact: true })).toBeEnabled()
   // Nothing is created by opening the card.
   await expect(page.getByLabel('Share link')).toHaveCount(0)
   await expect(page.getByLabel('Creator passphrase')).toHaveCount(0)
@@ -41,11 +41,11 @@ test('anonymous share shows its link and publication expiry only after confirmat
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByLabel('Share link')).toHaveCount(0)
-  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Create link', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByLabel('Share link')).toHaveValue(`https://trial.example.test/share/${id}`)
-  // The result replaces the explanation and the Create link button.
+  // The result replaces the explanation and the card's Share button.
   await expect(page.getByText('Your link is ready.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Create link', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Share', exact: true })).toHaveCount(0)
   await expect(page.getByText('Link available for 24 hours', { exact: false })).toBeVisible()
   expect(completionToken).toBe('upload-only-token')
   await expect(page.getByText('upload-only-token')).toHaveCount(0)
@@ -62,7 +62,7 @@ test('a failed upload gives a retryable message without exposing its storage add
   await page.route('https://trial-r2.example.test/staging/archive.board.zip', (route) => route.abort('failed'))
   await openApp(page)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Create link', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Share a board' }).getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('could not be uploaded')
   await expect(page.getByRole('alert')).not.toContainText('trial-r2.example.test')
 })

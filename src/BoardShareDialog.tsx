@@ -61,7 +61,13 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
                 who can open the copy, and for how long. It describes what sharing
                 does rather than telling the person to do anything; their only
                 step is the button below, if they want to share. */}
-            <p>{result ? 'Your link is ready.' : 'Share a copy of this board. Anyone with the link can open it for 24 hours.'}</p>
+            {/* Each sentence is its own line, so a wrap never splits one in two. */}
+            <p>{result ? 'Your link is ready.' : (
+              <>
+                <span className="board-share-sentence">Share a copy of this board.</span>{' '}
+                <span className="board-share-sentence">Anyone with the link can open it for 24 hours.</span>
+              </>
+            )}</p>
             <button className="help-about-close" type="button" aria-label="Close sharing" disabled={busy} onClick={onClose}>×</button>
           </div>
           {result ? (
@@ -79,7 +85,7 @@ export function BoardShareDialog({ onClose }: { onClose(): void }) {
             </div>
           ) : (
             <div className="board-share-actions">
-              <button className="board-share-primary" type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Create link</button>
+              <button className="board-share-primary" type="button" disabled={busy || !boards.activeBoard} onClick={() => void share()}>Share</button>
               {stage ? <p className="board-share-status" role="status">{labels[stage]}</p> : null}
               {busy && stage === 'uploading' ? <button type="button" onClick={() => abortRef.current?.abort()}>Cancel upload</button> : null}
             </div>
