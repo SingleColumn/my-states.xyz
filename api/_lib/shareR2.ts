@@ -20,9 +20,11 @@ export function isConflict(error: unknown): boolean {
 export class ShareR2 {
   private readonly client: S3Client
   private readonly bucket: string
+  private readonly uploadOrigin: string
 
   constructor(config: ShareConfig) {
     this.bucket = config.bucket
+    this.uploadOrigin = config.uploadOrigin
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: 'auto',
@@ -94,16 +96,10 @@ export class ShareR2 {
     await this.client.send(command)
   }
 
-  async signedPut(key: string): Promise<{ url: string; headers: Record<string, string> }> {
-    const headers = { 'Content-Type': 'application/zip', 'If-None-Match': '*' }
-    const url = await getSignedUrl(this.client, new PutObjectCommand({
-      Bucket: this.bucket, Key: key, ContentType: headers['Content-Type'], IfNoneMatch: headers['If-None-Match'],
-    }), { expiresIn: 900, signableHeaders: new Set(['content-type', 'if-none-match']) })
-    const signed = new URL(url).searchParams.get('X-Amz-SignedHeaders')?.split(';') ?? []
-    if (!['content-type', 'if-none-match'].every((name) => signed.includes(name))) {
-      throw new Error('R2 upload signing omitted a required header.')
-    }
-    return { url, headers }
+  async uploadTarget(_key: string, id: string, token: string): Promise<{ url: string; headers: Record<string, string> }> {
+    return { url: `${this.uploadOrigin}/upload/${id}`, headers: {
+      'Content-Type': 'application/zip', Authorization: `Bearer ${token}`,
+    } }
   }
 
   async signedGet(key: string, expiresIn = 120): Promise<string> {

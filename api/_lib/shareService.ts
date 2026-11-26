@@ -13,9 +13,10 @@ const SHA256 = /^[a-f0-9]{64}$/
 const STATUS_LIMIT = 4096
 const USAGE_KEY = 'trial/share-usage-v1.json'
 const RESOLVE_KEY = 'trial/resolve-usage-v1.json'
+const CLEANUP_STATE_KEY = 'trial/cleanup-state-v1.json'
 type UsageEntry = { id: string; source: string; at: number; bytes: number; deadline: number; completed?: true }
 type ResolveEntry = { source: string; at: number }
-type R2 = Pick<ShareR2, 'read' | 'head' | 'putJson' | 'delete' | 'copyCreateOnly' | 'signedPut' | 'signedGet' | 'list'>
+type R2 = Pick<ShareR2, 'read' | 'head' | 'putJson' | 'delete' | 'copyCreateOnly' | 'uploadTarget' | 'signedGet' | 'list'>
 
 export class ShareError extends Error {
   constructor(message: string, readonly status: number) { super(message) }
@@ -71,6 +72,22 @@ export class ShareService {
       throw new ShareError('Share metadata is invalid.', 503)
     }
     return { value: entry, etag: found.etag }
+  }
+
+  private async finalHeadOrRepair(value: ShareStatus) {
+    let final = await this.r2.head(value.finalKey)
+    if (final?.size === value.byteLength) return final
+    // Keep the validated staging object until expiry so an interrupted or
+    // externally missing final can be restored without extending the link.
+    const staged = await this.r2.read(value.stagingKey, MAX_COMPRESSED_BYTES)
+    if (!staged || staged.bytes.byteLength !== value.byteLength || digest(staged.bytes) !== value.sha256) {
+      throw new ShareError('This shared board is temporarily unavailable.', 503)
+    }
+    try { await this.r2.copyCreateOnly(value.stagingKey, value.finalKey, staged.etag) }
+    catch (error) { if (!isConflict(error)) throw error }
+    final = await this.r2.head(value.finalKey)
+    if (!final || final.size !== value.byteLength) throw new ShareError('This shared board is temporarily unavailable.', 503)
+    return final
   }
 
   private async readEntries<T>(key: string, valid: (entry: T) => boolean): Promise<{ entries: T[]; etag?: string }> {
@@ -166,7 +183,7 @@ export class ShareService {
       if (isConflict(error)) throw new ShareError('Could not allocate a share ID. Try again.', 503)
       throw error
     }
-    return { id, uploadToken, uploadDeadline: value.uploadDeadline, ...await this.r2.signedPut(value.stagingKey) }
+    return { id, uploadToken, uploadDeadline: value.uploadDeadline, ...await this.r2.uploadTarget(value.stagingKey, id, uploadToken) }
   }
 
   async complete(id: string, uploadToken: string): Promise<ShareStatus> {
@@ -179,8 +196,7 @@ export class ShareService {
     }
     if (value.status === 'ready') {
       if (value.expiresAt !== undefined && this.now() >= value.expiresAt) throw new ShareError('This share has expired.', 410)
-      const final = await this.r2.head(value.finalKey)
-      if (!final || final.size !== value.byteLength) throw new ShareError('This shared board is temporarily unavailable.', 503)
+      await this.finalHeadOrRepair(value)
       await this.markCompleted(id).catch(() => undefined)
       return value
     }
@@ -218,6 +234,7 @@ export class ShareService {
     }
     try { validateTrialArchive(read.bytes) }
     catch (error) { throw new ShareError(error instanceof Error ? error.message : 'The archive is invalid.', 422) }
+    if (this.now() > value.uploadDeadline) throw new ShareError('The upload window expired. Start a new share.', 410)
     try { await this.r2.copyCreateOnly(value.stagingKey, value.finalKey, staged.etag) }
     catch (error) {
       if (!isConflict(error)) throw error
@@ -227,6 +244,9 @@ export class ShareService {
       }
     }
     const publishedAt = this.now()
+    if (publishedAt > value.uploadDeadline) {
+      throw new ShareError('The upload window expired. Start a new share.', 410)
+    }
     const ready: ShareStatus = { ...value, status: 'ready', updatedAt: publishedAt, publishedAt, expiresAt: publishedAt + SHARE_MS }
     try { await this.r2.putJson(statusKey(id), ready, { etag: found.etag }) }
     catch (error) {
@@ -242,8 +262,8 @@ export class ShareService {
       }
       throw new ShareError('Share completion conflicted. Try again.', 409)
     }
-    // The PUT URL may still recreate staging. Cleanup also sweeps this prefix.
-    await this.r2.delete(value.stagingKey).catch(() => undefined)
+    // Retain staging until expiry for repair and to keep old create-only PUTs
+    // from recreating the key while their authorization remains valid.
     const current = await this.readStatus(id)
     if (current?.value.status !== 'ready') throw new ShareError('This share was disabled during completion.', 410)
     await this.markCompleted(id).catch(() => undefined)
@@ -257,8 +277,7 @@ export class ShareService {
     if (found.value.status === 'disabled') throw new ShareError('This share has been disabled.', 410)
     if (found.value.status === 'expired' || (found.value.expiresAt !== undefined && this.now() >= found.value.expiresAt))
       throw new ShareError('This share has expired.', 410)
-    const head = await this.r2.head(found.value.finalKey)
-    if (!head || head.size !== found.value.byteLength) throw new ShareError('This shared board is temporarily unavailable.', 503)
+    await this.finalHeadOrRepair(found.value)
     // Signing time is rounded to whole seconds; leave five seconds of margin.
     const now = this.now()
     const seconds = found.value.expiresAt === undefined ? 120
@@ -288,15 +307,6 @@ export class ShareService {
   async cleanup(stagingCursor?: string, sharesCursor?: string) {
     const staged = await this.r2.list('staging/', stagingCursor, 100)
     let removed = 0
-    for (const key of staged.keys) {
-      const id = /^staging\/([a-f0-9]{48})\//.exec(key)?.[1]
-      if (!id) continue
-      const found = await this.readStatus(id)
-      if (!found || found.value.status !== 'pending' || this.now() > found.value.uploadDeadline) {
-        await this.r2.delete(key)
-        removed++
-      }
-    }
     const statuses = await this.r2.list('shares/', sharesCursor, 100)
     for (const key of statuses.keys.filter((candidate) => /^shares\/[a-f0-9]{48}\/status\.json$/.test(candidate))) {
       const id = key.split('/')[1]
@@ -326,16 +336,46 @@ export class ShareService {
       await this.r2.delete(value.finalKey)
       removed += 2
     }
+    for (const key of staged.keys) {
+      const id = /^staging\/([a-f0-9]{48})\//.exec(key)?.[1]
+      if (!id) continue
+      const found = await this.readStatus(id)
+      if (!found || found.value.status === 'disabled' || found.value.status === 'expired'
+        || (found.value.status === 'ready' && found.value.expiresAt !== undefined && this.now() >= found.value.expiresAt)) {
+        await this.r2.delete(key)
+        removed++
+      }
+    }
     for (const key of statuses.keys.filter((candidate) => /^shares\/[a-f0-9]{48}\/archive\.board\.zip$/.test(candidate))) {
       const id = key.split('/')[1]
       const found = await this.readStatus(id)
       if (!found || found.value.status === 'disabled' || found.value.status === 'expired'
-        || (found.value.status === 'ready' && found.value.expiresAt !== undefined && this.now() >= found.value.expiresAt)
-        || (found.value.status === 'pending' && this.now() > found.value.uploadDeadline)) {
+        || (found.value.status === 'ready' && found.value.expiresAt !== undefined && this.now() >= found.value.expiresAt)) {
         await this.r2.delete(key)
         removed++
       }
     }
     return { removed, stagingCursor: staged.cursor, sharesCursor: statuses.cursor }
+  }
+
+  /** One bounded page per invocation; CAS state advances only after all work succeeds. */
+  async cleanupScheduled() {
+    const found = await this.r2.read(CLEANUP_STATE_KEY, 4096)
+    let state: { stagingCursor?: string; sharesCursor?: string; lastSuccessAt?: number } = {}
+    if (found) {
+      try { state = JSON.parse(decode(found.bytes)) }
+      catch { throw new ShareError('Cleanup progress is unreadable.', 503) }
+      if (!state || typeof state !== 'object'
+        || (state.stagingCursor !== undefined && typeof state.stagingCursor !== 'string')
+        || (state.sharesCursor !== undefined && typeof state.sharesCursor !== 'string')) {
+        throw new ShareError('Cleanup progress is invalid.', 503)
+      }
+    }
+    const result = await this.cleanup(state.stagingCursor, state.sharesCursor)
+    const next = { stagingCursor: result.stagingCursor, sharesCursor: result.sharesCursor,
+      lastSuccessAt: this.now() }
+    try { await this.r2.putJson(CLEANUP_STATE_KEY, next, found ? { etag: found.etag } : { none: true }) }
+    catch (error) { if (!isConflict(error)) throw error } // another run will continue from its committed cursor
+    return { removed: result.removed, backlog: !!(result.stagingCursor || result.sharesCursor), lastSuccessAt: next.lastSuccessAt }
   }
 }

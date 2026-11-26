@@ -358,7 +358,7 @@ export async function deleteBoard(boardId: string) {
   await tx.done
 }
 
-export async function importBoardContent(content: ImportedBoardContent, shareId?: string) {
+async function importBoardContentAtomic(content: ImportedBoardContent, shareId?: string, embeddedTheme?: ThemeDefinition) {
   if (shareId !== undefined && !/^[a-f0-9]{48}$/.test(shareId)) throw new Error('Invalid share ID.')
   validateAssets(content.assets)
   const sourceNoteIds = new Set<string>()
@@ -381,9 +381,40 @@ export async function importBoardContent(content: ImportedBoardContent, shareId?
     const activeNoteId = panel.config.activeNoteId ? noteIdMap.get(panel.config.activeNoteId) ?? null : null
     return { ...panel, id, config: { activeNoteId } }
   })
-  const board = makeBoard(content.name, { panels, canvas: remapLayouts(content.canvas, panelIdMap) }, content.themeId)
-
-  const tx = (await dbPromise).transaction(['boards', 'notes', 'assets', 'shareImports'], 'readwrite')
+  const tx = (await dbPromise).transaction(['boards', 'notes', 'assets', 'shareImports', 'themes'], 'readwrite')
+  const done = tx.done
+  void done.catch(() => {})
+  try {
+  let themeId = content.themeId
+  let importedTheme: { name: string; outcome: ThemeImportOutcome } | undefined
+  if (embeddedTheme) {
+    const store = tx.objectStore('themes')
+    let id = embeddedTheme.id
+    let outcome: ThemeImportOutcome = 'added'
+    for (let suffix = 2; ; suffix += 1) {
+      const existing = isBuiltInThemeId(id) ? undefined : await store.get(id)
+      if (!isBuiltInThemeId(id) && !existing) break
+      if (existing && sameDefinition(existing.definition, embeddedTheme)) {
+        themeId = existing.id
+        importedTheme = { name: existing.name, outcome: 'existing' }
+        break
+      }
+      id = `${embeddedTheme.id}-${suffix}`
+      outcome = 'renamed'
+    }
+    if (!importedTheme) {
+      const now = Date.now()
+      const theme: StoredTheme = {
+        id, name: embeddedTheme.name, version: embeddedTheme.version, schemaVersion: embeddedTheme.schemaVersion,
+        source: 'imported', definition: id === embeddedTheme.id ? embeddedTheme : { ...embeddedTheme, id },
+        createdAt: now, updatedAt: now,
+      }
+      await store.add(theme)
+      themeId = id
+      importedTheme = { name: theme.name, outcome }
+    }
+  }
+  const board = makeBoard(content.name, { panels, canvas: remapLayouts(content.canvas, panelIdMap) }, themeId)
   // The unique share ID and board are committed together. A concurrent tab's
   // duplicate add aborts this entire transaction, including its new board.
   if (shareId) await tx.objectStore('shareImports').add({ shareId, boardId: board.id })
@@ -409,8 +440,20 @@ export async function importBoardContent(content: ImportedBoardContent, shareId?
     })
   }
 
-  await tx.done
-  return board
+  await done
+  return { board, importedTheme }
+  } catch (error) {
+    try { tx.abort() } catch { /* The transaction may already have aborted. */ }
+    throw error
+  }
+}
+
+export async function importBoardContent(content: ImportedBoardContent, shareId?: string) {
+  return (await importBoardContentAtomic(content, shareId)).board
+}
+
+export async function importBoardContentWithTheme(content: ImportedBoardContent, shareId: string | undefined, embeddedTheme: ThemeDefinition) {
+  return importBoardContentAtomic(content, shareId, embeddedTheme)
 }
 
 export async function getSharedBoardId(shareId: string): Promise<string | null> {

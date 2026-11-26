@@ -42,11 +42,12 @@ class MemoryR2 {
     this.putRaw(destination, this.objects.get(sourceKey)!.bytes)
     this.copied++
   }
-  async signedPut(key: string) { return { url: `https://example.test/${key}`, headers: { 'Content-Type': 'application/zip', 'If-None-Match': '*' } } }
+  async uploadTarget(_key: string, id: string, token: string) { return { url: `https://upload.example.test/upload/${id}`, headers: { 'Content-Type': 'application/zip', Authorization: `Bearer ${token}` } } }
   async signedGet(key: string, expiresIn = 120) { return `https://example.test/${key}?seconds=${expiresIn}` }
   async list(prefix: string, cursor?: string, limit = 100) {
     const keys = [...this.objects.keys()].filter((key) => key.startsWith(prefix)).sort()
-    const start = cursor ? keys.indexOf(cursor) + 1 : 0
+    // Stable lexical cursor: deleting an earlier page cannot restart a scan.
+    const start = cursor ? Math.max(0, keys.findIndex((key) => key > cursor)) : 0
     const page = keys.slice(start, start + limit)
     return { keys: page, ...(start + limit < keys.length ? { cursor: page.at(-1) } : {}) }
   }
@@ -146,14 +147,20 @@ describe('anonymous share status and limits', () => {
     }
   })
 
-  it('does not republish after an outstanding upload URL recreates staging', async () => {
-    const { r2, service } = setup()
+  it('keeps staging for repair without extending a published link', async () => {
+    const { r2, service, clock } = setup()
     const { created, status, bytes } = await pending(r2, service)
     r2.putRaw(status.stagingKey, bytes)
     const first = await service.complete(created.id, created.uploadToken)
     r2.putRaw(status.stagingKey, bytes)
     expect((await service.complete(created.id, created.uploadToken)).expiresAt).toBe(first.expiresAt)
     expect(r2.copied).toBe(1)
+    await service.cleanup()
+    expect(r2.objects.has(status.stagingKey)).toBe(true)
+    r2.objects.delete(status.finalKey)
+    await expect(service.resolve(created.id)).resolves.toHaveProperty('url')
+    expect(r2.objects.has(status.finalKey)).toBe(true)
+    clock(first.expiresAt! + 1)
     await service.cleanup()
     expect(r2.objects.has(status.stagingKey)).toBe(false)
   })
@@ -198,5 +205,44 @@ describe('anonymous share status and limits', () => {
     r2.putRaw(status.stagingKey, bytes)
     await service.cleanup()
     expect(r2.objects.has(status.stagingKey)).toBe(false)
+  })
+
+  it('does not delete an archive when cleanup races publication', async () => {
+    const { r2, service, clock, now } = setup()
+    const { created, status, bytes } = await pending(r2, service)
+    r2.putRaw(status.stagingKey, bytes)
+    const copy = r2.copyCreateOnly.bind(r2)
+    r2.copyCreateOnly = async (from, to, etag) => {
+      await copy(from, to, etag)
+      await service.cleanup()
+    }
+    const ready = await service.complete(created.id, created.uploadToken)
+    expect(r2.objects.has(status.finalKey)).toBe(true)
+    await expect(service.resolve(created.id)).resolves.toHaveProperty('url')
+    clock(now() + SHARE_MS + 1)
+    await service.cleanup()
+    expect(r2.objects.has(status.finalKey)).toBe(false)
+    expect(ready.status).toBe('ready')
+  })
+
+  it('advances a durable cleanup scan past retained early pages', async () => {
+    const { r2, service, now } = setup()
+    const { status, bytes } = await pending(r2, service)
+    const publishedAt = now() - SHARE_MS - 1000
+    for (let index = 0; index < 130; index++) {
+      const id = index.toString(16).padStart(48, '0')
+      const entry = { ...status, id, stagingKey: `staging/${id}/${'a'.repeat(32)}`,
+        finalKey: `shares/${id}/archive.board.zip`, status: 'ready',
+        createdAt: publishedAt - 1000, publishedAt, expiresAt: publishedAt + SHARE_MS, updatedAt: publishedAt }
+      r2.putRaw(`shares/${id}/status.json`, strToU8(JSON.stringify(entry)))
+      r2.putRaw(entry.finalKey, bytes)
+    }
+    const last = `shares/${(129).toString(16).padStart(48, '0')}/archive.board.zip`
+    expect(r2.objects.has(last)).toBe(true)
+    for (let step = 0; step < 8; step++) await service.cleanupScheduled()
+    expect(r2.objects.has(last)).toBe(false)
+    const progress = r2.objects.get('trial/cleanup-state-v1.json')
+    expect(progress).toBeDefined()
+    expect(JSON.parse(new TextDecoder().decode(progress!.bytes)).lastSuccessAt).toBe(now())
   })
 })

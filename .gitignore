@@ -60,3 +60,4 @@ tmp/
 temp/
 *.tmp
 *.bak
+worker/wrangler.preview.jsonc

@@ -7,6 +7,7 @@ export interface ShareConfig {
   secretAccessKey: string
   sessionSigningKey: string
   allowedOrigin: string
+  uploadOrigin: string
 }
 
 const names = {
@@ -16,6 +17,7 @@ const names = {
   secretAccessKey: 'BOARD_SHARE_R2_SECRET_ACCESS_KEY',
   sessionSigningKey: 'BOARD_SHARE_SESSION_SIGNING_KEY',
   allowedOrigin: 'BOARD_SHARE_ALLOWED_ORIGIN',
+  uploadOrigin: 'BOARD_SHARE_UPLOAD_ORIGIN',
 } as const
 
 export function readShareConfig(env: Record<string, string | undefined>): ShareConfig {
@@ -27,9 +29,11 @@ export function readShareConfig(env: Record<string, string | undefined>): ShareC
   }
   let endpoint: URL
   let origin: URL
+  let upload: URL
   try {
     endpoint = new URL(result.endpoint)
     origin = new URL(result.allowedOrigin)
+    upload = new URL(result.uploadOrigin)
   } catch {
     throw new Error('Board sharing has an invalid endpoint or allowed origin.')
   }
@@ -41,6 +45,8 @@ export function readShareConfig(env: Record<string, string | undefined>): ShareC
     || origin.protocol !== 'https:'
     || origin.origin !== result.allowedOrigin
     || origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password
+    || upload.protocol !== 'https:' || upload.origin !== result.uploadOrigin
+    || upload.pathname !== '/' || upload.search || upload.hash || upload.username || upload.password
   ) throw new Error('Board sharing has an invalid endpoint or allowed origin.')
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(result.bucket)) throw new Error('Board sharing has an invalid bucket name.')
   if (result.accessKeyId.length < 10 || result.secretAccessKey.length < 20) throw new Error('Board sharing has invalid R2 credentials.')

@@ -7,18 +7,14 @@ const config: ShareConfig = {
   endpoint: `https://${'a'.repeat(32)}.r2.cloudflarestorage.com`, bucket: 'trial-bucket',
   accessKeyId: 'test-access-key', secretAccessKey: 'test-secret-access-key',
   sessionSigningKey: 'ab'.repeat(32), allowedOrigin: 'https://trial.example.test',
+  uploadOrigin: 'https://trial-upload.example.workers.dev',
 }
 
 describe('SDK presigning', () => {
-  it('binds the create-only and content-type headers to the staging PUT URL', async () => {
-    const result = await new ShareR2(config).signedPut('staging/test/archive.board.zip')
-    const url = new URL(result.url)
-    expect(url.pathname).toBe('/trial-bucket/staging/test/archive.board.zip')
-    expect(url.searchParams.get('X-Amz-Expires')).toBe('900')
-    expect(url.searchParams.get('X-Amz-SignedHeaders')?.split(';')).toEqual(
-      expect.arrayContaining(['content-type', 'if-none-match']),
-    )
-    expect(result.headers).toEqual({ 'Content-Type': 'application/zip', 'If-None-Match': '*' })
+  it('returns the bounded upload Worker target and keeps the token out of the URL', async () => {
+    const result = await new ShareR2(config).uploadTarget('staging/private', 'a'.repeat(48), 'b'.repeat(64))
+    expect(result.url).toBe(`${config.uploadOrigin}/upload/${'a'.repeat(48)}`)
+    expect(result.headers).toEqual({ 'Content-Type': 'application/zip', Authorization: `Bearer ${'b'.repeat(64)}` })
   })
   it('limits signed reads to two minutes', async () => {
     const url = new URL(await new ShareR2(config).signedGet('shares/test/archive.board.zip'))
