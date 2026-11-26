@@ -16,7 +16,7 @@ Evidence labels used below: **code** = current source inspection, **unit** = aut
 
 ### Remediation checkpoint (2026-11-26)
 
-The separable sharing-dialog changes, baseline report, and initial diagnostic were checkpointed as `a9087ad5ed46823ccd8aafc807a234c53e08a3dc`. The changes described below are currently uncommitted while external Preview configuration is pending. The original findings later in this document are the **7ca99a1 baseline**, preserved for traceability; this table is the current status. No claimed fix below relies on a unit test alone where a deployed platform or real R2 determines the guarantee.
+The separable sharing-dialog changes, baseline report, and initial diagnostic were checkpointed as `a9087ad5ed46823ccd8aafc807a234c53e08a3dc`. The remediation code was selectively committed as `70066b9f64a72744e9b60d1fefd3e2548d313c6b`; this report update follows it. The original findings later in this document are the **7ca99a1 baseline**, preserved for traceability; this table is the current status. No claimed fix below relies on a unit test alone where a deployed platform or real R2 determines the guarantee.
 
 | Finding | Current implementation and evidence | Remaining acceptance gate |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ The separable sharing-dialog changes, baseline report, and initial diagnostic we
 | P2 concurrency | Completion/cleanup now retain validated staging until expiry, repair a missing final from matching staging, mark expired before deletion and avoid deleting pending finals from a stale scan. Targeted race and pagination tests pass. | Real R2 concurrent copy/cleanup/delete-failure checks, including continuation tokens after deletes. A ready record with both objects missing remains unavailable and requires operator action. |
 | P4 dependencies | Narrow lockfile update: `prosemirror-view` 1.44.0, `markdown-it` 14.3.3, required `prosemirror-model` 1.25.13. `npm audit --omit=dev --json` reports zero production advisories on 2026-11-26. | Advisory feeds can change; repeat production audit before release. No broad dependency churn was applied. |
 
-The committed release-candidate SHA, verified Vercel deployment ID/SHA, and real R2 result are **pending**. The current live Preview still serves the prior deployment fingerprint `dpl_2k9FaKvQtYod6wNRLTeJa3Mc6R26`; it must not be described as this candidate. Read-only Production before-state: `https://my-states.xyz` returned 308 to `https://www.my-states.xyz`, which returned 200; neither was changed. A read-only after-state check remains due after Preview deployment.
+The committed code candidate is `70066b9f64a72744e9b60d1fefd3e2548d313c6b`; a clean `git archive` checkout passed `npm ci`, `npm test` and `npm run build`. The verified Vercel deployment ID/SHA and real R2 result are **pending**. The current live Preview still serves the prior deployment fingerprint `dpl_2k9FaKvQtYod6wNRLTeJa3Mc6R26`; it must not be described as this candidate. Read-only Production before-state: `https://my-states.xyz` returned 308 to `https://www.my-states.xyz`, which returned 200. Read-only after-state on 2026-11-26 returned the same 308 and 200 respectively; no Production settings or data were changed.
 
 ## Baseline implementation map and lifecycle at 7ca99a1
 
@@ -74,13 +74,13 @@ IP-based limits affect shared networks and can be bypassed by IP rotation; they 
 
 | Requirement/check | Evidence | Result / boundary |
 | --- | --- | --- |
-| Anonymous create → PUT → complete → clean-recipient open/reopen | **Preview**, fresh Chromium creator and separate recipient, one small synthetic share | Passed; create 201, complete 200, resolve 200, no browser download. Exact deployed SHA unobservable. |
-| Local Share UI, error/retry, manual-archive fidelity | **browser**, Chromium | Four selected browser tests passed, including notes, device image, theme, geometry/camera, independent edit and reload via manual archive. This is not a real R2 curated-image round trip. |
-| Service/API/archive/R2/storage logic | **unit** | Focused six files: 67 passed. Full `npm test`: 74 Vitest files/661 tests and 8 Node tests passed. Controlled clock tests cover first publication +24h, retry, signed GET deadline, ledger, cleanup. |
-| Build | local TypeScript/Vite | Passed on unsandboxed retry. Initial run failed on a transient unrelated browser test; next sandboxed Vite run hit `spawn EPERM`. Current successful build emitted only a large-chunk warning. |
-| Signed PUT/COPY/GET and exact CORS | **unit + official R2 docs** | Signed headers/method/key/lifetimes verified in installed SDK test; live CORS success for one Preview flow; production CORS and private bucket unverified. |
-| Oversized PUT, exact expiry, cleanup, races | **code/unit** | No destructive live test; complete rejects wrong size; controlled clock tests only. R2 storage-before-rejection and scheduler gap remain. |
-| Analytics payloads and account retention | **code + provider docs** | Path-leak risk confirmed by default pageview behavior; actual event payload/retention not inspected. |
+| Anonymous create → PUT → complete → clean-recipient open/reopen | **historical Preview**, fresh Chromium creator and separate recipient, one small synthetic share | Baseline passed create 201, complete 200, resolve 200, no download; exact prior deployed SHA unobservable. Candidate with Worker is not deployed. |
+| Local Share UI, error/retry, manual-archive fidelity | **browser**, Chromium | Baseline browser tests covered notes, device image, theme, geometry/camera, independent edit and reload via manual archive. This is not a real R2 curated-image round trip. |
+| Service/API/archive/R2/storage logic | **unit, clean committed checkout** | Candidate `70066b9` passed 76 Vitest files/669 tests and 13 Node tests after `npm ci`; controlled clock/race/pagination and theme-write-failure tests pass. |
+| Build | **local committed checkout** TypeScript/Vite | Candidate `70066b9` build passed; only a large-chunk warning. |
+| Worker upload and R2 conditions | **unit + official R2 docs** | Worker mock tests valid, replay, late extra byte, misleading length, token and conditional conflict. Cloudflare documents known-length `FixedLengthStream` and conditional `put` returning null. Actual R2 write/limit and Worker CORS unverified. |
+| Oversized PUT, exact expiry, cleanup, races | **code/unit** | No destructive live test; controlled 24-hour clocks, multi-page cleanup and failure/race mocks pass. Real R2 and observed schedule remain gates. |
+| Analytics payloads and account retention | **code + unit + local browser** | Recursive pre-send redaction and no-referrer tested; local intercepted request check did not observe actual PostHog pageview payload. Preview outbound event and historical retention unverified. |
 | Safari, Firefox, iOS, mobile fidelity | **external / not tested** | Chromium-only result. Do not claim other browser coverage. |
 
 ### Limits, abuse, and illustrative cost
@@ -120,4 +120,4 @@ The application returns 503 when required sharing config is missing/invalid or R
 
 ### Final summary
 
-**Verdict:** not ready. **Local fixes:** analytics pre-send redaction/referrer policy, bounded exact-shape API body, bounded upload Worker code, durable scheduled cleanup code, atomic theme import, and narrow dependency patches. **Unresolved release gates:** deploy and test the Worker against real test R2, configure and observe Preview schedule plus failure notification, verify real analytics payloads and exact Preview SHA, then perform a clean committed-candidate build/test and content-fidelity smoke checks. **Single next action:** configure the existing test bucket binding and Preview upload Worker, then run the bounded above-limit and valid-share tests before pushing a candidate that depends on it.
+**Verdict:** not ready. **Local fixes:** analytics pre-send redaction/referrer policy, bounded exact-shape API body, bounded upload Worker code, durable scheduled cleanup code, atomic theme import, and narrow dependency patches. **Unresolved release gates:** deploy and test the Worker against real test R2, configure and observe Preview schedule plus failure notification, verify real analytics payloads and exact Preview SHA, and complete content-fidelity smoke checks. The committed candidate passed a clean checkout test/build. **Single next action:** configure the existing test bucket binding and Preview upload Worker, then run the bounded above-limit and valid-share tests before pushing a candidate that depends on it.
