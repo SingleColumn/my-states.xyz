@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Palette } from 'lucide-react'
 import { useAppState } from './AppState'
 
 /** The option that means "follow Settings"; not a theme id, so it can never collide with one. */
@@ -26,7 +27,7 @@ export function useBoardThemeOptions() {
 }
 
 /**
- * The board's theme, beside the Settings button: what is on screen reads
+ * The board's theme, beside Share: what is on screen reads
  * off the selected option, and Global (…) names the theme Settings holds.
  */
 export function BoardThemeSelect() {
@@ -48,6 +49,7 @@ export function BoardThemeSelect() {
 
   return (
     <span className="board-theme-control">
+      <Palette className="board-theme-compact-icon" size={16} aria-hidden="true" />
       <select
         className="app-dropdown app-chrome-control board-theme-select"
         aria-label="Theme for this board"

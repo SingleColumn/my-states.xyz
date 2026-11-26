@@ -295,10 +295,15 @@ export async function expectArchitectureReportPass(page: Page) {
   }, { message: 'panel architecture report status' }).toBe('PASS · 0 errors · 0 warnings')
 }
 
-/** Adds a panel from the toolbar's "Add panel" dropdown and returns it. */
+// The words the "Add panel" menu shows (panelRegistry's labels), kept here so the
+// suite does not load the registry and its tldraw validators.
+const PANEL_MENU_LABELS: Record<PanelType, string> = { slideshow: 'Images', notes: 'Notes', spotify: 'Music', video: 'Video' }
+
+/** Adds a panel from the toolbar's "Add panel" menu and returns it. */
 export async function addPanelFromToolbar(page: Page, type: PanelType): Promise<PanelDescription> {
   const before = (await describeCanvas(page)).panels.map((panel) => panel.panelId)
-  await page.getByRole('combobox', { name: 'Add panel' }).selectOption(type)
+  await page.getByRole('button', { name: 'Add panel' }).click()
+  await page.getByRole('menu', { name: 'Add panel' }).getByRole('menuitem', { name: PANEL_MENU_LABELS[type], exact: true }).click()
   await expect.poll(async () => (await describeCanvas(page)).panels.length).toBe(before.length + 1)
   const added = (await describeCanvas(page)).panels.find((panel) => !before.includes(panel.panelId))
   if (!added) throw new Error('The added panel is not on the canvas')
@@ -319,19 +324,24 @@ export function boardPicker(page: Page) {
 }
 
 export async function boardPickerNames(page: Page): Promise<string[]> {
-  return boardPicker(page).locator('option').allTextContents()
+  await boardPicker(page).click()
+  const names = await page.getByRole('listbox', { name: 'Boards' }).getByRole('option').allTextContents()
+  await page.keyboard.press('Escape')
+  return names
 }
 
-/** Creates a board through the "New board" button and its name prompt, then waits for it to open. */
+/** Creates a board through the pinned row in the board picker. */
 export async function createBoardFromToolbar(page: Page, name: string) {
   page.once('dialog', (dialog) => void dialog.accept(name))
+  await boardPicker(page).click()
   await page.getByRole('button', { name: 'New board' }).click()
   await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe(name)
   await waitForCanvas(page)
 }
 
 export async function switchBoard(page: Page, name: string) {
-  await boardPicker(page).selectOption({ label: name })
+  await boardPicker(page).click()
+  await page.getByRole('listbox', { name: 'Boards' }).getByRole('option', { name, exact: true }).click()
   await expect.poll(async () => (await describeCanvas(page)).board?.name).toBe(name)
   await waitForCanvas(page)
 }

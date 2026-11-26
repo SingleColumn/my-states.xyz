@@ -36,9 +36,8 @@
 /* Two bands of text stacked on each other have to share a left column, or
    the seam between them reads as careless. The panel's title is moved to
    where the board's name is laid out -- measured, because that column is
-   the toolbar's inset plus the dropdown's own border and padding plus what
-   the browser adds inside it, and the first three are the theme's to
-   choose. AppChrome measures it; see --app-board-text-left there.
+   the toolbar's inset plus the board picker's own border and padding, all
+   the theme's to choose. AppChrome measures it; see --app-board-text-left there.
 
    Multiplied by --tl-scale because the two are not in the same units. The
    toolbar is drawn at screen size, while a panel is drawn inside tldraw's
@@ -127,14 +126,14 @@
   }
 }
 
-@media (max-width: 1399px) {
+@media (max-width: 1599px) {
   .app-chrome {
     column-gap: 12px;
     padding-inline: 12px;
   }
 
-  .board-toolbar select {
-    width: clamp(180px, 20vw, 220px);
+  .board-picker-trigger {
+    max-width: clamp(180px, 20vw, 220px);
   }
 
   .canvas-control-label-long {
@@ -151,8 +150,21 @@
   }
 }
 
-@media (max-width: 1399px) {
-  /* The words give way to the icon (the tooltip keeps them); a failure keeps its words. */
+@media (max-width: 1599px) {
+  .app-chrome-pan-control { width: var(--size-top-toolbar-control); justify-content: center; padding: 0; }
+  .canvas-control-label-long, .canvas-control-label-short { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  /* "Saved in this browser" shortens to "Saved"; the tooltip keeps the rest. */
+  .board-save-status:not(.is-failed) svg,
+  .board-save-status-long { display: none; }
+  .board-save-status-short { display: inline; }
+}
+
+/* Below 1200px the words give way to icons (tooltips keep them); a save failure keeps its words. */
+@media (max-width: 1199px) {
+  .board-share-launcher { width: var(--size-top-toolbar-control); padding: 0; }
+  .board-share-launcher span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .app-chrome-panel-add-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .board-save-status:not(.is-failed) svg { display: block; }
   .board-save-status:not(.is-failed) .board-save-status-text {
     position: absolute;
     width: 1px;
@@ -164,25 +176,29 @@
 }
 
 @media (max-width: 1199px) {
-  .board-theme-control {
-    display: none !important;
+  .app-chrome {
+    column-gap: var(--space-top-toolbar-gap);
   }
+  .app-chrome-identity { gap: var(--space-top-toolbar-gap); }
+  .app-chrome-boards,
+  .app-chrome-canvas { padding-left: var(--space-top-toolbar-gap); }
+
+  .board-theme-control {
+    width: var(--size-top-toolbar-control);
+  }
+
+  .board-theme-control .board-theme-compact-icon { display: block; position: absolute; z-index: 1; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+  /* The palette icon stands for the theme; the native arrow would sit on top of it. */
+  .app-chrome-tldraw .board-theme-select { width: var(--size-top-toolbar-control); color: transparent; padding: 0; appearance: none; text-indent: 100px; overflow: hidden; }
+  .board-theme-select option { color: var(--color-app-badge-text); }
 
   .board-actions-menu .board-actions-menu-theme {
     display: grid;
   }
 
-  .app-chrome-brand-name {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
-  .board-toolbar select {
-    width: clamp(160px, 22vw, 200px);
+  .board-picker-trigger {
+    min-width: 110px;
+    max-width: clamp(110px, 12vw, 140px);
   }
 
   .canvas-control-label-short {
@@ -192,12 +208,6 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
-  }
-
-  .app-chrome-pan-control {
-    width: var(--size-top-toolbar-control);
-    justify-content: center;
-    padding: 0;
   }
 
   .app-chrome-tldraw .tlui-page-menu__trigger {
@@ -210,18 +220,14 @@
   }
 }
 
-@media (max-width: 799px) {
+@media (max-width: 999px) {
   .app-chrome {
     grid-template-areas:
-      "boards boards boards"
-      "canvas spacer tldraw";
-    grid-template-columns: auto minmax(8px, 1fr) auto;
+      "identity boards spacer"
+      "canvas canvas tldraw";
+    grid-template-columns: auto auto minmax(8px, 1fr);
     row-gap: var(--space-top-toolbar-gap);
     column-gap: var(--space-app-chrome-compact-gap);
-  }
-
-  .app-chrome-boards {
-    justify-content: space-between;
   }
 
   .board-actions-menu { grid-template-columns: minmax(0, 1fr); }
@@ -234,31 +240,25 @@
     border-top: var(--border-width-hairline) solid var(--color-panel-divider);
   }
 
-  .app-chrome-canvas {
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .board-toolbar select {
+  /* Stacked layouts give the picker a row of its own: fixed widths, no fit-to-name. */
+  .board-picker-trigger {
     width: clamp(130px, 30vw, 190px);
+    min-width: 0;
+    max-width: none;
   }
 }
 
 @media (max-width: 520px) {
   .app-chrome {
     grid-template-areas:
+      "identity identity"
       "boards boards"
-      "canvas spacer"
+      "canvas canvas"
       "tldraw tldraw";
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .app-chrome-boards,
-  .board-toolbar { flex-wrap: wrap; }
-
-  .board-toolbar { width: 100%; }
-
-  .board-toolbar select {
+  .board-picker-trigger {
     width: clamp(105px, 28vw, 145px);
   }
 
@@ -270,7 +270,7 @@
 }
 
 @media (max-width: 380px) {
-  .board-toolbar select {
+  .board-picker-trigger {
     width: 100px;
   }
 }

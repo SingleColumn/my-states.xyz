@@ -85,7 +85,7 @@ test('board actions keep rename, duplicate, export, import and delete behavior',
   const picker = page.getByRole('combobox', { name: 'Open board' })
   page.once('dialog', (dialog) => void dialog.accept('Menu test board'))
   await chooseBoardMenuItem(page, 'Rename board')
-  await expect(picker.locator('option:checked')).toHaveText('Menu test board')
+  await expect(picker).toHaveAttribute('title', 'Menu test board')
 
   const downloadPromise = page.waitForEvent('download')
   await chooseBoardMenuItem(page, 'Export board')
@@ -98,17 +98,22 @@ test('board actions keep rename, duplicate, export, import and delete behavior',
   await chooseBoardMenuItem(page, 'Import board')
   page.once('dialog', (dialog) => void dialog.accept('Imported from menu'))
   await (await chooserPromise).setFiles(path)
-  await expect(picker.locator('option:checked')).toHaveText('Imported from menu')
-  const beforeDuplicate = await picker.locator('option').count()
+  await expect(picker).toHaveAttribute('title', 'Imported from menu')
+  await picker.click()
+  const beforeDuplicate = await page.getByRole('listbox', { name: 'Boards' }).getByRole('option').count()
+  await page.keyboard.press('Escape')
   await chooseBoardMenuItem(page, 'Duplicate board')
-  await expect(picker.locator('option')).toHaveCount(beforeDuplicate + 1)
+  await picker.click()
+  await expect(page.getByRole('listbox', { name: 'Boards' }).getByRole('option')).toHaveCount(beforeDuplicate + 1)
+  await page.keyboard.press('Escape')
 
-  const beforeDelete = await picker.locator('option').count()
+  const beforeDelete = beforeDuplicate + 1
   let confirmed = false
   page.once('dialog', (dialog) => { confirmed = dialog.message().startsWith('Delete '); void dialog.accept() })
   await chooseBoardMenuItem(page, 'Delete board')
   expect(confirmed).toBe(true)
-  await expect(picker.locator('option')).toHaveCount(beforeDelete - 1)
+  await picker.click()
+  await expect(page.getByRole('listbox', { name: 'Boards' }).getByRole('option')).toHaveCount(beforeDelete - 1)
 })
 
 test('panel actions keep fit, reset, hide and restore behavior', async ({ page }) => {

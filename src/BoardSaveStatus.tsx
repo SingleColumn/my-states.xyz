@@ -39,7 +39,13 @@ export function BoardSaveStatus() {
   return (
     <span className="board-save-status" data-testid="board-save-status" title={EXPLANATION}>
       <HardDrive size={14} aria-hidden="true" />
-      <span className="board-save-status-text">{status === 'saving' && showSaving ? 'Saving…' : 'Saved in this browser'}</span>
+      {status === 'saving' && showSaving
+        ? <span className="board-save-status-text">Saving…</span>
+        : <>
+          <span className="board-save-status-text board-save-status-long">Saved in this browser</span>
+          {/* A mid-width toolbar keeps a word: an icon on its own read as a button. */}
+          <span className="board-save-status-text board-save-status-short" aria-hidden="true">Saved</span>
+        </>}
     </span>
   )
 }

@@ -198,8 +198,10 @@ test('export writes a .board.zip and import brings the board back, listed in the
 
   // The picker lists the imported board straight away, and has it selected.
   // (A regression here once left it out until the next create or delete.)
-  await expect(boardPicker(page)).toHaveValue(imported.id)
-  const listed = await boardPicker(page).locator('option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value))
+  await expect(boardPicker(page)).toHaveAttribute('title', imported.name)
+  await boardPicker(page).click()
+  const listed = await page.getByRole('listbox', { name: 'Boards' }).getByRole('option').evaluateAll((options) => options.map((option) => option.getAttribute('data-board-id')))
+  await page.keyboard.press('Escape')
   expect(listed.sort()).toEqual([source.id, imported.id].sort())
   expect(await boardPickerNames(page)).toEqual([source.name, source.name])
 
@@ -400,7 +402,8 @@ test('a canvas command during a board switch is refused, and the switch complete
     }
   })
 
-  await boardPicker(page).selectOption({ label: first })
+  await boardPicker(page).click()
+  await page.getByRole('listbox', { name: 'Boards' }).getByRole('option', { name: first, exact: true }).click()
   await expect(dispatch(page, { kind: 'panel.move', panelId: secondNotes.panelId, x: 0, y: 0 }))
     .rejects.toThrow('Please wait for the current board operation to finish.')
 
@@ -408,7 +411,7 @@ test('a canvas command during a board switch is refused, and the switch complete
   await waitForCanvas(page)
   expect((await describeCanvas(page)).panels).toHaveLength(3)
   // The refused command left the other board exactly as it was.
-  await boardPicker(page).selectOption({ label: 'Second board' })
+  await switchBoard(page, 'Second board')
   await expect.poll(async () => (await describeCanvas(page)).board?.name, { timeout: 15_000 }).toBe('Second board')
   await waitForCanvas(page)
   expect((await describeCanvas(page)).panels.map(persistedShape)).toEqual(secondLayout)

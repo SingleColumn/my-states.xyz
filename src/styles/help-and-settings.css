@@ -451,13 +451,13 @@
   .app-settings-theme-meta { grid-column: 1 / -1; }
 }
 
-/* The board's theme choice: a select beside the Settings button at full
-   width, a group of radio items in the board … menu when the chrome is
-   compact. */
+/* The board's theme choice keeps its select at every width; compact chrome
+   shows its icon and also offers the choices in the board menu. */
 .board-theme-control {
   position: relative;
   display: inline-flex;
 }
+.board-theme-compact-icon { display: none; }
 
 .app-chrome-tldraw .board-theme-select {
   width: clamp(130px, 12vw, 180px);
@@ -480,9 +480,30 @@
 
 .board-toolbar-notice { color: var(--color-text-muted); }
 
-.board-share-dialog { width: min(620px, 94vw); }
-.board-share-body { display: grid; gap: 14px; padding: 22px; overflow: auto; }
+/* Narrow card: the dialog holds one sentence and one button, so a wide card
+   only adds empty space. Long text (the link and its notes) still wraps. */
+.board-share-dialog { width: min(440px, 94vw); }
+.board-share-body { display: grid; gap: 20px; padding: 24px; overflow: auto; }
 .board-share-body p, .board-share-body h3 { margin: 0; }
+/* The close button sits in the top-right corner beside the sentence, as the
+   dialog has no heading row. It is quiet (no box) until hovered, and its
+   negative margin pulls it toward the corner so it lines up with the padding
+   edge rather than floating inside it. */
+.board-share-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.board-share-intro p { padding-top: 4px; line-height: 1.5; }
+.board-share-body .board-share-intro .help-about-close {
+  width: 32px;
+  min-height: 32px;
+  margin: -4px -8px 0 0;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+.board-share-body .board-share-intro .help-about-close:hover:not(:disabled),
+.board-share-body .board-share-intro .help-about-close:focus-visible {
+  border-color: var(--color-control-border-hover);
+  background: var(--card-button-bg-hover);
+}
 .board-share-body form, .board-share-link { display: grid; gap: 8px; }
 .board-share-body input {
   width: 100%;

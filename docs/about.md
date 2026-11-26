@@ -10,8 +10,8 @@ Wherever you see a **···** button, it opens a menu with more options. Select 
 - Move a panel by dragging its frame. Buttons, fields, sliders, pictures and the text editor are part of the content and do not move the panel.
 - Resize a panel by dragging one of the handles on its selection outline.
 - Pan around the canvas with the usual canvas gestures, or select **Pan canvas** and drag anywhere. Select it again to leave pan mode.
-- Select **Fit all panels** in the **Panels** column of the **···** menu beside **Share** to bring every panel into view.
-- Undo and redo are in the toolbar at the top right. Deleting a panel by mistake is undoable.
+- Select **Fit all panels** in the **Panels** column of the **···** menu beside the board picker to bring every panel into view.
+- Undo and redo are with the canvas tools in the toolbar. Deleting a panel by mistake is undoable.
 
 ### Buttons on every panel
 
@@ -33,7 +33,7 @@ Your boards are saved automatically in this browser, on this computer. They are 
 
 A board is everything on the canvas at once: the camera and panel layout, the Music playlist reference, the Images settings together with local copies of any images you loaded, each Video panel's selected catalogue entry, and your notes.
 
-The controls at the top left of the canvas manage boards. Pick one from **Open board** and create one with **New board**. The **···** button beside **Share** opens one menu with **Panels** on the left and **Board** on the right. The **Board** column holds **Rename board**, **Duplicate board**, **Export board**, **Import board** and **Delete board**. A small note beside it says **Saved in this browser** while your changes are being kept, and **Not saved** if something goes wrong. **Duplicate board** makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a board removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
+The controls at the top left of the canvas manage boards. Open the board picker to switch boards or choose **New board**. The **···** button beside it opens one menu with **Panels** on the left and **Board** on the right. The **Board** column holds **Rename board**, **Duplicate board**, **Export board**, **Import board** and **Delete board**. A small note beside it says **Saved in this browser** while your changes are being kept, and **Not saved** if something goes wrong. **Duplicate board** makes an independent copy, named "(copy)" or the next free number, and opens it. Deleting a board removes this app's local copies of its images and notes after confirmation; original files and exported archives are unaffected.
 
 Use **Export board** to download a portable `.board.zip` archive, and **Import board** to load one (in .zip format). An imported board brings its canvas layout, settings, Markdown notes, and embedded local images; if a board with that name already exists, you are offered a new name for the import, with a suggestion already filled in, or you can keep the original name to add it as a separate board with the same name on purpose. Search results are never included.
 

@@ -23,7 +23,9 @@ test.describe('top toolbar', () => {
   test('keeps one combined board and panel menu', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await openApp(page)
+    await page.getByRole('combobox', { name: 'Open board' }).click()
     await expect(page.getByRole('button', { name: 'New board' })).toBeVisible()
+    await page.keyboard.press('Escape')
     for (const name of ['Rename board', 'Duplicate board', 'Export board', 'Import board', 'Delete board']) {
       await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
     }
@@ -44,7 +46,7 @@ test.describe('top toolbar', () => {
   test('repeats the theme choice in the menu on a narrow window', async ({ page }) => {
     await page.setViewportSize({ width: 1000, height: 800 })
     await openApp(page)
-    await expect(page.getByRole('combobox', { name: 'Theme for this board' })).toBeHidden()
+    await expect(page.getByRole('combobox', { name: 'Theme for this board' })).toBeVisible()
     await page.getByRole('button', { name: 'Board and panel options' }).click()
     await expect(page.getByRole('group', { name: 'Theme for this board' })).toBeVisible()
   })
@@ -52,9 +54,9 @@ test.describe('top toolbar', () => {
   test('menu actions still work: Duplicate board opens a copy', async ({ page }) => {
     await openApp(page)
     const picker = page.getByRole('combobox', { name: 'Open board' })
-    const before = await picker.locator('option').count()
+    const before = await picker.getAttribute('title')
     await chooseBoardMenuItem(page, 'Duplicate board')
-    await expect(picker.locator('option')).toHaveCount(before + 1)
+    await expect(picker).toHaveAttribute('title', `${before} (copy)`)
   })
 
   test('says where the board is saved, and the label is a plain note', async ({ page }) => {
