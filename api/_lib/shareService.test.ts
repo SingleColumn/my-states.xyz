@@ -245,4 +245,17 @@ describe('anonymous share status and limits', () => {
     expect(progress).toBeDefined()
     expect(JSON.parse(new TextDecoder().decode(progress!.bytes)).lastSuccessAt).toBe(now())
   })
+
+  it('reports committed cleanup progress after a concurrent cursor update', async () => {
+    const { r2, service, now } = setup()
+    const put = r2.putJson.bind(r2)
+    r2.putJson = async (key, value, condition) => {
+      if (key === 'trial/cleanup-state-v1.json') {
+        r2.putRaw(key, strToU8(JSON.stringify({ stagingCursor: 'other-run', lastSuccessAt: now() - 1000 })))
+        throw conflict()
+      }
+      return put(key, value, condition)
+    }
+    expect(await service.cleanupScheduled()).toEqual({ removed: 0, backlog: true, lastSuccessAt: now() - 1000 })
+  })
 })

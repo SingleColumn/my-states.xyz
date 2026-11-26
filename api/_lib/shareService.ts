@@ -375,7 +375,15 @@ export class ShareService {
     const next = { stagingCursor: result.stagingCursor, sharesCursor: result.sharesCursor,
       lastSuccessAt: this.now() }
     try { await this.r2.putJson(CLEANUP_STATE_KEY, next, found ? { etag: found.etag } : { none: true }) }
-    catch (error) { if (!isConflict(error)) throw error } // another run will continue from its committed cursor
-    return { removed: result.removed, backlog: !!(result.stagingCursor || result.sharesCursor), lastSuccessAt: next.lastSuccessAt }
+    catch (error) {
+      if (!isConflict(error)) throw error
+      // Another run committed the progress. Report that durable state rather
+      // than claiming our failed cursor update was the last successful one.
+      const committed = await this.r2.read(CLEANUP_STATE_KEY, 4096)
+      if (!committed) throw new ShareError('Cleanup progress is unavailable.', 503)
+      const current = JSON.parse(decode(committed.bytes)) as typeof next
+      return { removed: result.removed, backlog: !!(current.stagingCursor || current.sharesCursor), lastSuccessAt: current.lastSuccessAt }
+    }
+    return { removed: result.removed, backlog: !!(next.stagingCursor || next.sharesCursor), lastSuccessAt: next.lastSuccessAt }
   }
 }
