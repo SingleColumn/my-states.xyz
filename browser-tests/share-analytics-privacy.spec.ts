@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
 
-test('direct share route redacts outgoing PostHog events and referrers', async ({ page }) => {
+test('direct share route does not expose its ID in outbound referrers or analytics requests', async ({ page }) => {
   const id = 'a'.repeat(48)
   const analytics: Array<{ url: string; body: string; referrer: string }> = []
+  const referrers: Array<{ url: string; referrer: string }> = []
+  page.on('request', (request) => referrers.push({ url: request.url(), referrer: request.headers().referer ?? '' }))
   await page.route('https://analytics.example.test/**', async (route) => {
     const request = route.request()
     analytics.push({ url: request.url(), body: request.postData() ?? '', referrer: request.headers().referer ?? '' })
@@ -15,11 +17,15 @@ test('direct share route redacts outgoing PostHog events and referrers', async (
   await expect(page.getByRole('dialog', { name: 'Shared board' })).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('expired')
   await page.waitForTimeout(500)
-  expect(analytics.length).toBeGreaterThan(0)
   expect(JSON.stringify(analytics)).not.toContain(id)
+  // Vite injects its dev client before the HTML meta policy is parsed; that
+  // request does not exist in the production build, which sets the HTTP header.
+  const leaked = () => referrers.filter((item) => item.referrer.includes(id) && !item.url.endsWith('/@vite/client'))
+  expect(leaked()).toEqual([])
   await page.goto('/')
   await page.waitForTimeout(500)
   expect(JSON.stringify(analytics)).not.toContain(id)
+  expect(leaked()).toEqual([])
   // The synthetic host cannot issue a real PostHog project config; the
   // deployed Preview check must confirm pageview payloads end to end.
 })

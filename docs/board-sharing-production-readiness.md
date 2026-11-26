@@ -16,7 +16,7 @@ Evidence labels used below: **code** = current source inspection, **unit** = aut
 
 ### Remediation checkpoint (2026-11-26)
 
-The separable sharing-dialog changes, baseline report, and initial diagnostic were checkpointed as `a9087ad5ed46823ccd8aafc807a234c53e08a3dc`. The remediation code was selectively committed as `70066b9f64a72744e9b60d1fefd3e2548d313c6b`; this report update follows it. The original findings later in this document are the **7ca99a1 baseline**, preserved for traceability; this table is the current status. No claimed fix below relies on a unit test alone where a deployed platform or real R2 determines the guarantee.
+The separable sharing-dialog changes, baseline report, and initial diagnostic were checkpointed as `a9087ad5ed46823ccd8aafc807a234c53e08a3dc`. The remediation code was selectively committed as `70066b9f64a72744e9b60d1fefd3e2548d313c6b`; cleanup cursor reporting was tightened in `a94b13521eef616bce5f87e5f3bd07fc2a23ae61`. The original findings later in this document are the **7ca99a1 baseline**, preserved for traceability; this table is the current status. No claimed fix below relies on a unit test alone where a deployed platform or real R2 determines the guarantee.
 
 | Finding | Current implementation and evidence | Remaining acceptance gate |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ The separable sharing-dialog changes, baseline report, and initial diagnostic we
 | P2 concurrency | Completion/cleanup now retain validated staging until expiry, repair a missing final from matching staging, mark expired before deletion and avoid deleting pending finals from a stale scan. Targeted race and pagination tests pass. | Real R2 concurrent copy/cleanup/delete-failure checks, including continuation tokens after deletes. A ready record with both objects missing remains unavailable and requires operator action. |
 | P4 dependencies | Narrow lockfile update: `prosemirror-view` 1.44.0, `markdown-it` 14.3.3, required `prosemirror-model` 1.25.13. `npm audit --omit=dev --json` reports zero production advisories on 2026-11-26. | Advisory feeds can change; repeat production audit before release. No broad dependency churn was applied. |
 
-The committed code candidate is `70066b9f64a72744e9b60d1fefd3e2548d313c6b`; a clean `git archive` checkout passed `npm ci`, `npm test` and `npm run build`. The verified Vercel deployment ID/SHA and real R2 result are **pending**. The current live Preview still serves the prior deployment fingerprint `dpl_2k9FaKvQtYod6wNRLTeJa3Mc6R26`; it must not be described as this candidate. Read-only Production before-state: `https://my-states.xyz` returned 308 to `https://www.my-states.xyz`, which returned 200. Read-only after-state on 2026-11-26 returned the same 308 and 200 respectively; no Production settings or data were changed.
+The committed code candidate is `a94b13521eef616bce5f87e5f3bd07fc2a23ae61`; a clean `git archive` checkout passed `npm ci`, `npm test` and `npm run build`. The verified Vercel deployment ID/SHA and real R2 result are **pending**. The current live Preview still serves the prior deployment fingerprint `dpl_2k9FaKvQtYod6wNRLTeJa3Mc6R26`; it must not be described as this candidate. Read-only Production before-state: `https://my-states.xyz` returned 308 to `https://www.my-states.xyz`, which returned 200. Read-only after-state on 2026-11-26 returned the same 308 and 200 respectively; no Production settings or data were changed.
 
 ## Baseline implementation map and lifecycle at 7ca99a1
 
@@ -76,11 +76,11 @@ IP-based limits affect shared networks and can be bypassed by IP rotation; they 
 | --- | --- | --- |
 | Anonymous create → PUT → complete → clean-recipient open/reopen | **historical Preview**, fresh Chromium creator and separate recipient, one small synthetic share | Baseline passed create 201, complete 200, resolve 200, no download; exact prior deployed SHA unobservable. Candidate with Worker is not deployed. |
 | Local Share UI, error/retry, manual-archive fidelity | **browser**, Chromium | Baseline browser tests covered notes, device image, theme, geometry/camera, independent edit and reload via manual archive. This is not a real R2 curated-image round trip. |
-| Service/API/archive/R2/storage logic | **unit, clean committed checkout** | Candidate `70066b9` passed 76 Vitest files/669 tests and 13 Node tests after `npm ci`; controlled clock/race/pagination and theme-write-failure tests pass. |
-| Build | **local committed checkout** TypeScript/Vite | Candidate `70066b9` build passed; only a large-chunk warning. |
+| Service/API/archive/R2/storage logic | **unit, clean committed checkout** | Candidate `a94b135` passed 76 Vitest files/670 tests and 13 Node tests after `npm ci`; controlled clock/race/pagination and theme-write-failure tests pass. |
+| Build | **local committed checkout** TypeScript/Vite | Candidate `a94b135` build passed; only a large-chunk warning. |
 | Worker upload and R2 conditions | **unit + official R2 docs** | Worker mock tests valid, replay, late extra byte, misleading length, token and conditional conflict. Cloudflare documents known-length `FixedLengthStream` and conditional `put` returning null. Actual R2 write/limit and Worker CORS unverified. |
 | Oversized PUT, exact expiry, cleanup, races | **code/unit** | No destructive live test; controlled 24-hour clocks, multi-page cleanup and failure/race mocks pass. Real R2 and observed schedule remain gates. |
-| Analytics payloads and account retention | **code + unit + local browser** | Recursive pre-send redaction and no-referrer tested; local intercepted request check did not observe actual PostHog pageview payload. Preview outbound event and historical retention unverified. |
+| Analytics payloads and account retention | **code + unit + local browser** | Recursive pre-send redaction and local Chromium referrer checks passed. Vite's dev client loads before the HTML policy and is excluded from the latter check; the production Vercel response header is the relevant boundary. No actual PostHog pageview payload was emitted locally. Preview outbound event and historical retention unverified. |
 | Safari, Firefox, iOS, mobile fidelity | **external / not tested** | Chromium-only result. Do not claim other browser coverage. |
 
 ### Limits, abuse, and illustrative cost

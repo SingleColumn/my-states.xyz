@@ -44,6 +44,16 @@ Each run processes at most 100 staging keys and 100 share keys. R2 stores durabl
 
 Copy `worker/wrangler.preview.example.jsonc` to ignored `worker/wrangler.preview.jsonc`, replace its bucket placeholder with the existing **test** bucket, authenticate Wrangler through an operator-approved Cloudflare session, deploy the Worker, and set its exact `workers.dev` origin as `BOARD_SHARE_UPLOAD_ORIGIN` on the Preview branch. Never paste a credential into the config file. Test Worker CORS needs exact Preview origin, method `PUT`, headers `Authorization` and `Content-Type`; R2 browser CORS is needed only for signed GET (`GET` from exact app origin) after this change. Verify the bucket stays private and credentials are bucket-scoped. New R2 presigned PUT URLs are no longer issued by this candidate, but old URLs remain usable until their individual 15-minute expiry; staging cleanup handles their late objects.
 
+From the repository root, after changing only `bucket_name` in the copied config:
+
+```powershell
+Copy-Item worker/wrangler.preview.example.jsonc worker/wrangler.preview.jsonc
+npx wrangler login
+npx wrangler deploy --config worker/wrangler.preview.jsonc
+```
+
+Cloudflare documents `wrangler deploy --config` in its [Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/) and requires a known-length stream for R2 `put`; the Worker uses `FixedLengthStream` as documented in the [R2 Worker API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/). The copy step must precede editing `bucket_name`; do not run it again after editing or it will overwrite the local configuration.
+
 The separate curated-image feed must permit browser fetches from the app origin for export; its root comes from `VITE_IMAGE_COLLECTIONS_BASE_URL`. This root was not identified in the checkout. Other app-wide variables include `VITE_POSTHOG_HOST`, `VITE_POSTHOG_PROJECT_TOKEN`, `VITE_POSTHOG_INTERNAL_TESTER`, `VITE_LOCAL_ORIGIN`, and `VITE_TLDRAW_LICENSE_KEY`. None of the server secrets may have a `VITE_` prefix. Do not copy Preview objects or legacy trial statuses into Production.
 
 Emergency stop: block only `POST /api/boardShares?action=create` with an edge rule or a create-only code/config switch, leaving resolve and cleanup running. Removing a required R2 variable would also break existing links. Rollback must keep a compatible resolver and cleanup until all published links have expired and objects are removed; rolling back code does not delete R2 data or revoke already issued upload authorization.
