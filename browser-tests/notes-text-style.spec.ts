@@ -165,7 +165,7 @@ test.describe('font, size and colour', () => {
     await expect.poll(() => storedMarkdown(page)).toContain('data-font="typewriter"')
 
     const toolbar = page.getByRole('region', { name: 'Board controls' })
-    await toolbar.getByRole('button', { name: 'More board actions' }).click()
+    await toolbar.getByRole('button', { name: 'Board and panel options' }).click()
     const download = page.waitForEvent('download')
     await page.getByRole('menuitem', { name: 'Export board' }).click()
     const archive = testInfo.outputPath('styled.board.zip')

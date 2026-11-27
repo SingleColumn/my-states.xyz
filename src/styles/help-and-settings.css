@@ -451,13 +451,13 @@
   .app-settings-theme-meta { grid-column: 1 / -1; }
 }
 
-/* The board's theme choice: a select beside the Settings button at full
-   width, a group of radio items in the board … menu when the chrome is
-   compact. */
+/* The board's theme choice keeps its select at every width; compact chrome
+   shows its icon and also offers the choices in the board menu. */
 .board-theme-control {
   position: relative;
   display: inline-flex;
 }
+.board-theme-compact-icon { display: none; }
 
 .app-chrome-tldraw .board-theme-select {
   width: clamp(130px, 12vw, 180px);
@@ -479,6 +479,105 @@
 }
 
 .board-toolbar-notice { color: var(--color-text-muted); }
+
+/* Narrow card: the dialog holds one sentence and one button, so a wide card
+   only adds empty space. Long text (the link and its notes) still wraps. */
+.board-share-dialog { width: min(480px, 94vw); }
+.board-share-body { display: grid; gap: 20px; padding: 24px; overflow: auto; }
+.board-share-body p, .board-share-body h3 { margin: 0; }
+/* The close button sits in the top-right corner beside the sentence, as the
+   dialog has no heading row. It is quiet (no box) until hovered, and its
+   negative margin pulls it toward the corner so it lines up with the padding
+   edge rather than floating inside it. */
+.board-share-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+/* Each sentence starts its own line. "balance" evens out a sentence that has
+   to wrap on a narrow screen, so no line ends with one stray word. */
+.board-share-intro > p { padding-top: 4px; line-height: 1.5; text-wrap: balance; }
+.board-share-sentence { display: block; }
+.board-share-body .board-share-intro .help-about-close {
+  width: 32px;
+  min-height: 32px;
+  margin: -4px -8px 0 0;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+.board-share-body .board-share-intro .help-about-close:hover:not(:disabled),
+.board-share-body .board-share-intro .help-about-close:focus-visible {
+  border-color: var(--color-control-border-hover);
+  background: var(--card-button-bg-hover);
+}
+.board-share-body form, .board-share-link { display: grid; gap: 8px; }
+.board-share-link label { color: var(--color-text-muted); font-size: var(--type-sm); }
+/* The link and the one thing to do with it share a row, same height, so the
+   result and its action read as a unit. */
+.board-share-link-row { display: flex; align-items: stretch; gap: 8px; }
+.board-share-body .board-share-link-row input { flex: 1; width: auto; min-width: 0; }
+/* The Copy button keeps one width through its "Copied" label so it never jumps. */
+.board-share-body .board-share-link-row .board-share-primary { min-width: 104px; text-align: center; }
+/* Information, set apart from actions: quieter, smaller and behind a hairline. */
+.board-share-notes {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-panel-divider);
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+  line-height: 1.5;
+}
+/* The only filled button: the next step. Inverted from the card so it needs no
+   accent colour, which this theme does not have. */
+.board-share-body .board-share-primary {
+  min-height: 38px;
+  padding: 8px 18px;
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--background-dialog);
+  font-weight: var(--font-weight-semibold);
+}
+.board-share-body .board-share-primary:hover:not(:disabled),
+.board-share-body .board-share-primary:focus-visible { filter: brightness(0.9); }
+.board-share-body .board-share-actions { align-items: center; gap: 12px; }
+.board-share-body .board-share-status { color: var(--color-text-muted); font-size: var(--type-sm); }
+.board-share-body .board-share-error {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger, #ff9b9b) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-danger, #ff9b9b) 10%, transparent);
+  color: var(--color-text);
+}
+.board-share-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.board-share-body input {
+  width: 100%;
+  min-height: var(--size-input-height);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+}
+.board-share-body button {
+  width: fit-content;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-input);
+  color: var(--color-input-text);
+  cursor: pointer;
+}
+.board-share-body button:disabled { opacity: .55; cursor: default; }
+.board-share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.board-share-body ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.board-share-body li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.board-share-receiver { z-index: 2000; }
 
 .settings-launcher {
   width: var(--size-top-toolbar-control);

@@ -155,13 +155,21 @@ html[data-spike-gesture$="-resize"] * {
    slim strip of the full-screen view, so the two modes read as one app. The
    sizes are measured from the canvas panel (SpikeEditorLayer), since there
    they follow the panel's size and the theme. Until measured, the
-   full-screen view's own sizes stay. (The left edge still lines up with the
-   board name above, set by the full-screen rule.) */
+   full-screen view's own sizes stay. */
 .spike-page .panel-notes-surface.is-writing-mode {
   --card-header-button-size: var(--spike-header-button-size, 30px);
 }
 .spike-page .panel-notes-surface.is-writing-mode .card-header {
   padding-block: var(--spike-header-padding, calc(var(--card-padding) / 3));
+  /* The title starts where the sheet below it starts, so it reads as the
+     sheet's heading rather than the screen's. This is the sheet's own left
+     edge, worked out the way notes.css sizes it (its width, times the view's
+     zoom, never wider than the window less a margin each side), so it follows
+     the paper width, the zoom and any docked windows without measuring.
+     Replaces the full-screen rule that lines the title up with the board
+     name: that rule's correction for the canvas zoom does not apply here, as
+     this page is drawn at its own zoom, and it left the title under nothing. */
+  padding-left: calc((100% - min(var(--notes-paper-width, 794px) * var(--notes-zoom, 1), 100% - 2 * var(--card-padding))) / 2);
 }
 .spike-page .panel-notes-surface.is-writing-mode .card-title {
   font-size: var(--spike-header-title-size, var(--type-md));

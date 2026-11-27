@@ -63,11 +63,14 @@ button {
   pointer-events: none;
 }
 
-/* A Word Graph window floats above the whole app, including these menus, and no
-   z-index inside the app can lift a menu over it. Left alone, the window covered
-   the menu just opened and took its clicks. So it steps aside while one is open;
-   it is hidden, not closed, and comes back as it was. */
-body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
+/* The Word Graph and Animation windows float above the whole app, including
+   the toolbar's menus, and no z-index inside the app can lift a menu over
+   them. Left alone, a window covered the menu just opened and took its clicks.
+   So they step aside while any toolbar menu is open (board picker, ···, Add
+   panel); hidden, not closed, they come back as they were. The board picker
+   and Add panel used to be native dropdowns, which the browser always draws
+   on top, so they only needed this once they became the app's own menus. */
+body:has(.board-actions-menu, .board-picker-menu, .add-panel-menu) :is(.word-graph-window, .animation-window) {
   visibility: hidden;
 }
 
@@ -83,8 +86,8 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
 
 .app-chrome {
   display: grid;
-  grid-template-areas: "boards canvas spacer tldraw";
-  grid-template-columns: auto auto minmax(8px, 1fr) auto;
+  grid-template-areas: "identity boards canvas spacer tldraw";
+  grid-template-columns: auto auto auto minmax(8px, 1fr) auto;
   align-items: center;
   column-gap: var(--space-app-chrome-group-gap);
   width: calc(100% - 2 * var(--space-top-toolbar-edge));
@@ -104,13 +107,23 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   pointer-events: auto;
 }
 
-/* The logo and name, then the board controls: one group in the first column. */
+/* The mode and board controls occupy separate zones so their order is also the tab order. */
+.app-chrome-identity {
+  grid-area: identity;
+  display: flex;
+  align-items: center;
+  gap: var(--space-app-chrome-group-gap);
+  min-width: 0;
+}
+
 .app-chrome-boards {
   grid-area: boards;
   display: flex;
   align-items: center;
   gap: var(--space-app-chrome-group-gap);
   min-width: 0;
+  padding-left: var(--space-rich-content-inset);
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
 }
 
 .app-chrome-brand {
@@ -146,18 +159,87 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   min-width: 0;
 }
 
-.board-toolbar select {
-  width: min(var(--size-board-selector-width), 22vw);
+.board-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-detail-2);
+  /* Sized to the board's name, so a short name leaves room for the controls
+     beside it; a long one stops at the cap and ends in an ellipsis. */
+  width: auto;
+  min-width: 140px;
+  max-width: min(var(--size-board-selector-width), 22vw);
   height: var(--size-top-toolbar-control);
   min-height: var(--size-top-toolbar-control);
   padding: 0 var(--space-detail-3);
+  color: var(--color-app-badge-text);
+  text-align: left;
+  cursor: pointer;
 }
+
+.board-picker { position: relative; flex: 0 0 auto; min-width: 0; }
+.board-picker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-picker-trigger svg { flex: 0 0 auto; }
+.board-picker-menu {
+  position: absolute;
+  top: calc(100% + var(--space-popover-offset));
+  left: 0;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  width: max(100%, var(--size-board-menu-min-width));
+  max-width: calc(100vw - 2 * var(--space-menu-padding));
+  padding: var(--space-menu-padding);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--radius-control);
+  background: var(--background-menu);
+  box-shadow: var(--shadow-app-badge);
+}
+.board-picker-list { display: grid; max-height: min(45vh, 320px); overflow-y: auto; }
+.board-picker-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-menu-item-gap);
+  min-height: var(--size-menu-item-height);
+  padding: 0 var(--space-menu-item-padding-x);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-app-badge-text);
+  text-align: left;
+  cursor: pointer;
+}
+.board-picker-menu button:hover,
+.board-picker-menu button:focus-visible,
+.board-picker-menu button[aria-selected="true"] { background: var(--card-button-bg-hover); }
+.board-picker-new { flex: 0 0 auto; border-top: var(--border-width-hairline) solid var(--color-panel-divider) !important; }
 
 .board-toolbar .card-icon-button {
   width: var(--size-top-toolbar-control);
   height: var(--size-top-toolbar-control);
   min-width: var(--size-top-toolbar-control);
 }
+
+.board-share-launcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-detail-2);
+  height: var(--size-top-toolbar-control);
+  padding: 0 var(--space-detail-3);
+  border: var(--border-width-hairline) solid var(--color-app-badge-border);
+  border-radius: var(--button-radius);
+  background: var(--card-button-bg);
+  color: var(--color-app-badge-text);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.board-share-launcher:hover:not(:disabled),
+.board-share-launcher:focus-visible {
+  background: var(--card-button-bg-hover);
+}
+
+.board-share-launcher:disabled { opacity: var(--opacity-disabled); cursor: default; }
 
 .board-actions-menu .is-destructive:hover:not(:disabled) {
   color: var(--color-danger);
@@ -174,8 +256,14 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   left: 0;
   z-index: 30;
   display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: start;
+  gap: var(--space-menu-padding);
   width: max-content;
   min-width: var(--size-board-menu-min-width);
+  max-width: calc(100vw - 2 * var(--space-menu-padding));
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
@@ -184,17 +272,41 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   backdrop-filter: var(--blur-app-badge);
 }
 
+.board-actions-menu-column,
+.board-actions-menu-section {
+  display: grid;
+  align-content: start;
+}
+
+.board-actions-menu-column { min-width: 0; }
+
+.board-actions-menu-board {
+  padding-left: var(--space-menu-padding);
+  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
+.board-actions-menu.is-board-only { grid-template-columns: max-content; }
+.board-actions-menu.is-board-only .board-actions-menu-board { padding-left: 0; border-left: 0; }
+
+.board-actions-menu-section + .board-actions-menu-section {
+  margin-top: var(--space-detail-2);
+  padding-top: var(--space-detail-2);
+  border-top: var(--border-width-hairline) solid var(--color-panel-divider);
+}
+
 .board-actions-menu button {
   display: flex;
   align-items: center;
   gap: var(--space-menu-item-gap);
   min-height: var(--size-menu-item-height);
   padding: 0 var(--space-menu-item-padding-x);
+  border: 0;
   border-radius: var(--button-radius);
   background: transparent;
   color: var(--color-app-badge-text);
   cursor: pointer;
   text-align: left;
+  font: inherit;
 }
 
 /* A long label wraps to a second row instead of widening the whole menu. */
@@ -211,7 +323,7 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
 }
 
 /* The theme has its own selector in the toolbar on a wide window. */
-.board-actions-menu-theme { display: none; }
+.board-actions-menu .board-actions-menu-theme { display: none; }
 
 /* Quiet by design: once people know where their work is kept they stop
    reading it, so it is small and muted, and only a failure changes colour. */
@@ -225,6 +337,8 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   white-space: nowrap;
   opacity: 0.8;
 }
+
+.board-save-status-short { display: none; }
 
 .board-save-status.is-failed {
   color: var(--color-danger);
@@ -271,22 +385,20 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-top-toolbar-gap);
-  padding-left: var(--space-rich-content-inset);
-  border-left: var(--border-width-hairline) solid var(--color-panel-divider);
   min-width: 0;
 }
 
-.app-chrome-tldraw .tlui-toolbar,
-.app-chrome-tldraw .tlui-buttons__horizontal {
+.app-chrome-canvas .tlui-toolbar,
+.app-chrome-canvas .tlui-buttons__horizontal {
   gap: var(--space-top-toolbar-gap);
 }
 
-.app-chrome-tldraw .tlui-buttons__horizontal > * {
+.app-chrome-canvas .tlui-buttons__horizontal > * {
   margin-left: 0;
   margin-right: 0;
 }
 
-.app-chrome-tldraw .tlui-button {
+.app-chrome-canvas .tlui-button {
   width: var(--size-tldraw-control-button);
   min-width: var(--size-tldraw-control-button);
   height: var(--size-tldraw-control-button);
@@ -301,7 +413,7 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
     border-color var(--transition-fast);
 }
 
-.app-chrome-tldraw .tlui-page-menu__trigger {
+.app-chrome-canvas .tlui-page-menu__trigger {
   width: var(--size-tldraw-page-selector-width);
   min-width: var(--size-tldraw-page-selector-width);
   padding: 0 var(--space-control-padding-x);
@@ -311,43 +423,43 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   font-weight: var(--font-weight-medium);
 }
 
-.app-chrome-tldraw .tlui-page-menu__name {
+.app-chrome-canvas .tlui-page-menu__name {
   min-width: 0;
 }
 
-.app-chrome-tldraw .tlui-button::after {
+.app-chrome-canvas .tlui-button::after {
   inset: 0;
   border-radius: var(--button-radius);
   background: var(--card-button-bg-hover);
 }
 
-.app-chrome-tldraw .tlui-button:not(:disabled):hover {
+.app-chrome-canvas .tlui-button:not(:disabled):hover {
   color: var(--card-button-active-icon);
   border-color: var(--card-button-border);
 }
 
-.app-chrome-tldraw .tlui-button:not(:disabled):active {
+.app-chrome-canvas .tlui-button:not(:disabled):active {
   transform: translateY(var(--active-control-translate-y));
 }
 
-.app-chrome-tldraw .tlui-button:disabled {
+.app-chrome-canvas .tlui-button:disabled {
   color: var(--color-text-muted);
   opacity: var(--opacity-disabled);
 }
 
-.app-chrome-tldraw .tlui-button[data-isactive="true"],
-.app-chrome-tldraw .tlui-button[aria-expanded="true"] {
+.app-chrome-canvas .tlui-button[data-isactive="true"],
+.app-chrome-canvas .tlui-button[aria-expanded="true"] {
   color: var(--card-button-active-icon);
   border-color: var(--card-button-active-border);
 }
 
-.app-chrome-tldraw .tlui-button[data-isactive="true"]::after,
-.app-chrome-tldraw .tlui-button[aria-expanded="true"]::after {
+.app-chrome-canvas .tlui-button[data-isactive="true"]::after,
+.app-chrome-canvas .tlui-button[aria-expanded="true"]::after {
   background: var(--card-button-active-bg);
   opacity: 1;
 }
 
-.app-chrome-tldraw .tlui-icon {
+.app-chrome-canvas .tlui-icon {
   width: var(--size-tldraw-icon);
   height: var(--size-tldraw-icon);
 }
@@ -382,18 +494,6 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   display: none;
 }
 
-.canvas-view-menu-section {
-  padding-top: var(--space-detail-2);
-  border-top: var(--border-width-hairline) solid var(--color-panel-divider);
-}
-
-.canvas-view-menu-heading {
-  display: block;
-  padding: var(--space-detail-2) var(--space-control-padding-x);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-app-badge-meta);
-}
-
 .app-chrome-control:hover:not(:disabled) {
   color: var(--card-button-active-icon);
   background: var(--card-button-bg-hover);
@@ -418,20 +518,16 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   gap: var(--space-detail-1);
 }
 
-.app-chrome-menu-trigger {
-  width: var(--size-top-toolbar-control);
-  justify-content: center;
-  padding: 0;
-}
-
-.canvas-view-menu {
+/* Same surface as the board picker and the ··· menu, so all three toolbar
+   menus read as one family. */
+.add-panel-menu {
   position: absolute;
   top: calc(100% + var(--space-popover-offset));
-  right: 0;
-  z-index: 30;
+  left: 0;
+  z-index: 31;
   display: grid;
+  min-width: 100%;
   width: max-content;
-  min-width: var(--size-canvas-menu-min-width);
   padding: var(--space-menu-padding);
   border: var(--border-width-hairline) solid var(--color-app-badge-border);
   border-radius: var(--radius-control);
@@ -440,27 +536,23 @@ body:has(.board-actions-menu, .canvas-view-menu) .word-graph-window {
   backdrop-filter: var(--blur-app-badge);
 }
 
-.canvas-view-menu button {
+.add-panel-menu button {
   display: flex;
   align-items: center;
-  gap: var(--space-menu-item-gap);
   min-height: var(--size-menu-item-height);
   padding: 0 var(--space-menu-item-padding-x);
+  border: 0;
   border-radius: var(--button-radius);
   background: transparent;
   color: var(--color-app-badge-text);
-  cursor: pointer;
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
 
-.canvas-view-menu button:hover:not(:disabled) {
-  background: var(--card-button-bg-hover);
-}
-
-.canvas-view-menu button:disabled {
-  cursor: not-allowed;
-  opacity: var(--opacity-disabled);
-}
+.add-panel-menu button:hover:not(:disabled),
+.add-panel-menu button:focus-visible { background: var(--card-button-bg-hover); }
+.add-panel-menu button:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
 
 .callback-toast {
   position: fixed;

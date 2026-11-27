@@ -53,13 +53,12 @@ async function settled(page: Page) {
 }
 
 function read(page: Page) {
-  return page.evaluate((selectTextInset) => {
+  return page.evaluate(() => {
     // `|| 0` because a shape a whisker left of the origin rounds to -0.
     const round = (value: number) => Math.round(value) || 0
     const chrome = document.querySelector('.app-chrome')!
     const chromeBox = chrome.getBoundingClientRect()
-    const select = document.querySelector('.board-toolbar select')!
-    const selectStyle = getComputedStyle(select)
+    const boardName = document.querySelector('.board-picker-name')!
     const shell = document.querySelector('.canvas-panel-shell.is-full-screen')
     const panel = shell?.getBoundingClientRect()
     const title = shell?.querySelector('.card-title')?.getBoundingClientRect()
@@ -70,7 +69,7 @@ function read(page: Page) {
       chromeBottom: round(chromeBox.bottom),
       chromeRadius: getComputedStyle(chrome).borderTopLeftRadius,
       // Where the board's name is laid out, not where its control begins.
-      boardNameLeft: round(select.getBoundingClientRect().x + parseFloat(selectStyle.paddingLeft) + parseFloat(selectStyle.borderLeftWidth) + selectTextInset),
+      boardNameLeft: round(boardName.getBoundingClientRect().x),
       panelLeft: panel ? round(panel.x) : null,
       panelTop: panel ? round(panel.y) : null,
       panelWidth: panel ? round(panel.width) : null,
@@ -79,12 +78,5 @@ function read(page: Page) {
       panelBorder: shell ? getComputedStyle(shell).borderTopWidth : null,
       titleLeft: title ? round(title.x) : null,
     }
-  }, SELECT_TEXT_INSET)
+  })
 }
-
-/**
- * What a browser adds before a select's text on top of its padding, which
- * the stylesheet pulls the control back by at full screen. Measured in
- * Chromium; the assertion above allows a pixel either way.
- */
-const SELECT_TEXT_INSET = 4

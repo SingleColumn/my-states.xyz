@@ -1,4 +1,15 @@
 {
+  "headers": [{
+    "source": "/(.*)",
+    "headers": [{ "key": "Referrer-Policy", "value": "no-referrer" }]
+  }],
+  "schedules": {
+    "board-share-cleanup": {
+      "schedule": "0 * * * *",
+      "path": "/api/boardShareCleanup",
+      "requestMethod": "POST"
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",

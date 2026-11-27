@@ -4,6 +4,7 @@ import { createTLSchemaFromUtils, defaultBindingUtils, defaultShapeUtils, Editor
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { AppChromeMenuPanel, AppChromePropsProvider, type AppChromeRect } from './AppChrome'
 import { AppStateProvider, panelRuntime, useAppState } from './AppState'
+import { BoardShareReceiver } from './BoardShareReceiver'
 import { fitEditorToBounds, getChromeAwareInsets, getPanelBounds, getSelectedPanelPageBounds } from './canvasView'
 import { createCanvasApi } from './canvasApi'
 import { PanelShape, PanelShapeUtil } from './PanelShape'
@@ -491,7 +492,7 @@ function AppContent() {
     }
     const added = panels.add(panelType)
     if (!added) {
-      setCallbackStatus(`Only one ${getPanelDefinition(panelType).label} panel is allowed on the canvas. Restore the existing panel from the panel view menu if it is hidden.`)
+      setCallbackStatus(`Only one ${getPanelDefinition(panelType).label} panel is allowed on the canvas. Restore the existing panel from Panels in the toolbar options menu if it is hidden.`)
       return
     }
     setCallbackStatus(null)
@@ -802,6 +803,7 @@ function AppContent() {
       {isWelcomeVisible ? <WelcomeCard onClose={closeWelcome} onOpenHelp={openHelpFromWelcome} /> : null}
       <HelpAbout isOpen={isHelpAboutOpen} onClose={closeHelpAbout} returnFocusRef={helpAboutReturnFocusRef} onShowWelcome={showWelcomeAgain} />
       <AppSettings isOpen={isSettingsOpen} onClose={closeSettings} returnFocusRef={settingsReturnFocusRef} onOpenArchitectureReport={openArchitectureReport} />
+      <BoardShareReceiver />
       {boards.error ? <div className="callback-toast" role="alert">{boards.error} <button type="button" onClick={() => { void boards.flush().catch(() => {}) }}>Retry save</button></div> : null}
       {callbackStatus ? <div className="callback-toast">{callbackStatus}</div> : null}
     </main>

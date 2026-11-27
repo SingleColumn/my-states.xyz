@@ -6,6 +6,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { DesktopOnlyNotice } from './DesktopOnlyNotice'
 import { currentDeviceHints, isMobileDevice } from './deviceSupport'
 import { localOriginToUse } from './localOrigin'
+import { redactShareAnalytics } from './shareAnalytics'
 import 'tldraw/tldraw.css'
 // Self-hosted so the demo renders identically offline and on every machine.
 // Two entries: upright and italic, both variable on the weight axis. The
@@ -23,6 +24,7 @@ const posthogOptions = {
   defaults: '2026-05-30',
   autocapture: false,
   disable_session_recording: true,
+  before_send: redactShareAnalytics,
   loaded: (posthog: PostHogInterface) => {
     if (import.meta.env.VITE_POSTHOG_INTERNAL_TESTER === 'true') {
       posthog.register({ internal_tester: true })
@@ -74,7 +76,7 @@ if (localOrigin) {
             options={desktopPosthogOptions}
           >
             <App />
-            <Analytics />
+            <Analytics beforeSend={redactShareAnalytics} />
           </PostHogProvider>
         </React.StrictMode>,
       )

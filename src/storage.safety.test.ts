@@ -29,8 +29,8 @@ beforeAll(async () => {
 describe('the fresh database', () => {
   it('opens its own database and never reads the earlier one', async () => {
     const db = await openDB('my-states')
-    expect(db.version).toBe(2)
-    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'boards', 'directoryHandles', 'notes', 'preferences', 'themes'])
+    expect(db.version).toBe(3)
+    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'boards', 'directoryHandles', 'notes', 'preferences', 'shareImports', 'themes'])
     const boards = await db.getAll('boards')
     expect(boards).toHaveLength(1)
     expect(boards[0]).toMatchObject({ name: 'A new board', schemaVersion: storage.BOARD_SCHEMA_VERSION })

@@ -5,7 +5,7 @@ import {
   getBoardAssets,
   getStoredTheme,
   importBoardContent,
-  importStoredTheme,
+  importBoardContentWithTheme,
   boardLimits,
   type ImportedBoardContent,
   type ThemeImportOutcome,
@@ -433,7 +433,7 @@ export interface BoardArchiveImport {
   theme?: { name: string; outcome: ThemeImportOutcome }
 }
 
-export async function importBoardArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue): Promise<BoardArchiveImport> {
+export async function importBoardArchive(file: File, supportsCssValue: SupportsCssValue = acceptEveryValue, shareId?: string): Promise<BoardArchiveImport> {
   if (file.size > boardLimits.maxArchiveBytes) {
     throw new Error('The selected archive exceeds the 260 MB limit.')
   }
@@ -444,16 +444,6 @@ export async function importBoardArchive(file: File, supportsCssValue: SupportsC
 
   const manifest = parseManifest(manifestBytes)
   validateManifest(manifest, files, supportsCssValue)
-
-  // An embedded theme is installed first, under whatever id is free, and
-  // the board pins that id. The library is never overwritten by an import.
-  let themeId = manifest.theme?.id
-  let theme: BoardArchiveImport['theme']
-  if (manifest.theme?.definition) {
-    const installed = await importStoredTheme(manifest.theme.definition)
-    themeId = installed.theme.id
-    theme = { name: installed.theme.name, outcome: installed.outcome }
-  }
 
   const notes = manifest.notes.map((note) => ({
     id: note.id,
@@ -477,15 +467,25 @@ export async function importBoardArchive(file: File, supportsCssValue: SupportsC
     blob: new Blob([toArrayBuffer(files.get(image.path)!)], { type: image.mimeType }),
   }))
 
-  const board = await importBoardContent({
+  const content = {
     name: manifest.board.name,
-    ...(themeId ? { themeId } : {}),
+    ...(manifest.theme?.id ? { themeId: manifest.theme.id } : {}),
     panels: manifest.panels,
     canvas: manifest.canvas,
     notes,
     assets,
-  })
+  }
+  // The embedded theme, board, assets, notes and share mapping must commit
+  // together so a failed import cannot leave a stray theme in the library.
+  const imported = manifest.theme?.definition
+    ? await importBoardContentWithTheme(content, shareId, manifest.theme.definition)
+    : { board: await importBoardContent(content, shareId), importedTheme: undefined }
+  const { board, importedTheme: theme } = imported
   return { board, ...(theme ? { theme } : {}) }
+}
+
+export function importSharedBoardArchive(file: File, shareId: string): Promise<BoardArchiveImport> {
+  return importBoardArchive(file, acceptEveryValue, shareId)
 }
 
 async function themeForArchive(themeId: string): Promise<BoardManifest['theme']> {

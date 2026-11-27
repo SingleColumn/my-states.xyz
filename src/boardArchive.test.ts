@@ -12,10 +12,12 @@ import {
   getBoardAssets,
   getBoardSummaries,
   importBoardContent,
+  importBoardContentWithTheme,
   saveBoardAssets,
   boardLimits,
   BOARD_SCHEMA_VERSION,
   getStoredTheme,
+  getSharedBoardId,
   importStoredTheme,
   setBoardTheme,
 } from './storage'
@@ -122,6 +124,60 @@ describe('the theme a board archive carries', () => {
     expect((await getBoard(renamed.board.id))?.themeId).toBe('travelling-2')
     expect((await getStoredTheme('travelling'))?.definition.name).toBe('Custom')
     expect((await getStoredTheme('travelling-2'))?.definition.name).toBe('A stranger')
+  })
+
+  it('rolls back a newly embedded theme when a duplicate share mapping aborts board import', async () => {
+    await importStoredTheme(customTheme('source-for-rollback'))
+    const source = await createBoard('Rollback source')
+    await setBoardTheme(source.id, 'source-for-rollback')
+    const entries = await archiveEntries(await exportBoardArchive(source.id))
+    const shareId = 'b'.repeat(48)
+    const first = await importBoardArchive(asFile(new Blob([zipSync(entries)])), undefined, shareId)
+    expect(first.theme?.outcome).toBe('existing')
+    const before = (await getBoardSummaries()).length
+    const changed = manifest(entries)
+    changed.theme = { id: 'new-theme-rolled-back', definition: customTheme('new-theme-rolled-back') }
+    entries['manifest.json'] = strToU8(JSON.stringify(changed))
+    await expect(importBoardArchive(asFile(new Blob([zipSync(entries)])), undefined, shareId)).rejects.toThrow()
+    expect(await getStoredTheme('new-theme-rolled-back')).toBeUndefined()
+    expect(await getStoredTheme('source-for-rollback')).toBeDefined()
+    expect((await getBoardSummaries()).length).toBe(before)
+  })
+
+  it('rolls back theme, board and mapping when a later note write fails', async () => {
+    const before = (await getBoardSummaries()).length
+    const shareId = 'd'.repeat(48)
+    const content = {
+      name: 'Interrupted import', panels: createDefaultPanels(), canvas: null, assets: [],
+      notes: [{ id: 'note-1', title: 'Note', content: 'Text', createdAt: 1, updatedAt: 1,
+        // IndexedDB rejects functions during structured cloning, after theme and board writes.
+        invalid: () => undefined }],
+    }
+    await expect(importBoardContentWithTheme(content, shareId, customTheme('theme-after-write-failure'))).rejects.toThrow()
+    expect(await getStoredTheme('theme-after-write-failure')).toBeUndefined()
+    expect((await getBoardSummaries()).length).toBe(before)
+    expect(await getSharedBoardId(shareId)).toBeNull()
+  })
+
+  it('commits one new theme and one board when two tabs import the same share', async () => {
+    await importStoredTheme(customTheme('source-for-race'))
+    const source = await createBoard('Race source')
+    await setBoardTheme(source.id, 'source-for-race')
+    const entries = await archiveEntries(await exportBoardArchive(source.id))
+    const changed = manifest(entries)
+    changed.theme = { id: 'new-theme-for-race', definition: customTheme('new-theme-for-race') }
+    entries['manifest.json'] = strToU8(JSON.stringify(changed))
+    const archive = asFile(new Blob([zipSync(entries)]))
+    const before = (await getBoardSummaries()).length
+    const shareId = 'c'.repeat(48)
+    const outcomes = await Promise.allSettled([
+      importBoardArchive(archive, undefined, shareId),
+      importBoardArchive(archive, undefined, shareId),
+    ])
+    expect(outcomes.filter((item) => item.status === 'fulfilled')).toHaveLength(1)
+    expect((await getStoredTheme('new-theme-for-race'))?.name).toBe('Custom')
+    expect(await getStoredTheme('new-theme-for-race-2')).toBeUndefined()
+    expect((await getBoardSummaries()).length).toBe(before + 1)
   })
 
   it('keeps the id of a pinned theme that is not installed, on export and on import', async () => {

@@ -1,0 +1,20 @@
+// Production upload Worker. Kept separate from wrangler.preview.jsonc so a
+// Production deploy can never bind the test bucket, and a Preview deploy can
+// never write to Production shares.
+{
+  "name": "my-states-board-upload",
+  "main": "./boardShareUpload.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "r2_buckets": [{
+    // Must be the same bucket as Vercel Production's BOARD_SHARE_R2_BUCKET:
+    // the Worker reads the pending status the API writes there.
+    "binding": "BOARD_SHARES",
+    "bucket_name": "my-states-board-sharing-production"
+  }],
+  "vars": {
+    // The canonical origin after the apex redirect. Must equal Vercel
+    // Production's BOARD_SHARE_ALLOWED_ORIGIN exactly (no trailing slash).
+    "BOARD_SHARE_ALLOWED_ORIGIN": "https://www.my-states.xyz"
+  }
+}

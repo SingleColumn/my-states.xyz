@@ -1,8 +1,14 @@
-import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
-import { DefaultActionsMenu, DefaultActionsMenuContent, DefaultQuickActions, TldrawUiMenuActionItem, TldrawUiToolbar, useCanRedo, useCanUndo } from 'tldraw'
-import { Hand, Settings } from 'lucide-react'
+import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import {
+  DefaultActionsMenuContent, DefaultQuickActions, TldrawUiButtonIcon, TldrawUiMenuActionItem, TldrawUiMenuContextProvider,
+  TldrawUiPopover, TldrawUiPopoverContent, TldrawUiPopoverTrigger, TldrawUiToolbar, TldrawUiToolbarButton,
+  useCanRedo, useCanUndo, useEditor, usePassThroughWheelEvents, useReadonly, useValue,
+} from 'tldraw'
+import { AlignHorizontalDistributeCenter, Hand, Settings, Share2 } from 'lucide-react'
 import { CanvasViewControls } from './CanvasViewControls'
 import { BoardToolbar } from './BoardToolbar'
+import { BoardShareDialog } from './BoardShareDialog'
+import { useAppState } from './AppState'
 import { BoardThemeSelect } from './BoardThemeSelect'
 import type { PanelType } from './types'
 import { SpikeModeSwitch } from './spike/SpikeModeSwitch'
@@ -56,6 +62,52 @@ function UndoRedoQuickActions() {
   )
 }
 
+function ShareLauncher({ busy }: { busy: boolean }) {
+  const { boards } = useAppState()
+  const [open, setOpen] = useState(false)
+  return <>
+    <button className="board-share-launcher" type="button" aria-label="Share" title="Share this board"
+      disabled={busy || !boards.activeBoard} onClick={() => setOpen(true)}>
+      <Share2 size={16} aria-hidden="true" /><span>Share</span>
+    </button>
+    {open ? <BoardShareDialog onClose={() => setOpen(false)} /> : null}
+  </>
+}
+
+/**
+ * tldraw's arrange menu (align, distribute, stack, group…) with our own
+ * trigger. tldraw's draws a vertical "⋮", which sat a few buttons away from
+ * the board's "···" and read as a second, unexplained "more" menu. The
+ * content and the read-only rule are tldraw's, copied from DefaultActionsMenu.
+ */
+function CanvasActionsMenu() {
+  const editor = useEditor()
+  const isReadonlyMode = useReadonly()
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  usePassThroughWheelEvents(contentRef)
+  const isInAcceptableReadonlyState = useValue('arrange menu in read-only', () => editor.isInAny('hand', 'zoom'), [editor])
+  if (isReadonlyMode && !isInAcceptableReadonlyState) return null
+  return (
+    <span className="canvas-actions-menu">
+      <TldrawUiPopover id="actions-menu">
+        <TldrawUiPopoverTrigger>
+          <TldrawUiToolbarButton type="icon" data-testid="actions-menu.button"
+            aria-label="Canvas arrangement actions" title="Arrange selected panels">
+            <TldrawUiButtonIcon icon={<AlignHorizontalDistributeCenter size={16} />} small />
+          </TldrawUiToolbarButton>
+        </TldrawUiPopoverTrigger>
+        <TldrawUiPopoverContent side="bottom" sideOffset={6}>
+          <TldrawUiToolbar ref={contentRef} label="Arrange selected panels" className="tlui-actions-menu tlui-buttons__grid" data-testid="actions-menu.content">
+            <TldrawUiMenuContextProvider type="icons" sourceId="actions-menu">
+              <DefaultActionsMenuContent />
+            </TldrawUiMenuContextProvider>
+          </TldrawUiToolbar>
+        </TldrawUiPopoverContent>
+      </TldrawUiPopover>
+    </span>
+  )
+}
+
 export function AppChrome({
   isCanvasReady,
   isPanMode,
@@ -77,6 +129,7 @@ export function AppChrome({
   onAddPanel,
 }: AppChromeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const [boardBusy, setBoardBusy] = useState(false)
   // SPIKE: in Editor mode the canvas is hidden, so the controls that move or
   // arrange it would act on something nobody can see. They are left out
   // rather than greyed, because there is nothing for them to do there.
@@ -107,7 +160,7 @@ export function AppChrome({
 
   return (
     <div ref={rootRef} className="app-chrome" onPointerDown={stopCanvasEvent} onMouseDown={stopCanvasEvent} onClick={stopCanvasEvent}>
-      <div className="app-chrome-boards">
+      <div className="app-chrome-identity">
         <button
           className="app-chrome-brand"
           type="button"
@@ -119,7 +172,23 @@ export function AppChrome({
           <span className="app-chrome-brand-name">{HELP_ABOUT_LABEL}</span>
         </button>
         <SpikeModeSwitch />
-        <BoardToolbar />
+      </div>
+      <div className="app-chrome-boards">
+        <BoardToolbar
+          onBusyChange={setBoardBusy}
+          isCanvasReady={isCanvasReady}
+          editorMode={editorMode}
+          canUseSelectedPanel={canUseSelectedPanel}
+          canHideSelectedPanel={canHideSelectedPanel}
+          hiddenPanels={hiddenPanels}
+          onFitAllPanels={onFitAllPanels}
+          onFitSelectedPanel={onFitSelectedPanel}
+          onResetSelectedPanel={onResetSelectedPanel}
+          onResetPanelLayout={onResetPanelLayout}
+          onHideSelectedPanel={onHideSelectedPanel}
+          onRestorePanel={onRestorePanel}
+          onEnterMomentView={onEnterMomentView}
+        />
       </div>
 
       <section className="app-chrome-canvas" aria-label={editorMode ? 'Panel controls' : 'Canvas view controls'}>
@@ -138,35 +207,19 @@ export function AppChrome({
         <CanvasViewControls
           isReady={isCanvasReady}
           onAddPanel={onAddPanel}
-          canUseSelectedPanel={canUseSelectedPanel}
-          onFitPanels={onFitAllPanels}
-          onFitSelectedPanel={onFitSelectedPanel}
-          onResetSelectedPanel={onResetSelectedPanel}
-          onResetPanelLayout={onResetPanelLayout}
-          canHideSelectedPanel={canHideSelectedPanel}
-          hiddenPanels={hiddenPanels}
-          onHideSelectedPanel={onHideSelectedPanel}
-          onRestorePanel={onRestorePanel}
-          onEnterMomentView={onEnterMomentView}
           editorMode={editorMode}
         />
+        <TldrawUiToolbar className="app-chrome-tldraw-actions tlui-buttons__horizontal" label="Canvas actions">
+          <DefaultQuickActions><UndoRedoQuickActions /></DefaultQuickActions>
+          {editorMode ? null : <CanvasActionsMenu />}
+        </TldrawUiToolbar>
       </section>
 
       <div className="app-chrome-spacer" aria-hidden="true" />
 
-      <nav className="app-chrome-tldraw" aria-label="Canvas and application controls">
-        <TldrawUiToolbar className="app-chrome-tldraw-actions tlui-buttons__horizontal" label="Canvas actions">
-          <DefaultQuickActions>
-            <UndoRedoQuickActions />
-          </DefaultQuickActions>
-          {/* Align, group, zoom and the like: canvas only. Undo and redo
-              stay, since they also undo panel changes made in Editor mode. */}
-          {editorMode ? null : (
-            <DefaultActionsMenu>
-              <DefaultActionsMenuContent />
-            </DefaultActionsMenu>
-          )}
-        </TldrawUiToolbar>
+      <nav className="app-chrome-tldraw" aria-label="Board and application controls">
+        <ShareLauncher busy={boardBusy} />
+        <BoardThemeSelect />
         <button
           className="app-chrome-control settings-launcher"
           type="button"
@@ -176,7 +229,8 @@ export function AppChrome({
         >
           <Settings size={16} aria-hidden="true" />
         </button>
-        <BoardThemeSelect />
+        {/* Log in, and later the account menu, goes here when it exists. No
+            space is held for it until then, so Settings sits at the right edge. */}
       </nav>
     </div>
   )
@@ -202,32 +256,22 @@ export function AppChromeMenuPanel() {
 }
 
 /**
- * What a browser lays out before a select's text, on top of whatever
- * padding the stylesheet gives it. The inset is the browser's, not ours, so
- * it is a measured constant rather than a derived one: 4px in Chromium, and
- * being a pixel out elsewhere costs a pixel of alignment and nothing more.
- */
-const SELECT_TEXT_INSET = 4
-
-/**
  * Where the open board's name is laid out, measured from the toolbar's own
  * left edge.
  *
  * A panel at full screen puts its title directly beneath this, and two
  * bands of text stacked on each other have to share a left column or the
  * seam reads as careless. That column cannot be written in the stylesheet:
- * it is the toolbar's inset plus the dropdown's border and padding, each of
- * which a theme may change, plus what the browser adds inside the control.
- * So it is measured here and handed over as a custom property. Measuring
- * from the toolbar rather than the window also makes it the same number
- * before and after the toolbar goes flush to the window edge.
+ * it is the toolbar's inset plus the picker's border and padding, each of
+ * which a theme may change. So the name itself is measured here and handed
+ * over as a custom property. Measuring from the toolbar rather than the
+ * window also makes it the same number before and after the toolbar goes
+ * flush to the window edge.
  */
 function boardTextLeft(chrome: HTMLElement) {
-  const select = chrome.querySelector('.board-toolbar select')
-  if (!select) return 0
-  const style = getComputedStyle(select)
-  const inset = select.getBoundingClientRect().x - chrome.getBoundingClientRect().x
-  return inset + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) + SELECT_TEXT_INSET
+  const name = chrome.querySelector('.board-picker-name')
+  if (!name) return 0
+  return name.getBoundingClientRect().x - chrome.getBoundingClientRect().x
 }
 
 function stopCanvasEvent(event: React.SyntheticEvent) {

@@ -192,7 +192,7 @@
   --space-top-toolbar-edge: 6px;
   --space-top-toolbar-gap: 5px;
   --space-app-chrome-group-gap: 16px;
-  --space-top-toolbar-padding-block: 7px;
+  --space-top-toolbar-padding-block: 5px;
   --space-top-toolbar-padding-inline: 14px;
   --space-toast-top: 22px;
   --space-toast-padding-y: 12px;
@@ -247,8 +247,8 @@
   --canvas-pattern-grid: linear-gradient(var(--color-canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-canvas-grid) 1px, transparent 1px);
   --canvas-pattern-lines: linear-gradient(var(--color-canvas-grid) 1px, transparent 1px);
   --canvas-pattern-dots: radial-gradient(circle, var(--color-canvas-grid) 1.5px, transparent 2.5px);
-  --size-top-toolbar-height: 54px;
-  --size-top-toolbar-control: 36px;
+  --size-top-toolbar-height: 44px;
+  --size-top-toolbar-control: 32px;
   --size-board-selector-width: 260px;
   --size-tldraw-control-button: var(--size-top-toolbar-control);
   --size-tldraw-page-selector-width: 112px;

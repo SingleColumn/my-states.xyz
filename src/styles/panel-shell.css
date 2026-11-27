@@ -416,8 +416,9 @@
 }
 
 .app-chrome-panel-add-control {
-  width: 112px;
+  height: var(--size-top-toolbar-control);
   padding-right: var(--space-detail-2);
+  white-space: nowrap;
 }
 
 .card-header > .card-title { min-width: 0; }

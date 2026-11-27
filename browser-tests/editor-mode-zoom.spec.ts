@@ -109,9 +109,8 @@ test('in Editor mode, the toolbar leaves out controls that act on the hidden can
   await openApp(page)
   const view = page.getByRole('group', { name: 'View' })
   const pan = page.getByRole('button', { name: 'Pan canvas' })
-  const layoutMenu = page.getByRole('button', { name: 'Open panel view and layout actions' })
+  const layoutMenu = page.getByRole('button', { name: 'Board and panel options' })
   const canvasActions = page.getByTestId('actions-menu.button')
-  const hiddenMenu = page.getByRole('button', { name: 'Open hidden panels' })
   await expect(pan).toBeVisible()
   await expect(layoutMenu).toBeVisible()
   await expect(canvasActions).toBeVisible()
@@ -119,11 +118,14 @@ test('in Editor mode, the toolbar leaves out controls that act on the hidden can
   await view.getByRole('button', { name: 'Editor' }).click()
   await expect(page.locator('[data-testid="spike-editor-layer"]')).toBeVisible()
   await expect(pan).toHaveCount(0)
-  await expect(layoutMenu).toHaveCount(0)
+  await expect(layoutMenu).toBeVisible()
   await expect(canvasActions).toHaveCount(0)
-  await expect(hiddenMenu).toHaveCount(0)
+  await layoutMenu.click()
+  await expect(page.getByRole('menuitem', { name: 'Fit all panels' })).toHaveCount(0)
+  await expect(page.getByRole('menuitem', { name: 'Prepare board for screenshot' })).toHaveCount(0)
+  await expect(page.getByRole('menuitem', { name: 'Rename board' })).toBeVisible()
   // Still useful in Editor mode: adding panels, and undo for panel changes.
-  await expect(page.getByRole('combobox', { name: 'Add panel' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add panel' })).toBeVisible()
   await expect(page.getByTestId('quick-actions.undo')).toBeVisible()
 
   // A hidden panel can be brought back from the toolbar, as a window.
@@ -131,11 +133,13 @@ test('in Editor mode, the toolbar leaves out controls that act on the hidden can
   await images.getByRole('button', { name: 'Images panel actions' }).click()
   await page.getByRole('menuitem', { name: 'Hide panel' }).click()
   await expect(images).toHaveCount(0)
-  await hiddenMenu.click()
-  await expect(page.getByRole('menuitem')).toHaveText(['Restore Images 1'])
-  await page.getByRole('menuitem', { name: 'Restore Images 1' }).click()
+  await layoutMenu.click()
+  const hiddenGroup = page.getByRole('group', { name: 'Hidden panels' })
+  await expect(hiddenGroup.getByRole('menuitem')).toHaveText(['Restore Images 1'])
+  await hiddenGroup.getByRole('menuitem', { name: 'Restore Images 1' }).click()
   await expect(images).toHaveCount(1)
-  await expect(hiddenMenu).toHaveCount(0)
+  await layoutMenu.click()
+  await expect(page.getByRole('group', { name: 'Hidden panels' })).toHaveCount(0)
 
   // Back on the canvas, everything returns.
   await view.getByRole('button', { name: 'Canvas' }).click()
@@ -147,23 +151,28 @@ test('in Editor mode, the toolbar leaves out controls that act on the hidden can
 test('in Editor mode, the Notes choice is left out while the page is showing', async ({ page }) => {
   await openApp(page)
   const writingCount = () => page.evaluate(() => window.myStates!.describe().panels.filter((panel) => panel.type === 'notes').length)
-  const add = page.getByRole('combobox', { name: 'Add panel' })
-  await expect(add.locator('option', { hasText: 'Notes' })).toHaveCount(1)
+  const add = page.getByRole('button', { name: 'Add panel' })
+  const choices = page.getByRole('menu', { name: 'Add panel' }).getByRole('menuitem')
+  await add.click()
+  await expect(choices.filter({ hasText: 'Notes' })).toHaveCount(1)
+  await page.keyboard.press('Escape')
 
   await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Editor' }).click()
   await expect(page.locator('[data-testid="spike-editor-layer"]')).toBeVisible()
   // Left out, rather than adding a panel that Editor mode would never draw.
-  await expect(add.locator('option', { hasText: 'Notes' })).toHaveCount(0)
-  await expect(add.locator('option', { hasText: 'Images' })).toHaveCount(1)
+  await add.click()
+  await expect(choices.filter({ hasText: 'Notes' })).toHaveCount(0)
+  await expect(choices.filter({ hasText: 'Images' })).toHaveCount(1)
   expect(await writingCount()).toBe(1)
 
   // Other panels are still added, and drawn as windows.
-  await add.selectOption('slideshow')
+  await choices.filter({ hasText: 'Images' }).click()
   await expect(page.locator('.spike-window')).toHaveCount(3)
 
   // Back on the canvas the choice works again.
   await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Canvas' }).click()
-  await expect(add.locator('option', { hasText: 'Notes' })).toHaveCount(1)
+  await add.click()
+  await expect(choices.filter({ hasText: 'Notes' })).toHaveCount(1)
 })
 
 test('in Editor mode, Music and Images windows offer focus view in their ⋯ menu', async ({ page }) => {

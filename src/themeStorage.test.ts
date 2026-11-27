@@ -33,11 +33,12 @@ beforeAll(async () => {
   await storage.initializeBoards()
 })
 
-describe('the version 2 database', () => {
+describe('the upgraded database', () => {
   it('adds the themes store and keeps every version-1 store and record', async () => {
     const db = await openDB('my-states')
-    expect(db.version).toBe(2)
-    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'boards', 'directoryHandles', 'notes', 'preferences', 'themes'])
+    expect(db.version).toBe(3)
+    expect(db.objectStoreNames.contains('shareImports')).toBe(true)
+    expect([...db.objectStoreNames].sort()).toEqual(['assets', 'boards', 'directoryHandles', 'notes', 'preferences', 'shareImports', 'themes'])
     expect(await db.get('boards', 'from-v1')).toEqual(versionOneBoard)
     expect(await db.get('preferences', 'active-board-id')).toEqual({ key: 'active-board-id', value: 'from-v1' })
     db.close()

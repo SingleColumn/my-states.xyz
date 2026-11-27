@@ -183,7 +183,13 @@ export function NotesPanel({ panelId }: { panelId: string }) {
   ) : null
 
   return (
-    <section ref={sectionRef} className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}${momentView && !activeNote ? ' is-moment-empty' : ''}`}>
+    <section ref={sectionRef} className={`panel panel-notes-surface${isWritingMode ? ' is-writing-mode' : ''}${momentView && !activeNote ? ' is-moment-empty' : ''}`}
+      // The sheet's size is set here, above both the header and the body, so
+      // Editor mode can line the header's title up with the sheet's edge.
+      style={{
+        '--notes-paper-width': paperWidths[paperWidth].width,
+        '--notes-zoom': zoom / 100,
+      } as CSSProperties}>
       <PanelHeader
         panelId={panelId}
         panelType="notes"
@@ -306,8 +312,6 @@ export function NotesPanel({ panelId }: { panelId: string }) {
         style={{
           '--notes-editor-font-size': editorFontSizes[fontSize].fontSize,
           '--notes-editor-line-height': editorFontSizes[fontSize].lineHeight,
-          '--notes-paper-width': paperWidths[paperWidth].width,
-          '--notes-zoom': zoom / 100,
         } as CSSProperties}
       >
         {/* No title field in either treatment: the note is named by its

@@ -349,11 +349,11 @@ test('recovery stays outside board archives and remains scoped while switching b
   await expect(page.locator('.word-graph-window')).toHaveCount(0)
 })
 
-test('the board and panel menus can be used with a Word Graph window open over them', async ({ page }) => {
+test('the combined menu can be used with a Word Graph window open over it', async ({ page }) => {
   await openApp(page)
   const { dialog } = await selectAndOpen(page)
   await expect(node(page, 'night')).toBeVisible()
-  const boardMenu = page.getByRole('button', { name: 'More board actions' })
+  const boardMenu = page.getByRole('button', { name: 'Board and panel options' })
 
   await boardMenu.click()
   await expect(dialog).toBeHidden()
@@ -367,7 +367,7 @@ test('the board and panel menus can be used with a Word Graph window open over t
   await expect(dialog).toBeVisible()
   await expect(node(page, 'night')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Open panel view and layout actions' }).click()
+  await boardMenu.click()
   await expect(dialog).toBeHidden()
   await page.keyboard.press('Escape')
   await expect(dialog).toBeVisible()
