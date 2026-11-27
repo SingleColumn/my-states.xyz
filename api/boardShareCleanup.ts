@@ -1,13 +1,13 @@
 import boardShares from './boardShares.js'
 import { alertOnCleanupFailure } from './_lib/cleanupAlert.js'
+import { scheduledCleanupRequest } from './_lib/scheduledCleanup.js'
 
 // Vercel Schedules targets a plain path. The shared handler still verifies
 // the operations bearer key before advancing the durable cleanup cursor.
 export default {
   async fetch(request: Request) {
     try {
-      const url = new URL('/api/boardShares?action=cleanup', request.url)
-      const response = await boardShares.fetch(new Request(url, request))
+      const response = await boardShares.fetch(scheduledCleanupRequest(request))
       if (response.status >= 500) await signalFailure()
       return response
     } catch {
