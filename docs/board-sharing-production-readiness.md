@@ -396,6 +396,25 @@ Use a fresh browser profile/private window for the creator and a **different** b
 
 Checks that necessarily remain post-release because the feature is not in Production: steps 1–10. Expiry after 24 h is covered by server-side checks proven on Preview; no 24-hour wait is required.
 
+### 6.1a Smoke test results (2026-11-27, after merging PR #26)
+
+Run 14:39–14:46 UTC by the reviewer, Playwright Chromium 153 headless, 1440×900, a fresh context per creator and per recipient. Two synthetic shares; no ID, token or signed URL recorded here.
+
+| Step | Result | Evidence |
+|---|---|---|
+| 1 Versions | PASS | PR #26 merged 14:37:59Z as `50d5124f173d5ffb7a51d2bb29157f9ae8ff9d1c` (= `origin/main`). Production deployment `dpl_5trDGrhGbKTQd8sjLTB6qsvzW4xH`, READY, built from `50d5124` at 14:38:03Z, after every Production variable was set. Production Worker version `17c6caa2-5686-418e-aa6c-bfbacb80be2a` (100 %). |
+| 2 Redirect | PASS | `https://my-states.xyz/` 308 → `https://www.my-states.xyz/`; `www` 200 with `Referrer-Policy: no-referrer`; `/share/<48 zeros>` serves the app; resolve of an unknown ID → 404 JSON. |
+| 3 Creator | PASS (both shares) | Fresh context with no cookies; the first-run welcome dialog was dismissed with “Got it”; stages shown; link starts `https://www.my-states.xyz/share/`; Copy link put exactly the link on the clipboard (“Copied”); wording “Link available for 24 hours, until 28 nov, 15:42 … keep their own copies …”. Requests: create 201 → Worker `PUT` 200 at `my-states-board-upload.my-states-xyz.workers.dev` → complete 200. No downloads, no page errors. |
+| 4 Recipient | PASS | Separate fresh context, direct navigation: resolve 200, image imported as a `blob:` (loaded). Share A: note text present, pinned theme “Minimal” preserved (visually identical to the default, so this proves the setting carried, not a visual change), recipient rename persisted after reload, creator's board unchanged. Reloading `/share/<id>` reopened the local copy **without** a new resolve. |
+| 5 Network/CORS | PASS | Recipient R2 `GET` 200 from bucket `my-states-board-sharing-production`, `Access-Control-Allow-Origin: https://www.my-states.xyz`. No CORS errors. |
+| 6 Library image | PASS | Share B: collection chosen from the Images panel; creator image served from `library.endlessmoment.xyz` (all library requests 200, so library CORS for `www` works); recipient image imported as `blob:`. |
+| 7 Analytics | PASS | Headless Chromium is filtered out as a bot by both PostHog and Vercel Analytics, so the payload check reopened share A in a context presenting as ordinary Chrome (user agent, brand list and `navigator.webdriver` corrected). 5 analytics requests decoded: PostHog `$pageview` ×2, `$$heatmap`, `$web_vitals` (`eu.i.posthog.com`) and Vercel `/_vercel/insights/view` ×2. `$current_url`, `$pathname`, `$session_entry_url`, `$session_entry_pathname` and Vercel `o` all read `…/share/:id`; after an onward navigation the session-entry properties stay redacted. Neither the full ID nor its first 12 characters appeared in any URL, header or body. This sent a few real test events to Production analytics. |
+| 8 Schedule | **FAIL → fix in review** | `board-share-cleanup` created for Production at 14:39:34Z, active, hourly, `POST /api/boardShareCleanup`. First scheduled run `schx_3HSTGKB4CD04WS0Z4JXM26B8RJ` at 15:14:49Z **failed with HTTP 415** (“JSON Content-Type is required”). The key check runs before that point, so **Production `CRON_SECRET` does equal the signing key**. Cause: the route copied the whole incoming request into the cleanup action, and the scheduler's empty body reached the JSON-body check instead of the scheduled-cleanup branch. Preview's runs at 14:14Z and 15:14Z returned 200 on the same code, because its request carried no body at all. Unit tests reproduce it: with the old forwarding, 4 of 5 empty-body request shapes fail, including `Content-Length: 0`, because copying a request drops that header. Fix on branch `fix/scheduled-cleanup-request`: the scheduled route forwards only the method and the `Authorization` header (`api/_lib/scheduledCleanup.ts`). Not yet deployed. Until it is, Production cleanup does not run: expired links are still refused by the server, but their files stay in R2 (staging files are removed after 2 days by the lifecycle rule). |
+| 9 Cleanup auth | PASS | Unauthenticated `POST /api/boardShareCleanup` → 401; create from the apex origin → 403. |
+| 10 Isolation | PASS | Production bucket: exactly the two smoke shares (status, archive, staging each) and the two usage ledgers. Test bucket: 23 objects, last modified 14:14:54Z (Preview cleanup), untouched during 14:41–14:46Z. |
+
+Smoke-test objects: two Production shares created 14:42–14:43Z remain in `my-states-board-sharing-production`. Nobody else has the links; they expire at 15:42 and 15:43 UTC on 2026-11-28, and hourly cleanup then removes their files. Browser coverage remains Chromium only.
+
 ### 6.2 Rollback
 
 - **Trigger:** any of steps 3–9 fails, analytics shows share IDs, or cleanup fails repeatedly.

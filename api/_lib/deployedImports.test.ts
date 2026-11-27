@@ -56,6 +56,7 @@ describe('The files that are deployed as server functions', () => {
       '/api/_lib/cleanupAlert.ts',
       '/api/_lib/creatorAuth.ts',
       '/api/_lib/httpAdapter.ts',
+      '/api/_lib/scheduledCleanup.ts',
       '/api/_lib/shareArchive.ts',
       '/api/_lib/shareConfig.ts',
       '/api/_lib/shareR2.ts',
