@@ -51,6 +51,12 @@ npx wrangler login
 npx wrangler deploy --config worker/wrangler.preview.jsonc
 ```
 
+Production has its own Worker, `my-states-board-upload`, in `worker/wrangler.production.jsonc`. It binds `BOARD_SHARES` to `my-states-board-sharing-production` and allows only `https://www.my-states.xyz`. Keeping it in a separate file means a Production deploy cannot bind the test bucket. Deploy it only when preparing the Production release, then set the `workers.dev` origin it prints as Production `BOARD_SHARE_UPLOAD_ORIGIN` in Vercel:
+
+```powershell
+npx wrangler deploy --config worker/wrangler.production.jsonc
+```
+
 Cloudflare documents `wrangler deploy --config` in its [Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/) and requires a known-length stream for R2 `put`; the Worker uses `FixedLengthStream` as documented in the [R2 Worker API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/). The binding remains in the tracked config for later deployments.
 
 The separate curated-image feed must permit browser fetches from the app origin for export; its root comes from `VITE_IMAGE_COLLECTIONS_BASE_URL`. This root was not identified in the checkout. Other app-wide variables include `VITE_POSTHOG_HOST`, `VITE_POSTHOG_PROJECT_TOKEN`, `VITE_POSTHOG_INTERNAL_TESTER`, `VITE_LOCAL_ORIGIN`, and `VITE_TLDRAW_LICENSE_KEY`. None of the server secrets may have a `VITE_` prefix. Do not copy Preview objects or legacy trial statuses into Production.
