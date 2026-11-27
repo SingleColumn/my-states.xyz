@@ -179,6 +179,39 @@ describe('anonymous share status and limits', () => {
     expect(r2.objects.has(status.finalKey)).toBe(false)
   })
 
+  it('does not serve a board disabled while its missing final is being restored', async () => {
+    const { r2, service, now } = setup()
+    const { created, status, bytes } = await pending(r2, service)
+    r2.putRaw(status.stagingKey, bytes)
+    await service.complete(created.id, created.uploadToken)
+    r2.objects.delete(status.finalKey)
+    const original = r2.copyCreateOnly.bind(r2)
+    r2.copyCreateOnly = async (from, to, etag) => {
+      // Disable lands mid-repair: status and final are gone, staging is not yet.
+      await r2.putJson(`shares/${created.id}/status.json`, { ...r2.status(created.id), status: 'disabled', updatedAt: now() }, {})
+      r2.objects.delete(to)
+      await original(from, to, etag)
+    }
+    await expect(service.resolve(created.id)).rejects.toMatchObject({ status: 410, message: 'This share has been disabled.' })
+    expect(r2.objects.has(status.finalKey)).toBe(false)
+  })
+
+  it('does not serve a board that expires while its missing final is being restored', async () => {
+    const { r2, service, clock } = setup()
+    const { created, status, bytes } = await pending(r2, service)
+    r2.putRaw(status.stagingKey, bytes)
+    const published = await service.complete(created.id, created.uploadToken)
+    r2.objects.delete(status.finalKey)
+    clock(published.expiresAt! - 60_000)
+    const original = r2.copyCreateOnly.bind(r2)
+    r2.copyCreateOnly = async (from, to, etag) => {
+      await original(from, to, etag)
+      clock(published.expiresAt!)
+    }
+    await expect(service.resolve(created.id)).rejects.toMatchObject({ status: 410, message: 'This share has expired.' })
+    expect(r2.objects.has(status.finalKey)).toBe(false)
+  })
+
   it('limits public resolution and protects old published shares without expiresAt', async () => {
     const { r2, service } = setup()
     const { created, status, bytes } = await pending(r2, service)

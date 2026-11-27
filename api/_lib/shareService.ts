@@ -87,6 +87,16 @@ export class ShareService {
     catch (error) { if (!isConflict(error)) throw error }
     final = await this.r2.head(value.finalKey)
     if (!final || final.size !== value.byteLength) throw new ShareError('This shared board is temporarily unavailable.', 503)
+    // Disable and cleanup delete the final before staging. A copy that lands
+    // between those deletes would bring a revoked board back, so confirm the
+    // share is still live and undo the restore if it is not.
+    const current = await this.readStatus(value.id)
+    if (current?.value.status !== 'ready'
+      || (current.value.expiresAt !== undefined && this.now() >= current.value.expiresAt)) {
+      await this.r2.delete(value.finalKey)
+      if (!current) throw new ShareError('Share not found.', 404)
+      throw new ShareError(current.value.status === 'disabled' ? 'This share has been disabled.' : 'This share has expired.', 410)
+    }
     return final
   }
 
