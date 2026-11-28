@@ -14,7 +14,9 @@ Status labels: **PASS** (observed or proven for the stated scope), **FAIL** (obs
 
 **Released to Production; post-release smoke test passed (updated 2026-11-27, 17:14 UTC).** At the time of the original review Production was not configured. Since then every item in §5 that gated release has been done (Worker, Production variables, Preview cleanup, bucket CORS), PR #26 was merged and the §6.1 smoke test passed on Production. Its one failure, the first scheduled cleanup run (HTTP 415), was fixed in PR #27 (merged 15:39:47Z, deployed 15:41Z). The next hourly run, at 16:14:49Z, **succeeded**, and `trial/cleanup-state-v1.json` now exists in the Production bucket (§6.1a step 8). Not yet done: the optional items U4, U8, C2 and C3 in §5, and limitations listed in §3 remain as written. Browser coverage is Chromium only.
 
-**Single next action:** none blocks the release. Recommended next: set an alert webhook (U4), because the existing alert covers server errors (5xx) only, and a cleanup that returns 4xx, as the 415 did, or does not run at all is silent.
+**How to read the rest of this document.** Sections 1 to 4 and 7 record the state found during the review on 2026-11-27, 11:20 to 12:00 UTC, **before any Production configuration or release**. They were not rewritten, so results such as "Production variables missing", "cleanup has never succeeded" and "Production configuration ready: FAIL" describe that moment, not today. The current state is in the *Done* notes in §5 and the results in §6.1a. Where the two differ, §5 and §6.1a win.
+
+**Single next action:** none blocks the release. Recommended next: add monitoring that detects a failing or missing cleanup run. The existing alert (U4, `BOARD_SHARE_CLEANUP_ALERT_URL`) fires only for responses of 500 or above, and a missed run never reaches the handler, so U4 alone would not have caught the 415. Pair it with C3 (alert on 4xx and compare `lastSuccessAt`), or check Vercel Schedules executions and `trial/cleanup-state-v1.json` by hand until then (U10 names who does that).
 
 ---
 
@@ -84,6 +86,8 @@ Test bucket after cleanup: 26 objects (identical count to before the review). Th
 ---
 
 ## 2. Checklist
+
+> **Historical snapshot (review time, before release).** Results below were true at 11:20 to 12:00 UTC on 2026-11-27. See §5 *Done* notes and §6.1a for the current state.
 
 ### 2.1 Release candidate (prompt §1)
 
@@ -289,7 +293,7 @@ Observation: the “Welcome to my-states.xyz” first-run dialog opens over the 
 | Check | Result | Evidence |
 |---|---|---|
 | Tests/build pass for committed candidate | PASS | §1.4 |
-| Production configuration ready | **FAIL** | §5 |
+| Production configuration ready | **FAIL at review time; done since** | §5 *Done* notes, §6.1a |
 | No unresolved release-blocking defect | PASS (code) | No code defect found that blocks release; blockers are configuration |
 | Post-release smoke test written | PASS | §6.1 |
 | Monitoring/cleanup ownership explicit | PASS (assigned in §5) / not yet in place | |
@@ -299,6 +303,8 @@ Observation: the “Welcome to my-states.xyz” first-run dialog opens over the 
 ---
 
 ## 3. Findings
+
+> **Historical snapshot (review time, before release).** The external gaps in §3.2 were closed afterwards; see §5 *Done* notes and §6.1a.
 
 ### 3.1 Confirmed defects (code)
 
@@ -325,6 +331,8 @@ IP-based limits (shared networks, IP rotation); no create-only kill switch; no s
 ---
 
 ## 4. Configuration matrix (no secret values)
+
+> **Historical snapshot (review time, before release).** Cells reading "missing" for Production were set later on 2026-11-27 (§5 U1, U2 *Done* notes).
 
 “Verified” means the evidence named; Sensitive values were never read.
 
