@@ -327,10 +327,12 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
 
   // Focus view's fixed height is more than a small player needs once the
   // canvas is zoomed out, and the spare room showed as a band beside the
-  // player: the panel is fitted to the player here as well.
+  // player: the panel is fitted to the player here as well. It depends on the
+  // music's identity, not the object, which is new on every render and would
+  // refit the panel after a resize by hand.
   useLayoutEffect(() => {
     if (focusView) fitPanelToPlayerRef.current()
-  }, [focusView, chosen])
+  }, [focusView, chosen?.kind, chosen?.id])
 
   useLayoutEffect(() => {
     if (!fitAfterHidingRef.current || !searchHidden) return
