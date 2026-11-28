@@ -10,6 +10,9 @@
      block redefines these to scale with the panel; the roles below alias them
      either way, so the ladder is declared in one place. */
   --type-xs: 12px;
+  /* Footer text is one size in every theme and at every panel size, so what
+     fits on a footer line does not depend on the theme or the zoom. */
+  --size-footer-text: 12px;
   --type-sm: 13.5px;
   --type-md: 15px;
   --type-lg: 18px;
@@ -125,7 +128,7 @@
   --font-size-notes-control-label: var(--type-sm);
   --font-size-notes-control: var(--type-md);
   --font-size-notes-selector: var(--type-md);
-  --font-size-notes-footer: var(--type-xs);
+  --font-size-notes-footer: var(--size-footer-text);
   --font-size-notes-editor: var(--type-md);
   --font-size-notes-code-editor: var(--type-md);
   --font-size-notes-toolbar: var(--type-sm);
@@ -314,7 +317,7 @@
   --card-title-size: 20px;
   --card-header-button-size: 32px;
 
-  --card-footer-meta-size: 11px;
+  --card-footer-meta-size: var(--size-footer-text);
   --card-footer-button-size: 24px;
   --size-card-footer-min-height: calc(24px + (var(--space-card-footer-padding-y) * 2));
 
@@ -346,7 +349,7 @@
   /* Panel chrome. */
   --card-title-size: var(--type-xl);
   --card-eyebrow-size: var(--type-xs);
-  --card-footer-meta-size: var(--type-xs);
+  --card-footer-meta-size: var(--size-footer-text);
   --font-size-panel-body: var(--type-md);
   --font-size-panel-label: var(--type-sm);
 
@@ -463,7 +466,7 @@
   --font-size-notes-control-label: var(--type-sm);
   --font-size-notes-control: var(--type-md);
   --font-size-notes-selector: var(--type-md);
-  --font-size-notes-footer: var(--type-xs);
+  --font-size-notes-footer: var(--size-footer-text);
   --font-size-notes-editor: var(--type-md);
   --font-size-notes-code-editor: var(--type-md);
   --font-size-notes-toolbar: var(--type-sm);

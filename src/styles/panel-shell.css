@@ -524,6 +524,8 @@
   min-height: var(--size-card-footer-min-height);
   padding: var(--space-card-footer-padding-y) var(--card-padding);
   border-top: var(--card-border);
+  /* Not the type scale's tracking: footer text keeps one width in every theme. */
+  letter-spacing: normal;
 }
 
 .card-footer-meta {
