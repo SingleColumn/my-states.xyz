@@ -136,7 +136,9 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-panel-header-gap);
-  padding: var(--card-padding);
+  /* Sides keep the panel's padding; top and bottom are tighter so the title
+     strip stays slim however wide the panel is scaled. */
+  padding: calc(var(--card-padding) * 0.55) var(--card-padding);
   border-bottom: var(--card-border);
 }
 
@@ -183,18 +185,18 @@
    stay as easy to hit. The footer's min-height is re-declared on .panel
    because it is computed from the padding there, not at the point of use. */
 :root[data-panel-density="snug"] .card-header {
-  padding-block: calc(var(--card-padding) * 0.7);
+  padding-block: calc(var(--card-padding) * 0.42);
 }
 :root[data-panel-density="snug"] .panel {
-  --space-card-footer-padding-y: 8px;
+  --space-card-footer-padding-y: 4px;
   --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
 }
 :root[data-panel-density="slim"] .card-header {
-  padding-block: calc(var(--card-padding) * 0.4);
+  padding-block: calc(var(--card-padding) * 0.3);
   border-bottom-width: 1px;
 }
 :root[data-panel-density="slim"] .panel {
-  --space-card-footer-padding-y: 5px;
+  --space-card-footer-padding-y: 3px;
   --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
 }
 
@@ -522,6 +524,8 @@
   min-height: var(--size-card-footer-min-height);
   padding: var(--space-card-footer-padding-y) var(--card-padding);
   border-top: var(--card-border);
+  /* Not the type scale's tracking: footer text keeps one width in every theme. */
+  letter-spacing: normal;
 }
 
 .card-footer-meta {

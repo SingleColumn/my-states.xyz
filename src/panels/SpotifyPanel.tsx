@@ -298,7 +298,9 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   function fitPanelToPlayer(): number | undefined {
     const section = sectionRef.current
     const body = bodyRef.current
-    if (!section || !body || !commands.setPanelHeight || focusView || commands.isPanelFullScreen(panelId)) return undefined
+    if (!section || !body || !commands.setPanelHeight || commands.isPanelFullScreen(panelId)) return undefined
+    // Focus view with nothing to play has no player to fit the panel to.
+    if (focusView && (body.querySelector<HTMLElement>('.spotify-player-block')?.offsetHeight ?? 0) === 0) return undefined
     const bodyStyle = getComputedStyle(body)
     let needed = Number.parseFloat(bodyStyle.paddingTop) + Number.parseFloat(bodyStyle.paddingBottom)
     for (const child of body.children) {
@@ -323,6 +325,15 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   const fitPanelToPlayerRef = useRef(fitPanelToPlayer)
   fitPanelToPlayerRef.current = fitPanelToPlayer
 
+  // Focus view's fixed height is more than a small player needs once the
+  // canvas is zoomed out, and the spare room showed as a band beside the
+  // player: the panel is fitted to the player here as well. It depends on the
+  // music's identity, not the object, which is new on every render and would
+  // refit the panel after a resize by hand.
+  useLayoutEffect(() => {
+    if (focusView) fitPanelToPlayerRef.current()
+  }, [focusView, chosen?.kind, chosen?.id])
+
   useLayoutEffect(() => {
     if (!fitAfterHidingRef.current || !searchHidden) return
     fitAfterHidingRef.current = false
@@ -336,7 +347,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // panel the visitor resizes by hand is not pulled back.
   useEffect(() => {
     const block = bodyRef.current?.querySelector<HTMLElement>('.spotify-player-block')
-    if (!searchHidden || heightBeforeHiding === null || !block) return
+    if (!searchHidden || (heightBeforeHiding === null && !focusView) || !block) return
     let lastHeight = block.offsetHeight
     const observer = new ResizeObserver(() => {
       if (block.offsetHeight === lastHeight) return
@@ -345,7 +356,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
     })
     observer.observe(block)
     return () => observer.disconnect()
-  }, [searchHidden, heightBeforeHiding])
+  }, [searchHidden, heightBeforeHiding, focusView])
 
   function hideSearch() {
     fitAfterHidingRef.current = true
@@ -544,6 +555,11 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
   // The line about Spotify's player goes with the player, above it. Only the
   // panel's own cover, shown when the player could not load, keeps it under
   // itself; the focus view keeps it in the footer.
+  // One line in the footer, cut with "…" when it is long; the whole text is
+  // the tooltip, so nothing is lost when it is cut.
+  const footerMeta = focusView
+    ? view.nextStep ?? loadedMusicLabel(shownSong, shownPlaylist.name)
+    : shownSong?.name ?? shownPlaylist.name ?? 'No playlist loaded'
   const noteWithPlayer = view.nextStep !== null && !focusView && view.middle !== 'cover'
 
   // The one action that goes with the line about Spotify's player, when there
@@ -858,8 +874,8 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
       </div>
 
       <footer className="card-footer" {...panelContentProps}>
-        <span className="card-footer-meta" role={focusView && view.nextStep ? 'status' : undefined}>
-          {focusView ? view.nextStep ?? loadedMusicLabel(shownSong, shownPlaylist.name) : shownSong?.name ?? shownPlaylist.name ?? 'No playlist loaded'}
+        <span className="card-footer-meta" role={focusView && view.nextStep ? 'status' : undefined} title={footerMeta}>
+          {footerMeta}
         </span>
         <div className="card-footer-status">
           {focusView ? embedHelp : null}
@@ -876,7 +892,7 @@ export function SpotifyPanel({ panelId }: { panelId: string }) {
                   the suggestions or results before anything is chosen. */}
               {view.login === 'footer' ? (
                 <a className="spotify-footer-link" href={SPOTIFY_LOGIN_URL} target="_blank" rel="noopener noreferrer" onClick={leaveToLogIn} title="Opens Spotify's login page in a new tab">
-                  Log in to Spotify
+                  {focusView ? 'Log in' : 'Log in to Spotify'}
                 </a>
               ) : null}
             </>

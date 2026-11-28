@@ -191,7 +191,7 @@
    text's own margins, so lines are as wide as in the panel and break in the same
    places. */
 :root[data-moment-view] .notes-editor-content {
-  padding-inline: calc(var(--card-padding) + var(--space-panel-body-x) + var(--border-width-hairline));
+  padding-inline: calc(var(--card-padding) * 0.5 + var(--space-panel-body-x) * 0.5 + var(--border-width-hairline));
 }
 
 /* Its scroll bar and the prompt in an empty line are both for someone writing,

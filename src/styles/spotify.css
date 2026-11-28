@@ -17,21 +17,17 @@
   --size-control-icon: 16px;
   --size-primary-icon: 18px;
   --space-row-bottom: 8px;
-  justify-content: center;
+  /* Starts at the top, so the player sits right under the header. Centred, the
+     room the panel has beyond the player's height split into a band above it
+     (the margin under the header) and one below. */
+  justify-content: flex-start;
   overflow: auto;
 }
 
-/* The body centres what it holds, so a gap under the last part would show
-   as extra room under it rather than as space between parts. */
 .panel-spotify-surface.is-focus-view .panel-body > :last-child {
   margin-bottom: 0;
 }
 
-/* The footer is the only place the focus view names the playlist, so a long
-   name wraps there instead of being cut off. */
-.panel-spotify-surface.is-focus-view .card-footer-meta {
-  white-space: normal;
-}
 
 .album-frame-empty {
   background: var(--background-album-empty);
@@ -429,12 +425,18 @@
   text-align: center;
 }
 
+/* When the framed player is the first thing under the header, the body's own
+   top padding would stack on the frame's: the frame alone gives the space. */
+.panel-spotify-surface .panel-body:has(> .spotify-player-block.is-framed:first-child) {
+  padding-top: 0;
+}
+
 .spotify-player-block.is-framed {
-  padding: var(--space-playlist-gap);
+  padding: calc(var(--space-playlist-gap) * 0.5);
   /* The player's own corner plus the padding round it, so the two curves run
      side by side, an even gap apart. The player sets its corner here in the
      panel's pixels, since it keeps one size on screen at every zoom. */
-  border-radius: calc(var(--spotify-player-radius, 12px) + var(--space-playlist-gap));
+  border-radius: calc(var(--spotify-player-radius, 12px) + var(--space-playlist-gap) * 0.5);
 }
 
 /* Room above and below the login line, so it is not pressed against the
@@ -464,8 +466,12 @@
   justify-self: center;
 }
 
+/* The player block pushes itself to the foot of the panel (auto margin) so it
+   sits under any results; with no results in focus view that left the free
+   room above it, as a wide band under the header. */
 .panel-spotify-surface.is-focus-view .spotify-player-block {
   padding-top: 0;
+  margin-block: 0;
 }
 
 /* The card's login is a link styled as its second button. */
