@@ -85,11 +85,14 @@ body:has(.board-actions-menu, .board-picker-menu, .add-panel-menu) :is(.word-gra
 }
 
 .app-chrome {
-  display: grid;
-  grid-template-areas: "identity boards canvas spacer tldraw";
-  grid-template-columns: auto auto auto minmax(8px, 1fr) auto;
+  /* Groups keep their natural width and wrap to a new row when they don't fit.
+     Window-width breakpoints can't know how wide a theme's font makes the
+     labels, so a grid here squeezed the groups into each other. */
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   column-gap: var(--space-app-chrome-group-gap);
+  row-gap: var(--space-top-toolbar-gap);
   width: calc(100% - 2 * var(--space-top-toolbar-edge));
   min-height: var(--size-top-toolbar-height);
   margin: var(--space-top-toolbar-edge);
@@ -487,8 +490,16 @@ body:has(.board-actions-menu, .board-picker-menu, .add-panel-menu) :is(.word-gra
 }
 
 .app-chrome-spacer {
-  grid-area: spacer;
+  flex: 1 1 8px;
+  min-width: 8px;
 }
+
+.app-chrome-identity,
+.app-chrome-boards,
+.app-chrome-canvas { flex: 0 0 auto; }
+
+/* Stays on the right, also when it wraps onto a row of its own. */
+.app-chrome-tldraw { flex: 0 0 auto; margin-left: auto; }
 
 .canvas-control-label-short {
   display: none;

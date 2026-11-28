@@ -81,7 +81,7 @@
 
 @container panel-shell (max-height: 520px) {
   .panel {
-    --space-panel-body-top: 8px;
+    --space-panel-body-top: 4px;
     --space-panel-body-bottom: 8px;
     --space-row-bottom: var(--space-divider-inset);
     --space-now-playing-bottom: var(--space-divider-inset);

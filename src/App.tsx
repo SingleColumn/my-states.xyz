@@ -448,7 +448,12 @@ function AppContent() {
       previousPanelGeometryRef.current.delete(panelId)
       setFullScreenPanelId(null)
       const layout = applyPanelFocusViewSize(panelShapeToLayout(shape), panel.type)
-      writePanelShape(editor, panelId, { x: layout.x, y: layout.y, props: { w: layout.w, h: layout.h } })
+      // The panel changes width in place, so one that sat near the window's
+      // right edge would run off it: slide it back until it is in view.
+      const view = editor.getViewportPageBounds()
+      const inset = 12 / editor.getZoomLevel()
+      const x = Math.max(view.minX + inset, Math.min(layout.x, view.maxX - inset - layout.w))
+      writePanelShape(editor, panelId, { x, y: layout.y, props: { w: layout.w, h: layout.h } })
       editor.bringToFront([shape.id])
     })
   }, [])

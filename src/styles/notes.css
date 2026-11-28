@@ -23,7 +23,8 @@
    a note is open -- and a row template has to be rewritten for each of
    those. Everything above the writing takes its own height; the writing
    takes what is left. */
-.notes-body {
+.panel-body.notes-body {
+  padding-inline: calc(var(--space-panel-body-x) * 0.5);
   /* Scale the reading measure with the writer's chosen text size rather than
      fixing it in pixels. The wider 68em surface gives long-form prose room
      to breathe while remaining capped by the panel on smaller screens. */
@@ -135,7 +136,8 @@
 
 .notes-editor-content {
   min-height: 100%;
-  padding: var(--card-padding);
+  /* Side margins about as narrow as the Images panel's picture frame. */
+  padding: calc(var(--card-padding) * 0.6) calc(var(--card-padding) * 0.5);
   color: var(--color-input-text);
   font-size: var(--notes-editor-font-size, var(--font-size-notes-editor));
   line-height: var(--notes-editor-line-height, var(--line-height-rich-content));

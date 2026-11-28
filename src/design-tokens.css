@@ -81,7 +81,7 @@
   --size-board-menu-min-width: 190px;
   --size-canvas-menu-min-width: 220px;
   --space-card-eyebrow-bottom: 4px;
-  --space-card-footer-padding-y: 12px;
+  --space-card-footer-padding-y: 6px;
   --size-form-select: 160px;
   /* Enough to hold "Playlist" and its arrow once the select is sized by the
      button below it rather than by this width. */
@@ -183,17 +183,17 @@
   --line-height-track-meta: 1.35;
   --line-height-code: 1.55;
 
-  --space-panel-header-gap: 12px;
-  --space-panel-body-x: 16px;
-  --space-panel-body-top: 14px;
-  --space-panel-body-bottom: 16px;
+  --space-panel-header-gap: 8px;
+  --space-panel-body-x: 10px;
+  --space-panel-body-top: 4px;
+  --space-panel-body-bottom: 10px;
   --space-control-gap: 10px;
   --space-control-inner-gap: 8px;
-  --space-top-toolbar-edge: 6px;
-  --space-top-toolbar-gap: 5px;
-  --space-app-chrome-group-gap: 16px;
-  --space-top-toolbar-padding-block: 5px;
-  --space-top-toolbar-padding-inline: 14px;
+  --space-top-toolbar-edge: 3px;
+  --space-top-toolbar-gap: 4px;
+  --space-app-chrome-group-gap: 10px;
+  --space-top-toolbar-padding-block: 3px;
+  --space-top-toolbar-padding-inline: 10px;
   --space-toast-top: 22px;
   --space-toast-padding-y: 12px;
   --space-toast-padding-x: 14px;
@@ -247,8 +247,8 @@
   --canvas-pattern-grid: linear-gradient(var(--color-canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-canvas-grid) 1px, transparent 1px);
   --canvas-pattern-lines: linear-gradient(var(--color-canvas-grid) 1px, transparent 1px);
   --canvas-pattern-dots: radial-gradient(circle, var(--color-canvas-grid) 1.5px, transparent 2.5px);
-  --size-top-toolbar-height: 44px;
-  --size-top-toolbar-control: 32px;
+  --size-top-toolbar-height: 34px;
+  --size-top-toolbar-control: 28px;
   --size-board-selector-width: 260px;
   --size-tldraw-control-button: var(--size-top-toolbar-control);
   --size-tldraw-page-selector-width: 112px;
@@ -315,8 +315,8 @@
   --card-header-button-size: 32px;
 
   --card-footer-meta-size: 11px;
-  --card-footer-button-size: 26px;
-  --size-card-footer-min-height: calc(26px + (var(--space-card-footer-padding-y) * 2));
+  --card-footer-button-size: 24px;
+  --size-card-footer-min-height: calc(24px + (var(--space-card-footer-padding-y) * 2));
 
 }
 
@@ -361,8 +361,8 @@
   /* Images. */
   --image-panel-label-size: var(--type-sm);
   --image-panel-status-size: var(--type-md);
-  --card-header-button-size: clamp(30px, min(7cqi, 5.4cqb), 260px);
-  --card-footer-button-size: clamp(26px, min(5.8cqi, 4.6cqb), 210px);
+  --card-header-button-size: clamp(26px, min(5cqi, 4cqb), 30px);
+  --card-footer-button-size: clamp(22px, min(4.4cqi, 3.6cqb), 26px);
   --size-card-footer-min-height: calc(var(--card-footer-button-size) + (var(--space-card-footer-padding-y) * 2));
   --size-play-button: clamp(44px, min(10cqi, 8cqb), 380px);
   --size-input-height: clamp(34px, min(7.5cqi, 4.4cqb), 260px);
@@ -370,10 +370,10 @@
   --size-primary-icon: clamp(18px, min(3.8cqi, 3cqb), 150px);
 
   --card-padding: clamp(12px, min(3.2cqi, 2.6cqb), 130px);
-  --space-panel-header-gap: clamp(8px, min(2.2cqi, 1.8cqb), 90px);
-  --space-panel-body-x: clamp(12px, min(3cqi, 2.4cqb), 120px);
-  --space-panel-body-top: clamp(10px, min(2.5cqi, 2cqb), 100px);
-  --space-panel-body-bottom: clamp(12px, min(2.8cqi, 2.2cqb), 110px);
+  --space-panel-header-gap: clamp(6px, min(1.6cqi, 1.3cqb), 64px);
+  --space-panel-body-x: clamp(8px, min(2cqi, 1.6cqb), 80px);
+  --space-panel-body-top: clamp(3px, min(0.8cqi, 0.6cqb), 30px);
+  --space-panel-body-bottom: clamp(8px, min(1.8cqi, 1.4cqb), 70px);
   --space-control-gap: clamp(8px, min(2cqi, 1.6cqb), 80px);
   --space-control-inner-gap: clamp(6px, min(1.6cqi, 1.3cqb), 64px);
   --space-input-row-top: clamp(7px, min(1.8cqi, 1.45cqb), 72px);
