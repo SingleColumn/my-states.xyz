@@ -12,9 +12,11 @@ Status labels: **PASS** (observed or proven for the stated scope), **FAIL** (obs
 
 ## 0. Verdict
 
-**Ready after explicitly listed configuration** — the committed candidate's code passed every live, unit and build check run here, and no release-blocking code defect was found. Production is **not** configured: three required Production variables, the Production upload Worker, and a working cleanup schedule do not exist yet, and cleanup has never completed successfully in any environment. The configuration in §5 (items U1–U8, plus Codex item C1) must be done, and the Preview cleanup run (U3) observed succeeding, before merging to `main`. Production behaviour itself is unverified until the post-release smoke test in §6 passes.
+**Released to Production; post-release smoke test passed (updated 2026-11-27, 17:14 UTC).** At the time of the original review Production was not configured. Since then every item in §5 that gated release has been done (Worker, Production variables, Preview cleanup, bucket CORS), PR #26 was merged and the §6.1 smoke test passed on Production. Its one failure, the first scheduled cleanup run (HTTP 415), was fixed in PR #27 (merged 15:39:47Z, deployed 15:41Z). The next hourly run, at 16:14:49Z, **succeeded**, and `trial/cleanup-state-v1.json` now exists in the Production bucket (§6.1a step 8). Not yet done: the optional items U4, U8, C2 and C3 in §5, and limitations listed in §3 remain as written. Browser coverage is Chromium only.
 
-**Single next action:** ~~Codex adds a tracked `worker/wrangler.production.jsonc` (C1)~~ — written and dry-run validated, not yet committed. Next: commit it, then the user deploys it (U1) to obtain the Production `BOARD_SHARE_UPLOAD_ORIGIN` that every other Production step depends on.
+**How to read the rest of this document.** Sections 1 to 4 and 7 record the state found during the review on 2026-11-27, 11:20 to 12:00 UTC, **before any Production configuration or release**. They were not rewritten, so results such as "Production variables missing", "cleanup has never succeeded" and "Production configuration ready: FAIL" describe that moment, not today. The current state is in the *Done* notes in §5 and the results in §6.1a. Where the two differ, §5 and §6.1a win.
+
+**Single next action:** none blocks the release. Recommended next: add monitoring that detects a failing or missing cleanup run. The existing alert (U4, `BOARD_SHARE_CLEANUP_ALERT_URL`) fires only for responses of 500 or above, and a missed run never reaches the handler, so U4 alone would not have caught the 415. Pair it with C3 (alert on 4xx and compare `lastSuccessAt`), or check Vercel Schedules executions and `trial/cleanup-state-v1.json` by hand until then (U10 names who does that).
 
 ---
 
@@ -85,6 +87,8 @@ Test bucket after cleanup: 26 objects (identical count to before the review). Th
 
 ## 2. Checklist
 
+> **Historical snapshot (review time, before release).** Results below were true at 11:20 to 12:00 UTC on 2026-11-27. See §5 *Done* notes and §6.1a for the current state.
+
 ### 2.1 Release candidate (prompt §1)
 
 | Check | Result | Evidence |
@@ -140,7 +144,7 @@ Behaviour that necessarily remains for after release: canonical-origin link gene
 | Independent Preview/Production credentials | PASS (policy) / UNVERIFIED (values) | Cloudflare has separate account tokens `my-states-board-sharing-test` and `…-production`, each scoped to its own bucket only. Vercel stores the R2 key/secret as *Sensitive* (unreadable); which token each Vercel value belongs to cannot be read without disclosure. Production values were created 08:09 UTC, eight minutes after the Production token was issued (consistent, not proof). |
 | Independent signing secrets | N/A until Production key exists | |
 | Values that must match across surfaces | PASS (identified) | Per environment: Vercel `BOARD_SHARE_R2_BUCKET` = Worker `BOARD_SHARES` bucket (Preview: both `my-states-board-sharing-test` ✔); Vercel `BOARD_SHARE_ALLOWED_ORIGIN` = Worker `BOARD_SHARE_ALLOWED_ORIGIN` (Preview: identical ✔) = R2 CORS origin; Vercel `BOARD_SHARE_UPLOAD_ORIGIN` = Worker URL (Preview ✔); `CRON_SECRET` = `BOARD_SHARE_SESSION_SIGNING_KEY`. |
-| `CRON_SECRET` equality established from code | PASS | `boardShareCleanup.ts` forwards the request unchanged to the cleanup action; `hasOperationsKey()` accepts only `Bearer <64 lowercase hex>` and constant-time compares the decoded bytes with `BOARD_SHARE_SESSION_SIGNING_KEY`. Vercel sends `Authorization: Bearer <CRON_SECRET>` (*docs*). So `CRON_SECRET` must equal the signing key in lowercase-hex form. |
+| `CRON_SECRET` equality established from code | PASS | `boardShareCleanup.ts` forwards the method and `Authorization` header to the cleanup action (`scheduledCleanupRequest`; the original version copied the whole request, which caused the 415 in §6.1a step 8); `hasOperationsKey()` accepts only `Bearer <64 lowercase hex>` and constant-time compares the decoded bytes with `BOARD_SHARE_SESSION_SIGNING_KEY`. Vercel sends `Authorization: Bearer <CRON_SECRET>` (*docs*). So `CRON_SECRET` must equal the signing key in lowercase-hex form. |
 | Secret equality compared safely | N/A — **`CRON_SECRET` does not exist in any environment** | The live Preview invocation returned 401 (§2.10). |
 | Deployment created after variable changes | PASS (Preview) / N/A (Production) | Last Preview sharing variable change 2026-11-26T11:57:58Z < Preview deployment 20:23:09Z. Production variables (2026-11-27) post-date the current Production deployment; the release deployment must be created after all U-items. |
 
@@ -289,7 +293,7 @@ Observation: the “Welcome to my-states.xyz” first-run dialog opens over the 
 | Check | Result | Evidence |
 |---|---|---|
 | Tests/build pass for committed candidate | PASS | §1.4 |
-| Production configuration ready | **FAIL** | §5 |
+| Production configuration ready | **FAIL at review time; done since** | §5 *Done* notes, §6.1a |
 | No unresolved release-blocking defect | PASS (code) | No code defect found that blocks release; blockers are configuration |
 | Post-release smoke test written | PASS | §6.1 |
 | Monitoring/cleanup ownership explicit | PASS (assigned in §5) / not yet in place | |
@@ -299,6 +303,8 @@ Observation: the “Welcome to my-states.xyz” first-run dialog opens over the 
 ---
 
 ## 3. Findings
+
+> **Historical snapshot (review time, before release).** The external gaps in §3.2 were closed afterwards; see §5 *Done* notes and §6.1a.
 
 ### 3.1 Confirmed defects (code)
 
@@ -325,6 +331,8 @@ IP-based limits (shared networks, IP rotation); no create-only kill switch; no s
 ---
 
 ## 4. Configuration matrix (no secret values)
+
+> **Historical snapshot (review time, before release).** Cells reading "missing" for Production were set later on 2026-11-27 (§5 U1, U2 *Done* notes).
 
 “Verified” means the evidence named; Sensitive values were never read.
 
@@ -360,7 +368,7 @@ Order matters where noted. “Codex” = code/config-file changes in the repo; �
 |---|---|---|---|
 | C1 | Codex | **Written 2026-11-27, not yet committed.** `worker/wrangler.production.jsonc`: name `my-states-board-upload`, `main ./boardShareUpload.mjs`, compatibility date 2026-11-01, `workers_dev: true`, `BOARD_SHARES` → `my-states-board-sharing-production`, `BOARD_SHARE_ALLOWED_ORIGIN = "https://www.my-states.xyz"`. Preview config unchanged. `npx wrangler@4.168.0 deploy --dry-run` (nothing uploaded) listed exactly those two bindings for Production and the unchanged test-bucket bindings for Preview. | Done: the dry run shows it cannot bind the test bucket |
 | U1 | User (after C1) | `npx wrangler deploy --config worker/wrangler.production.jsonc`; record version ID and workers.dev URL. Check with `curl -X OPTIONS <url>/upload/<48 zeros> -H "Origin: https://www.my-states.xyz" -H "Access-Control-Request-Method: PUT"` → 204 with exact origin. **Done 2026-11-27T13:27:33Z:** `my-states-board-upload`, version `17c6caa2-5686-418e-aa6c-bfbacb80be2a` (100 %), origin `https://my-states-board-upload.my-states-xyz.workers.dev`. Checked 13:28Z: bindings are `BOARD_SHARES` → `my-states-board-sharing-production` and origin `https://www.my-states.xyz`; deployed source SHA-256 `6aef218a…ffe4` (identical to the reviewed Worker); preflight from `www` 204 with exact origin, `PUT`, `Authorization, Content-Type`; preflight from the Preview origin and from the apex 403; forged token 403. | Done |
-| U2 | User | In Vercel Production: set `BOARD_SHARE_UPLOAD_ORIGIN` = U1's URL (no trailing slash); generate a new 32-byte random key as 64 lowercase hex and set it as both `BOARD_SHARE_SESSION_SIGNING_KEY` and `CRON_SECRET` (Sensitive). Do not reuse the Preview key. | **Done 2026-11-27:** signing key 13:34Z and `CRON_SECRET` 13:37Z (Sensitive, Production only, set by the user); `BOARD_SHARE_UPLOAD_ORIGIN` 13:40Z = `https://my-states-board-upload.my-states-xyz.workers.dev` (read back exactly). All eight Production sharing variables present once each. Equality of the two Sensitive values is proved only by the first successful Production cleanup run (§6.1 step 8). |
+| U2 | User | In Vercel Production: set `BOARD_SHARE_UPLOAD_ORIGIN` = U1's URL (no trailing slash); generate a new 32-byte random key as 64 lowercase hex and set it as both `BOARD_SHARE_SESSION_SIGNING_KEY` and `CRON_SECRET` (Sensitive). Do not reuse the Preview key. | **Done 2026-11-27:** signing key 13:34Z and `CRON_SECRET` 13:37Z (Sensitive, Production only, set by the user); `BOARD_SHARE_UPLOAD_ORIGIN` 13:40Z = `https://my-states-board-upload.my-states-xyz.workers.dev` (read back exactly). All eight Production sharing variables present once each. Equality of the two Sensitive values is proved by the first successful Production cleanup run (§6.1 step 8): **confirmed** by run `schx_02GRPTZ95J46ECXHG1YCHD20HK` at 16:14:49Z. |
 | U3 | User | In Vercel Preview (branch `experiment/board-sharing`): set `CRON_SECRET` to the Preview signing key (or rotate both to a new identical lowercase-hex value), redeploy the branch, then `vercel schedules invoke board-share-cleanup --git-branch experiment/board-sharing` and `vercel schedules executions list …`. | **Execution succeeds**; `trial/cleanup-state-v1.json` appears in the test bucket; expired test archives disappear over subsequent runs. If it still fails with 401 while the values match, Deployment Protection is blocking the schedule — stop and report. **Done 2026-11-27:** Preview key and `CRON_SECRET` replaced together; redeploy `dpl_bu8oBAq24zrSXoViEe5waNt1zJK3` (`b810fc1`, 13:48Z); manual run `schx_0Z2PVV220J67G1JT79EBX5JV8J` at 13:54Z **succeeded** (4.6 s); `trial/cleanup-state-v1.json` written with `lastSuccessAt` 13:54:17Z and no backlog; three expired test shares marked `expired` and their archives/staging removed. Vercel Deployment Protection does not block Preview schedule runs. Hourly Preview schedule enabled 13:59Z (`active`, no end date). |
 | U4 | User | Optional, recommended: create an HTTPS incoming webhook for each environment and set `BOARD_SHARE_CLEANUP_ALERT_URL`; redeploy. | Controlled failure delivers one generic event |
 | U5 | User | Remove the obsolete Preview `BOARD_SHARE_CREATOR_PASSWORD_HASH`. | Absent from env list |
@@ -409,7 +417,7 @@ Run 14:39–14:46 UTC by the reviewer, Playwright Chromium 153 headless, 1440×9
 | 5 Network/CORS | PASS | Recipient R2 `GET` 200 from bucket `my-states-board-sharing-production`, `Access-Control-Allow-Origin: https://www.my-states.xyz`. No CORS errors. |
 | 6 Library image | PASS | Share B: collection chosen from the Images panel; creator image served from `library.endlessmoment.xyz` (all library requests 200, so library CORS for `www` works); recipient image imported as `blob:`. |
 | 7 Analytics | PASS | Headless Chromium is filtered out as a bot by both PostHog and Vercel Analytics, so the payload check reopened share A in a context presenting as ordinary Chrome (user agent, brand list and `navigator.webdriver` corrected). 5 analytics requests decoded: PostHog `$pageview` ×2, `$$heatmap`, `$web_vitals` (`eu.i.posthog.com`) and Vercel `/_vercel/insights/view` ×2. `$current_url`, `$pathname`, `$session_entry_url`, `$session_entry_pathname` and Vercel `o` all read `…/share/:id`; after an onward navigation the session-entry properties stay redacted. Neither the full ID nor its first 12 characters appeared in any URL, header or body. This sent a few real test events to Production analytics. |
-| 8 Schedule | **FAIL → fix in review** | `board-share-cleanup` created for Production at 14:39:34Z, active, hourly, `POST /api/boardShareCleanup`. First scheduled run `schx_3HSTGKB4CD04WS0Z4JXM26B8RJ` at 15:14:49Z **failed with HTTP 415** (“JSON Content-Type is required”). The key check runs before that point, so **Production `CRON_SECRET` does equal the signing key**. Cause: the route copied the whole incoming request into the cleanup action, and the scheduler's empty body reached the JSON-body check instead of the scheduled-cleanup branch. Preview's runs at 14:14Z and 15:14Z returned 200 on the same code, because its request carried no body at all. Unit tests reproduce it: with the old forwarding, 4 of 5 empty-body request shapes fail, including `Content-Length: 0`, because copying a request drops that header. Fix on branch `fix/scheduled-cleanup-request`: the scheduled route forwards only the method and the `Authorization` header (`api/_lib/scheduledCleanup.ts`). Not yet deployed. Until it is, Production cleanup does not run: expired links are still refused by the server, but their files stay in R2 (staging files are removed after 2 days by the lifecycle rule). |
+| 8 Schedule | **PASS after fix (initial run FAILED)** | `board-share-cleanup` created for Production at 14:39:34Z, active, hourly, `POST /api/boardShareCleanup`. First scheduled run `schx_3HSTGKB4CD04WS0Z4JXM26B8RJ` at 15:14:49Z **failed with HTTP 415** (“JSON Content-Type is required”). The key check runs before that point, so **Production `CRON_SECRET` does equal the signing key**. Cause: the route copied the whole incoming request into the cleanup action, and the scheduler's empty body reached the JSON-body check instead of the scheduled-cleanup branch. Preview's runs at 14:14Z and 15:14Z returned 200 on the same code, because its request carried no body at all. Unit tests reproduce it: with the old forwarding, 4 of 5 empty-body request shapes fail, including `Content-Length: 0`, because copying a request drops that header. Fix (PR #27, merged 15:39:47Z as `00f9dd441dcec0bf7530db5f2787537a07a90659`): the scheduled route forwards only the method and the `Authorization` header (`api/_lib/scheduledCleanup.ts`). Production deployment `music-images-canvas-3kgg94nuu` built from that merge, READY 15:41:20Z. **Verified 2026-11-27 17:14Z:** the next scheduled run `schx_02GRPTZ95J46ECXHG1YCHD20HK` at 16:14:49Z **succeeded** (`invokeSource: scheduled`), and `trial/cleanup-state-v1.json` exists in `my-states-board-sharing-production` with `lastSuccessAt` 16:14:51Z (no other content). This also proves that Production `CRON_SECRET` equals the signing key, since the key check precedes the cleanup. Between 14:39Z and 15:41Z no Production cleanup ran; no expired share was affected in that window. The 17:14Z run had not yet appeared when checked, which is within the documented schedule jitter. |
 | 9 Cleanup auth | PASS | Unauthenticated `POST /api/boardShareCleanup` → 401; create from the apex origin → 403. |
 | 10 Isolation | PASS | Production bucket: exactly the two smoke shares (status, archive, staging each) and the two usage ledgers. Test bucket: 23 objects, last modified 14:14:54Z (Preview cleanup), untouched during 14:41–14:46Z. |
 
@@ -431,7 +439,7 @@ Smoke-test objects: two Production shares created 14:42–14:43Z remain in `my-s
 |---|---|
 | F1 analytics ID disclosure | Fixed in source (unit); live payload UNVERIFIED (§2.11) |
 | F2 upload size not enforced | **Fixed and verified live** on the real Worker + R2 test bucket (§2.6) |
-| F3 no scheduled cleanup | Code fixed; **configuration missing**, never succeeded (§2.10) |
+| F3 no scheduled cleanup | **Fixed and verified:** Preview cleanup succeeded 13:54Z (§5 U3); Production cleanup succeeded 16:14Z after PR #27 (§6.1a step 8) |
 | F4 unbounded API body | **Fixed and verified live** on Preview (§2.7) |
 | F5 theme outlives failed import | Fixed (unit) |
 | P1 production settings/provenance | Provenance now verified; Production settings incomplete (§5) |
